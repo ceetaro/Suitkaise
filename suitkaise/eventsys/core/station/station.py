@@ -58,6 +58,7 @@ from suitkaise.eventsys.data.enums.enums import (
 )
 from suitkaise.eventsys.events.base_event import Event
 import suitkaise.eventsys.keyreg.keyreg as keyreg
+import suitkaise.eventsys.keyreg.compress_keys as compress_keys
 
 class Station(ABC):
     """
@@ -608,24 +609,71 @@ class Station(ABC):
             
     def _low_compression(self, events: List[Event]) -> None:
         """
-        Pass until more data is available.
+        Apply low level compression to events designated as
+        'low_compress_events' in the compress_events() method.
+
+        Args:
+            events (List[Event]): the events to compress at low level
         
         """
-        pass
+        for event in events:
+            for key in event.data:
+                if keyreg.is_registered(key):
+                    key_name = key.__name__
+                    value = event.data[key]
+                    compressed = compress_keys.compress(key_name, value, 
+                                                        CompressionLevel.LOW)
+                else:
+                    print(f"Key '{key}' not registered with keyreg.")
+
+                event.data[key] = key
 
     def _normal_compression(self, events: List[Event]) -> None:
         """
-        Pass until more data is available.
+        Apply normal level compression to events designated as
+        'normal_compress_events' in the compress_events() method.
+
+        Args:
+            events (List[Event]): the events to compress at normal level
 
         """
-        pass
+        for event in events:
+            for key in event.data:
+                if keyreg.is_registered(key):
+                    key_name = key.__name__
+                    value = event.data[key]
+                    compressed = compress_keys.compress(key_name, value, 
+                                                        CompressionLevel.NORMAL)
+                else:
+                    print(f"Key '{key}' not registered with keyreg.")
+
+                event.data[key] = key
+        
 
     def _high_compression(self, events: List[Event]) -> None:
         """
-        Pass until more data is available.
+        Apply high level compression to events designated as
+        'high_compress_events' in the compress_events() method.
+
+        Args:
+            events (List[Event]): the events to compress at high level
 
         """
-        pass
+        for event in events:
+            for key in event.data:
+                if keyreg.is_registered(key):
+                    key_name = key.__name__
+                    value = event.data[key]
+                    compressed = compress_keys.compress(key_name, value, 
+                                                        CompressionLevel.HIGH)
+                    if compressed is None:
+                        if keyreg.is_optional(key):
+                            event.data.pop(key, None)
+
+                else:
+                    print(f"Key '{key}' not registered with keyreg.")
+
+                event.data[key] = key
 
     #
     # EVENT RETRIEVAL METHODS

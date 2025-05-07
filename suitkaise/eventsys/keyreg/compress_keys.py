@@ -127,9 +127,10 @@ class CompressedData:
                 f"ratio={self.compression_ratio:.2f}x\n")
     
 
-def compress(data: Any,
-             level: CompressionLevel = CompressionLevel.NORMAL,
-             key: str = None) -> Union[CompressedData, FunctionInstance]:
+def compress(key: str,
+             data: Any,
+             level: CompressionLevel = CompressionLevel.NORMAL
+             ) -> Union[CompressedData, FunctionInstance]:
     """
     Compress data using the appropriate strategy, based on data type and compression
     level.
@@ -245,13 +246,12 @@ def select_compression_strategy(data: Any,
         CompressStrat: The selected compression strategy.
     
     """
+    if has_specialized_compression(data):
+        return CompressStrat.SPECIALIZED
+
     # check if a replacement function is available for this key
     if keyreg.is_registered(key) and keyreg.has_replacement_function(key):
         return CompressStrat.FUNCTION
-    
-    # check for optional keys at high level
-    if key and level == CompressionLevel.HIGH and keyreg.is_optional(key):
-        return CompressStrat.REMOVE
     
     # simple types that don't need compression
     if isinstance(data, (int, float, bool, complex, type(None))):
@@ -265,16 +265,18 @@ def select_compression_strategy(data: Any,
     if isinstance(data, str) and len(data) > 100:
         return CompressStrat.GZIP
     
+    # check for optional keys at high level
+    if key and level == CompressionLevel.HIGH and keyreg.is_optional(key):
+        return CompressStrat.REMOVE
+    
     # binary data, use zlib
     if level == CompressionLevel.NORMAL or level == CompressionLevel.LOW:
         return CompressStrat.ZLIB
-    
     # high compression, use lzma
-    if level == CompressionLevel.HIGH:
+    elif level == CompressionLevel.HIGH:
         return CompressStrat.LZMA
     
-    if has_specialized_compression(data):
-        return CompressStrat.SPECIALIZED
+
     
     print(f"No conditions met, using strategy CompressStrat.NONE")
     return CompressStrat.NONE
@@ -404,7 +406,6 @@ def specialized_decompression(data: bytes, original_type: type) -> Any:
     # For now, we will just return the original data as is
     print(f"Specialized decompression not implemented, just unpickling data\n")
     return pickle.loads(data)
-
         
 
     

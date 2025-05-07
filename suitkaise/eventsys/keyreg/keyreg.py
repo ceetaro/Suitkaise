@@ -493,11 +493,11 @@ def initialize_key_registries() -> None:
 
 
 def register(key: str,
-                 key_user: Optional[str],
-                 value_type: Union[Type, Tuple[Type, ...], List[Type], AnyType],
-                 validator: Optional[Callable[[Any], bool]] = None,
-                 is_optional: bool = False,
-                 description: Optional[str] = None) -> None:
+             key_user: Optional[str],
+             value_type: Union[Type, Tuple[Type, ...], List[Type], AnyType],
+             validator: Optional[Callable[[Any], bool]] = None,
+             is_optional: bool = False,
+             description: Optional[str] = None) -> None:
     """
     Register a key with the EventKeyRegistry and optionally the OptionalKeyRegistry.
 
