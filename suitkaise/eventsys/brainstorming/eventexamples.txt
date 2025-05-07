@@ -1,0 +1,204 @@
+event system
+
+uses context managers to handle event processing
+
+with MyEvent() as event:
+    self.value = self._get_value()
+    if self.value:
+        event.success() sets event.state to True
+    else:
+        event.failure() sets event.state to False
+
+block exits
+event now has a success or failure state
+before exiting the block, the event is processed
+event.post(event.state)
+
+the context manager automatically handles the event processing
+
+
+manual collection of events
+with MyEvent.collect() as event:
+or...
+with MyEvent.collect([YourEvent, ThirdEvent]) as event:
+
+   with YourEvent() as event1:
+       self.value = self._get_value()
+       if self.value:
+           event.success() sets event.state to True
+       else:
+           event.failure() sets event.state to False
+
+   with ThirdEvent() as event2:
+       self.value2 = self._get_value2()
+       if self.value2:
+           event.success() sets event.state to True
+       else:
+           event.failure() sets event.state to False
+
+MyEvent.collect() has collected the events in the block
+now, it checks the state of each event
+if all events are successful, MyEvent.success() is called
+otherwise, MyEvent.failure() is called
+
+we can also use a couple of neat tricks.
+
+manual collection of events
+with MyEvent.collect() as event: can default
+or...
+with MyEvent.collect([YourEvent.invert, ThirdEvent.optional]) as event:
+
+   with YourEvent() as event1:
+       self.value = self._get_value()
+       if self.value:
+           event1.success() sets event.state to True
+       else:
+           event1.failure() sets event.state to False
+
+
+  if not self.value2:
+       with ThirdEvent() as event2:
+           self.value2 = self._get_value2()
+           if self.value2:
+               event2.success() sets event.state to True
+           else:
+               event2.failure() sets event.state to False
+
+
+MyEvent.collect() has collected the events in the block
+now, it checks the state of each event and updates its own
+state accordingly. 
+
+It sees that YourEvent is inverted, so it checks the state of YourEvent
+and sets YourEvents state to False if it is True, and True if it is False
+
+The order of the events in the .collect arg list
+does not matter, unless...
+
+another trick: AnyEvent class
+
+with MyEvent.collect([AnyEvent.invert, AnyEvent, AnyEvent.optional]) as event:
+
+   with FirstEvent() as event1:
+       self.value = self._get_value()
+       if self.value:
+           event1.success() sets event.state to True
+       else:
+           event1.failure() sets event.state to False
+
+   with SecondEvent() as event2:
+       self.value2 = self._get_value2()
+       if self.value2:
+           event2.success() sets event.state to True
+       else:
+           event2.failure() sets event.state to False
+
+  if not self.value3:
+       with ThirdEvent() as event3:
+           self.value3 = self._get_value3()
+           if self.value3:
+               event3.success() sets event.state to True
+           else:
+               event3.failure() sets event.state to False
+
+block exits
+
+   with FourthEvent() as event4:
+       self.value4 = self._get_value4()
+       if self.value4:
+           event4.success() sets event.state to True
+       else:
+           event4.failure() sets event.state to False
+
+
+but, we have AnyEvents in the collect list, and 4 events in the block
+versus only 3 events in the collect list
+
+so, the collect list checks each event state in order, and applies 
+the AnyEvent.invert to the first event state, nothing to the second,
+and the AnyEvent.optional to the third event state
+
+the fourth event is not in the collect list, so it is ignored for the 
+collection and treated as a normal non collection event that posts based
+only on its own state.
+
+if you wanted to include the fourth event but not the third...
+
+with MyEvent.collect([AnyEvent.invert, AnyEvent, FourthEvent.optional]) as event:
+this would process the first 2 events, but ignore the collecting the third
+event because there are no more AnyEvents, and it isnt FourthEvent
+
+order matters if an AnyEvent is anywhere in the collect list
+
+
+with data
+
+with MyEvent(events=[YourEvent.invert() ThirdEvent()], mods=['collect']) as event:
+
+    with YourEvent() as event1:
+        self.value = self._get_value()
+        if self.value:
+            event1.success() sets event.state to True
+        else:
+            event1.failure() sets event.state to False
+        event1.add_data(self.value, 'self.value') 
+
+    # block exits, event1's state gets updated in its data dict
+    # event1's data gets added to MyEvent's data dict
+    
+    with ThirdEvent() as event2:
+        self.value2 = self._get_value2()
+        if self.value2:
+            event2.success() sets event.state to True
+        else:
+            event2.failure() sets event.state to False
+        event2.add_data(self.value2, 'self.value2')
+
+    # block exits, event2's state gets updated in its data dict
+    # event2's data gets added to MyEvent's data dict
+
+    with FifthEvent.pass_data() as event3:
+        self.value3 = self._get_value3()
+        if self.value3:
+            event3.success() sets event.state to True
+        else:
+            event3.failure() sets event.state to False
+        event3.add_data(self.value3, 'self.value3')
+
+    # block exits, event3's state gets updated in its data dict
+    # event3's data DOES NOT get added to MyEvent's data dict,
+    # because it is not in the collect list even though it is inside the block
+
+
+
+When each event's state gets checked, any data in the event is added to 
+MyEvent's data dict. 
+If the event collection succeeds, the data is passed to MyEvent._succeeded() as kwargs
+
+If the event collection fails, the data is passed to MyEvent._failed() as kwargs
+
+
+What does a _succeeded() or _failed() look like?
+
+def _succeeded(self, *args, **kwargs):
+    state = 'success'
+    # anything else you want to do here
+    # like logging, or setting a flag, etc
+    self._post(state, *args, **kwargs)
+
+def _failed(self, *args, **kwargs):
+    state = 'failure'
+    # anything else you want to do here
+    # like logging, or setting a flag, etc
+    self._post(state, *args, **kwargs)
+
+
+
+    
+
+
+        
+
+
+
+

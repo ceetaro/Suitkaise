@@ -1,0 +1,3 @@
+Serializing data
+
+to keep data streamlined

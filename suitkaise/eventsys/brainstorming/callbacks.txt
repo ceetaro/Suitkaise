@@ -1,0 +1,128 @@
+callback chains: special thread management
+
+instead of each callback immediately being added to a queue,
+the callback starts a "chain" 
+
+how to chain callbacks:
+
+callbacks can be chained with a simple decorator,
+@chain
+
+@chain will say, "hey, if this function is called from a 
+callback inside a chain thread, then add it to the chain's queue
+instead of the normal queue"
+@chain will also add the chain to all functions that are called from this
+function, so you can chain once and it will remain in the kwargs
+
+example:
+
+with MyEvent() as event:
+
+    self.value = self._get_value()
+    if self.value:
+        event.success() sets event.state to True
+    else:
+        event.failure() sets event.state to False
+
+
+block exits
+
+lets say the event was successful
+
+so we call MyEvent._succeeded()
+
+which calls MyEvent._post(state, *args, **kwargs)
+
+def _post(self, state, *args, **kwargs):
+    
+    - now, we are in the post event.
+    - we need to do 2 main things: post the event to the bus,
+    - and call direct callbacks from here
+
+
+    with Chain.getchain() as chain:
+        - this will asynchronize the call to the bus
+
+    1.  self._to_bus(state, *args, **kwargs)
+        - this will post the event to the bus
+        - in the bus, 2 methods are waiting for this event
+        - 1. Scanner.scan('file1'), waiting for kwarg {'a_key': 'file1'}
+        - 2. Scanner.scan('file2'), waiting for kwarg {'a_key': 'file2'}
+
+    in our kwargs, we have {
+        'value': (value from self.value)
+        'a_key': 'file2'
+    }
+
+    - so, the bus will call Scanner.scan('file2') with the kwargs
+    - not Scanner.scan('file1') because the key doesn't match
+
+this is what Scanner.scan() looks like:
+@chain(scan_level=ScanLevel.NORMAL)
+def scan(self, scan_level=ScanLevel, *args, **kwargs):
+    
+    - since this has the @chain decorator, it will do 2 things:
+    - 1. check if we are already in a chain thread
+        - if we are, it will add this to the chain's queue
+    - 2. if we are not, it will create a new chain thread,
+        - starting its own processes.
+
+    - to avoid a super long delay between self._post, we asynchronize the 
+    - _to_bus call, so we can keep going.
+
+2. calling functions directly from succeeded()
+
+    - so, the event has sent the event to the bus using _to_bus.
+    - now, we need to call direct callbacks from here.
+
+    - this is for events where we would always follow a certain path,
+    - like finding data in a file recursively.
+
+
+    Example usage: gathering all child components connected to a PyQt widget
+
+    with LayerFound(component=self.current_component) as event:
+        
+        look for children of the lowest level component
+        children = Component._find_children(self.current_component, 'file1')
+        if children:
+            event.success() sets event.state to True
+        else:
+            event.failure() sets event.state to False
+        event.add_data(children, 'children')
+        event.add_data(self.current_component, 'component')
+        event.add_data(self.current_component.name, 'component_name')
+        (or something like that)
+
+def succeeded(self, *args, **kwargs):
+    # this is called when the event is successful
+    # we need to call the direct callbacks from here
+    # and also post the event to the bus
+
+    # we need to check if we are in a chain thread
+    # if we are, we need to add the callbacks to the chain's queue
+    # if we are not, we need to create a new chain thread only if 
+    # @chain is used as a decorator of the function def we are calling
+
+and we keep recalling this block using layerfound until we find all the children
+
+
+
+By separating the posting and any direct callbacks,
+we can parallelize the callbacks if we want to.
+
+
+other tricks using chain:
+
+@newchain will create a new chain thread even if we are already in a chain thread
+@breakchain will remove the chain reference from the kwargs.
+- use breakchain when a function has no other functions being called from it
+
+
+
+
+
+
+    
+
+    

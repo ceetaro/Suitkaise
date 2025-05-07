@@ -1,0 +1,228 @@
+Event bus implementation
+
+I think there should be 3 main components to the event bus:
+
+1. event buses
+2. bus stations
+3. event bridge
+
+i want to have a system where there is a bus station instance in each processor in the pool
+and a bus in each thread.
+
+here is the idea:
+each bus acts as the event bus for that thread, with its own event 
+history and functionality.
+
+to sync with other buses, we have the bus stations.
+if you want to sync the current bus's with the rest of the buses, you can call
+bus.to_station()
+
+this will:
+- add the current buses event queue to the bus station's queue,
+filling the queue based on timestamp.
+
+- sync the bus's event history with the bus station's event history,
+inserting each event chronologically based on timestamp
+(not just appending to the end)
+
+- create a new bus in this thread.
+
+to get the bus station's event history, you can call
+bus.from_station()
+
+this will:
+- get the bus station's event history and add it to the current bus's
+event history, filling the queue based on timestamp.
+
+- add any events in the bus station's queue that originated in this 
+thread to the current bus's event queue, and remove them 
+from the bus station's queue.
+
+
+
+to do both:
+- bus.to_station()
+and 
+- bus.from_station()
+
+bus.round_trip()
+
+this will:
+-call bus.to_station(), which creates a new bus instance in the thread
+-and then directly after, call bus.from_station() to sync with the new bus instance
+in the same thread.
+
+- effectively creating the original bus instance in the thread...
+- with the original bus's event queue, but the entire station's event history,
+including the event history of the original bus.
+
+additionally, buses can ask for only some event types from the history, to save
+memory.
+this is done by passing a list of event types to the bus.from_station() call.
+
+------------------------------------
+bus stations
+
+there are 2 types of bus stations:
+1. local bus stations
+2. main bus stations
+
+local stations are created in each processor in the pool, and manage all 
+threads and their buses in that processor.
+
+there are 2 main bus stations:
+
+internal bus station: events that occur internally, aka in the Suitkaise
+code, all feed into this bus station.
+
+external bus station: events that occur externally, aka in code that was
+imported in by a user, while their program runs, all feed into the external
+bus station.
+
+local bus stations are created in each processor in the pool, and marked as 
+internal or external stations.
+
+each station will send their event history to their respective main station
+and sync with the main station's event history using the same pattern as the buses.
+
+--------------------------------------
+event bridge
+
+the event bridge manages the ability for the internal and external bus stations
+to communicate with each other.
+
+it has 6 states: (1,2,5,6 are one part, 3,4 are another part)
+1. open
+2. closed
+3. locked
+4. unlocked
+5. one way external
+6. one way internal
+
+open: if the bridge is open, the internal and external bus stations can
+communicate with each other, and buses can get event history from a station on
+the other side of the bridge. 
+(internal buses can get history from the external station, and vice versa)
+
+closed: if the bridge is closed, the internal and external bus stations
+cannot communicate with each other, and buses cannot get event history from 
+a station on the other side of the bridge.
+
+this is for testing a user's program on its own, without any interference
+from the internal code running.
+
+locked: manually locked by the user, this keeps the bridge in a closed state.
+used when the user wants to test their program on its own, and get accurate
+performance metrics.
+
+unlocked: manually unlocked by the user, this allows the bridge to open and
+close on its own when it needs to.
+
+one way external: if the bridge is open, the internal bus station can
+communicate with the external bus station, but not vice versa.
+
+one way internal: if the bridge is open, the external bus station can
+communicate with the internal bus station, but not vice versa.
+
+to lock/unlock the bridge, you can call:
+bridge.lock() or bridge.unlock()
+this will set the bridge to locked or unlocked, respectively.
+
+the rest go as follows:
+- bridge.open() - opens the bridge
+- bridge.close() - closes the bridge
+- bridge.only_to_external() - sets the bridge to one way external
+- bridge.only_to_internal() - sets the bridge to one way internal
+
+
+additionally, when closing at least one part of the bridge, you can choose to
+clear all buses and stations of events from the other side.
+
+if closed: can clear all external events from the internal buses and stations,
+and vice versa.
+
+if one way external: can clear all internal events from the external buses and stations
+
+if one way internal: can clear all external events from the internal buses and stations
+
+------------------------------------
+
+memory management
+
+we should try to remove unnecessary events from the event histories to
+save memory.
+
+we should also add a dynamic size limit multiplier to events, and 
+compress events that might need to stay in the history for a long time.
+
+ex. if an events size limit is 1000 bytes, and the event history size
+is currently deemed as too large, we can change the multiplier to 0.8
+so now new events of that type getting posted will have a size limit of
+800 bytes.
+
+additionally, we can compress and recompress events if we are not using
+a high amount of memory, to further save memory.
+
+I think we could do this in a few ways:
+1. remove events after a subscriber has been called
+2. remove events after a certain amount of time
+3. remove events after they get referenced in an event history search
+
+since some events might need to last for much longer than others due to their
+importance, we shouldn't use time as the main factor for removing events.
+
+we should use a combination of 1 and 3 first, and only use time when 
+it makes sense.
+
+---------------
+time management
+
+to save time on searching for events and filtering events to send back to the
+bus, we can use lookup indices.
+
+we can also use bisect.bisect to more quickly insert events into the event history
+in their chronological order.
+
+
+
+-------------------------------------------
+thread and process safety
+
+we should add read and write locks for station histories, so that 
+we can have multiple readers but only one writer at a time.
+
+also, try and use lock free data structures where possible,
+in order to help better maintin performance and concurrency.
+
+we can also use batching to reduce lock acquisitions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
