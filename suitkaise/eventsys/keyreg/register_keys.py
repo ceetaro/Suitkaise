@@ -99,8 +99,7 @@ def register_default_keys():
                 description="Timestamps for the event")
     
     register("created", float,
-                description="Creation time of the event",
-                optional=True)
+                description="Creation time of the event")
     
     register("modified", float,
                 description="Last modified time of the event",
@@ -124,8 +123,7 @@ def register_default_keys():
     
     register("lock", str,
                 validator=lambda x: any('Lock', 'RLock') in x,
-                description="Lock for the event",
-                optional=True)
+                description="Lock for the event")
     
     register("kwargs", dict,
                 description="Keyword arguments for the event")
@@ -135,8 +133,7 @@ def register_default_keys():
                 optional=True)
     
     register("exception", dict,
-                description="Exception data if the event failed",
-                optional=True)
+                description="Exception data if the event failed")
     
     register("is_optional", bool,
                 description="Whether the event is optional")
@@ -151,16 +148,13 @@ def register_default_keys():
                 description="Original class name of the event before any modifiers")
     
     register("failed_states", list,
-                description="List of failed states for the event",
-                optional=True)
+                description="List of failed states for the event")
     
     register("succeeded_states", list,
-                description="List of succeeded states for the event",
-                optional=True)
+                description="List of succeeded states for the event")
     
     register("optional_states", list,
-                description="List of optional states for the event",
-                optional=True)
+                description="List of optional states for the event")
     
     register("is_compressed", bool,
                 description="Whether the event is compressed")

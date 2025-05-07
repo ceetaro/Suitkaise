@@ -605,6 +605,7 @@ class Station(ABC):
                   f"Current size: {byteconv.convert_bytes(current_size)}\n"
                   f"Compression took {elapsed_time} seconds\n")
             
+            
     def _low_compression(self, events: List[Event]) -> None:
         """
         Pass until more data is available.
@@ -624,9 +625,6 @@ class Station(ABC):
         Pass until more data is available.
 
         """
-        # current ideas
-        # this is where we remove optional keys
-        # and use specialized compression for specific types
         pass
 
     #

@@ -237,8 +237,9 @@ class FunctionInstanceBuilder:
                 for param in self.param_info.values()
             )
             if not accepts_kwargs:
-                raise ValueError(f"Parameter '{param_name}' is not in the function signature "
-                                 f"and the function does not accept arbitrary kwargs.\n")
+                print(f"Warning: Function '{self.func_name}' does not accept "
+                      f"keyword arguments. Argument '{param_name}' will not be added.\n")
+                return self
             
             self.provided_kwargs[param_name] = value
             print(f"Added '{param_name}' to kwargs: {value}")

@@ -902,7 +902,6 @@ def add_replacement_function(key: str,
         fib.add_callable(function)
         fib.add_args(args)
         fib.add_kwargs(kwargs)
-        fib.validate()
         replacement_function = fib.build()
 
     with event_key_registry._lock:
