@@ -617,7 +617,7 @@ class Station(ABC):
         
         """
         for event in events:
-            for key in event.data:
+            for key in event.data.keys():
                 if keyreg.is_registered(key):
                     key_name = key.__name__
                     value = event.data[key]
@@ -638,7 +638,7 @@ class Station(ABC):
 
         """
         for event in events:
-            for key in event.data:
+            for key in event.data.keys():
                 if keyreg.is_registered(key):
                     key_name = key.__name__
                     value = event.data[key]
@@ -660,7 +660,7 @@ class Station(ABC):
 
         """
         for event in events:
-            for key in event.data:
+            for key in event.data.keys():
                 if keyreg.is_registered(key):
                     key_name = key.__name__
                     value = event.data[key]
@@ -1353,14 +1353,133 @@ class Station(ABC):
             events (List[Event]): the events to add
         
         """
+        if not events:
+            print(f"Empty event list provided to update indexes for station '{self.name}'")
+            return
+
         # for small batches, use the single event method
         if len(events) < 10:
             for event in events:
                 self._update_indexes_single(event)
             return
         
-        # rest of implementation here...
-        
+        # for larger batches, use the multiple event method
+        with self.lock:
+            # process event type index
+            if 'event_type_index' in self.active_indexes:
+                events_by_type = {}
+                for event in events:
+                    event_type = event.event_type
+                    if event_type not in events_by_type:
+                        events_by_type[event_type] = []
+                    events_by_type[event_type].append(event)
+
+                # update the index with the batches
+                for event_type, type_events in events_by_type.items():
+                    if event_type not in self.event_type_index:
+                        self.event_type_index[event_type] = []
+                    self.event_type_index[event_type].extend(type_events)
+
+            # process time posted index
+            if 'time_posted_index' in self.active_indexes:
+                events_by_time = {}
+                for event in events:
+                    try:
+                        timestamp = event.data['metadata']['timestamps'].get('posted', 0)
+                        if timestamp not in events_by_time:
+                            events_by_time[timestamp] = []
+                        events_by_time[timestamp].append(event)
+                    except (AttributeError, KeyError):
+                        print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
+                              "does not have a valid post time for indexing.")
+
+                # update the index with the batches
+                for timestamp, time_events in events_by_time.items():
+                    if timestamp not in self.time_posted_index:
+                        self.time_posted_index[timestamp] = []
+                    self.time_posted_index[timestamp].extend(time_events)
+
+            # process key index
+            if 'key_index' in self.active_indexes:
+                events_by_key = {}
+                for event in events:
+                    try:
+                        # get the event keys
+                        for key in event.data.keys():
+                            if keyreg.is_registered(key):
+                                if key not in events_by_key:
+                                    events_by_key[key] = []
+                                events_by_key[key].append(event)
+                    except (AttributeError, KeyError):
+                        print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
+                              "does not have valid keys for indexing.")
+
+                # update the index with the batches
+                for key, key_events in events_by_key.items():
+                    if key not in self.key_index:
+                        self.key_index[key] = []
+                    self.key_index[key].extend(key_events)
+
+            # process thread index
+            if 'thread_index' in self.active_indexes:
+                events_by_thread = {}
+                for event in events:
+                    try:
+                        thread_data = event.data['metadata'].get('thread_data', None)
+                        thread_id = thread_data.get('id', None) if thread_data else None
+                        thread_name = thread_data.get('name', None) if thread_data else None
+
+                        if thread_id and thread_name:
+                            thread_key = (thread_id, thread_name)
+                            if thread_key not in events_by_thread:
+                                events_by_thread[thread_key] = []
+                            events_by_thread[thread_key].append(event)
+                    except (AttributeError, KeyError):
+                        print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
+                              "does not have valid thread data for indexing.")
+
+                # update the index with the batches
+                for thread_key, thread_events in events_by_thread.items():
+                    if thread_key not in self.thread_index:
+                        self.thread_index[thread_key] = []
+                    self.thread_index[thread_key].extend(thread_events)
+
+            # process state index
+            if 'state_index' in self.active_indexes:
+                events_by_state = {
+                    EventState.NONE: [],
+                    EventState.SUCCESS: [],
+                    EventState.FAILURE: []
+                }
+
+                for event in events:
+                    # get the event state
+                    event_state = event.state if event.state else EventState.NONE
+                    events_by_state[event_state].append(event)
+
+                # update the index with the batches
+                for state, state_events in events_by_state.items():
+                    if state_events:
+                        self.state_index[state].extend(state_events)
+
+            # process priority index
+            if 'priority_index' in self.active_indexes:
+                events_by_priority = {}
+                for priority in EventPriority:
+                    events_by_priority[priority] = []
+
+                for event in events:
+                    # get the event priority
+                    event_priority = event.priority if event.priority else EventPriority.NORMAL
+                    events_by_priority[event_priority].append(event)
+
+                # update the index with the batches
+                for priority, priority_events in events_by_priority.items():
+                    if priority_events:
+                        self.priority_index[priority].extend(priority_events)
+
+            print(f"Updated indexes for {len(events)} events in station '{self.name}'")
+
     
     def _rebuild_indexes(self) -> None:
         """
