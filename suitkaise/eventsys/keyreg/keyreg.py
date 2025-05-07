@@ -66,6 +66,7 @@ import uuid
 
 import suitkaise.time.sktime as sktime
 from suitkaise.eventsys.data.enums.enums import CompressionLevel
+from suitkaise.utils.fib.fib import FunctionInstance, FunctionInstanceBuilder
 
 AnyType = Union[None, str, int, float, bool, Dict[str, Any], List[Any], Set[Any], Tuple[Any, ...], Enum]
 
@@ -170,7 +171,7 @@ class EventKeyRegistry:
                 'idshort': str(uuid.uuid4())[:8],
                 'created': sktime.now(),
                 'should_compress': should_compress,
-                'is_compressed': CompressionLevel.NONE,
+                'compressed_at': CompressionLevel.NONE,
                 'replace_with_function': replace_with_function,
             }
 
@@ -353,7 +354,7 @@ class EventKeyRegistry:
             Dict[str, Dict[str, Any]]: Dictionary of all registered keys and their metadata.
         
         """
-        return self._keys.copy()
+        return self._keys
         
     
     def get_keys_with_user(self, key_user: str) -> List[Dict[str, Any]]:
@@ -725,7 +726,7 @@ def get_keys_to_compress(level: CompressionLevel = CompressionLevel.LOW) -> List
     """
     Get all keys that:
     - have should_compress set to True
-    - have is_compressed set to a lower level than the requested level
+    - have compressed_at set to a lower level than the requested level
 
     Args:
         level: Compression level to check against.
@@ -737,11 +738,11 @@ def get_keys_to_compress(level: CompressionLevel = CompressionLevel.LOW) -> List
     event_key_registry = EventKeyRegistry()
     keys_to_compress = []
     for key, metadata in event_key_registry.get_all_keys().items():
-        if metadata['should_compress'] and metadata['is_compressed'] < level:
+        if metadata['should_compress'] and metadata['compressed_at'] < level:
             keys_to_compress.append(key)
     return keys_to_compress
 
-def key_is_compressed(key: str) -> Tuple[bool, CompressionLevel]:
+def key_is_compressed(key: str) -> bool:
     """
     Check if a key is compressed.
 
@@ -749,21 +750,14 @@ def key_is_compressed(key: str) -> Tuple[bool, CompressionLevel]:
         key: Key name to check.
 
     Returns:
-        Tuple[bool, CompressionLevel]: Tuple containing a boolean 
-            indicating if the key is compressed, and the compression level
-            it has been compressed to.
+        bool: True if the key is compressed, False otherwise.
     
     """
     event_key_registry = EventKeyRegistry()
     key_info = event_key_registry.get_key_info(key)
     if key_info:
-        if key_info['is_compressed'] != CompressionLevel.NONE:
-            return True, get_compression_level(key)
-        else:
-            return False, CompressionLevel.NONE
-        
-    print(f"Key '{key}' not found in registry.")
-    return False, CompressionLevel.NONE
+        return key_info['compressed_at'] != CompressionLevel.NONE
+    return False
 
 def get_compression_level(key: str) -> CompressionLevel:
     """
@@ -779,7 +773,7 @@ def get_compression_level(key: str) -> CompressionLevel:
     event_key_registry = EventKeyRegistry()
     key_info = event_key_registry.get_key_info(key)
     if key_info:
-        return key_info['is_compressed']
+        return key_info['compressed_at']
     
     print(f"Key '{key}' not found in registry.")
     return CompressionLevel.NONE
@@ -795,16 +789,18 @@ def upgrade_compression_level(keys: List[str], level: CompressionLevel) -> None:
     """
     event_key_registry = EventKeyRegistry()
     with event_key_registry._lock:
+        all_keys = event_key_registry.get_all_key_names()
         for key in keys:
-            if key in event_key_registry.get_all_key_names():
-                if level > event_key_registry.get_key_info(key)['is_compressed']:
-                    event_key_registry.get_key_info(key)['is_compressed'] = level
+            if key in all_keys:
+                if level > event_key_registry:
+                    event_key_registry._keys[key]['compressed_at'] = level
                 else:
                     print(f"Key '{key}' is already at a higher compression level.")
             else:
                 print(f"Key '{key}' not found in registry.")
 
         print(f"Set compression level for keys: {keys} to {level}.")
+
 
 def reset_compression_level(keys: List[str]) -> None:
     """
@@ -818,28 +814,39 @@ def reset_compression_level(keys: List[str]) -> None:
     """
     event_key_registry = EventKeyRegistry()
     with event_key_registry._lock:
+        all_keys = event_key_registry.get_all_key_names()
         for key in keys:
-            if key in event_key_registry.get_all_key_names():
-                event_key_registry.get_key_info(key)['is_compressed'] = CompressionLevel.NONE
+            if key in all_keys:
+                event_key_registry._keys[key]['compressed_at'] = CompressionLevel.NONE
             else:
                 print(f"Key '{key}' not found in registry.")
 
         print(f"Reset compression level for keys: {keys} to NONE.")
 
 
-def is_valid_function_replacement(self) -> bool:
+
+def has_replacement_function(self) -> bool:
     """
     Check if given data can successfully be used to create a 
-    FunctionReplacement object.
+    FunctionInstance.
 
     Returns:
         bool: True if valid, False otherwise.
     
     """
-    pass
+    event_key_registry = EventKeyRegistry()
+    key_info = event_key_registry.get_key_info(self)
+    if key_info:
+        if key_info['replace_with_function'] is not None:
+            return True
+        else:
+            return False
+    else:
+        print(f"Key '{self}' not found in registry.")
+        return False
 
 
-def get_replacement_function():
+def get_replacement_function(key: str) -> FunctionInstance:
     """
     Get the replacement function for a key.
 
@@ -847,31 +854,82 @@ def get_replacement_function():
         key: Key name to get the replacement function for.
 
     Returns:
-        Optional[Callable[[Any], Any]]: The replacement function for the key, 
-        or None if not found.
+        FunctionInstance: The replacement function container,
+            with a callable, args, and kwargs.
     
     """
-    pass
+    event_key_registry = EventKeyRegistry()
+    key_info = event_key_registry.get_key_info(key)
+    if key_info:
+        if key_info['replace_with_function'] is not None:
+            if isinstance(key_info['replace_with_function'], FunctionInstance):
+                return key_info['replace_with_function']
+            else:
+                print(f"Key '{key}' does not have a valid replacement function.")
+                return None
+        else:
+            print(f"Key '{key}' does not have a replacement function.")
+            return None
+    else:
+        print(f"Key '{key}' not found in registry.")
+        return None
 
-def add_replacement_function() -> None:
+
+def add_replacement_function(key: str,
+                             function: Callable,
+                             args: List[Tuple[str, Any]],
+                             kwargs: Dict[str, Any]) -> None:
     """
-    Add a replacement function for a key.
+    Add a replacement function for a key, using the FunctionInstanceBuilder.
 
-    Also add a string representation of the function, that will
-    be used to get required args and kwargs for the function.
-
-    When using repr to populate args and kwargs, do this:
-
-    module.function(arg1=val1, arg2=val2, ...)
-
-    instead of:
-    
-    module.function(arg1, arg2, ...)
+    Creates a FunctionInstance that can regenerate the original data held 
+    by this key, if needed.
 
     Args:
         key: Key name to add the replacement function for.
-        function: The replacement function to add.
-        repr: Required string representation of the function.
+        function: A callable representing the function to be used as a replacement.
+        args: Arguments for the function.
+            - each arg should be a tuple of (param name, param value).
+            - the FIB will validate that the param value is the correct type.
+        kwargs: Keyword arguments for the function.
+            - kwargs can just be a Dict[str, Any].
+            - the FIB will validate that required kwargs are present.
     
     """
-    pass
+    event_key_registry = EventKeyRegistry()
+
+    with FunctionInstanceBuilder() as fib:
+        fib.add_callable(function)
+        fib.add_args(args)
+        fib.add_kwargs(kwargs)
+        fib.validate()
+        replacement_function = fib.build()
+
+    with event_key_registry._lock:
+        if is_registered(key):
+            event_key_registry._keys[key]['replace_with_function'] = replacement_function
+            print(f"Added replacement function for key: {key}")
+        else:
+            print(f"Key '{key}' not found in registry.")
+            return None
+    print(f"Replacement function for key '{key}' added successfully.")
+
+
+
+def remove_replacement_function(key: str) -> None:
+    """
+    Remove the replacement function for a key.
+
+    Args:
+        key: Key name to remove the replacement function for.
+    
+    """
+    event_key_registry = EventKeyRegistry()
+    with event_key_registry._lock:
+        if is_registered(key):
+            event_key_registry._keys[key]['replace_with_function'] = None
+            print(f"Removed replacement function for key: {key}")
+        else:
+            print(f"Key '{key}' not found in registry.")
+            return None
+    print(f"Replacement function for key '{key}' removed successfully.")

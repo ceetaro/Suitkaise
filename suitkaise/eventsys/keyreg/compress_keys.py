@@ -69,6 +69,7 @@ from suitkaise.eventsys.data.enums.enums import CompressionLevel
 import suitkaise.eventsys.keyreg.keyreg as keyreg
 import suitkaise.utils.math.byte_conversions as byteconv
 import suitkaise.utils.formatting.format_data as fmt
+from suitkaise.utils.fib.fib import FunctionInstance, FunctionInstanceBuilder
 
 class CompressStrat(Enum):
     """
@@ -126,65 +127,9 @@ class CompressedData:
                 f"ratio={self.compression_ratio:.2f}x\n")
     
 
-class FunctionReplacement:
-    """
-    Container for function-based data replacement.
-
-    This class stores a reference to a function that can regenerate the 
-    original data when called. Called when needed, rather than storing a large
-    piece of data in memory.
-
-    Example: a function that regenerates an ast.Module tree for a file
-    
-    """
-    def __init__(self, 
-                 func: Callable,
-                 args: Tuple = None,
-                 kwargs: Dict = None,
-                 module_name: str = None,
-                 func_name: str = None):
-        """
-        Initialize function replacement.
-
-        Args:
-            func: The function to call to regenerate the data.
-            args: Arguments to pass to the function.
-            kwargs: Keyword arguments to pass to the function.
-            module_name: Name of the module containing the function
-                (for serialization).
-            func_name: Name of the function (for serialization).
-        
-        """
-        self.func = func
-        self.args = args if args is not None else ()
-        self.kwargs = kwargs if kwargs is not None else {}
-        self.module_name = module_name
-        self.func_name = func_name
-
-    def execute(self) -> Any:
-        """
-        Execute the function to regenerate the data.
-
-        Returns:
-            The result of the function call.
-        
-        """
-        return self.func(*self.args, **self.kwargs)
-    
-    def __repr__(self):
-        """String representation of function replacement."""
-        if self.module_name and self.func_name:
-            func_str = f"{self.module_name}.{self.func_name}"
-        else:
-            func_str = self.func.__name__
-        return (f"FunctionReplacement(func={func_str}, "
-                f"args={self.args}, "
-                f"kwargs={fmt.format_data(self.kwargs)})\n")
-    
-
 def compress(data: Any,
              level: CompressionLevel = CompressionLevel.NORMAL,
-             key: str = None) -> Union[CompressedData, FunctionReplacement]:
+             key: str = None) -> Union[CompressedData, FunctionInstance]:
     """
     Compress data using the appropriate strategy, based on data type and compression
     level.
@@ -195,7 +140,7 @@ def compress(data: Any,
         key: key associated with this data (if available)
 
     Returns:
-        either a CompressedData object or a FunctionReplacement object,
+        either a CompressedData object or a FunctionInstance object,
         containing the compressed data/metadata or the function to regenerate the data.
     
     """
@@ -204,14 +149,8 @@ def compress(data: Any,
 
     if strategy == CompressStrat.FUNCTION and key:
         replacement_func = keyreg.get_replacement_function(key)
-        if replacement_func:
-            try:
-                replacement = create_function_replacement(replacement_func, data)
-                return replacement
-            except Exception as e:
-                print(f"Error creating function replacement: {e}")
-                # fall back to standard compression
-                strategy = select_compression_strategy(data, level, None)
+        if replacement_func and isinstance(replacement_func, FunctionInstance):
+            return replacement_func
 
 
     # if strategy is REMOVE
@@ -254,7 +193,7 @@ def compress(data: Any,
     )
 
 
-def decompress(compressed_data: Union[CompressedData, FunctionReplacement]) -> Any:
+def decompress(compressed_data: Union[CompressedData, FunctionInstance]) -> Any:
     """
     Decompress data that was previously compressed.
 
@@ -270,7 +209,7 @@ def decompress(compressed_data: Union[CompressedData, FunctionReplacement]) -> A
     if isinstance(compressed_data, CompressedData):
         strategy = compressed_data.strategy
         compressed = compressed_data.data
-    elif isinstance(compressed_data, FunctionReplacement):
+    elif isinstance(compressed_data, FunctionInstance):
         # execute the function to regenerate the data
         return compressed_data.execute()
     else:
@@ -307,7 +246,7 @@ def select_compression_strategy(data: Any,
     
     """
     # check if a replacement function is available for this key
-    if keyreg.is_registered(key) and keyreg.is_replacement_function(key) is not None:
+    if keyreg.is_registered(key) and keyreg.has_replacement_function(key):
         return CompressStrat.FUNCTION
     
     # check for optional keys at high level
@@ -466,19 +405,8 @@ def specialized_decompression(data: bytes, original_type: type) -> Any:
     print(f"Specialized decompression not implemented, just unpickling data\n")
     return pickle.loads(data)
 
-def create_function_replacement() -> FunctionReplacement:
-    """
-    Create a function replacement for the data, from a Callable[Any, Any] function.
+        
 
-    This method also extracts the args and kwargs from the function signature given
-    and uses them to create a FunctionReplacement object.
-
-    Args:
-        data (Any): The data to replace with a function.
-        func (Callable): The function to use for replacement.
-
-    """
-    pass
     
     
 

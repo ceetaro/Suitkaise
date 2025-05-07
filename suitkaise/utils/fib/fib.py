@@ -143,6 +143,7 @@ class FunctionInstanceBuilder:
         self.provided_kwargs = {} # only kwargs given to FIB
         self.signature = None
         self.param_info = {} # maps param names to their metadata
+        self.built = False
 
     def __enter__(self):
         """Enter the context manager."""
@@ -150,110 +151,37 @@ class FunctionInstanceBuilder:
     
     def __exit__(self, exc_type, exc_value, traceback):
         """Exit the context manager."""
-        pass
+        if not self.built:
+            print("FunctionInstanceBuilder was not built. "
+                  "Please call build() before exiting the context "
+                  "if you would like to store the FunctionInstance.\n")
 
-    def add_callable(self, func: Union[Callable, str],
-                    module_path: str = None) -> 'FunctionInstanceBuilder':
+    def add_callable(self, func: Callable) -> 'FunctionInstanceBuilder':
         """
-        Add a function to build an instance for.
-
-        This method handles several ways of specifying a function:
-        1. A callable function object
-        2. A function name string with module_path
-        3. A fully qualified name string (e.g., 'package.module.function')
-
+        Add a callable function to build an instance for.
+        
         Args:
-            func: The function to add (callable or name as string)
-            module_path: Optional module path or fully qualified module name
-                        Can be dot notation (package.module) or file path
-
+            func: The function to add (must be a callable object)
+            
         Returns:
             self for method chaining
-
         """
-        if isinstance(func, str):
-            # CASE 1: Function provided as a string
-            if not module_path:
-                # Try to parse as a fully qualified name if no module_path is provided
-                if '.' in func:
-                    # Split the fully qualified name into parts
-                    parts = func.split('.')
-                    func_name = parts[-1]  # Last part is the function name
-                    
-                    # Everything before the function name is the module path
-                    module_spec = '.'.join(parts[:-1])
-                    
-                    try:
-                        # Try to import using the fully qualified module path
-                        module = importlib.import_module(module_spec)
-                        self.func = getattr(module, func_name)
-                        self.module_name = module.__name__
-                        self.module_path = getattr(module, '__file__', None)
-                        self.func_name = func_name
-                        
-                        print(f"Imported function {func_name} from module {module_spec}")
-                    except (ImportError, AttributeError) as e:
-                        raise ValueError(f"Could not import {module_spec}.{func_name}: {e}")
-                else:
-                    raise ValueError("If providing just a function name, you must also provide module_path")
-            else:
-                # CASE 2: Module path is provided explicitly
-                try:
-                    # Handle different module path formats
-                    if '/' in module_path or '\\' in module_path:
-                        # It's a file path - convert to module notation
-                        # This is tricky and might not work in all cases
-                        import os
-                        import sys
-                        
-                        # Get absolute path and normalize slashes
-                        abs_path = os.path.abspath(module_path)
-                        norm_path = os.path.normpath(abs_path)
-                        
-                        # Handle .py extension
-                        if norm_path.endswith('.py'):
-                            norm_path = norm_path[:-3]
-                        
-                        # Find which part of sys.path this module is in
-                        for path in sys.path:
-                            if norm_path.startswith(path):
-                                # Convert to module notation by removing sys.path prefix
-                                # and replacing slashes with dots
-                                relative_path = norm_path[len(path):].lstrip(os.sep)
-                                module_spec = relative_path.replace(os.sep, '.')
-                                break
-                        else:
-                            # If we can't find it in sys.path, try a direct import
-                            # This might not work, but it's worth a try
-                            module_spec = os.path.basename(norm_path)
-                    else:
-                        # It's already in module notation (package.module)
-                        module_spec = module_path
-                    
-                    # Now import the module and get the function
-                    module = importlib.import_module(module_spec)
-                    self.func = getattr(module, func)
-                    self.module_name = module.__name__
-                    self.module_path = getattr(module, '__file__', None)
-                    self.func_name = func
-                    
-                    print(f"Imported function {func} from module {module_spec}")
-                except (ImportError, AttributeError) as e:
-                    raise ValueError(f"Could not import {func} from {module_path}: {e}")
-        elif callable(func):
-            # CASE 3: Function provided as a callable object
-            import sys
+        import sys
+        import inspect
+        
+        if not callable(func):
+            raise ValueError(f"Expected a callable function, got {type(func)}")
             
-            self.func = func
-            self.module_name = func.__module__
-            # Find the module's file path if possible
-            module_obj = sys.modules.get(func.__module__)
-            self.module_path = getattr(module_obj, '__file__', None)
-            self.func_name = func.__name__
-            
-            print(f"Using callable {self.module_name}.{self.func_name}")
-        else:
-            raise ValueError(f"Expected a callable or function name string, got {type(func)}")
+        # Store function information
+        self.func = func
+        self.module_name = func.__module__
+        self.func_name = func.__name__
+        
+        # Get the module path
+        module_obj = sys.modules.get(self.module_name)
+        self.module_path = getattr(module_obj, '__file__', None)
+        
+        print(f"Using callable {self.module_name}.{self.func_name}")
         
         # Inspect function signature
         try:
@@ -275,8 +203,9 @@ class FunctionInstanceBuilder:
         
         return self
 
-        
-    def add_argument(self, param_name: str, value: Any,
+
+    def add_argument(self, param_name: str, 
+                     value: Any,
                      override_value=False,
                      kwargs_only: bool = False) -> 'FunctionInstanceBuilder':
         """
@@ -323,8 +252,10 @@ class FunctionInstanceBuilder:
         annotation = param_info['annotation']
         if annotation is not None:
             if not isinstance(value, annotation) and value is not None:
-                print(f"Warning: Value '{value}' for parameter '{param_name}' "
-                      f"does not match the expected type '{annotation.__name__}'.\n")
+                raise TypeError(
+                    f"Parameter '{param_name}' expected type {annotation}, "
+                    f"but got {type(value)} instead.\n"
+                    )
                 
         # determine if this should be a positional or keyword argument
         if kwargs_only:
@@ -414,7 +345,7 @@ class FunctionInstanceBuilder:
             """
             return self.add_argument(param_name, value, override_value, kwargs_only=True)   
     
-    def add_multiple_args(self,
+    def add_args(self,
                               args: List[Tuple[str, Any]],
                               override_values: bool = False,
                               kwargs_only: bool = False) -> 'FunctionInstanceBuilder':
@@ -486,8 +417,8 @@ class FunctionInstanceBuilder:
                     missing.append(param_name)
 
             if missing:
-                raise ValueError(f"Missing required positional arguments: "
-                                 f"{', '.join(missing)}\n")
+                print(f"Missing required positional arguments: {', '.join(missing)}\n")
+                return False
             
         # check that all required keyword only parameters have provided values
         keyword_only_params = [
@@ -500,7 +431,8 @@ class FunctionInstanceBuilder:
         ]
         for name in required_keyword_only_params:
             if name not in self.provided_kwargs:
-                raise ValueError(f"Missing required keyword-only argument: {name}\n")
+                print(f"Missing required keyword-only argument: {name}\n")
+                return False
             
         return True
     
