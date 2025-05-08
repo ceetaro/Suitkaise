@@ -36,29 +36,16 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
+# suitkaise/int/eventsys/core/station/main_station.py
 
 """
-Main module for running the Suitkaise application.
-This module serves as the entry point for the application, initializing
-the necessary components and starting the main event loop.
-
-It is responsible for setting up the environment and ensuring that
-all required dependencies are loaded before the application starts.
-
-It is also responsible for handling command-line arguments and
-configuration settings.
+Module holding the abstract MainStation class for managing all events on one side of 
+the Bridge. This class inherits from the Station class, and is the main manager 
+and chronicler of either all internal (IntStation) or external (ExtStation) events. 
+IntStation and ExtStation inherit from this abstract class, and implement the methods
+specific to their respective event systems. Communicates will all BusStations
+in processes dedicated to their side of the Bridge. Responsible for all cross-process
+communication and event management, and gathers events from all BusStations and the
+opposite MainStation.
 
 """
-
-
-import suitkaise.int.time.sktime as sktime
-
-def main():
-    sktime.setup_time()
-
-
-
-
-if __name__ == "__main__":
-    main()

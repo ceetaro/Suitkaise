@@ -36,29 +36,83 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
+# suitkaise/int/eventsys/data/enums/enums.py
+
+# enums for events
 
 """
-Main module for running the Suitkaise application.
-This module serves as the entry point for the application, initializing
-the necessary components and starting the main event loop.
-
-It is responsible for setting up the environment and ensuring that
-all required dependencies are loaded before the application starts.
-
-It is also responsible for handling command-line arguments and
-configuration settings.
+This module contains enums for the event system that will 
+likely be used in more than one file/module.
 
 """
 
-
-import suitkaise.int.time.sktime as sktime
-
-def main():
-    sktime.setup_time()
+from enum import Enum, auto, IntEnum
+from typing import Any, Dict, Type
 
 
+class EventState(Enum):
+    """
+    Enum for the state of an event.
+
+    """
+    NONE = None # state before processing
+    SUCCESS = 'success' # event completed successfully
+    FAILURE = 'failure' # event failed
 
 
-if __name__ == "__main__":
-    main()
+class EventPriority(IntEnum):
+    """
+    Enum for the priority of an event.
+
+    This is used for determining what events should get compressed
+    or cleaned first from event histories if they reach size limits.
+
+    Also useful for sorting events, either in a queue or for analysis.
+    Some events with high priority may be logged when others are not.
+
+    """
+    LOWEST = 1 # lowest priority
+    LOW = 2 # low priority
+    NORMAL = 3 # normal priority
+    HIGH = 4 # high priority
+    HIGHEST = 5 # highest priority
+
+class ValueType(Enum):
+    """
+    Enum for the type of value in an event.
+
+    """
+    ANY = auto() # any value
+    DICT = auto() # dictionary value
+    LIST = auto() # list value
+
+
+class StationLevel(Enum):
+    """
+    Enum for BusStation levels.
+
+    """
+    LOCAL = auto() # local bus station
+    MAIN = auto() # main bus station
+
+
+class CompressionLevel(IntEnum):
+    """
+    Enum for compression levels.
+
+    """
+    NONE = 0 # no compression
+    LOW = 1 # low compression
+    NORMAL = 2 # normal compression
+    HIGH = 3 # high compression
+
+
+class SKDomain(Enum):
+    """
+    Enum for SK domains.
+
+    """
+    INTERNAL = auto() # internal, uses IntStation
+    EXTERNAL = auto() # external, uses ExtStation
+
+    

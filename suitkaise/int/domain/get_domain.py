@@ -36,29 +36,20 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
+# suitkaise/int/domain/get_domain.py
 
 """
-Main module for running the Suitkaise application.
-This module serves as the entry point for the application, initializing
-the necessary components and starting the main event loop.
+Get the domain of the current thread or process, which is either
+internal or external.
 
-It is responsible for setting up the environment and ensuring that
-all required dependencies are loaded before the application starts.
+Anything running under the 'int' directory is considered internal,
+and anything running under the 'ext' directory is considered external.
 
-It is also responsible for handling command-line arguments and
-configuration settings.
+Get the domain of the calling function/its module.
+
+This is used to validate that all internal operations are communicating
+internally, and all external operations are communicating externally,
+with the only exception being the IntStation and ExtStation, which
+are allowed to communicate with each other.
 
 """
-
-
-import suitkaise.int.time.sktime as sktime
-
-def main():
-    sktime.setup_time()
-
-
-
-
-if __name__ == "__main__":
-    main()

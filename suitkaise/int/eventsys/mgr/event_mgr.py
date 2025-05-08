@@ -36,29 +36,47 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
+# suitkaise/int/eventsys/mgr/event_mgr.py
 
 """
-Main module for running the Suitkaise application.
-This module serves as the entry point for the application, initializing
-the necessary components and starting the main event loop.
-
-It is responsible for setting up the environment and ensuring that
-all required dependencies are loaded before the application starts.
-
-It is also responsible for handling command-line arguments and
-configuration settings.
+This is the manager file for initializing the event system and key registry.
+It sets up the event system and registers keys for various events.
+This module is responsible for managing the event system and ensuring that
+the necessary components are initialized correctly.
 
 """
 
+# manager file for initializing the event system and key registry
+import suitkaise.int.eventsys.keyreg.keyreg as keyreg
+import suitkaise.int.eventsys.keyreg.register_keys as register_keys
 
-import suitkaise.int.time.sktime as sktime
+
+def setup_event_system():
+    """
+    Initialize the event system and key registry.
+    This function sets up the event system and registers keys for various events.
+    """
+    # Initialize the key registry
+    keyreg.initialize_key_registries()
+
+    # Register default keys
+    register_keys.register_default_keys()
+
+
+
 
 def main():
-    sktime.setup_time()
+    """
+    Main function to set up the event system.
 
+    Call this directly to test the event system setup.
 
+    """
+    setup_event_system()
 
 
 if __name__ == "__main__":
     main()
+
+
+

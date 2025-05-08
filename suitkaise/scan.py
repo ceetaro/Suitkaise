@@ -36,7 +36,7 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/scan.py
+# suitkaise/int/scan.py
 
 """
 Placeholder scanning script to copy file structures and contents to the clipboard.

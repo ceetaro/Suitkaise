@@ -36,29 +36,9 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
-
-"""
-Main module for running the Suitkaise application.
-This module serves as the entry point for the application, initializing
-the necessary components and starting the main event loop.
-
-It is responsible for setting up the environment and ensuring that
-all required dependencies are loaded before the application starts.
-
-It is also responsible for handling command-line arguments and
-configuration settings.
+# suitkaise/int/eventsys/core/station/ext_station.py
 
 """
 
 
-import suitkaise.int.time.sktime as sktime
-
-def main():
-    sktime.setup_time()
-
-
-
-
-if __name__ == "__main__":
-    main()
+"""
