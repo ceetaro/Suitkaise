@@ -39,6 +39,120 @@
 # suitkaise/int/eventsys/core/station/int_station.py
 
 """
+Module containing the IntStation singleton class for managing internal events.
 
+The IntStation acts as the central repository for all internal events in the system.
+It communicates with BusStations in all internal processes and with the ExtStation
+through the EventBridge.
 
 """
+
+import threading
+from typing import List, Optional, Type, ClassVar
+
+from suitkaise.int.eventsys.data.enums.enums import (
+    StationLevel, BridgeDirection, BridgeState, SKDomain
+)
+from suitkaise.int.eventsys.events.base_event import Event
+from suitkaise.int.eventsys.core.station.main_station import MainStation
+from suitkaise.int.eventsys.core.station.bus_station import BusStation
+import suitkaise.int.time.sktime as sktime
+import suitkaise.int.domain.get_domain as get_domain
+
+class IntStation(MainStation):
+    """
+    Singleton class managing all internal events in the system.
+    
+    The IntStation is responsible for:
+    1. Collecting events from all internal BusStations
+    2. Distributing internal events to interested BusStations
+    3. Communicating with the ExtStation through the EventBridge
+    4. Maintaining a chronological history of all internal events
+    
+    This class follows the Singleton pattern - only one instance exists.
+    Use IntStation.get_instance() to get the singleton instance.
+
+    """
+    _instance: ClassVar[Optional["IntStation"]] = None
+    _instance_lock = threading.RLock()
+
+    def __new__(cls):
+        """Control instance creation for the singleton pattern."""
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = super(IntStation, cls).__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        """
+        Initialize the IntStation singleton.
+        
+        This will only execute once, when the singleton is first created.
+        Subsequent calls to IntStation() will return the existing instance
+        without re-initializing.
+
+        """
+        if hasattr(self, "_initialized") and self._initialized:
+            return
+        
+        super().__init__()
+
+        self.name = "INTSTATION"
+
+        domain = get_domain.get_domain()
+        if domain != SKDomain.INTERNAL:
+            raise RuntimeError("IntStation can only be used in the INTERNAL domain.")
+        
+        self._initialized = True
+
+        # last syncs
+        self.last_bus_sync = None
+        self.last_ext_sync = None
+
+        print(f"IntStation initialized in domain: {domain}")
+
+
+    @classmethod
+    def get_instance(cls) -> "IntStation":
+        """
+        Get the singleton instance of IntStation.
+        
+        This method ensures that only one instance of IntStation exists
+        throughout the application.
+
+        Returns:
+            IntStation: The singleton instance of IntStation.
+
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
+
+    
+
+
+        
+
+
+
+    
+
+                
+
+
+
+        
+
+
+
+
+
+
+
+        
+
+        
+        
+
+

@@ -150,7 +150,7 @@ class BusStation(Station):
                     return cls._instances[pid]
                 
     
-    def __init__(self, name: str):
+    def __init__(self, name: str = None):
         """
         Initialize a new BusStation.
 
@@ -159,10 +159,12 @@ class BusStation(Station):
 
         """
         super().__init__(name)
+        if name:
+            self.name = f"BusStation-{self.process_id} ({name})"
 
         # dictionary of registered EventBuses
         self.registered_buses = {}
-
+        
         # communication with the MainStation
         self.domain = get_domain.get_domain()
         self.main_connection = None # bool
@@ -462,7 +464,7 @@ class BusStation(Station):
                     except Exception as e:
                         print(f"{self.name}: Error distributing events to bus "
                                 f"{bus.thread_name}: {e}\n")
-                        
+                                      
 
     def propagate_all_to_main(self):
         """
@@ -608,6 +610,36 @@ class BusStation(Station):
         except Exception as e:
             print(f"{self.name}: Error deserializing events: {e}\n")
             return []
+        
+
+    def has_interest_in(self, event_type: Type[Event]) -> bool:
+        """
+        Check if this BusStation has interest in a specific event type.
+
+        This is true if any registered EventBus has interest in the event type,
+        or _type_matches_interests is True.
+
+        Args:
+            event_type: The event type to check.
+
+        Returns:
+            bool: True if this BusStation has interest in the event type,
+                  False otherwise.
+        
+        """
+        with self.lock:
+            # check if any registered EventBus has interest in the event type
+            for bus_ref, interests in self.registered_buses.items():
+                bus = bus_ref()
+                if bus is None:
+                    continue
+
+                if event_type in interests:
+                    return True
+
+            # check if this BusStation has interest in the event type
+            return self._type_matches_interests(event_type, interests)
+
         
     def shutdown(self):
         """

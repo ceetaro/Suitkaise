@@ -116,4 +116,39 @@ class SKDomain(Enum):
     EXTERNAL = auto() # external, uses ExtStation
     UNKNOWN = auto() # unknown, uses UnknownStation
 
+
+class BridgeDirection(Enum):
+    """
+    Enum for the direction of communication across the event bridge.
+
+    This defines how events can flow between the internal and external domains.
+    - OPEN: Events can flow in both directions.
+    - CLOSED: No events can flow in either direction.
+    - ONLY_TO_EXT: Events can only flow from internal to external.
+    - ONLY_TO_INT: Events can only flow from external to internal.
+    
+    """
+    OPEN = auto() # events can flow in both directions
+    CLOSED = auto() # no events can flow in either direction
+    ONLY_TO_EXT = auto() # events can only flow from internal to external
+    ONLY_TO_INT = auto() # events can only flow from external to internal
+
+
+class BridgeState(Enum):
+    """
+    Enum for the control state of the event bridge, which gets changed
+    manually by the user.
+
+    - LOCKED: The bridge is locked to the current BridgeDirection.
+    - UNLOCKED: The bridge is unlocked and BridgeDirection can be changed by code.
+    - FORCE_OPEN: Forces BridgeDirection to change to OPEN, and locks it there.
+    - FORCE_CLOSED: Forces BridgeDirection to change to CLOSED, and locks it there.
+    
+    """
+    LOCKED = auto() # bridge is locked to current BridgeDirection
+    UNLOCKED = auto() # bridge is unlocked, BridgeDirection can be changed by code
+    FORCE_OPEN = auto() # forces BridgeDirection to OPEN, and locks it there
+    FORCE_CLOSED = auto() # forces BridgeDirection to CLOSED, and locks it there
+
+
     

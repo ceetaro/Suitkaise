@@ -40,12 +40,302 @@
 
 """
 Module holding the abstract MainStation class for managing all events on one side of 
-the Bridge. This class inherits from the Station class, and is the main manager 
+the EventBridge. This class inherits from the Station class, and is the main manager 
 and chronicler of either all internal (IntStation) or external (ExtStation) events. 
 IntStation and ExtStation inherit from this abstract class, and implement the methods
 specific to their respective event systems. Communicates will all BusStations
-in processes dedicated to their side of the Bridge. Responsible for all cross-process
+in processes dedicated to their side of the EventBridge. Responsible for all cross-process
 communication and event management, and gathers events from all BusStations and the
 opposite MainStation.
 
 """
+
+import threading
+from abc import ABC, abstractmethod
+from typing import Dict, List, Set, Type, Optional, Any
+
+from suitkaise.int.eventsys.data.enums.enums import (
+    StationLevel, BridgeDirection, BridgeState, SKDomain
+    )
+from suitkaise.int.eventsys.events.base_event import Event
+from suitkaise.int.eventsys.core.station.station import Station
+from suitkaise.int.eventsys.core.station.bus_station import BusStation
+import suitkaise.int.domain.get_domain as get_domain
+
+class MainStation(Station, ABC):
+    """
+    Abstract base class for main event stations (IntStation and ExtStation).
+
+    The MainStation acts as the central repository for either all internal
+    or all external events, and interfaces (works) with:
+
+    1. All BusStations on its side of the Bridge (SKDomain.INTERNAL or SKDomain.EXTERNAL)
+    2. The other MainStation through the EventBridge
+
+    MainStation is responsible for:
+    - Cross-process communication with BusStations
+    - Distributing events to appropriate BusStations
+    - Communication with the opposite MainStation through the EventBridge
+    - Maintaining a complete history of all events on its side
+
+    This is an abstract class - use IntStation or ExtStation.
+    
+    """
+
+    def __init__(self):
+        """
+        Initialize the MainStation.
+
+        The MainStation's name will be either IntStation or ExtStation, depending on
+        the process it is running in. The station name will be handled by IntStation or
+        ExtStation, and is not specifically set here.
+        
+        """
+        super().__init__()
+        
+        # registry of connected BusStations
+        self.bus_stations = {} # dict of BusStations by process ID
+        self.bus_stations_lock = threading.Lock()   
+
+        # connection to EventBridge
+        self.bridge = None
+
+        # station level
+        self.station_level = StationLevel.MAIN
+
+        # settings and state
+        self.domain = get_domain.get_domain()
+        self.auto_sync = True
+        self.sync_interval = 15.0 # seconds between syncs
+
+        print(f"Created {self.__class__.__name__} with domain {self.domain.name}")
+
+
+# 
+# Bus registration methods
+#
+
+    def register_bus_station(self, station: BusStation) -> None:
+        """
+        Register a BusStation with this MainStation.
+
+        This establishes a connection between the MainStation and a 
+        BusStation on its side of the EventBridge. This can be BusStations
+        from other processes, or the local BusStation in the same process.
+        The MainStation will then be able to send and receive events
+        from this BusStation.
+
+        Args:
+            station (BusStation): The BusStation to register.
+        
+        """
+        with self.bus_stations_lock:
+            process_id = station.process_id
+
+            if process_id in self.bus_stations:
+                # BusStation already registered
+                print(f"BusStation {process_id} already registered with {self.name}")
+                return
+            
+            # Register the BusStation
+            self.bus_stations[process_id] = station
+            print(f"Registered BusStation {process_id} with {self.name}")
+
+
+    def unregister_bus_station(self, process_id: int) -> None:
+        """
+        Unregister a BusStation from this MainStation.
+
+        This removes the connection between the MainStation and a
+        BusStation on its side of the EventBridge.
+
+        Args:
+            process_id (int): The process ID of the BusStation to unregister.
+
+        """
+        with self.bus_stations_lock:
+            if process_id not in self.bus_stations:
+                # BusStation not registered
+                print(f"BusStation {process_id} not registered with {self.name}")
+                return
+            
+            # Unregister the BusStation
+            del self.bus_stations[process_id]
+            print(f"Unregistered BusStation {process_id} from {self.name}")
+
+    
+    def get_bus_station(self, process_id: int) -> Optional[BusStation]:
+        """
+        Get a BusStation by process ID.
+
+        Args:
+            process_id (int): The process ID of the BusStation to get.
+
+        Returns:
+            Optional[BusStation]: The BusStation with the given process ID, 
+            or None if not found.
+        
+        """
+        with self.bus_stations_lock:
+            return self.bus_stations.get(process_id, None)
+        
+        
+# 
+# Event distribution methods
+#
+
+    def has_interest_in(self, event_type: Type) -> bool:
+        """
+        Check if this MainStation has interest in a specific event type.
+
+        Args:
+            event_type (Type[Event]): The event type to check.
+
+        Returns:
+            bool: True if the MainStation has interest in the event type,
+            False otherwise.
+        
+        """
+        # MainStation is interested in all events
+        return True
+
+    def distribute_events(self, events: List[Event]) -> None:
+        """
+        Distribute events to all registered BusStations,
+        based on their interests.
+
+        Args:
+            events (List[Event]): The list of events to distribute.
+
+        """
+        # group events by type for distribution
+        events_by_type = {}
+        for event in events:
+            event_type = event.event_type
+            if event_type not in events_by_type:
+                events_by_type[event_type] = []
+            events_by_type[event_type].append(event)
+
+        # distribute events to BusStations
+        with self.bus_stations_lock:
+            for event_type, event_list in events_by_type.items():
+                for process_id, station in self.bus_stations.items():
+                    if station.has_interest_in(event_type):
+                        try:
+                            station.add_event(event)
+                            print(f"Distributed {event.idshort} to BusStation "
+                                  f"{process_id} from {self.name}")
+                            
+                        except Exception as e:
+                            print(f"Error distributing event {event.idshort} to "
+                                  f"BusStation {process_id}: {e}")
+                            
+    
+    def distribute_event(self, event: Event) -> None:
+        """
+        Distribute a single event to all registered BusStations,
+        based on their interests.
+
+        Args:
+            event (Event): The event to distribute.
+
+        """
+        self.distribute_events([event])
+
+    
+#
+# EventBridge communication methods
+#
+
+    def connect_to_bridge(self) -> None:
+        """
+        Connect this MainStation to the EventBridge singleton.
+
+        The EventBridge is used to faciliate communication with the opposite
+        MainStation (IntStation or ExtStation).
+
+        It manages the syncing of events between the two MainStations.
+        
+        """
+        from suitkaise.int.eventsys.core.bridge.event_bridge import EventBridge
+        self.bridge = EventBridge.get_connection()
+        print(f"Connected {self.name} to EventBridge")
+        if self.bridge is None:
+            raise RuntimeError("Failed to connect to EventBridge")
+        
+
+    def connected_to_bridge(self) -> bool:
+        """
+        Check if this MainStation is connected to the EventBridge.
+
+        Returns:
+            bool: True if connected to the EventBridge, False otherwise.
+        
+        """
+        return self.bridge is not None
+    
+    def get_bridge_direction(self) -> BridgeDirection:
+        """
+        Get the direction of communication across the EventBridge.
+
+        Returns:
+            BridgeDirection: The direction of communication (INTERNAL or EXTERNAL).
+        
+        """
+        if self.bridge is None:
+            try:
+                self.connect_to_bridge()
+            except RuntimeError:
+                raise RuntimeError("Not connected to EventBridge")
+        return self.bridge.get_direction()
+    
+    
+    def get_bridge_state(self) -> BridgeState:
+        """
+        Get the current state of the EventBridge.
+
+        Returns:
+            BridgeState: The current state of the EventBridge.
+        
+        """
+        if self.bridge is None:
+            try:
+                self.connect_to_bridge()
+            except RuntimeError:
+                raise RuntimeError("Not connected to EventBridge")
+        return self.bridge.get_state()
+    
+
+
+#
+# get methods
+#
+        
+
+    def get_domain(self) -> SKDomain:
+        """
+        Get the domain of this MainStation.
+
+        Returns:
+            SKDomain: The domain of this MainStation (INTERNAL or EXTERNAL).
+        
+        """
+        return self.domain
+    
+    
+    def get_station_level(self) -> StationLevel:
+        """
+        Get the station level of this MainStation.
+
+        Returns:
+            StationLevel: The station level of this MainStation (MAIN).
+        
+        """
+        return StationLevel.MAIN
+
+            
+
+        
+
+        
+

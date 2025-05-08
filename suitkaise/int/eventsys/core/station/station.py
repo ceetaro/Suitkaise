@@ -80,15 +80,17 @@ class Station(ABC):
 
     """
 
-    def __init__(self, name: str):
+    def __init__(self):
         """
         Initialize a new Station.
 
         Args:
-            name (str): a descriptive name for the station
-        
+            
         """
-        self.name = name
+        self.process_id = os.getpid() # process ID
+        self.process_name = f"Process-{self.process_id}" # process name
+
+        self.name = f"Station-{self.process_id}" # station name
         self.event_history = []
 
         # lazy indexes
@@ -102,9 +104,6 @@ class Station(ABC):
         self.active_indexes = [] # list of indexes currently built
 
         self.lock = threading.RLock() # lock for thread-safe access
-
-        self.process_id = os.getpid() # process ID
-        self.process_name = f"Process-{self.process_id}" # process name
 
         # config
         self.history_size_limit = None # size limit for the history, in bytes
@@ -279,6 +278,26 @@ class Station(ABC):
             self.last_clear = sktime.now()
 
             print(f"Cleared history and indexes for station '{self.name}'")
+
+    #
+    # INTERESTS
+    # 
+
+    def has_interest_in(self, event_type: Type) -> bool:
+        """
+        Check if the station is interested in a specific event.
+
+        Should be overridden by subclasses.
+
+        Args:
+            event_type (Type): the event type to check
+
+        Returns:
+            bool: True if the event type is of interest, False otherwise
+        
+        """
+        return False
+            
 
     #
     # EVENT SIZE AND SPACE MANAGEMENT
@@ -679,7 +698,7 @@ class Station(ABC):
     # EVENT RETRIEVAL METHODS
     #
     
-    def _type_matches_interests(self, event, interests):
+    def _type_matches_interests(self, event_or_type, interests):
         """
         Helper method to check if an event type matches any of the interests.
         
@@ -692,6 +711,19 @@ class Station(ABC):
         Returns:
             bool: True if the event type matches any interest, False otherwise
         """
+        def get_event_instance_from_type(self, event_type: Type) -> Optional[Event]:
+            """Get an event instance from the event type."""
+            with self.lock:
+                for event in self.event_history:
+                    if isinstance(event, event_type):
+                        return event.copy()
+                return None
+            
+        if isinstance(event_or_type, type):
+            event = get_event_instance_from_type(event_or_type)
+        elif isinstance(event_or_type, Event):
+            event = event_or_type
+
         # Direct match
         if event.event_type in interests:
             return True
@@ -705,6 +737,7 @@ class Station(ABC):
                     return True
 
         return False
+    
 
     def get_events(self, interests: Optional[Set[Type[Event]]] = None) -> List[Event]:
         """

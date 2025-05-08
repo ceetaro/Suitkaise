@@ -79,21 +79,21 @@ class EventKeyRegistry:
 
     """
     _instance = None
-    _lock = threading.RLock()
+    _instance_lock = threading.RLock()
 
     def __new__(cls):
-        with cls._lock:
+        with cls._instance_lock:
             if cls._instance is None:
                 cls._instance = super(EventKeyRegistry, cls).__new__(cls)
-                cls._instance._keys = {}
-                cls._instance._initialized = False
             return cls._instance
         
     def __init__(self):
-        with self._lock:
-            if not self._initialized:
-                self._keys = {}
-                self._initialized = True
+        with self._instance_lock:
+            if hasattr(self, '_initialized') and self._initialized:
+                return
+            
+            self._keys = {}
+            self._initialized = True
 
     def register(self, 
                  key: str,
@@ -139,7 +139,7 @@ class EventKeyRegistry:
             description: Optional description for the key.
         
         """
-        with self._lock:
+        with self._instance_lock:
             # validate inputs
             if not isinstance(key, str):
                 raise ValueError("Key must be a string.")
@@ -205,7 +205,7 @@ class EventKeyRegistry:
             bool: True if the key was unregistered, False if it was not found.
 
         """
-        with self._lock:
+        with self._instance_lock:
             if key in self._keys:
                 del self._keys[key]
                 print(f"Unregistered key: {key}")
@@ -237,7 +237,7 @@ class EventKeyRegistry:
             is_optional: New optional status for the key.
         
         """
-        with self._lock:
+        with self._instance_lock:
             if key in self._keys:
                 self._keys[key]['is_optional'] = is_optional
                 print(f"Changed optional status of key '{key}' to {is_optional}.")
@@ -395,10 +395,10 @@ class OptionalKeyRegistry:
 
     """
     _instance = None
-    _lock = threading.RLock()
+    _instance_lock = threading.RLock()
 
     def __new__(cls):
-        with cls._lock:
+        with cls._instance_lock:
             if cls._instance is None:
                 cls._instance = super(OptionalKeyRegistry, cls).__new__(cls)
                 cls._instance._optional_keys = set()
@@ -406,7 +406,7 @@ class OptionalKeyRegistry:
             return cls._instance
         
     def __init__(self):
-        with self._lock:
+        with self._instance_lock:
             if not self._initialized:
                 self._optional_keys = set()
                 self._initialized = True
@@ -419,7 +419,7 @@ class OptionalKeyRegistry:
             key: The key to register.
         
         """
-        with self._lock:
+        with self._instance_lock:
             if key['key'] not in self._optional_keys and key['is_optional'] is True:
                 self._optional_keys.add(key)
                 print(f"Registered optional key: {key['key']}")
@@ -442,7 +442,7 @@ class OptionalKeyRegistry:
             bool: True if the key was unregistered, False if it was not found.
         
         """
-        with self._lock:
+        with self._instance_lock:
             if key in self._optional_keys:
                 self._optional_keys.remove(key)
                 EventKeyRegistry().change_optional_status(key['key'], False)
@@ -486,9 +486,9 @@ def initialize_key_registries() -> None:
     It creates an instance of the EventKeyRegistry and OptionalKeyRegistry.
     
     """
-    with EventKeyRegistry._lock:
+    with EventKeyRegistry._instance_lock:
         EventKeyRegistry()
-    with OptionalKeyRegistry._lock:
+    with OptionalKeyRegistry._instance_lock:
         OptionalKeyRegistry()
 
 
@@ -788,7 +788,7 @@ def upgrade_compression_level(keys: List[str], level: CompressionLevel) -> None:
     
     """
     event_key_registry = EventKeyRegistry()
-    with event_key_registry._lock:
+    with event_key_registry._instance_lock:
         all_keys = event_key_registry.get_all_key_names()
         for key in keys:
             if key in all_keys:
@@ -813,7 +813,7 @@ def reset_compression_level(keys: List[str]) -> None:
     
     """
     event_key_registry = EventKeyRegistry()
-    with event_key_registry._lock:
+    with event_key_registry._instance_lock:
         all_keys = event_key_registry.get_all_key_names()
         for key in keys:
             if key in all_keys:
@@ -904,7 +904,7 @@ def add_replacement_function(key: str,
         fib.add_kwargs(kwargs)
         replacement_function = fib.build()
 
-    with event_key_registry._lock:
+    with event_key_registry._instance_lock:
         if is_registered(key):
             event_key_registry._keys[key]['replace_with_function'] = replacement_function
             print(f"Added replacement function for key: {key}")
@@ -924,7 +924,7 @@ def remove_replacement_function(key: str) -> None:
     
     """
     event_key_registry = EventKeyRegistry()
-    with event_key_registry._lock:
+    with event_key_registry._instance_lock:
         if is_registered(key):
             event_key_registry._keys[key]['replace_with_function'] = None
             print(f"Removed replacement function for key: {key}")
