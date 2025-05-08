@@ -129,34 +129,23 @@ class Station(ABC):
     #
 
     @abstractmethod
-    def _process_incoming_event(self, event: Event) -> None:
-        """
-        Process an incoming event according to station rules.
-
-        Args:
-            event (Event): the event to process
-        
-        """
-        pass
-
-    @abstractmethod
-    def _process_all_incoming_events(self, events: List[Event]) -> None:
-        """
-        Process all incoming events according to station rules.
-
-        Args:
-            events (List[Event]): the events to process
-        
-        """
-        pass
-
-    @abstractmethod
     def get_station_level(self) -> StationLevel:
         """
         Get the station level.
 
         Returns:
             StationLevel: the station level
+        
+        """
+        pass
+
+    @abstractmethod
+    def distribute_events(self, events: List[Event]) -> None:
+        """
+        Distribute events to the appropriate stations.
+
+        Args:
+            events (List[Event]): the events to distribute
         
         """
         pass
@@ -191,7 +180,7 @@ class Station(ABC):
             self._manage_history()
 
             # process the event according to station rules
-            self.process_incoming_event(event)
+            self.distribute_events([event])
 
             print(f"Added event {event.event_type_name} ({event.idshort}) "
                   f"to station '{self.name}'\n"
@@ -243,7 +232,7 @@ class Station(ABC):
             self._manage_history()
 
             # process the events according to station rules
-            self._process_all_incoming_events(events)
+            self.distribute_events(events)
 
             print(f"Added {len(events)} events to station '{self.name}'\n"
                   f"Batch size: {batch_size} bytes\n")

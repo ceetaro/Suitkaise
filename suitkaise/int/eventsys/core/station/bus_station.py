@@ -464,6 +464,197 @@ class BusStation(Station):
                                 f"{bus.thread_name}: {e}\n")
                         
 
+    def propagate_all_to_main(self):
+        """
+        Propagate all local events to the MainStation.
+
+        This is used when a bus calls to_station() with StationLevel.MAIN.
+        
+        """
+        with self._main_station_lock:
+            if not self.main_connection:
+                if self.able_to_connect():
+                    self._connect_to_main_station(self.domain)
+                    if not self.main_connection:
+                        raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                else:
+                    raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                
+            try:
+                # send all events to MainStation
+                serialized_events = self._serialize_events(self.event_history)
+                self.connected_station.send(('events', serialized_events))
+                print(f"{self.name}: Propagated all events to "
+                      f"{self.connected_station.name}.\n")
+                
+            except Exception as e:
+                print(f"{self.name}: Error propagating events to "
+                      f"{self.connected_station.name}: {e}\n")
+                
+
+    def event_to_main_station(self, event: Event):
+        """
+        Send a single event to the MainStation.
+
+        Args:
+            event: The event to send.
+        
+        """
+        with self._main_station_lock:
+            if not self.main_connection:
+                if self.able_to_connect():
+                    self._connect_to_main_station(self.domain)
+                    if not self.main_connection:
+                        raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                else:
+                    raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                
+            try:
+                # send event to MainStation
+                serialized_event = self._serialize_events([event])
+                self.connected_station.send(('event', serialized_event))
+                print(f"{self.name}: Sent event to "
+                      f"{self.connected_station.name}.\n")
+                
+            except Exception as e:
+                print(f"{self.name}: Error sending event to "
+                      f"{self.connected_station.name}: {e}\n")
+                
+
+    def from_main_station(self, interests=None, round_trip=False):
+        """
+        Retrieve events from the MainStation.
+
+        Args:
+            interests: Optional set of event types to retrieve
+            round_trip: Whether to send local events first (round trip sync)
+
+        Returns:
+            List[Event]: List of events retrieved from the MainStation.
+        
+        """
+        with self._main_station_lock:
+            if not self.main_connection:
+                if self.able_to_connect():
+                    self._connect_to_main_station(self.domain)
+                    if not self.main_connection:
+                        raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                else:
+                    raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                
+            try:
+                # if round trip, send local events first
+                if round_trip:
+                    self.propagate_all_to_main()
+
+                serialized_interests = None
+                if interests:
+                    interest_names = [interest.__name__ for interest in interests]
+                    serialized_interests = pickle.dumps(interest_names)
+
+                # request events from MainStation
+                self.connected_station.send(('get_events', serialized_interests))
+                message_type, data = self.connected_station.receive()
+
+                if message_type == 'events':
+                    events = self._deserialize_events(data)
+                    print(f"{self.name}: Received {len(events)} events from "
+                          f"{self.connected_station.name}.\n")
+                    return events
+                else:
+                    print(f"{self.name}: Unexpected message type from "
+                          f"{self.connected_station.name}: {message_type}.\n")
+                    return []
+                
+            except Exception as e:
+                print(f"{self.name}: Error retrieving events from "
+                      f"{self.connected_station.name}: {e}\n")
+                return []
+            
+
+    def _serialize_events(self, events: List[Event]) -> bytes:
+        """
+        Serialize events for transmission to the MainStation.
+
+        Args:
+            events: List of events to serialize.
+
+        Returns:
+            bytes: Serialized events.
+        
+        """
+        try:
+            # use pickle to serialize events
+            return pickle.dumps(events)
+        except Exception as e:
+            print(f"{self.name}: Error serializing events: {e}\n")
+            return pickle.dumps([])
+        
+
+    def _deserialize_events(self, data: bytes) -> List[Event]:
+        """
+        Deserialize events received from the MainStation.
+
+        Args:
+            data: Serialized event data.
+
+        Returns:
+            List[Event]: Deserialized events.
+        
+        """
+        try:
+            # use pickle to deserialize events
+            return pickle.loads(data)
+        except Exception as e:
+            print(f"{self.name}: Error deserializing events: {e}\n")
+            return []
+        
+    def shutdown(self):
+        """
+        Shutdown the station and its background tasks.
+
+        This should be called before the process exits.
+        
+        """
+        # stop the background tasks
+        self._running = False
+
+        # wait for threads to finish
+        if self._sync_thread and self._sync_thread.is_alive():
+            self._sync_thread.join(timeout=1.0)
+
+        if self._compression_thread and self._compression_thread.is_alive():
+            self._compression_thread.join(timeout=1.0)
+
+        # final sync with the MainStation
+        if self.main_connection:
+            self._sync_with_main()
+            print(f"{self.name}: Final sync with MainStation complete.\n")
+
+        # remove the instance from the dictionary
+        with self._instances_lock:
+            self._instances.pop(self.process_id, None)
+
+        print(f"{self.name}: Shutdown complete.\n")
+
+
+#
+# Station abstract methods
+#
+
+    def get_station_level(self) -> StationLevel:
+        """
+        Get the station level of this BusStation.
+
+        Returns:
+            StationLevel: The station level of this BusStation.
+        
+        """
+        return self._station_level
+
+
+                        
+
                         
 
 
