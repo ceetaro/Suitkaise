@@ -56,6 +56,7 @@ from math import sqrt
 
 from suitkaise.int.eventsys.data.enums.enums import EventState, ValueType, StationLevel
 from suitkaise.int.eventsys.events.base_event import Event
+import suitkaise.int.domain.get_domain as get_domain
 
 from suitkaise.int.eventsys.context.thread_context import (
     get_or_create_bus, get_current_collector, set_bus
@@ -101,6 +102,8 @@ class EventBus:
         self.subscribers = {}    # {event_type: [{'callback': func, 'keys': {}}]}
         self.lock = threading.Lock() # Lock for thread safety
         self.interests = set() # Event types this bus is interested in
+
+        self.domain = get_domain.get_domain() # Get the current domain
 
         # collectors
         self.collectors = [] # List of collectors registered with this bus

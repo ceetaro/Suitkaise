@@ -114,5 +114,6 @@ class SKDomain(Enum):
     """
     INTERNAL = auto() # internal, uses IntStation
     EXTERNAL = auto() # external, uses ExtStation
+    UNKNOWN = auto() # unknown, uses UnknownStation
 
     

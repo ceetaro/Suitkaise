@@ -65,11 +65,12 @@ from typing import Dict, List, Set, Type, Optional, Any, Union, Tuple
 
 import suitkaise.int.time.sktime as sktime
 from suitkaise.int.eventsys.data.enums.enums import (
-    StationLevel, EventState, EventPriority, CompressionLevel
+    StationLevel, EventState, EventPriority, CompressionLevel, SKDomain
 )
 from suitkaise.int.eventsys.events.base_event import Event
 import suitkaise.int.eventsys.keyreg.keyreg as keyreg
 from suitkaise.int.eventsys.core.station.station import Station
+import suitkaise.int.domain.get_domain as get_domain
 
 class BusStation(Station):
     """
@@ -163,7 +164,8 @@ class BusStation(Station):
         self.registered_buses = {}
 
         # communication with the MainStation
-        self.main_connection = None
+        self.domain = get_domain.get_domain()
+        self.main_connection = None # bool
         self.connected_station = None # either IntStation or ExtStation
         self._main_station_lock = threading.RLock()
 
@@ -276,7 +278,14 @@ class BusStation(Station):
             bool: True if the BusStation can connect to the MainStation,
                   False otherwise.
         """
-        pass
+        try:
+            if self.main_connection is not False:
+                return True
+            else:
+                raise ValueError(f"{self.name} cannot connect to the MainStation.")
+        except Exception as e:
+            print(f"Error checking connection for {self.name}: {e}")
+            return False
 
     def _connect_to_main_station(self, domain: str):
         """
@@ -288,18 +297,76 @@ class BusStation(Station):
 
         """
         with self._main_station_lock:
-            if 
+            if self.domain == SKDomain.INTERNAL:
+                # connect to the IntStation
+                from suitkaise.int.eventsys.core.station.int_station import IntStation
+                self.connected_station = IntStation.get_connection()
+                if self.connected_station:
+                    self.main_connection = True
+                    print(f"Connected to IntStation for {self.name}.")
+                else:
+                    print(f"Failed to connect to IntStation for {self.name}.")
+                    self.main_connection = False
+                    self.connected_station = None
+
+            elif self.domain == SKDomain.EXTERNAL:
+                # connect to the ExtStation
+                from suitkaise.int.eventsys.core.station.ext_station import ExtStation
+                self.connected_station = ExtStation.get_connection()
+                if self.connected_station:
+                    self.main_connection = True
+                    print(f"Connected to ExtStation for {self.name}.")
+                else:
+                    print(f"Failed to connect to ExtStation for {self.name}.")
+                    self.main_connection = False
+                    self.connected_station = None
+            else:
+                raise ValueError(f"Unknown domain: {self.domain}")
+            
+            print(f"Connected to {self.connected_station.name} for {self.name}.")
+
 
     def _sync_with_main(self):
         """
         Synchronize with the MainStation.
 
-        This method should be implemented to handle the specifics of
-        syncing with the MainStation, including sending and receiving
-        events.
+        This sends local events to the MainStation and retrieves
+        events back from the MainStation.
         
         """
-        pass
+        with self._main_station_lock:
+            if not self.main_connection:
+                if self.able_to_connect():
+                    self._connect_to_main_station(self.domain)
+                    if not self.main_connection:
+                        raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                else:
+                    raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                
+            try:
+                # send events to the MainStation
+                serialized_events = self._serialize_events(self.event_history)
+                self.connected_station.send(('events', serialized_events))
+
+                # receive events from the MainStation
+                self.connected_station.send(('get_events', None))
+                message_type, data = self.connected_station.receive()
+
+                if message_type == 'events':
+                    remote_events = self._deserialize_events(data)
+                    self._add_events_to_history(remote_events)
+                    print(f"{self.name}: Received {len(remote_events)} events from "
+                          f"{self.connected_station.name}.")
+                    
+                else: 
+                    print(f"{self.name}: Unexpected message type from "
+                          f"{self.connected_station.name}: {message_type}.")
+                    
+                self.last_sync = sktime.now()
+
+            except Exception as e:
+                print(f"{self.name}: Error syncing with MainStation: {e}")
+                
 
     def register_bus(self, bus, interests=None):
         """
