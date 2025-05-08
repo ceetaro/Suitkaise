@@ -52,7 +52,7 @@ opposite MainStation.
 
 import threading
 from abc import ABC, abstractmethod
-from typing import Dict, List, Set, Type, Optional, Any
+from typing import Dict, List, Set, Type, Optional, Any, Tuple
 
 from suitkaise.int.eventsys.data.enums.enums import (
     StationLevel, BridgeDirection, BridgeState, SKDomain
@@ -107,8 +107,35 @@ class MainStation(Station, ABC):
         self.domain = get_domain.get_domain()
         self.auto_sync = True
         self.sync_interval = 15.0 # seconds between syncs
+        self.compression_interval = 90.0 # seconds between compressions
+        self.history_size_limit = 150 * 1024 * 1024 # 150 MB
+        self.compress_threshold = 100 * 1024 * 1024 # 100 MB
+
+        self._sync_thread = None
+        self._compression_thread = None
+        self._running = False
+
+        self._init_background()
 
         print(f"Created {self.__class__.__name__} with domain {self.domain.name}")
+
+    @abstractmethod
+    def _init_background(self) -> None:
+        """
+        Initialize and start background tasks for the MainStation.
+
+        IntStation and ExtStation will implement this method to start their
+        specific background tasks. This is called during the initialization
+        of the MainStation.
+
+        This should:
+        1. Start the thread to periodically sync with the other MainStation
+        using the EventBridge.
+        2. Start the thread to periodically compress events in the event
+        history.
+        
+        """
+        pass
 
 
 # 
@@ -273,6 +300,22 @@ class MainStation(Station, ABC):
         
         """
         return self.bridge is not None
+    
+    def get_bridge_info(self) -> Tuple[BridgeDirection, BridgeState]:
+        """
+        Get the EventBridge information.
+
+        Returns:
+            Tuple[BridgeDirection, BridgeState]: The direction and state of the EventBridge.
+        
+        """
+        if self.bridge is None:
+            try:
+                self.connect_to_bridge()
+            except RuntimeError:
+                raise RuntimeError("Not connected to EventBridge")
+        return self.bridge.get_info()
+    
     
     def get_bridge_direction(self) -> BridgeDirection:
         """

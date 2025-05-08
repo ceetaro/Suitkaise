@@ -205,7 +205,6 @@ class BusStation(Station):
             name=f"SyncThread-{self.process_id}",
             daemon=True
             )
-        
         self._sync_thread.start()
 
         # start the compression thread

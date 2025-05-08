@@ -103,6 +103,8 @@ class IntStation(MainStation):
         if domain != SKDomain.INTERNAL:
             raise RuntimeError("IntStation can only be used in the INTERNAL domain.")
         
+        self.bridge = self.connect_to_bridge()
+        
         self._initialized = True
 
         # last syncs
@@ -110,6 +112,38 @@ class IntStation(MainStation):
         self.last_ext_sync = None
 
         print(f"IntStation initialized in domain: {domain}")
+
+
+    def _init_background(self) -> None:
+        """
+        Initialize and start background tasks for the MainStation.
+
+        This should:
+        1. Start the thread to periodically sync with the other MainStation
+        using the EventBridge.
+        2. Start the thread to periodically compress events in the event
+        history.
+        
+        """
+        self._running = True
+
+        # start the thread to sync with the other MainStation
+        self._sync_thread = threading.Thread(
+            target=self._sync_with_extstation,
+            name="IntStation Sync Thread",
+            daemon=True
+        )
+        self._sync_thread.start()
+
+        # start the thread to compress events in the event history
+        self._compression_thread = threading.Thread(
+            target=self._compress_station_history,
+            name="IntStation Compression Thread",
+            daemon=True
+        )
+        self._compression_thread.start()
+
+        print(f"Started background tasks for IntStation.")
 
 
     @classmethod
@@ -127,9 +161,83 @@ class IntStation(MainStation):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+
+    def _compress_station_history(self):
+        """
+        Periodically compress the event history to save space.
+        
+        This method runs in a separate thread and compresses the event
+        history every 5 minutes. The compression level is set to HIGH
+        for maximum space savings.
+
+        """
+        while self._running:
+            try:
+                # check if comporession is needed
+                if self.needs_compressing == True:
+                    self.compress_events() # from Station class
+                    print(f"Compressed events for {self.name}.")
+
+                sktime.sleep(self.compression_interval)
+
+            except Exception as e:
+                print(f"Error in compression thread for {self.name}: {e}")
+                sktime.yawn(3, 10, 100, self.station_name, dprint=True)
+                sktime.sleep(1)
+
+
+# 
+# Bridge related methods
+#
+
+    def _sync_with_extstation(self):
+        """
+        Periodically sync with the ExtStation using the EventBridge.
+
+        Uses EventBridge.sync() to synchronize events with the ExtStation.
+        This method runs in a separate thread and syncs every self.compression_interval
+        seconds.
+        
+        """
+        while self._running:
+            try:
+                # if last_ext_sync is None or more than sync_interval seconds ago
+                if self.last_ext_sync:
+                    elapsed = sktime.elapsed(self.last_ext_sync)
+                
+                if self.last_ext_sync is None or elapsed > self.sync_interval:
+                    # sync with the ExtStation, depending on BridgeState 
+                    # and BridgeDirection
+                    synced = self.bridge.sync()
+                    if synced:
+                        self.last_ext_sync = sktime.now()
+                        print(f"Synced with ExtStation at "
+                              f"{sktime.to_custom_time_format(self.last_ext_sync)}.")
+                    else:
+                        direction, state = self.get_bridge_info()
+                        if self.bridge.can_send_to_ext():
+                            raise RuntimeError(
+                                f"Failed to sync with ExtStation despite BridgeState {state} "
+                                f"and BridgeDirection {direction} allowing a sync."
+                                )
+                        # if we can't sync due to bridge closure, don't raise an error
+                        # because this is intended behavior
+                        
+            except Exception as e:
+                print(f"Error in sync thread for {self.name}: {e}")
+                raise e
+            
+            finally:
+                # sleep for the sync interval
+                sktime.sleep(self.sync_interval)
+
+
+
+
+        
     
 
-    
 
 
         

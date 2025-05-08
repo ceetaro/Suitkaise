@@ -306,13 +306,14 @@ def to_iso(value: TimeValue) -> Optional[str]:
     else:
         return dt.isoformat()
     
-def elapsed(start: TimeValue, end: TimeValue) -> Optional[float]:
+def elapsed(start: TimeValue, end: TimeValue = now()) -> Optional[float]:
     """
     Calculate the elapsed time between two values.
 
     Args:
         start: The start value.
         end: The end value.
+            If None, the current time is used.
 
     Returns:
         The elapsed time in seconds, or None if conversion fails.
