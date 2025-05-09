@@ -60,6 +60,7 @@ from suitkaise.int.eventsys.data.enums.enums import (
 from suitkaise.int.eventsys.events.base_event import Event
 from suitkaise.int.eventsys.core.station.station import Station
 from suitkaise.int.eventsys.core.station.bus_station import BusStation
+import suitkaise.int.time.sktime as sktime
 import suitkaise.int.domain.get_domain as get_domain
 
 class MainStation(Station, ABC):
@@ -102,6 +103,11 @@ class MainStation(Station, ABC):
 
         # station level
         self.station_level = StationLevel.MAIN
+
+        # inter station messaging
+        self.received_messages = {} # maps bus name to received message
+        self.requests = {} # maps bus id to request
+        self.replies = {} # maps bus id to processed replies
 
         # settings and state
         self.domain = get_domain.get_domain()
@@ -206,6 +212,25 @@ class MainStation(Station, ABC):
         with self.bus_stations_lock:
             return self.bus_stations.get(process_id, None)
         
+    
+    def get_bus_station_by_name(self, name: str) -> Optional[BusStation]:
+        """
+        Get a BusStation by name.
+
+        Args:
+            name (str): The name of the BusStation to get.
+
+        Returns:
+            Optional[BusStation]: The BusStation with the given name, 
+            or None if not found.
+        
+        """
+        with self.bus_stations_lock:
+            for station in self.bus_stations.values():
+                if station.name == name:
+                    return station
+            return None
+        
         
 # 
 # Event distribution methods
@@ -303,10 +328,11 @@ class MainStation(Station, ABC):
     
     def get_bridge_info(self) -> Tuple[BridgeDirection, BridgeState]:
         """
-        Get the EventBridge information.
+        Get information about the EventBridge connection.
 
         Returns:
-            Tuple[BridgeDirection, BridgeState]: The direction and state of the EventBridge.
+            Tuple[BridgeDirection, BridgeState]: A tuple containing the direction
+            and state of the EventBridge.
         
         """
         if self.bridge is None:
@@ -315,7 +341,7 @@ class MainStation(Station, ABC):
             except RuntimeError:
                 raise RuntimeError("Not connected to EventBridge")
         return self.bridge.get_info()
-    
+        
     
     def get_bridge_direction(self) -> BridgeDirection:
         """
@@ -348,6 +374,131 @@ class MainStation(Station, ABC):
                 raise RuntimeError("Not connected to EventBridge")
         return self.bridge.get_state()
     
+
+# 
+# Communicating with BusStations
+#
+
+    def msg_from_bus_station(self, id: int,
+                             message: str,
+                             data: Optional[Any] = None) -> None:
+        """
+        Receive a message from a BusStation.
+        Use this to send messages with data from the BusStation to the MainStation.
+
+        Args:
+            id (int): The process ID of the BusStation sending the message.
+            message (str): The message to send.
+            data (Optional[Any]): Optional data to send with the message.
+        
+        """
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                if message in self._valid_msgs:
+                    msg_dict = {
+                        "id": id,
+                        "message": message,
+                        "data": data,
+                        "time_received": sktime.now()
+                    }
+                    self.received_messages[id] = msg_dict
+                    print(f"Received message from BusStation {id}: {message}")
+
+
+    def req_from_bus_station(self, id: int,
+                             message: str,
+                             data: Optional[Any] = None) -> None:
+        """
+        Receive a request from a BusStation.
+        Requests are messages that need a reply from the MainStation.
+
+        Args:
+            id (int): The process ID of the BusStation sending the request.
+            message (str): The request message to send.
+            data (Optional[Any]): Optional data to send with the request.
+        
+        """
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                now = sktime.now()
+                if message in self._valid_msgs:
+                    msg_dict = {
+                        "id": id,
+                        "message": message,
+                        "data": data,
+                        "time_received": now
+                    }
+                    self.received_messages[id] = msg_dict
+                    print(f"Received request from BusStation {id}: {message}")
+        
+                
+                if message in self._valid_reqs:
+                    req_dict = {
+                        "id": id,
+                        "message": message,
+                        "data": data if data else None,
+                        "time_received": now
+                    }
+                    self.requests[id] = req_dict
+                    print(f"Received request from BusStation {id}: {message}")
+
+
+
+    def _unpack_received_data(self):
+        """
+        Unpack received data from messages depending on the message type.
+        
+        """
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                now = sktime.now()
+                msgs_to_clear = []
+                for process_id, message in self.received_messages.items():
+                    if message == 'take_my_bus_station_events':
+                        # unpack the data from the message
+                        data = self.messages[process_id].get('data', None)
+                        if data is not None:
+                            # process the data
+                            events = self._deserialize_events(data)
+                            self.add_multiple_events(events)
+
+                        msgs_to_clear.append(process_id)
+
+                if msgs_to_clear:
+                    for process_id in msgs_to_clear:
+                        self.received_messages.pop(process_id, None)
+
+                    print(f"Cleared {len(msgs_to_clear)} messages after unpacking data")
+
+
+    def _reply_to_requests(self):
+        """
+        Check if there are any requests from BusStations that need a reply,
+        and add the reply and its data to the replies list.
+        
+        """
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                now = sktime.now()
+                for process_id, request in self.requests:
+                    # check what the request is
+                    if request == 'get_your_main_station_events':
+                        # send the events to the BusStation with this process ID
+                        events = self.event_history
+                        data = self._serialize_events(events)
+                        # send the data to the BusStation
+                        self.replies[process_id] = {
+                            'reply_to_id': process_id,
+                            'original_request': self.requests[process_id],
+                            'message': 'my_main_station_events',
+                            'data': data,
+                            'time_sent': now
+                        }
+
+
+
+
+                        
 
 
 #

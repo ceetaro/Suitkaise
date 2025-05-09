@@ -79,6 +79,13 @@ class Station(ABC):
     - IntStation/ExtStation: Domain-level event management
 
     """
+    _valid_msgs = [
+        'get_your_main_station_events', 
+        'take_my_bus_station_events',
+        'my_main_station_events'
+        ]
+    _valid_reqs = ['get_your_main_station_events']
+    _valid_replies = ['my_main_station_events']]
 
     def __init__(self):
         """
@@ -217,6 +224,16 @@ class Station(ABC):
                     print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
                           "does not have a valid post time.")
                     return 0
+                
+            # check for duplicates
+            seen_ids = set()
+            for event in events:
+                if hasattr(event, 'id') and event.id in seen_ids:
+                    combined.remove(event)
+                    print(f"Duplicate event {event.event_type_name} ({event.idshort}) "
+                          "found in batch, skipping.")
+                else:
+                    seen_ids.add(event.id)
                 
             self.event_history = sorted(combined, key=get_timestamp)
 
@@ -1574,4 +1591,46 @@ class Station(ABC):
                 self.priority_index = {}
             else:
                 print(f"Unknown index name '{index_name}' for station '{self.name}'")
+
+
+# 
+# Serialization and Deserialization Methods
+#
+
+    def _serialize_events(self, events: List[Event]) -> bytes:
+        """
+        Serialize events for transmission to the MainStation.
+
+        Args:
+            events: List of events to serialize.
+
+        Returns:
+            bytes: Serialized events.
+        
+        """
+        try:
+            # use pickle to serialize events
+            return pickle.dumps(events)
+        except Exception as e:
+            print(f"{self.name}: Error serializing events: {e}\n")
+            return pickle.dumps([])
+        
+
+    def _deserialize_events(self, data: bytes) -> List[Event]:
+        """
+        Deserialize events received from the MainStation.
+
+        Args:
+            data: Serialized event data.
+
+        Returns:
+            List[Event]: Deserialized events.
+        
+        """
+        try:
+            # use pickle to deserialize events
+            return pickle.loads(data)
+        except Exception as e:
+            print(f"{self.name}: Error deserializing events: {e}\n")
+            return []
 

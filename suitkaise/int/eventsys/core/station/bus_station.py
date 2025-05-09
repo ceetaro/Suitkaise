@@ -164,7 +164,7 @@ class BusStation(Station):
 
         # dictionary of registered EventBuses
         self.registered_buses = {}
-        
+
         # communication with the MainStation
         self.domain = get_domain.get_domain()
         self.main_connection = None # bool
@@ -205,6 +205,7 @@ class BusStation(Station):
             name=f"SyncThread-{self.process_id}",
             daemon=True
             )
+        
         self._sync_thread.start()
 
         # start the compression thread
@@ -228,7 +229,7 @@ class BusStation(Station):
         """
         while self._running:
             try:
-                id = self.station_name
+                id = self.name
                 # only sync if the connection is established
                 if self.main_connection and self.connected_station:
                     self._sync_with_main()
@@ -347,21 +348,22 @@ class BusStation(Station):
             try:
                 # send events to the MainStation
                 serialized_events = self._serialize_events(self.event_history)
-                self.connected_station.send(('events', serialized_events))
+                self.connected_station.msg_from_bus_station((self.process_id, 'take_my_bus_station_events', serialized_events))
 
                 # receive events from the MainStation
-                self.connected_station.send(('get_events', None))
-                message_type, data = self.connected_station.receive()
+                self.connected_station.req_from_bus_station((self.process_id, 'get_your_main_station_events'))
+                expected_message_type = 'my_main_station_events'
+                remote_events = self.get_data_from_reply(self.process_id, expected_message_type)
 
-                if message_type == 'events':
-                    remote_events = self._deserialize_events(data)
+                if remote_events:
+                    events = self._deserialize_events(remote_events)
                     self._add_events_to_history(remote_events)
                     print(f"{self.name}: Received {len(remote_events)} events from "
                           f"{self.connected_station.name}.")
                     
                 else: 
                     print(f"{self.name}: Unexpected message type from "
-                          f"{self.connected_station.name}: {message_type}.")
+                          f"{self.connected_station.name}: {expected_message_type}.\n")
                     
                 self.last_sync = sktime.now()
 
@@ -484,7 +486,7 @@ class BusStation(Station):
             try:
                 # send all events to MainStation
                 serialized_events = self._serialize_events(self.event_history)
-                self.connected_station.send(('events', serialized_events))
+                self.connected_station.msg_from_bus_station((self.process_id, 'take_my_bus_station_events', serialized_events))
                 print(f"{self.name}: Propagated all events to "
                       f"{self.connected_station.name}.\n")
                 
@@ -513,9 +515,10 @@ class BusStation(Station):
             try:
                 # send event to MainStation
                 serialized_event = self._serialize_events([event])
-                self.connected_station.send(('event', serialized_event))
-                print(f"{self.name}: Sent event to "
-                      f"{self.connected_station.name}.\n")
+                if isinstance(serialized_event, list):
+                    self.connected_station.msg_from_bus_station((self.process_id, 'take_my_bus_station_events', serialized_event))
+                    print(f"{self.name}: Sent event to "
+                        f"{self.connected_station.name}.\n")
                 
             except Exception as e:
                 print(f"{self.name}: Error sending event to "
@@ -554,61 +557,24 @@ class BusStation(Station):
                     serialized_interests = pickle.dumps(interest_names)
 
                 # request events from MainStation
-                self.connected_station.send(('get_events', serialized_interests))
-                message_type, data = self.connected_station.receive()
+                self.connected_station.req_from_bus_station((self.process_id, 'get_your_main_station_events', serialized_interests))
+                expected_message_type = 'my_main_station_events'
+                remote_events = self.get_data_from_reply(expected_message_type)
 
-                if message_type == 'events':
-                    events = self._deserialize_events(data)
+                if remote_events:
+                    events = self._deserialize_events(remote_events)
                     print(f"{self.name}: Received {len(events)} events from "
                           f"{self.connected_station.name}.\n")
                     return events
                 else:
                     print(f"{self.name}: Unexpected message type from "
-                          f"{self.connected_station.name}: {message_type}.\n")
+                          f"{self.connected_station.name}: {expected_message_type}.\n")
                     return []
                 
             except Exception as e:
                 print(f"{self.name}: Error retrieving events from "
                       f"{self.connected_station.name}: {e}\n")
                 return []
-            
-
-    def _serialize_events(self, events: List[Event]) -> bytes:
-        """
-        Serialize events for transmission to the MainStation.
-
-        Args:
-            events: List of events to serialize.
-
-        Returns:
-            bytes: Serialized events.
-        
-        """
-        try:
-            # use pickle to serialize events
-            return pickle.dumps(events)
-        except Exception as e:
-            print(f"{self.name}: Error serializing events: {e}\n")
-            return pickle.dumps([])
-        
-
-    def _deserialize_events(self, data: bytes) -> List[Event]:
-        """
-        Deserialize events received from the MainStation.
-
-        Args:
-            data: Serialized event data.
-
-        Returns:
-            List[Event]: Deserialized events.
-        
-        """
-        try:
-            # use pickle to deserialize events
-            return pickle.loads(data)
-        except Exception as e:
-            print(f"{self.name}: Error deserializing events: {e}\n")
-            return []
         
 
     def has_interest_in(self, event_type: Type[Event]) -> bool:
@@ -638,6 +604,45 @@ class BusStation(Station):
 
             # check if this BusStation has interest in the event type
             return self._type_matches_interests(event_type, interests)
+        
+
+    def get_data_from_reply(self, expected_message_type: str) -> Any:
+        """
+        Get the data from the replies dict in the MainStation that correspond
+        to this BusStation's process id and match the expected message type.
+
+        Args:
+            expected_message_type: The expected message type to match.
+
+        Returns:
+            Any: The data from the reply that matches the expected message type.
+        
+        """
+        with self._main_station_lock:
+            if not self.main_connection:
+                if self.able_to_connect():
+                    self._connect_to_main_station(self.domain)
+                    if not self.main_connection:
+                        raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                else:
+                    raise ValueError(f"{self.name} cannot connect to the MainStation.")
+                
+            try:
+                # get the data from the replies dict
+                for process_id, message in self.connected_station.replies.items():
+                    if process_id == self.process_id and message == expected_message_type:
+                        # get the data from the message
+                        data = self.connected_station.replies[process_id].get('data', None)
+                        if data:
+                            return data
+                        
+                print(f"{self.name}: No data found for expected message type "
+                      f"{expected_message_type}.\n")
+                return None
+                
+            except Exception as e:
+                print(f"{self.name}: Error getting data from reply: {e}\n")
+                return None
 
         
     def shutdown(self):
