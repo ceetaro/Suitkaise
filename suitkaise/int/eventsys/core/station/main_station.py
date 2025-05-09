@@ -51,6 +51,7 @@ opposite MainStation.
 """
 
 import threading
+import uuid
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Type, Optional, Any, Tuple
 
@@ -112,7 +113,7 @@ class MainStation(Station, ABC):
         # settings and state
         self.domain = get_domain.get_domain()
         self.auto_sync = True
-        self.sync_interval = 15.0 # seconds between syncs
+        self.ext_sync_interval = 15.0 # seconds between syncs
         self.compression_interval = 90.0 # seconds between compressions
         self.history_size_limit = 150 * 1024 * 1024 # 150 MB
         self.compress_threshold = 100 * 1024 * 1024 # 100 MB
@@ -395,13 +396,15 @@ class MainStation(Station, ABC):
         if hasattr(self, "_instance_lock"):
             with self._instance_lock:
                 if message in self._valid_msgs:
+                    uuid = str(uuid.uuid4())
                     msg_dict = {
-                        "id": id,
+                        "process_id": id,
+                        "uuid": uuid,
                         "message": message,
                         "data": data,
                         "time_received": sktime.now()
                     }
-                    self.received_messages[id] = msg_dict
+                    self.received_messages[uuid] = msg_dict
                     print(f"Received message from BusStation {id}: {message}")
 
 
@@ -422,53 +425,112 @@ class MainStation(Station, ABC):
             with self._instance_lock:
                 now = sktime.now()
                 if message in self._valid_msgs:
+                    uuid = str(uuid.uuid4())
                     msg_dict = {
-                        "id": id,
+                        "process_id": id,
+                        "uuid": uuid,
                         "message": message,
                         "data": data,
-                        "time_received": now
+                        "time_received": now,
+                        "request": True
                     }
-                    self.received_messages[id] = msg_dict
+                    self.received_messages[uuid] = msg_dict
                     print(f"Received request from BusStation {id}: {message}")
         
                 
                 if message in self._valid_reqs:
                     req_dict = {
-                        "id": id,
+                        "process_id": id,
+                        "uuid": uuid,
                         "message": message,
                         "data": data if data else None,
                         "time_received": now
                     }
-                    self.requests[id] = req_dict
+                    self.requests[uuid] = req_dict
                     print(f"Received request from BusStation {id}: {message}")
 
 
-
-    def _unpack_received_data(self):
+    def _process_received_messages(self) -> None:
         """
-        Unpack received data from messages depending on the message type.
+        Process received messages and do something with them.
+        This is called periodically to check for new messages and process them.
+
+        How:
+        1. Processes all messages that aren't requests.
+        2. Processes all requests.
+        3. Clears messages responded to.
+        After step 3, the dict should be empty.
+        
+        """
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                try:
+                    now = sktime.now()
+                    msgs_to_clear = []
+                    for uuid, message in self.received_messages.items():
+                        # check if the message is not a request
+                        if not message.get("request", False):
+                            # handle non requests now
+                            if message.get("data", None) is not None:
+                                # process the message
+                                self._process_received_data(message)
+                            else:
+                                # for now, we don't have any messages without data
+                                pass
+                            msgs_to_clear.append(process_id)
+
+                    # check if there are any requests to process
+                    if self.requests:
+                        # process the requests
+                        self._reply_to_requests()
+                        for uuid, message in self.received_messages.items():
+                            # check if the request has been replied to
+                            id = message.get("id", None)
+                            time_received = message.get("time_received", None)
+                            for req_id, req in self.requests.items():
+                                if not req.get("id", None) == id \
+                                and not req.get("time_received", None) == time_received:
+                                    # the request has been replied to, so clear it
+                                    msgs_to_clear.append(req_id)
+
+                except Exception as e:
+                    print(f"Error processing received messages: {e}")
+                    raise e
+                
+                finally:
+                    # clear the messages that have been processed
+                    if msgs_to_clear:
+                        for process_id in msgs_to_clear:
+                            self.received_messages.pop(process_id, None)
+                        print(f"Cleared {len(msgs_to_clear)} messages after processing")
+
+        
+
+    def _process_received_data(self, message: Dict[str, Any]) -> None:
+        """
+        Unpack and process received data from messages depending on the message type.
         
         """
         if hasattr(self, "_instance_lock"):
             with self._instance_lock:
                 now = sktime.now()
-                msgs_to_clear = []
-                for process_id, message in self.received_messages.items():
-                    if message == 'take_my_bus_station_events':
+                if message.get("message", None) is 'take_my_bus_station_events':
+                    # unpack the data from the message
+                    data = message.get("data", None)
+                    if data is not None:
+                        # process the data
+                        events = self._deserialize_events(data)
+                        self.add_multiple_events(events)
+                    elif message.get("message", None) is 'bus_has_processed_reply':
                         # unpack the data from the message
-                        data = self.messages[process_id].get('data', None)
+                        data = message.get("data", None)
                         if data is not None:
                             # process the data
-                            events = self._deserialize_events(data)
-                            self.add_multiple_events(events)
+                            for reply in self.replies:
+                                if reply == data:
+                                    # remove the reply from the replies list
+                                    self.replies.pop(reply, None)
 
-                        msgs_to_clear.append(process_id)
-
-                if msgs_to_clear:
-                    for process_id in msgs_to_clear:
-                        self.received_messages.pop(process_id, None)
-
-                    print(f"Cleared {len(msgs_to_clear)} messages after unpacking data")
 
 
     def _reply_to_requests(self):
@@ -479,26 +541,44 @@ class MainStation(Station, ABC):
         """
         if hasattr(self, "_instance_lock"):
             with self._instance_lock:
-                now = sktime.now()
-                for process_id, request in self.requests:
-                    # check what the request is
-                    if request == 'get_your_main_station_events':
-                        # send the events to the BusStation with this process ID
-                        events = self.event_history
-                        data = self._serialize_events(events)
-                        # send the data to the BusStation
-                        self.replies[process_id] = {
-                            'reply_to_id': process_id,
-                            'original_request': self.requests[process_id],
-                            'message': 'my_main_station_events',
-                            'data': data,
-                            'time_sent': now
-                        }
+                try:
+                    now = sktime.now()
+                    requests_to_clear = []
+                    for uuid, request in self.requests:
+                        # check what the request is
+                        if request == 'get_your_main_station_events':
+                            # send the events to the BusStation with this process ID
+                            events = self.event_history.copy()
+                            # filter based on bus interests
+                            process_id = request.get("process_id", None)
+                            if process_id is not None:
+                                bus_station = self.get_bus_station(process_id)
+                                if bus_station:
+                                    for event in events:
+                                        if not bus_station.has_interest_in(event.event_type):
+                                            events.remove(event)
 
-
-
-
-                        
+                            data = self._serialize_events(events)
+                            # send the data to the BusStation
+                            self.replies[process_id] = {
+                                'reply_to_id': process_id,
+                                'original_request': self.requests[process_id],
+                                'message': 'my_main_station_events',
+                                'data': data,
+                                'time_sent': now
+                            }
+                            requests_to_clear.append(process_id)
+                            print(f"Replied to request from BusStation {process_id}: "
+                                  f"{self.requests[process_id]}")
+                except Exception as e:
+                    print(f"Error replying to requests: {e}")
+                    raise e
+                
+                finally:
+                    if requests_to_clear:
+                        for process_id in requests_to_clear:
+                            self.requests.pop(process_id, None)
+                        print(f"Cleared {len(requests_to_clear)} requests after replying")
 
 
 #

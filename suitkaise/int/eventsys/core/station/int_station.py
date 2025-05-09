@@ -130,7 +130,7 @@ class IntStation(MainStation):
 
         # start the thread to sync with the other MainStation
         self._sync_thread = threading.Thread(
-            target=self._sync_with_extstation,
+            target=self._intstation_sync, # sync with extstation and busstations
             name="IntStation Sync Thread",
             daemon=True
         )
@@ -189,10 +189,46 @@ class IntStation(MainStation):
 
 
 # 
-# Bridge related methods
+# Communication with BusStations and Bridge/ExtStation
 #
 
-    def _sync_with_extstation(self):
+    def connect(self) -> 'IntStation':
+        """
+        Return the IntStation instance.
+
+        This method can be used by BusStations to connect to the IntStation.
+        
+        """
+        return self.get_instance()
+
+
+    def _intstation_sync(self):
+        """
+        Periodically sync with the ExtStation and any BusStations in 
+        a background thread.
+
+        This method:
+        1. attempts to sync its events with Exstation through EventBridge.sync()
+        2. replies to requests from BusStations asking for MainStation events,
+           making said events available in the IntStation's self.replies dict for
+           the BusStation to get.
+        
+        """
+        while self._running:
+            try:
+                # sync with the ExtStation
+                self._sync_with_extstation()
+
+                # sync with BusStations if they request it
+                self._process_received_messages()
+
+            except Exception as e:
+                print(f"Error in sync thread for {self.name}: {e}")
+                sktime.yawn(3, 10, 100, self.station_name, dprint=True)
+                sktime.sleep(1)
+                
+
+    def _sync_with_extstation(self) -> None:
         """
         Periodically sync with the ExtStation using the EventBridge.
 
@@ -207,7 +243,7 @@ class IntStation(MainStation):
                 if self.last_ext_sync:
                     elapsed = sktime.elapsed(self.last_ext_sync)
                 
-                if self.last_ext_sync is None or elapsed > self.sync_interval:
+                if self.last_ext_sync is None or elapsed > self.ext_sync_interval:
                     # sync with the ExtStation, depending on BridgeState 
                     # and BridgeDirection
                     synced = self.bridge.sync()
@@ -229,9 +265,6 @@ class IntStation(MainStation):
                 print(f"Error in sync thread for {self.name}: {e}")
                 raise e
             
-            finally:
-                # sleep for the sync interval
-                sktime.sleep(self.sync_interval)
 
 
 

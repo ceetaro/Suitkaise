@@ -302,7 +302,7 @@ class BusStation(Station):
             if self.domain == SKDomain.INTERNAL:
                 # connect to the IntStation
                 from suitkaise.int.eventsys.core.station.int_station import IntStation
-                self.connected_station = IntStation.get_connection()
+                self.connected_station = IntStation.connect()
                 if self.connected_station:
                     self.main_connection = True
                     print(f"Connected to IntStation for {self.name}.")
@@ -314,7 +314,7 @@ class BusStation(Station):
             elif self.domain == SKDomain.EXTERNAL:
                 # connect to the ExtStation
                 from suitkaise.int.eventsys.core.station.ext_station import ExtStation
-                self.connected_station = ExtStation.get_connection()
+                self.connected_station = ExtStation.connect()
                 if self.connected_station:
                     self.main_connection = True
                     print(f"Connected to ExtStation for {self.name}.")
@@ -558,8 +558,8 @@ class BusStation(Station):
 
                 # request events from MainStation
                 self.connected_station.req_from_bus_station((self.process_id, 'get_your_main_station_events', serialized_interests))
-                expected_message_type = 'my_main_station_events'
-                remote_events = self.get_data_from_reply(expected_message_type)
+                request = self.connected_station.get_most_recent_request()
+                remote_events = self.get_data_from_reply(request)
 
                 if remote_events:
                     events = self._deserialize_events(remote_events)
@@ -567,8 +567,9 @@ class BusStation(Station):
                           f"{self.connected_station.name}.\n")
                     return events
                 else:
-                    print(f"{self.name}: Unexpected message type from "
-                          f"{self.connected_station.name}: {expected_message_type}.\n")
+                    print(f"{self.name}: No events found from reply to "
+                          f"{request.get('process_id', None)}'s request with "
+                          f"message {request.get('message', None)}.\n")
                     return []
                 
             except Exception as e:
@@ -606,7 +607,7 @@ class BusStation(Station):
             return self._type_matches_interests(event_type, interests)
         
 
-    def get_data_from_reply(self, expected_message_type: str) -> Any:
+    def get_data_from_reply(self, request: Dict[str, Any]):
         """
         Get the data from the replies dict in the MainStation that correspond
         to this BusStation's process id and match the expected message type.
@@ -628,16 +629,21 @@ class BusStation(Station):
                     raise ValueError(f"{self.name} cannot connect to the MainStation.")
                 
             try:
+                req_uuid = request.get('uuid', None)
                 # get the data from the replies dict
-                for process_id, message in self.connected_station.replies.items():
-                    if process_id == self.process_id and message == expected_message_type:
+                for msg_uuid, message in self.connected_station.replies.items():
+                    if req_uuid == message.get('uuid', None):
                         # get the data from the message
-                        data = self.connected_station.replies[process_id].get('data', None)
+                        data = self.connected_station.replies[msg_uuid].get('data', None)
                         if data:
-                            return data
+                            return data.copy()
                         
-                print(f"{self.name}: No data found for expected message type "
-                      f"{expected_message_type}.\n")
+                    # tell the MainStation to remove the message
+                    # get uuid of the original request
+
+                    self.connected_station.msg_from_bus_station(self.process_id, 'bus_has_processed_reply')
+                        
+                print(f"{self.name}: No data found for uuid {req_uuid}.\n")
                 return None
                 
             except Exception as e:

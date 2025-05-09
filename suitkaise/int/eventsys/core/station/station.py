@@ -83,9 +83,10 @@ class Station(ABC):
         'get_your_main_station_events', 
         'take_my_bus_station_events',
         'my_main_station_events'
+        'bus_has_processed_reply'
         ]
     _valid_reqs = ['get_your_main_station_events']
-    _valid_replies = ['my_main_station_events']]
+    _valid_replies = ['my_main_station_events']
 
     def __init__(self):
         """
