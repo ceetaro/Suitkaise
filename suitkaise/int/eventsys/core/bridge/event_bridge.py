@@ -133,10 +133,14 @@ class EventBridge:
         self._bridge_direction = initial_direction or BridgeDirection.CLOSED
         self._bridge_state = initial_state or BridgeState.UNLOCKED
 
+
         # Initialize the stations
         self.int_station = None
         self.ext_station = None
         self.stations_connected = False # True if both stations are connected
+
+        self._initialized = True
+
 
 
     def get_state(self) -> BridgeState:
@@ -178,6 +182,170 @@ class EventBridge:
         
         """
         return self._bridge_direction in (BridgeDirection.OPEN, BridgeDirection.ONLY_TO_EXT)
+    
+    def set_direction(self, direction: BridgeDirection) -> None:
+        """
+        Set the direction of the EventBridge.
+
+        This will only take effect if the bridge is unlocked.
+
+        Args:
+            direction (BridgeDirection): The new direction for the EventBridge.
+        
+        """
+        if self._bridge_state == BridgeState.UNLOCKED:
+            self._bridge_direction = direction
+        else:
+            # ignore if locked
+            pass
+
+    def set_state(self, state: BridgeState) -> None:
+        """
+        Set the state of the EventBridge.
+
+        This can only be done manually by the user.
+
+        Args:
+            state (BridgeState): The new state for the EventBridge.
+        
+        """
+        self._bridge_state = state
+        if state == BridgeState.FORCE_OPEN:
+            self._bridge_direction = BridgeDirection.OPEN
+        elif state == BridgeState.FORCE_CLOSED:
+            self._bridge_direction = BridgeDirection.CLOSED
+
+
+    def both_stations_connected(self) -> bool:
+        """
+        Check if both stations are connected before syncing.
+        
+        """
+        if self.stations_connected:
+            return True
+        
+        # try and connect to both stations
+        if self.int_station is None:
+            self.int_station = IntStation.get_instance()
+
+        if self.ext_station is None:
+            self.ext_station = ExtStation.get_instance()
+
+        if self.int_station._connected_to_bridge and self.ext_station._connected_to_bridge:
+            self.stations_connected = True
+            return True
+        
+        return False
+
+
+    def sync(self) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Sync the two MainStations by combining their event histories.
+
+        This method is called by both MainStations to combine their event histories
+        and set the event histories of both MainStations to the combined history.
+
+        Returns:
+            Tuple[bool, Dict[str, Any]]: A tuple containing a boolean indicating
+            if the sync was successful, and a report including at least state and 
+            direction of the bridge during the sync.
+
+        """
+        start_time = sktime.now()
+        message = None
+        int_synced = False
+        ext_synced = False
+        report = {
+            "message": message,
+            "state": None,
+            "direction": None,
+            "sync_start": start_time,
+            "sync_end": None,
+            "sync_duration": None,
+        }
+
+        try:
+            with self._instance_lock:
+                # check if both stations are connected
+                if self.both_stations_connected():
+                    if not self._bridge_direction == BridgeDirection.CLOSED:
+                        # get all events from both stations
+                        int_events = self.int_station.get_all_events()
+                        ext_events = self.ext_station.get_all_events()
+                        # combine the events
+                        combined = int_events + ext_events
+                        
+                        # remove duplicates
+                        for event in combined:
+                            if event in int_events and event in ext_events:
+                                combined.remove(event)
+
+                        # set the event histories of both stations to the combined history
+                        if self.can_sync_to_int():
+                            int_synced = self.int_station.receive_bridge_events(combined)
+                        if self.can_sync_to_ext():
+                            ext_synced = self.ext_station.receive_bridge_events(combined)
+
+                        end_time = sktime.now()
+                        report["sync_end"] = end_time
+                        report["sync_duration"] = sktime.elapsed(start_time, end_time)
+                        report["state"] = self._bridge_state.name
+                        report["direction"] = self._bridge_direction.name
+
+                        # check if both stations synced
+                        if int_synced and ext_synced:
+                            message = f"{self.name}: Bridge synced events between both stations."
+                            report["message"] = message
+                            return True, report
+                        
+                        elif int_synced and not ext_synced:
+                            message = f"{self.name}: Bridge only synced ExtStation events to IntStation."
+                            report["message"] = message
+                            return True, report
+                        
+                        elif ext_synced and not int_synced:
+                            message = f"{self.name}: Bridge only synced IntStation events to ExtStation."
+                            report["message"] = message
+                            return True, report
+
+                    else:
+                        end_time = sktime.now()
+                        message = f"{self.name}: Bridge is closed, no events synced."
+                        report["message"] = message
+                        report["state"] = self._bridge_state.name
+                        report["direction"] = self._bridge_direction.name
+                        report["sync_end"] = end_time
+                        report["sync_duration"] = sktime.elapsed(start_time, end_time)
+                        return False, report
+                    
+                else:
+                    end_time = sktime.now()
+                    message = f"{self.name}: IntStation and/or ExtStation not connected to EventBridge."
+                    message += " Please connect both stations before syncing."
+                    report["message"] = message
+                    report["state"] = self._bridge_state.name
+                    report["direction"] = self._bridge_direction.name
+                    report["sync_end"] = end_time
+                    report["sync_duration"] = sktime.elapsed(start_time, end_time)
+                    return False, report
+                
+        except Exception as e:
+            end_time = sktime.now()
+            message = f"{self.name}: Error syncing events: {e}"
+            report["message"] = message
+            report["state"] = self._bridge_state.name
+            report["direction"] = self._bridge_direction.name
+            report["sync_end"] = end_time
+            report["sync_duration"] = sktime.elapsed(start_time, end_time)
+            return False, report
+
+
+                        
+
+
+                    
+                
+
     
     
 

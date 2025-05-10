@@ -419,6 +419,29 @@ class MainStation(Station, ABC):
             raise RuntimeError("Not connected to EventBridge")
         return self.bridge.get_state()
     
+    def receive_bridge_events(self, events: List[Event]) -> bool:
+        """
+        Receive events from the EventBridge.
+
+        This is called by the EventBridge when events are received from
+        the opposite MainStation.
+
+        Args:
+            events (List[Event]): The list of events to receive.
+        
+        """
+        synced = False
+        if not self._connected_to_bridge():
+            raise RuntimeError("Not connected to EventBridge")
+        if hasattr(self, "_instance_lock"):
+            with self._instance_lock:
+                if events:
+                    self.event_history.clear()
+                    self.add_multiple_events(events)
+                    synced = True
+        print(f"Received {len(events)} events from EventBridge")
+        return synced
+    
 
 # 
 # Communicating with BusStations

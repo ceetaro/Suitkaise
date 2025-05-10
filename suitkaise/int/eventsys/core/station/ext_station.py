@@ -189,7 +189,7 @@ class ExtStation(MainStation):
         
         """
         return self.get_instance()
-
+    
 
     def _extstation_sync(self):
         """

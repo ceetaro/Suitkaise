@@ -875,6 +875,20 @@ class Station(ABC):
         return False
     
 
+    def get_all_events(self) -> List[Event]:
+        """
+        Get all events from the station's history.
+
+        Used by the Bridge to get all events from the station.
+
+        Returns:
+            List[Event]: a list of all events in the station's history
+        
+        """
+        with self.lock:
+            return self.event_history.copy()
+    
+
     def get_events(self, interests: Optional[Set[Type[Event]]] = None) -> List[Event]:
         """
         Get all events from the station's history that match the given interests.
@@ -1710,6 +1724,7 @@ class Station(ABC):
                 self.priority_index = {}
             else:
                 print(f"Unknown index name '{index_name}' for station '{self.name}'")
+
 
 
 # 
