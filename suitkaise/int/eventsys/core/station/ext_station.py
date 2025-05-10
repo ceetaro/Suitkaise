@@ -90,10 +90,10 @@ class ExtStation(MainStation):
     
     def __init__(self):
         """
-        Initialize the IntStation singleton.
+        Initialize the ExtStation singleton.
         
         This will only execute once, when the singleton is first created.
-        Subsequent calls to IntStation() will return the existing instance
+        Subsequent calls to ExtStation() will return the existing instance
         without re-initializing.
 
         """
@@ -110,11 +110,13 @@ class ExtStation(MainStation):
         
         self.bridge = self.connect_to_bridge()
 
+        self.int_sync_interval = 30.0
+
         self._initialized = True
 
         # last syncs
         self.last_bus_sync = None
-        self.last_ext_sync = None
+        self.last_int_sync = None
 
         print(f"ExtStation initialized in domain: {domain}")
 
@@ -124,9 +126,171 @@ class ExtStation(MainStation):
         Initialize and start background tasks for the ExtStation.
 
         This should:
-        1. Start the thread to periodically sync with the IntStation
+        1. Start the thread to periodically sync with the ExtStation
         using the EventBridge.
-        2. 
-
+        2. Start the thread to periodically manage the event history.
  
         """
+        self._running = True
+
+        # Ensure bridge connection
+        if not self.bridge:
+            try:
+                self.bridge = self.connect_to_bridge()
+                if not self.bridge:
+                    print(f"Warning: Failed to connect to EventBridge during initialization.")
+            except Exception as e:
+                print(f"Error connecting to EventBridge: {e}")
+                # Continue anyway, background thread will retry
+
+        # start the thread to sync with the other MainStation
+        self._sync_thread = threading.Thread(
+            target=self._extstation_sync, # sync with intstation and busstations
+            name="ExtStation Sync Thread",
+            daemon=True
+        )
+        self._sync_thread.start()
+
+        # start the thread to compress events in the event history
+        self._compression_thread = threading.Thread(
+            target=self._manage_history,
+            name="ExtStation Compression Thread",
+            daemon=True
+        )
+        self._compression_thread.start()
+
+        print(f"Started background tasks for ExtStation.")
+
+
+    @classmethod
+    def get_instance(cls) -> "ExtStation":
+        """
+        Get the singleton instance of ExtStation.
+
+        This method ensures that only one instance of ExtStation exists
+        throughout the application.
+
+        Returns:
+            ExtStation: The singleton instance of ExtStation.
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
+# 
+# Communication with BusStations and Bridge/IntStation
+#
+
+    def connect(self) -> 'ExtStation':
+        """
+        Return the ExtStation instance.
+
+        This method can be used by BusStations to connect to the ExtStation.
+        
+        """
+        return self.get_instance()
+
+
+    def _extstation_sync(self):
+        """
+        Periodically sync with the ExtStation and any BusStations in 
+        a background thread.
+
+        This method:
+        1. attempts to sync its events with IntStation through EventBridge.sync()
+        2. replies to requests from BusStations asking for MainStation events,
+           making said events available in the ExtStation's self.replies dict for
+           the BusStation to get.
+        
+        """
+        while self._running:
+            start_time = sktime.now()
+            try:
+                # set a max operation time
+                max_operation_time = 30.0
+
+                # check if we should continue
+                if not self._running:
+                    break
+
+                # perform sync with IntStation
+                operation_start = sktime.now()
+                self._sync_with_intstation()
+
+                # check for timeout
+                if sktime.elapsed(operation_start) > max_operation_time:
+                    print(f"Warning: Sync with IntStation took too long. "
+                          f"Elapsed time: {sktime.elapsed(operation_start)} seconds.")
+                
+                # perform the sync with BusStations
+                operation_start = sktime.now()
+                self._process_received_messages()
+
+                # check for timeout
+                if sktime.elapsed(operation_start) > max_operation_time:
+                    print(f"Warning: Sync with BusStations took too long. "
+                          f"Elapsed time: {sktime.elapsed(operation_start)} seconds.")
+                    
+                elapsed = sktime.elapsed(start_time)
+                if elapsed < 5.0:
+                    # sleep for a short time to avoid busy waiting
+                    sktime.sleep(5.0 - elapsed)
+
+            except Exception as e:
+                print(f"{self.name}: Error in ExtStation sync thread: {e}")
+                self._sync_yawn()
+            
+                # prevent tight loop
+                if elapsed < 2.0:
+                    sktime.sleep(2.0 - elapsed)
+
+    def _sync_with_intstation(self) -> None:
+        """
+        Periodically sync with the IntStation using the EventBridge.
+
+        Uses EventBridge.sync() to synchronize events with the IntStation.
+        This method runs in a separate thread.
+        
+        """
+        while self._running:
+            try:
+                if not self._connected_to_bridge():
+                    attempts = 0
+                    while not self._connected_to_bridge():
+                        if attempts >= 3:
+                            self._bridge_error_yawn()
+
+                        print(f"Warning: Not connected to EventBridge. Retrying...")
+                        attempts += 1
+                        sktime.sleep(2)
+                        
+
+
+                # if last_int_sync is None or more than sync_interval seconds ago
+                if self.last_int_sync:
+                    elapsed = sktime.elapsed(self.last_int_sync)
+                
+                if self.last_int_sync is None or elapsed > self.int_sync_interval:
+                    # check bridge direction and state
+                    direction, state = self.get_bridge_info()
+
+                    if not self.bridge.can_send_to_int():
+                        # Log the state but don't treat as error
+                        print(f"{self.name}: cannot currently sync with IntStation. "
+                            f"Bridge direction {direction.name}/state {state.name}.")
+                        # Sleep before next attempt
+                        continue
+
+                    # sync with IntStation
+                    synced = self.bridge.sync()
+                    if synced:
+                        self.last_int_sync = sktime.now()
+                        print(f"{self.name}: synced with IntStation.")
+                        print(f"Time since last sync: {sktime.elapsed(self.last_int_sync)} seconds.")
+                    else:
+                        print(f"{self.name}: failed to sync with IntStation.")
+
+            except Exception as e:
+                print(f"Error in sync with IntStation: {e}")
+                self._bridge_error_yawn()
+                sktime.sleep(1)

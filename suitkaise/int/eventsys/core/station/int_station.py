@@ -105,6 +105,8 @@ class IntStation(MainStation):
             raise RuntimeError("IntStation can only be used in the INTERNAL domain.")
         
         self.bridge = self.connect_to_bridge()
+
+        self.ext_sync_interval = 30.0
         
         self._initialized = True
 
@@ -122,8 +124,7 @@ class IntStation(MainStation):
         This should:
         1. Start the thread to periodically sync with the ExtStation
         using the EventBridge.
-        2. Start the thread to periodically compress events in the event
-        history.
+        2. Start the thread to periodically manage the event history.
         
         """
         self._running = True
@@ -194,7 +195,7 @@ class IntStation(MainStation):
         a background thread.
 
         This method:
-        1. attempts to sync its events with Exstation through EventBridge.sync()
+        1. attempts to sync its events with Extstation through EventBridge.sync()
         2. replies to requests from BusStations asking for MainStation events,
            making said events available in the IntStation's self.replies dict for
            the BusStation to get.
@@ -234,7 +235,7 @@ class IntStation(MainStation):
                     sktime.sleep(5.0 - elapsed)
 
             except Exception as e:
-                print(f"Error in IntStation sync thread: {e}")
+                print(f"{self.name} Error in IntStation sync thread: {e}")
                 self._sync_yawn()
             
                 # prevent tight loop
@@ -248,8 +249,7 @@ class IntStation(MainStation):
         Periodically sync with the ExtStation using the EventBridge.
 
         Uses EventBridge.sync() to synchronize events with the ExtStation.
-        This method runs in a separate thread and syncs every self.compression_interval
-        seconds.
+        This method runs in a separate thread.
         
         """
         while self._running:
@@ -294,42 +294,3 @@ class IntStation(MainStation):
                 print(f"Error in sync with ExtStation: {e}")
                 self._bridge_error_yawn()
                 sktime.sleep(1)
-            
-                
-
-    
-
-            
-
-
-
-
-        
-    
-
-
-
-        
-
-
-
-    
-
-                
-
-
-
-        
-
-
-
-
-
-
-
-        
-
-        
-        
-
-
