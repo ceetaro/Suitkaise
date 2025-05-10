@@ -282,7 +282,7 @@ class ExtStation(MainStation):
                         continue
 
                     # sync with IntStation
-                    synced = self.bridge.sync()
+                    synced = self.bridge.sync(self)
                     if synced:
                         self.last_int_sync = sktime.now()
                         print(f"{self.name}: synced with IntStation.")

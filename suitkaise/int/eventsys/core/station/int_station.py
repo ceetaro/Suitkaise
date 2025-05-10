@@ -282,7 +282,11 @@ class IntStation(MainStation):
                         continue
 
                     # sync with ExtStation
-                    synced = self.bridge.sync()
+                    synced, report = self.bridge.sync()
+                    if report:
+                        state = report.get("state")
+                        direction = report.get("direction")
+                        # NOTE: and more... depending on what else we add to the report
                     if synced:
                         self.last_ext_sync = sktime.now()
                         print(f"{self.name}: synced with ExtStation.")
