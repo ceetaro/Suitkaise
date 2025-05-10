@@ -49,7 +49,7 @@ clarity and uniformity.
 """
 import datetime
 import time
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Dict, Type
 from enum import Enum, auto
 from zoneinfo import ZoneInfo
 
@@ -395,20 +395,28 @@ def to_custom_time_diff_format(value: Union[int, float],
 
 # ========== TIME DELAY =========================================
 
-def sleep(seconds: float, dprint: bool = False) -> None:
+def sleep(seconds: float, message_on_sleep: str = None, dprint: bool = False) -> None:
     """
-    Sleep for a specified number of seconds.
-
+    Sleep for a specified number of seconds with optional messaging.
+    
     Args:
-        seconds: The number of seconds to sleep.
-
+        seconds: The number of seconds to sleep
+        message_on_sleep: Optional message to display before sleeping
+        dprint: If True, print debug information about the sleep
+    
+    Example:
+        sleep(5, message_on_sleep="Waiting for resource to become available")
     """
+    if message_on_sleep:
+        print(message_on_sleep)
+        
     if dprint:
         print(f"Sleeping for {seconds} seconds...")
+        
     time.sleep(seconds)
+    
     if dprint:
         print(f"Slept for {seconds} seconds.")
-
 
 
 
@@ -417,96 +425,112 @@ def yawn(yawn_limit: int = 2,
          sleep_for: float = 1.0,
          id: str = None, 
          message_on_sleep: str = None,
-         dprint: bool = False) -> None:
+         exception_on_sleep: Type[Exception] = None,
+         dprint: bool = False) -> bool:
     """
-    Yawn for a specified number of seconds.
-
-    If another yawn by the same id happens within the yawn_for time,
-    the program will sleep for sleep_for seconds.
-
-    Uses the parameters from the first call to determine the yawn_for
-    and sleep_for values.
-
-    Allows for some better flexibility than just instant sleep calls.
-
-    Uses:
-    - sleep daemon threads after a high resource usage has been 
-    detected and did not reduce after a certain time.
-    - sleep background threads if no user input has been detected for a
-    certain time.
-    - sleep threads that are waiting for a certain event to happen if the
-    event won't happen for a certain time.
-    - time out busy loops
-
+    Circuit breaker pattern for graceful handling of repeated error conditions.
+    
+    If this function is called with the same ID multiple times within a short period,
+    it will trigger a sleep after reaching the specified threshold. This provides
+    a safety mechanism for preventing overload during error conditions.
+    
     Args:
-        yawn_limit: number of yawns until the program sleeps
-        - first call counts as 1 yawn
-        - sleeps once the number of yawns is reached.
-        yawn_for: time to yawn for, in seconds
-        sleep_for: time to sleep for, in seconds
-        id: id of the yawn
-        - will raise an error if the id is None
-        dprint: if True, will print debug information
-
+        yawn_limit: Number of yawns required to trigger a sleep (first call counts as 1)
+        yawn_for: Time window in seconds during which yawns are counted
+        sleep_for: Duration in seconds to sleep when limit is reached
+        id: Unique identifier for this circuit breaker
+        message_on_sleep: Optional message to display when sleeping
+        exception_on_sleep: Optional exception type to raise instead of sleeping
+        dprint: If True, print debug information
+        
+    Returns:
+        bool: True if the function caused sleep or raised an exception, False otherwise
+        
+    Raises:
+        ValueError: If id is None on first call
+        Exception: The specified exception_on_sleep type if provided and triggered
+        
+    Examples:
+        # Simple usage
+        yawn(3, 30, 5, "database_connection")
+        
+        # With custom message
+        yawn(2, 10, 30, "api_rate_limit", message_on_sleep="API rate limit exceeded, pausing...")
+        
+        # With exception instead of sleep
+        yawn(3, 60, 0, "critical_service", exception_on_sleep=ServiceUnavailableError)
     """
     global yawns
-
+    triggered = False
     current_time = now()
 
-    # clean up expired yawns
+    # Validate ID
+    if id is None:
+        raise ValueError("id cannot be None when creating a yawn circuit breaker")
+
+    # Clean up expired yawns
     if id in yawns:
         yawndata = yawns[id]
         elapsed = current_time - yawndata['yawn_start']
 
-        # if the yawn has expired, remove it
+        # If the yawn has expired, remove it
         if elapsed > yawndata['yawn_for'] and not yawndata['sleeping']:
             if dprint:
-                print(f"{id}'s yawn expired after {elapsed:.2f} seconds. "
-                      f"Removing {id} from yawns.")
+                print(f"Circuit breaker {id} expired after {elapsed:.2f} seconds (reset)")
             del yawns[id]
-            
 
-    # now check if id exists
+    # Process existing circuit breaker
     if id in yawns:
         yawndata = yawns[id]
 
-        # check if we are already sleeping
+        # If already sleeping, just return
         if yawndata['sleeping']:
             if dprint:
-                print(f"Yawn {id} is already sleeping.")
-            return
+                print(f"Circuit breaker {id} is already in sleep state")
+            return False
         
-        # calc elapsed time since first yawn
+        # Calculate time since first yawn
         elapsed = current_time - yawndata['yawn_start']
 
-        # if another yawn happens within the yawn_for time,
-        # increment the number of yawns
+        # If within the time window, increment count
         if elapsed <= yawndata['yawn_for']:
             yawndata['yawn_count'] += 1
             if dprint:
-                print(f"Another yawn happened within the yawn_for time for id {id}."
-                      f"Number of yawns: {yawndata['yawn_count']}")
+                print(f"Circuit breaker {id}: {yawndata['yawn_count']}/{yawndata['yawn_limit']} "
+                      f"events within {elapsed:.2f}s window")
                 
-        # check if we reached the number of yawns
+        # Check if limit reached
         if yawndata['yawn_count'] >= yawndata['yawn_limit']:
-            # sleep for the specified time
-            if dprint:
-                print(f"{yawndata['yawn_limit']} yawns have been detected. "
-                      f"{id} going to sleep...")
-        
             yawndata['sleeping'] = True
-            sleep(yawndata['sleep_for'], dprint=dprint)
-
-            if dprint:
-                print(f"{id} slept for {yawndata['sleep_for']} seconds due to a yawn.")
-
-            # remove this yawn, it's job is complete
-            del yawns[id]
-
+            triggered = True
+            
+            # Compose message
+            display_message = message_on_sleep
+            if display_message is None:
+                display_message = (f"Circuit breaker {id} triggered: "
+                                  f"{yawndata['yawn_count']} events in "
+                                  f"{elapsed:.2f}s exceeded limit of {yawndata['yawn_limit']}")
+                
+            # Either raise exception or sleep
+            if exception_on_sleep is not None:
+                if dprint:
+                    print(f"Circuit breaker {id} raising {exception_on_sleep.__name__}")
+                del yawns[id]  # Clean up
+                raise exception_on_sleep(display_message)
+            else:
+                # Display message and sleep
+                print(display_message)
+                if dprint:
+                    print(f"Sleeping for {yawndata['sleep_for']} seconds...")
+                    
+                sleep(yawndata['sleep_for'], dprint=dprint)
+                
+                if dprint:
+                    print(f"Circuit breaker {id} reset after sleep")
+                    
+                del yawns[id]  # Clean up after sleeping
     else:
-        # if the id is not in the yawns dictionary, create a new entry
-        if id is None:
-            raise ValueError("id cannot be None when creating a new yawn.")
+        # Initialize new circuit breaker
         yawns[id] = {
             'yawn_start': current_time,
             'yawn_limit': yawn_limit,
@@ -517,11 +541,10 @@ def yawn(yawn_limit: int = 2,
         }
 
         if dprint:
-            print(f"First yawn registered for id {id}.\n"
-                  f"Will sleep for {sleep_for} seconds "
-                  f"if {yawn_limit} yawns are detected within {yawn_for} seconds.")
-            
-
+            print(f"Circuit breaker {id} initialized: {yawn_limit} events within "
+                  f"{yawn_for}s will trigger a {sleep_for}s pause")
+    
+    return triggered
 
 def set_yawns_global() -> None:
     """

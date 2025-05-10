@@ -148,7 +148,7 @@ class IntStation(MainStation):
 
         # start the thread to compress events in the event history
         self._compression_thread = threading.Thread(
-            target=self._compress_station_history,
+            target=self._manage_history,
             name="IntStation Compression Thread",
             daemon=True
         )
@@ -173,45 +173,6 @@ class IntStation(MainStation):
             cls._instance = cls()
         return cls._instance
     
-
-    def _intstation_yawn(self) -> None:
-        """
-        Set the yawn to timeout background tasks.
-
-        If 3 exceptions are raised within 20 seconds, this method will
-        set the yawn to timeout background tasks for 30 seconds, allowing
-        other processes some time to reset or fix issues before attempting
-        to run these tasks again.
-        
-        """
-        message = "IntStation raised an exception 3 times within the last 18 seconds. "
-        message += "Timing out background tasks for 30 seconds."
-        sktime.yawn(3, 20, 30, self.station_name, message, dprint=True)
-
-
-    def _compress_station_history(self):
-        """
-        Periodically compress the event history to save space.
-        
-        This method runs in a separate thread and compresses the event
-        history every 5 minutes. The compression level is set to HIGH
-        for maximum space savings.
-
-        """
-        while self._running:
-            try:
-                # check if comporession is needed
-                if self.needs_compressing == True:
-                    self.compress_events() # from Station class
-                    print(f"Compressed events for {self.name}.")
-
-                sktime.sleep(self.compression_interval)
-
-            except Exception as e:
-                print(f"Error in compression thread for {self.name}: {e}")
-                self._intstation_yawn()
-                sktime.sleep(1)
-
 
 # 
 # Communication with BusStations and Bridge/ExtStation
@@ -240,21 +201,46 @@ class IntStation(MainStation):
         
         """
         while self._running:
+            start_time = sktime.now()
             try:
-                # sync with the ExtStation
+                # set a max operation time
+                max_operation_time = 30.0
+
+                # check if we should continue
+                if not self._running:
+                    break
+
+                # perform sync with ExtStation before syncing with BusStations
+                operation_start = sktime.now()
                 self._sync_with_extstation()
 
-                # sync with BusStations if they request it
+                # check for timeout
+                if sktime.elapsed(operation_start) > max_operation_time:
+                    print(f"Warning: Sync with ExtStation took too long. "
+                          f"Elapsed time: {sktime.elapsed(operation_start)} seconds.")
+                
+                # perform the sync with BusStations
+                operation_start = sktime.now()
                 self._process_received_messages()
 
-            except Exception as e:
-                print(f"Error in sync thread for {self.name}: {e}")
-                self._intstation_yawn()
-                sktime.sleep(1)
+                # check for timeout
+                if sktime.elapsed(operation_start) > max_operation_time:
+                    print(f"Warning: Sync with BusStations took too long. "
+                          f"Elapsed time: {sktime.elapsed(operation_start)} seconds.")
+                    
+                elapsed = sktime.elapsed(start_time)
+                if elapsed < 5.0:
+                    # sleep for a short time to avoid busy waiting
+                    sktime.sleep(5.0 - elapsed)
 
-            finally:
-                # Sleep for a short time before next sync attempt
-                sktime.sleep(4)
+            except Exception as e:
+                print(f"Error in IntStation sync thread: {e}")
+                self._sync_yawn()
+            
+                # prevent tight loop
+                if elapsed < 2.0:
+                    sktime.sleep(2.0 - elapsed)
+
                 
 
     def _sync_with_extstation(self) -> None:
@@ -272,7 +258,7 @@ class IntStation(MainStation):
                     attempts = 0
                     while not self._connected_to_bridge():
                         if attempts >= 3:
-                            self._intstation_yawn()
+                            self._bridge_error_yawn()
 
                         print(f"Warning: Not connected to EventBridge. Retrying...")
                         attempts += 1
@@ -306,7 +292,7 @@ class IntStation(MainStation):
 
             except Exception as e:
                 print(f"Error in sync with ExtStation: {e}")
-                self._intstation_yawn()
+                self._bridge_error_yawn()
                 sktime.sleep(1)
             
                 

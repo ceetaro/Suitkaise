@@ -145,6 +145,50 @@ class MainStation(Station, ABC):
         pass
 
 
+    def _sync_yawn(self) -> None:
+        """
+        Circuit breaker for the synchronization thread.
+        
+        This will pause the synchronization thread if too many errors occur,
+        rather than raising exceptions, since we want the thread to continue
+        running after a cooling-off period.
+        
+        """
+        id = f"{self.name}_sync"
+        message = f"{self.name} sync raised errors 3 times within 20 seconds. " \
+                 f"Pausing sync operations for 30 seconds."
+        
+        sktime.yawn(3, 20, 30, id, message_on_sleep=message, dprint=True)
+
+    def _bridge_error_yawn(self) -> bool:
+        """
+        Circuit breaker for bridge communication errors.
+        
+        This will raise an exception if too many bridge errors occur,
+        as bridge errors likely indicate a serious problem that requires
+        attention.
+        
+        Returns:
+            bool: True if an exception was raised, False otherwise
+        
+        Raises:
+            BridgeCommunicationError: If too many bridge errors occur
+
+        """
+        id = f"{self.name}_bridge"
+        message = f"{self.name} encountered multiple bridge communication errors."
+        
+        try:
+            return sktime.yawn(3, 15, 0, id,
+                             message_on_sleep=message,
+                             exception_on_sleep=RuntimeError,
+                             dprint=True)
+        except RuntimeError as e:
+            # Log the error before re-raising
+            print(message)
+            raise
+
+
 # 
 # Bus registration methods
 #

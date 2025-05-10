@@ -210,7 +210,7 @@ class BusStation(Station):
 
         # start the compression thread
         self._compression_thread = threading.Thread(
-            target=self._compress_station_history,
+            target=self._manage_history,
             name=f"CompressionThread-{self.process_id}",
             daemon=True
             )
@@ -219,57 +219,70 @@ class BusStation(Station):
         print(f"Started background tasks for {self.name} "
               f"with PID {self.process_id}.")
         
+    def _connection_yawn(self) -> None:
+        """
+        Circuit breaker for MainStation connection operations.
+        Pauses connection attempts if too many errors occur.
+
+        """
+        id = f"{self.name}_connection"
+        message = f"{self.name} failed to connect to MainStation multiple times. Pausing connection attempts for 15 seconds."
+        
+        sktime.yawn(5, 30, 15, id, message_on_sleep=message, dprint=True)
+
+    def _sync_yawn(self) -> None:
+        """
+        Circuit breaker for BusStation sync operations.
+        Pauses the sync thread if too many errors occur.
+        """
+        station_id = f"{self.name}_sync"
+        message = f"{self.name} sync raised errors 3 times within 15 seconds. Pausing sync operations for 20 seconds."
+        
+        sktime.yawn(3, 15, 20, station_id, message_on_sleep=message, dprint=True)
+        
+    
     def _sync_with_main_station(self):
         """
         Periodically synchronize with the MainStation.
 
         This runs in a separate thread dedicated to syncing with
         the MainStation. It sends and receives events at regular intervals.
-        
         """
         while self._running:
+            start_time = sktime.now()
             try:
-                id = self.name
-                # only sync if the connection is established
+                # Check if we should continue
+                if not self._running:
+                    break
+                    
+                # Only sync if the connection is established  
                 if self.main_connection and self.connected_station:
                     self._sync_with_main()
                     print(f"Completed sync with {self.connected_station.name} for {self.name}.")
-                    sktime.sleep(self.sync_interval)
-
+                    
+                    # Wait for next sync cycle
+                    elapsed = sktime.elapsed(start_time)
+                    if elapsed < self.sync_interval:
+                        sktime.sleep(self.sync_interval - elapsed)
+                        
                 elif self.able_to_connect():
                     self._connect_to_main_station()
-
+                    # Short sleep after connection attempt
+                    sktime.sleep(2.0)
+                    
                 else:
                     print(f"MainStation connection not established for {self.name}.")
-                    sktime.yawn(3, 5, 10, id, dprint=True)
-                    # sleep for a second before trying again
+                    self._connection_yawn()
+                    # Sleep for a second before trying again
                     sktime.sleep(1)
+                    
             except Exception as e:
                 print(f"Error in sync thread for {self.name}: {e}")
-                sktime.yawn(3, 5, 10, id, dprint=True)
-                sktime.sleep(1)
-
-    def _compress_station_history(self):
-        """
-        Periodically check for and compress events.
-
-        This runs in a separate background thread dedicated to
-        compressing events.
-        
-        """
-        while self._running:
-            try:
-                # check if comporession is needed
-                if self.needs_compressing == True:
-                    self.compress_events() # from Station class
-                    print(f"Compressed events for {self.name}.")
-
-                sktime.sleep(self.compression_interval)
-
-            except Exception as e:
-                print(f"Error in compression thread for {self.name}: {e}")
-                sktime.yawn(3, 10, 40, self.station_name, dprint=True)
-                sktime.sleep(1)
+                self._sync_yawn()
+                
+                # Prevent tight error loops
+                if sktime.elapsed(start_time) < 1.0:
+                    sktime.sleep(1.0)
 
 
     def able_to_connect(self) -> bool:

@@ -117,16 +117,26 @@ class Station(ABC):
         self.history_size_limit = None # size limit for the history, in bytes
         self.current_history_size = 0 # current size of the history, in bytes
         self.compress_threshold = None # threshold for compression, in bytes
-        self.needs_compressing = False # flag to indicate if compression is needed
         self.event_sizes = {} # cache of event sizes by id
 
-        self.last_compress = None # last compression timestamp
+        # managing history in the background
+        self.rush_compression = False # flag to indicate if we need to quickly compress once
+        self.remove_events = False # flag to indicate if we need to remove events
 
         self.last_clear = None # last clear timestamp
         self.clearing = False # flag to indicate if clearing is in progress
+        self.clear_events = False # flag to indicate if we need to clear events
+        self.priorities_to_clear = [] # list of priorities to clear
+
+        self.last_compression = None # last compression timestamp
+        self.compressing = False # flag to indicate if compression is in progress
+        self.needs_compressing = False # flag to indicate if compression is needed
 
         # last sync timestamp
         self.last_sync = sktime.now()
+
+        # running flag for subclasses
+        self._running = False # flag to indicate if the station is running
 
         print(f"Created new {self.__class__.__name__} '{self.name}' "
               f"with PID {self.process_id} and name {self.process_name}")
@@ -159,6 +169,58 @@ class Station(ABC):
         pass
         
     #
+    # yawns
+    #
+
+    
+    def _compression_yawn(self) -> None:
+        """
+        Circuit breaker for the compression thread.
+        
+        This will pause the compression thread if too many errors occur,
+        rather than raising exceptions, since compression is non-critical
+        and can safely be delayed.
+
+        """
+        id = f"{self.name}_compression"
+        message = f"{self.name} compression raised errors 3 times within 30 seconds. " \
+                 f"Pausing compression for 45 seconds."
+        
+        sktime.yawn(3, 30, 45, id, message_on_sleep=message, dprint=True)
+
+    def _clearing_yawn(self) -> None:
+        """
+        Circuit breaker for when waiting for clearing operations.
+        Provides a timeout mechanism for clearing operations.
+
+        """
+        id = f"{self.name}_clearing"
+        message = f"{self.name} clearing operation taking too long. Waiting another 5 seconds."
+        
+        sktime.yawn(4, 8, 5, id, message_on_sleep=message, dprint=True)
+
+
+    #
+    # INTERESTS
+    # 
+
+    def has_interest_in(self, event_type: Type) -> bool:
+        """
+        Check if the station is interested in a specific event.
+
+        Should be overridden by subclasses.
+
+        Args:
+            event_type (Type): the event type to check
+
+        Returns:
+            bool: True if the event type is of interest, False otherwise
+        
+        """
+        return False
+
+
+    #
     # EVENT MANAGEMENT METHODS
     #
     
@@ -182,10 +244,6 @@ class Station(ABC):
             # update the indexes
             # use the single event method for small batches
             self._update_indexes_single(event)
-
-            # check if we need to manage the history size
-            # and update the needs_compressing flag
-            self._manage_history()
 
             # process the event according to station rules
             self.distribute_events([event])
@@ -245,15 +303,51 @@ class Station(ABC):
             # update active indexes
             self._update_indexes_multiple(events)
 
-            # check if we need to manage the history size
-            # and update the needs_compressing flag
-            self._manage_history()
-
             # process the events according to station rules
             self.distribute_events(events)
 
             print(f"Added {len(events)} events to station '{self.name}'\n"
                   f"Batch size: {batch_size} bytes\n")
+            
+
+    def _manage_history(self) -> None:
+        """
+        Manage the station's history based on set flags.
+
+        This runs in the background and periodically checks to see if the
+        history needs to be compressed or cleared, or we have hit the size limit
+        and need to rush a compression and possibly remove events.
+        
+        """
+        while self._running:
+            try:
+                self._check_history()
+                # first, handle oversize history
+                if self.rush_compression:
+                    self._compress_events(CompressionLevel.HIGH)
+
+                if self._need_to_remove_events():
+                    self._remove_events_from_history()
+
+                # next, handle clearing old events
+                if self.clear_events:
+                    self._clear_old_events(self.priorities_to_clear)
+                    self.clear_events = False
+
+                if self.needs_compressing:
+                    self._compress_events()
+                    self.needs_compressing = False
+
+
+            except Exception as e:
+                print(f"Error in station '{self.name}' history management: {e}")
+                self._compression_yawn()
+                sktime.sleep(5)
+
+            finally:
+                # Sleep for a bit before checking again
+                sktime.sleep(2)
+                
     
     def _add_to_history(self, event: Event) -> None:
         """
@@ -298,29 +392,6 @@ class Station(ABC):
 
             print(f"Cleared history and indexes for station '{self.name}'")
 
-    #
-    # INTERESTS
-    # 
-
-    def has_interest_in(self, event_type: Type) -> bool:
-        """
-        Check if the station is interested in a specific event.
-
-        Should be overridden by subclasses.
-
-        Args:
-            event_type (Type): the event type to check
-
-        Returns:
-            bool: True if the event type is of interest, False otherwise
-        
-        """
-        return False
-            
-
-    #
-    # EVENT SIZE AND SPACE MANAGEMENT
-    #
             
     def _calculate_event_size(self, event: Event) -> int:
         """
@@ -355,7 +426,7 @@ class Station(ABC):
                   f"{getattr(event, 'idshort', 'unknown')}: {e}")
             return 10000 # 10KB safety size for unknown events
             
-    def _manage_history(self) -> None:
+    def _check_history(self) -> None:
         """
         Manage the history size and set the needs_compressing flag.
 
@@ -379,24 +450,24 @@ class Station(ABC):
             # rush order on event compression with CompressionLevel.HIGH
             self._rush_compress_events()
 
-            if self.current_history_size > self.history_size_limit:
-                self._remove_events_from_history()
-
         # check if we need to compress the history
         should_compress = False
-        if self.last_compress is None:
-            if self.compress_threshold is not None \
-            and self.current_history_size > self.compress_threshold:
-                should_compress = True
-        elif self.last_compress is not None:
-            time_since_last = now - self.last_compress
-            if self.compress_threshold is not None \
-            and self.current_history_size > self.compress_threshold:
-                if time_since_last > 300:
+        if self.rush_compression:
+            should_compress = True
+        else:
+            if self.last_compression is None:
+                if self.compress_threshold is not None \
+                and self.current_history_size > self.compress_threshold:
                     should_compress = True
-            else:
-                if time_since_last > 900:
-                    should_compress = True
+            elif self.last_compression is not None:
+                time_since_last = now - self.last_compression
+                if self.compress_threshold is not None \
+                and self.current_history_size > self.compress_threshold:
+                    if time_since_last > 300:
+                        should_compress = True
+                else:
+                    if time_since_last > 900:
+                        should_compress = True
 
 
         should_clear = False
@@ -405,19 +476,17 @@ class Station(ABC):
         if self.last_clear is None:
             last_clear = sktime.get_start_time()
             
-        elif self.last_clear is not None:
+        else:
             last_clear = self.last_clear
 
         # clear lowest priority events every 2 hours
         if (now - last_clear) > 7200:
-            self.clearing = True
-            priorities_to_clear = [EventPriority.LOWEST]
-            self._clear_old_events(priorities_to_clear)
+            self.clear_events = True
+            self.priorities_to_clear = [EventPriority.LOWEST]
         # clear low and lowest priority events every 12 hours
         elif (now - last_clear) > 43200:
-            self.clearing = True
-            priorities_to_clear = [EventPriority.LOWEST, EventPriority.LOW]
-            self._clear_old_events(priorities_to_clear)
+            self.clear_events = True
+            self.priorities_to_clear = [EventPriority.LOWEST, EventPriority.LOW]
 
         
         # update flags for background processing
@@ -431,6 +500,24 @@ class Station(ABC):
             print(f"Marking station '{self.name}' as currently clearing.\n"
                   f"Clearing events of priority {', '.join([p.name for p in priorities_to_clear])}\n")
                 
+
+    def _need_to_remove_events(self) -> bool:
+        """
+        Check if the history size exceeds the limit and if we need to remove events.
+
+        This checks if the current history size is greater than the limit,
+        and if we have already removed events in this cycle.
+
+        Returns:
+            bool: True if we need to remove events, False otherwise
+        
+        """
+        if self.history_size_limit is None:
+            return False
+        elif self.current_history_size > self.history_size_limit:
+            return True
+
+
     def _remove_events_from_history(self) -> None:
         """
         Remove events from the history until it is below the size limit.
@@ -499,6 +586,7 @@ class Station(ABC):
         
         """
         try:
+            self.clearing = True
             if not priorities:
                 print(f"No priorities provided to clear events from station '{self.name}'")
                 return
@@ -558,7 +646,7 @@ class Station(ABC):
     # COMPRESSION METHODS
     #
     
-    def compress_events(self, level: CompressionLevel = None) -> None:
+    def _compress_events(self, level: CompressionLevel = None) -> None:
         """
         Compress events based on priority and size.
 
@@ -574,13 +662,22 @@ class Station(ABC):
         """
         with self.lock:
             if self.clearing:
-                # loop until the clearing is done
+                clearing_start = sktime.now()
+                max_wait = 60.0
+
                 while self.clearing:
+                    # Check for absolute timeout
+                    if sktime.elapsed(clearing_start) > max_wait:
+                        print(f"{self.name}: Clearing operation timed out after {max_wait} seconds.")
+                        self.clearing = False  # Force exit from clearing state
+                        break
+                        
+                    # Short sleep and circuit breaker check
                     loop_start = sktime.now()
                     sktime.sleep(0.5)
-                    sktime.yawn(5, 3, 5, f"{self.name} waiting for clearing to finish", dprint=True)
+                    self._clearing_yawn()
                     loop_end = sktime.now()
-                    # if we slept for 5 secs after hitting yawn_limit...
+                    
                     if sktime.elapsed(loop_start, loop_end) > 5:
                         print(f"{self.name} is clearing events, event compression paused.\n")
 
@@ -636,12 +733,12 @@ class Station(ABC):
             size_reduction = original_size - current_size
 
             # update the last compression timestamp
-            self.last_compress = sktime.now()
+            self.last_compression = sktime.now()
 
             # reset the needs_compressing flag
             self.needs_compressing = False
 
-            elapsed_time = sktime.elapsed(start_time, self.last_compress)
+            elapsed_time = sktime.elapsed(start_time, self.last_compression)
             print(f"Compressed {compress_count} events "
                   f"({byteconv.convert_bytes(size_reduction)}) "
                   f"from station '{self.name}'.\n"
@@ -722,12 +819,16 @@ class Station(ABC):
         """
         Rush compress events in the station's history.
 
-        This is a high-priority compression that should be done
-        immediately, regardless of the current compression level.
+        Rush compression is 
         
         """
-        # TODO : once we setup background processing, implement this
-        pass
+        with self.lock:
+            if self.rush_compression is True:
+                print(f"Already rushing a compression for station '{self.name}'")
+                return
+            else:
+                self.rush_compression = True
+                print(f"Rushing compression for station '{self.name}'")
 
     #
     # EVENT RETRIEVAL METHODS
