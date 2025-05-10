@@ -514,14 +514,14 @@ class MainStation(Station, ABC):
         if hasattr(self, "_instance_lock"):
             with self._instance_lock:
                 now = sktime.now()
-                if message.get("message", None) is 'take_my_bus_station_events':
+                if message.get("message", None) == 'take_my_bus_station_events':
                     # unpack the data from the message
                     data = message.get("data", None)
                     if data is not None:
                         # process the data
                         events = self._deserialize_events(data)
                         self.add_multiple_events(events)
-                    elif message.get("message", None) is 'bus_has_processed_reply':
+                    elif message.get("message", None) == 'bus_has_processed_reply':
                         # unpack the data from the message
                         data = message.get("data", None)
                         if data is not None:
@@ -544,9 +544,9 @@ class MainStation(Station, ABC):
                 try:
                     now = sktime.now()
                     requests_to_clear = []
-                    for uuid, request in self.requests:
+                    for uuid, request in self.requests.items():
                         # check what the request is
-                        if request == 'get_your_main_station_events':
+                        if request.get("message", None) == 'get_your_main_station_events':
                             # send the events to the BusStation with this process ID
                             events = self.event_history.copy()
                             # filter based on bus interests

@@ -123,6 +123,7 @@ class Station(ABC):
         self.last_compress = None # last compression timestamp
 
         self.last_clear = None # last clear timestamp
+        self.clearing = False # flag to indicate if clearing is in progress
 
         # last sync timestamp
         self.last_sync = sktime.now()
@@ -409,12 +410,12 @@ class Station(ABC):
 
         # clear lowest priority events every 2 hours
         if (now - last_clear) > 7200:
-            clearing = True
+            self.clearing = True
             priorities_to_clear = [EventPriority.LOWEST]
             self._clear_old_events(priorities_to_clear)
         # clear low and lowest priority events every 12 hours
         elif (now - last_clear) > 43200:
-            clearing = True
+            self.clearing = True
             priorities_to_clear = [EventPriority.LOWEST, EventPriority.LOW]
             self._clear_old_events(priorities_to_clear)
 
@@ -426,9 +427,9 @@ class Station(ABC):
                   f"Current size: {byteconv.convert_bytes(self.current_history_size)}\n"
                   f"Compression threshold: {byteconv.convert_bytes(self.compress_threshold)}\n")
 
-        if clearing:
-            print(f"Marking station '{self.name}' for clearing.\n"
-                  f"Clearing events of priority {priorities_to_clear.name}.\n")
+        if self.clearing:
+            print(f"Marking station '{self.name}' as currently clearing.\n"
+                  f"Clearing events of priority {', '.join([p.name for p in priorities_to_clear])}\n")
                 
     def _remove_events_from_history(self) -> None:
         """
@@ -497,56 +498,60 @@ class Station(ABC):
             priorities (List[EventPriority]): the priorities to clear
         
         """
-        if not priorities:
-            print(f"No priorities provided to clear events from station '{self.name}'")
-            return
-        
-        cleared_count = 0
-        cleared_size = 0
-        now = sktime.now()
+        try:
+            if not priorities:
+                print(f"No priorities provided to clear events from station '{self.name}'")
+                return
+            
+            cleared_count = 0
+            cleared_size = 0
+            now = sktime.now()
 
-        # age threshold already set in _manage_history()
-        for priority in priorities:
-            if priority not in self.priority_index:
-                continue
-
-            events = self.priority_index[priority].copy()
-            if priority == EventPriority.LOWEST:
-                # remove events older than 2 hours
-                age_limit = now - 7200
-            elif priority == EventPriority.LOW:
-                # remove events older than 12 hours
-                age_limit = now - 43200
-
-            for event in events:
-                try:
-                    timestamp = event.data['metadata']['timestamps'].get('posted', 0)
-
-                    if timestamp < age_limit:
-                        # remove the event from history
-                        self.event_history.remove(event)
-
-                        # update size tracking
-                        event_size = self._calculate_event_size(event)
-                        self.current_history_size -= event_size
-                        cleared_size += event_size
-                        cleared_count += 1
-
-                        # remove from size cache
-                        if hasattr(event, 'id'):
-                            self.event_sizes.pop(event.id, None)
-                except (AttributeError, KeyError):
-                    print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
-                          "does not have a valid post time.")
+            # age threshold already set in _manage_history()
+            for priority in priorities:
+                if priority not in self.priority_index:
                     continue
 
-        # Rebuild all indexes after removing events
-        if cleared_count > 0:
-            self._rebuild_indexes()
-            self.last_clear = now
-            print(f"Cleared {cleared_count} events "
-                  f"({byteconv.convert_bytes(cleared_size)}) "
-                  f"from station '{self.name}'\n")
+                events = self.priority_index[priority].copy()
+                if priority == EventPriority.LOWEST:
+                    # remove events older than 2 hours
+                    age_limit = now - 7200
+                elif priority == EventPriority.LOW:
+                    # remove events older than 12 hours
+                    age_limit = now - 43200
+
+                for event in events:
+                    try:
+                        timestamp = event.data['metadata']['timestamps'].get('posted', 0)
+
+                        if timestamp < age_limit:
+                            # remove the event from history
+                            self.event_history.remove(event)
+
+                            # update size tracking
+                            event_size = self._calculate_event_size(event)
+                            self.current_history_size -= event_size
+                            cleared_size += event_size
+                            cleared_count += 1
+
+                            # remove from size cache
+                            if hasattr(event, 'id'):
+                                self.event_sizes.pop(event.id, None)
+                    except (AttributeError, KeyError):
+                        print(f"Warning: Event {getattr(event, 'idshort', 'unknown')} "
+                            "does not have a valid post time.")
+                        continue
+
+            # Rebuild all indexes after removing events
+            if cleared_count > 0:
+                self._rebuild_indexes()
+                self.last_clear = now
+                print(f"Cleared {cleared_count} events "
+                    f"({byteconv.convert_bytes(cleared_size)}) "
+                    f"from station '{self.name}'\n")
+        finally:
+            # Always reset the clearing flag, even if an exception occurs
+            self.clearing = False
         
 
     #
@@ -568,6 +573,18 @@ class Station(ABC):
 
         """
         with self.lock:
+            if self.clearing:
+                # loop until the clearing is done
+                while self.clearing:
+                    loop_start = sktime.now()
+                    sktime.sleep(0.5)
+                    sktime.yawn(5, 3, 5, f"{self.name} waiting for clearing to finish", dprint=True)
+                    loop_end = sktime.now()
+                    # if we slept for 5 secs after hitting yawn_limit...
+                    if sktime.elapsed(loop_start, loop_end) > 5:
+                        print(f"{self.name} is clearing events, event compression paused.\n")
+
+
             start_time = sktime.now()
             print(f"Compressing events in station '{self.name}' "
                   f"with compression level {level.name}...\n")

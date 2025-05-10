@@ -128,6 +128,16 @@ class IntStation(MainStation):
         """
         self._running = True
 
+        # Ensure bridge connection
+        if not self.bridge:
+            try:
+                self.bridge = self.connect_to_bridge()
+                if not self.bridge:
+                    print(f"Warning: Failed to connect to EventBridge during initialization.")
+            except Exception as e:
+                print(f"Error connecting to EventBridge: {e}")
+                # Continue anyway, background thread will retry
+
         # start the thread to sync with the other MainStation
         self._sync_thread = threading.Thread(
             target=self._intstation_sync, # sync with extstation and busstations
@@ -162,6 +172,21 @@ class IntStation(MainStation):
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+    
+
+    def _intstation_yawn(self) -> None:
+        """
+        Set the yawn to timeout background tasks.
+
+        If 3 exceptions are raised within 20 seconds, this method will
+        set the yawn to timeout background tasks for 30 seconds, allowing
+        other processes some time to reset or fix issues before attempting
+        to run these tasks again.
+        
+        """
+        message = "IntStation raised an exception 3 times within the last 18 seconds. "
+        message += "Timing out background tasks for 30 seconds."
+        sktime.yawn(3, 20, 30, self.station_name, message, dprint=True)
 
 
     def _compress_station_history(self):
@@ -184,8 +209,25 @@ class IntStation(MainStation):
 
             except Exception as e:
                 print(f"Error in compression thread for {self.name}: {e}")
-                sktime.yawn(3, 10, 100, self.station_name, dprint=True)
+                self._intstation_yawn()
                 sktime.sleep(1)
+
+    
+    def _connected_to_bridge(self):
+        """Ensure the bridge connection is established, with retry logic."""
+        if not self.bridge:
+            try:
+                self.bridge = self.connect_to_bridge()
+                if self.bridge:
+                    print(f"Successfully connected to EventBridge.")
+                    return True
+                else:
+                    print(f"Failed to connect to EventBridge.")
+                    return False
+            except Exception as e:
+                print(f"Error connecting to EventBridge: {e}")
+                return False
+        return True
 
 
 # 
@@ -224,8 +266,12 @@ class IntStation(MainStation):
 
             except Exception as e:
                 print(f"Error in sync thread for {self.name}: {e}")
-                sktime.yawn(3, 10, 100, self.station_name, dprint=True)
+                self._intstation_yawn()
                 sktime.sleep(1)
+
+            finally:
+                # Sleep for a short time before next sync attempt
+                sktime.sleep(4)
                 
 
     def _sync_with_extstation(self) -> None:
@@ -239,31 +285,51 @@ class IntStation(MainStation):
         """
         while self._running:
             try:
+                if not self._connected_to_bridge():
+                    attempts = 0
+                    while not self._connected_to_bridge():
+                        if attempts >= 3:
+                            self._intstation_yawn()
+
+                        print(f"Warning: Not connected to EventBridge. Retrying...")
+                        attempts += 1
+                        sktime.sleep(2)
+                        
+
+
                 # if last_ext_sync is None or more than sync_interval seconds ago
                 if self.last_ext_sync:
                     elapsed = sktime.elapsed(self.last_ext_sync)
                 
                 if self.last_ext_sync is None or elapsed > self.ext_sync_interval:
-                    # sync with the ExtStation, depending on BridgeState 
-                    # and BridgeDirection
+                    # check bridge direction and state
+                    direction, state = self.get_bridge_info()
+
+                    if not self.bridge.can_send_to_ext():
+                        # Log the state but don't treat as error
+                        print(f"{self.name}: cannot currently sync with ExtStation. "
+                            f"Bridge direction {direction.name}/state {state.name}.")
+                        # Sleep before next attempt
+                        continue
+
+                    # sync with ExtStation
                     synced = self.bridge.sync()
                     if synced:
                         self.last_ext_sync = sktime.now()
-                        print(f"Synced with ExtStation at "
-                              f"{sktime.to_custom_time_format(self.last_ext_sync)}.")
+                        print(f"{self.name}: synced with ExtStation.")
+                        print(f"Time since last sync: {sktime.elapsed(self.last_ext_sync)} seconds.")
                     else:
-                        direction, state = self.get_bridge_info()
-                        if self.bridge.can_send_to_ext():
-                            raise RuntimeError(
-                                f"Failed to sync with ExtStation despite BridgeState {state} "
-                                f"and BridgeDirection {direction} allowing a sync."
-                                )
-                        # if we can't sync due to bridge closure, don't raise an error
-                        # because this is intended behavior
-                        
+                        print(f"{self.name}: failed to sync with ExtStation.")
+
             except Exception as e:
-                print(f"Error in sync thread for {self.name}: {e}")
-                raise e
+                print(f"Error in sync with ExtStation: {e}")
+                self._intstation_yawn()
+                sktime.sleep(1)
+            
+                
+
+    
+
             
 
 

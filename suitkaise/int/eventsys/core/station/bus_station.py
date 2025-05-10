@@ -289,7 +289,7 @@ class BusStation(Station):
             print(f"Error checking connection for {self.name}: {e}")
             return False
 
-    def _connect_to_main_station(self, domain: str):
+    def _connect_to_main_station(self):
         """
         Connect to the appropriate MainStation, based on the domain.
 
@@ -348,10 +348,10 @@ class BusStation(Station):
             try:
                 # send events to the MainStation
                 serialized_events = self._serialize_events(self.event_history)
-                self.connected_station.msg_from_bus_station((self.process_id, 'take_my_bus_station_events', serialized_events))
+                self.connected_station.msg_from_bus_station(self.process_id, 'take_my_bus_station_events', serialized_events)
 
                 # receive events from the MainStation
-                self.connected_station.req_from_bus_station((self.process_id, 'get_your_main_station_events'))
+                self.connected_station.req_from_bus_station(self.process_id, 'get_your_main_station_events')
                 expected_message_type = 'my_main_station_events'
                 remote_events = self.get_data_from_reply(self.process_id, expected_message_type)
 

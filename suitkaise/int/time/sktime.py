@@ -412,8 +412,12 @@ def sleep(seconds: float, dprint: bool = False) -> None:
 
 
 
-def yawn(num_yawns: int = 2, yawn_for: float = 10.0, sleep_for: float = 1.0,
-         id: str = None, dprint: bool = False) -> None:
+def yawn(yawn_limit: int = 2, 
+         yawn_for: float = 10.0, 
+         sleep_for: float = 1.0,
+         id: str = None, 
+         message_on_sleep: str = None,
+         dprint: bool = False) -> None:
     """
     Yawn for a specified number of seconds.
 
@@ -435,7 +439,7 @@ def yawn(num_yawns: int = 2, yawn_for: float = 10.0, sleep_for: float = 1.0,
     - time out busy loops
 
     Args:
-        num_yawns: number of yawns until the program sleeps
+        yawn_limit: number of yawns until the program sleeps
         - first call counts as 1 yawn
         - sleeps once the number of yawns is reached.
         yawn_for: time to yawn for, in seconds
@@ -484,10 +488,10 @@ def yawn(num_yawns: int = 2, yawn_for: float = 10.0, sleep_for: float = 1.0,
                       f"Number of yawns: {yawndata['yawn_count']}")
                 
         # check if we reached the number of yawns
-        if yawndata['yawn_count'] >= yawndata['num_yawns']:
+        if yawndata['yawn_count'] >= yawndata['yawn_limit']:
             # sleep for the specified time
             if dprint:
-                print(f"{yawndata['num_yawns']} yawns have been detected. "
+                print(f"{yawndata['yawn_limit']} yawns have been detected. "
                       f"{id} going to sleep...")
         
             yawndata['sleeping'] = True
@@ -505,7 +509,7 @@ def yawn(num_yawns: int = 2, yawn_for: float = 10.0, sleep_for: float = 1.0,
             raise ValueError("id cannot be None when creating a new yawn.")
         yawns[id] = {
             'yawn_start': current_time,
-            'num_yawns': num_yawns,
+            'yawn_limit': yawn_limit,
             'yawn_count': 1,
             'yawn_for': yawn_for,
             'sleep_for': sleep_for,
@@ -515,7 +519,7 @@ def yawn(num_yawns: int = 2, yawn_for: float = 10.0, sleep_for: float = 1.0,
         if dprint:
             print(f"First yawn registered for id {id}.\n"
                   f"Will sleep for {sleep_for} seconds "
-                  f"if {num_yawns} yawns are detected within {yawn_for} seconds.")
+                  f"if {yawn_limit} yawns are detected within {yawn_for} seconds.")
             
 
 
