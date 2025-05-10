@@ -212,23 +212,6 @@ class IntStation(MainStation):
                 self._intstation_yawn()
                 sktime.sleep(1)
 
-    
-    def _connected_to_bridge(self):
-        """Ensure the bridge connection is established, with retry logic."""
-        if not self.bridge:
-            try:
-                self.bridge = self.connect_to_bridge()
-                if self.bridge:
-                    print(f"Successfully connected to EventBridge.")
-                    return True
-                else:
-                    print(f"Failed to connect to EventBridge.")
-                    return False
-            except Exception as e:
-                print(f"Error connecting to EventBridge: {e}")
-                return False
-        return True
-
 
 # 
 # Communication with BusStations and Bridge/ExtStation

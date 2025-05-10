@@ -317,15 +317,23 @@ class MainStation(Station, ABC):
             raise RuntimeError("Failed to connect to EventBridge")
         
 
-    def connected_to_bridge(self) -> bool:
-        """
-        Check if this MainStation is connected to the EventBridge.
+    def _connected_to_bridge(self):
+        """Ensure the bridge connection is established, with retry logic."""
+        if not self.bridge:
+            try:
+                self.bridge = self.connect_to_bridge()
+                if self.bridge:
+                    print(f"{self.name}: connected to EventBridge")
+                    return True
+                else:
+                    print(f"{self.name}: failed to connect to EventBridge")
+                    return False
+            except Exception as e:
+                print(f"{self.name}: error connecting to EventBridge: {e}")
+                return False
+        return True
 
-        Returns:
-            bool: True if connected to the EventBridge, False otherwise.
         
-        """
-        return self.bridge is not None
     
     def get_bridge_info(self) -> Tuple[BridgeDirection, BridgeState]:
         """
@@ -336,12 +344,10 @@ class MainStation(Station, ABC):
             and state of the EventBridge.
         
         """
-        if self.bridge is None:
-            try:
-                self.connect_to_bridge()
-            except RuntimeError:
-                raise RuntimeError("Not connected to EventBridge")
-        return self.bridge.get_info()
+        if not self._connected_to_bridge():
+            raise RuntimeError(f"{self.name}: cannot connect to EventBridge")
+        direction = self.get_bridge_direction()
+        state = self.get_bridge_state()
         
     
     def get_bridge_direction(self) -> BridgeDirection:
@@ -352,11 +358,8 @@ class MainStation(Station, ABC):
             BridgeDirection: The direction of communication (INTERNAL or EXTERNAL).
         
         """
-        if self.bridge is None:
-            try:
-                self.connect_to_bridge()
-            except RuntimeError:
-                raise RuntimeError("Not connected to EventBridge")
+        if not self._connected_to_bridge():
+            raise RuntimeError("Not connected to EventBridge")
         return self.bridge.get_direction()
     
     
@@ -368,11 +371,8 @@ class MainStation(Station, ABC):
             BridgeState: The current state of the EventBridge.
         
         """
-        if self.bridge is None:
-            try:
-                self.connect_to_bridge()
-            except RuntimeError:
-                raise RuntimeError("Not connected to EventBridge")
+        if not self._connected_to_bridge():
+            raise RuntimeError("Not connected to EventBridge")
         return self.bridge.get_state()
     
 
