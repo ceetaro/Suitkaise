@@ -63,7 +63,7 @@ import pickle
 import weakref
 from typing import Dict, List, Set, Type, Optional, Any, Union, Tuple
 
-import suitkaise.int.utils.time.sktime as sktime
+import suitkaise.int.time.sktime as sktime
 from suitkaise.int.eventsys.data.enums.enums import (
     StationLevel, EventState, EventPriority, CompressionLevel, SKDomain
 )

@@ -85,8 +85,19 @@ from suitkaise.int.eventsys.events.base_event import Event
 from suitkaise.int.eventsys.data.enums.enums import BridgeDirection, BridgeState
 from suitkaise.int.eventsys.core.station.int_station import IntStation
 from suitkaise.int.eventsys.core.station.ext_station import ExtStation
-import suitkaise.int.time.sktime as sktime
+import suitkaise.int.utils.time.sktime as sktime
 
+class BridgeError(Exception):
+    """Custom exception for the EventBridge."""
+    pass
+
+class BridgeConnectionError(BridgeError):
+    """Exception raised when the bridge cannot connect to both MainStations."""
+    pass
+
+class BridgeCycleError(BridgeError):
+    """Exception raised when the bridge cycle cannot be completed."""
+    pass
 
 class EventBridge:
     """
@@ -103,15 +114,15 @@ class EventBridge:
     and setting the event histories of both MainStations to the combined history.
     
     """
-    _instance = None
-    _instance_lock = threading.RLock()
+    _bridge = None
+    _bridge_lock = threading.RLock()
 
     def __new__(cls):
         """Control instance creation for the singleton pattern."""
-        with cls._instance_lock:
-            if cls._instance is None:
-                cls._instance = super(EventBridge, cls).__new__(cls)
-        return cls._instance
+        with cls._bridge_lock:
+            if cls._bridge is None:
+                cls._bridge = super(EventBridge, cls).__new__(cls)
+        return cls._bridge
     
     def __init__(self, 
                  initial_direction: Optional[BridgeDirection] = None,
@@ -127,7 +138,7 @@ class EventBridge:
         if hasattr(self, '_initialized') and self._initialized:
             return  
         
-        self.name = "EVENTBRIDGE"
+        self.name = "BRIDGE"
 
         # Initialize the bridge direction and state
         self._bridge_direction = initial_direction or BridgeDirection.CLOSED
@@ -137,215 +148,12 @@ class EventBridge:
         # Initialize the stations
         self.int_station = None
         self.ext_station = None
-        self.stations_connected = False # True if both stations are connected
-
-        self._initialized = True
-
-
-
-    def get_state(self) -> BridgeState:
-        """
-        Get the current state of the EventBridge.
-
-        Returns:
-            BridgeState: The current state of the EventBridge.
+        self.stations_connected = None
+        self._connect_to_main_stations()
         
-        """
-        return self._bridge_state
-    
-    def get_direction(self) -> BridgeDirection:
-        """
-        Get the current direction of the EventBridge.
+        # processing thread
+        self._bridge_background_thread = None
 
-        Returns:
-            BridgeDirection: The current direction of the EventBridge.
-        
-        """
-        return self._bridge_direction
-    
-    def can_sync_to_int(self) -> bool:
-        """
-        Check if the ExtStation can sync to IntStation.
-
-        Returns:
-            bool: True if the EventBridge can sync to IntStation, False otherwise.
-        
-        """
-        return self._bridge_direction in (BridgeDirection.OPEN, BridgeDirection.ONLY_TO_INT)
-    
-    def can_sync_to_ext(self) -> bool:
-        """
-        Check if the IntStation can sync to ExtStation.
-
-        Returns:
-            bool: True if the EventBridge can sync to ExtStation, False otherwise.
-        
-        """
-        return self._bridge_direction in (BridgeDirection.OPEN, BridgeDirection.ONLY_TO_EXT)
-    
-    def set_direction(self, direction: BridgeDirection) -> None:
-        """
-        Set the direction of the EventBridge.
-
-        This will only take effect if the bridge is unlocked.
-
-        Args:
-            direction (BridgeDirection): The new direction for the EventBridge.
-        
-        """
-        if self._bridge_state == BridgeState.UNLOCKED:
-            self._bridge_direction = direction
-        else:
-            # ignore if locked
-            pass
-
-    def set_state(self, state: BridgeState) -> None:
-        """
-        Set the state of the EventBridge.
-
-        This can only be done manually by the user.
-
-        Args:
-            state (BridgeState): The new state for the EventBridge.
-        
-        """
-        self._bridge_state = state
-        if state == BridgeState.FORCE_OPEN:
-            self._bridge_direction = BridgeDirection.OPEN
-        elif state == BridgeState.FORCE_CLOSED:
-            self._bridge_direction = BridgeDirection.CLOSED
-
-
-    def both_stations_connected(self) -> bool:
-        """
-        Check if both stations are connected before syncing.
-        
-        """
-        if self.stations_connected:
-            return True
-        
-        # try and connect to both stations
-        if self.int_station is None:
-            self.int_station = IntStation.get_instance()
-
-        if self.ext_station is None:
-            self.ext_station = ExtStation.get_instance()
-
-        if self.int_station._connected_to_bridge and self.ext_station._connected_to_bridge:
-            self.stations_connected = True
-            return True
-        
-        return False
-
-
-    def sync(self) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Sync the two MainStations by combining their event histories.
-
-        This method is called by both MainStations to combine their event histories
-        and set the event histories of both MainStations to the combined history.
-
-        Returns:
-            Tuple[bool, Dict[str, Any]]: A tuple containing a boolean indicating
-            if the sync was successful, and a report including at least state and 
-            direction of the bridge during the sync.
-
-        """
-        start_time = sktime.now()
-        message = None
-        int_synced = False
-        ext_synced = False
-        report = {
-            "message": message,
-            "state": None,
-            "direction": None,
-            "sync_start": start_time,
-            "sync_end": None,
-            "sync_duration": None,
-        }
-
-        try:
-            with self._instance_lock:
-                # check if both stations are connected
-                if self.both_stations_connected():
-                    if not self._bridge_direction == BridgeDirection.CLOSED:
-                        # get all events from both stations
-                        int_events = self.int_station.get_all_events()
-                        ext_events = self.ext_station.get_all_events()
-                        # combine the events
-                        combined = int_events + ext_events
-                        
-                        # remove duplicates
-                        for event in combined:
-                            if event in int_events and event in ext_events:
-                                combined.remove(event)
-
-                        # set the event histories of both stations to the combined history
-                        if self.can_sync_to_int():
-                            int_synced = self.int_station.receive_bridge_events(combined)
-                        if self.can_sync_to_ext():
-                            ext_synced = self.ext_station.receive_bridge_events(combined)
-
-                        end_time = sktime.now()
-                        report["sync_end"] = end_time
-                        report["sync_duration"] = sktime.elapsed(start_time, end_time)
-                        report["state"] = self._bridge_state.name
-                        report["direction"] = self._bridge_direction.name
-
-                        # check if both stations synced
-                        if int_synced and ext_synced:
-                            message = f"{self.name}: Bridge synced events between both stations."
-                            report["message"] = message
-                            return True, report
-                        
-                        elif int_synced and not ext_synced:
-                            message = f"{self.name}: Bridge only synced ExtStation events to IntStation."
-                            report["message"] = message
-                            return True, report
-                        
-                        elif ext_synced and not int_synced:
-                            message = f"{self.name}: Bridge only synced IntStation events to ExtStation."
-                            report["message"] = message
-                            return True, report
-
-                    else:
-                        end_time = sktime.now()
-                        message = f"{self.name}: Bridge is closed, no events synced."
-                        report["message"] = message
-                        report["state"] = self._bridge_state.name
-                        report["direction"] = self._bridge_direction.name
-                        report["sync_end"] = end_time
-                        report["sync_duration"] = sktime.elapsed(start_time, end_time)
-                        return False, report
-                    
-                else:
-                    end_time = sktime.now()
-                    message = f"{self.name}: IntStation and/or ExtStation not connected to EventBridge."
-                    message += " Please connect both stations before syncing."
-                    report["message"] = message
-                    report["state"] = self._bridge_state.name
-                    report["direction"] = self._bridge_direction.name
-                    report["sync_end"] = end_time
-                    report["sync_duration"] = sktime.elapsed(start_time, end_time)
-                    return False, report
-                
-        except Exception as e:
-            end_time = sktime.now()
-            message = f"{self.name}: Error syncing events: {e}"
-            report["message"] = message
-            report["state"] = self._bridge_state.name
-            report["direction"] = self._bridge_direction.name
-            report["sync_end"] = end_time
-            report["sync_duration"] = sktime.elapsed(start_time, end_time)
-            return False, report
-
-
-                        
-
-
-                    
-                
-
-    
-    
-
+        # TODO finish once EventCycle is finished
+        # NOTE: EventCycle needs to be built off of Cycle class,
+        #       which is also not yet finished.

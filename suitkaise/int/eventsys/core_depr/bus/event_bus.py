@@ -50,7 +50,7 @@ the local station (BusStation) and can propagate them to the main station if nee
 
 import threading
 import bisect
-import suitkaise.int.utils.time.sktime as sktime
+import suitkaise.int.time.sktime as sktime
 from typing import Dict, Any, List, Tuple, Optional, Callable, Type, Union, Set
 from math import sqrt
 

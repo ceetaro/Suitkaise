@@ -61,7 +61,7 @@ from suitkaise.int.eventsys.data.enums.enums import (
 from suitkaise.int.eventsys.events.base_event import Event
 from suitkaise.int.eventsys.core_depr.station.station import Station
 from suitkaise.int.eventsys.core_depr.station.bus_station import BusStation
-import suitkaise.int.utils.time.sktime as sktime
+import suitkaise.int.time.sktime as sktime
 import suitkaise.int.domain.get_domain as get_domain
 
 class MainStation(Station, ABC):

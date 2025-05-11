@@ -51,7 +51,7 @@ import contextlib
 import uuid
 import datetime
 import threading
-import suitkaise.int.time.sktime as sktime
+import suitkaise.int.utils.time.sktime as sktime
 from typing import Dict, Any, Optional, Tuple, Union, Type, List
 
 from suitkaise.int.eventsys.data.enums.enums import EventState, EventPriority
@@ -418,7 +418,7 @@ class Event:
         print(f"State: {self.state.name}")
         print(f"Posted at: {sktime.to_custom_time_format(self.timestamps['posted'])}\n")
 
-        from suitkaise.int.eventsys.core.bus.event_bus import EventBus
+        from suitkaise.int.eventsys.core_depr.bus.event_bus import EventBus
         bus = EventBus.get_current_bus()
         bus.post(self)
 
@@ -760,7 +760,7 @@ class Event:
                 set_parent_collector(self)
 
                 # Register this with the bus
-                from suitkaise.int.eventsys.core.bus.event_bus import EventBus
+                from suitkaise.int.eventsys.core_depr.bus.event_bus import EventBus
                 bus = EventBus.get_current_bus()
                 bus.register_collector(self)
 
@@ -780,7 +780,7 @@ class Event:
                     set_parent_collector(self._parent_collector)
                 
                 # Unregister this collector from the bus
-                from suitkaise.int.eventsys.core.bus.event_bus import EventBus
+                from suitkaise.int.eventsys.core_depr.bus.event_bus import EventBus
                 bus = EventBus.get_current_bus()
                 bus.unregister_collector(self)
 

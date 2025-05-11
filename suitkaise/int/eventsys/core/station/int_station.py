@@ -55,9 +55,9 @@ from suitkaise.int.eventsys.data.enums.enums import (
     StationLevel, BridgeDirection, BridgeState, SKDomain
 )
 from suitkaise.int.eventsys.events.base_event import Event
-from suitkaise.int.eventsys.core.station.main_station import MainStation
-from suitkaise.int.eventsys.core.station.bus_station import BusStation
-import suitkaise.int.time.sktime as sktime
+from suitkaise.int.eventsys.core_depr.station.main_station import MainStation
+from suitkaise.int.eventsys.core_depr.station.bus_station import BusStation
+import suitkaise.int.utils.time.sktime as sktime
 import suitkaise.int.domain.get_domain as get_domain
 
 class IntStation(MainStation):
