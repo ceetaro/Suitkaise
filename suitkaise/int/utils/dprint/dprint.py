@@ -90,7 +90,8 @@ class Dprint:
                  print_to_console: Optional[bool] = None,
                  should_log: Optional[bool] = None,
                  add_newline: Optional[bool] = None,
-                 add_time: Optional[bool] = None) -> None:
+                 add_time: Optional[bool] = None,
+                 add_file_name: Optional[bool] = None) -> None:
         """
         Print a message using Dprint.
 
@@ -108,6 +109,7 @@ class Dprint:
         
         """
         self.message = message
+        self.original_message = message
 
         from suitkaise.int.utils.path.get_paths import get_file_path_of_caller
 
@@ -164,6 +166,11 @@ class Dprint:
         self.timestamp_format = self.settings._timestamp_format   
         self.time_diff_format = self.settings._time_diff_format  
 
+        if add_file_name is not None:
+            self.add_file_name = add_file_name
+        else:
+            self.add_file_name = self.settings._auto_add_file_name
+
         printed = self._dprint()
 
 
@@ -197,12 +204,12 @@ class Dprint:
                 if self.should_log and self.log_level:
                     logged = self._log_message()
 
-                displayed = self._print_to_dprint_tab()
+            displayed = self._print_to_dprint_tab()
 
-                if printed and logged and displayed:
-                    return True
-                else:
-                    raise DprintingError("Failed to process Dprint message.")
+            if printed and logged and displayed:
+                return True
+            else:
+                raise DprintingError("Failed to process Dprint message.")
 
         except DprintingError as e:
             print(f"Error Dprinting message '{self.message}': {e}")
@@ -215,9 +222,18 @@ class Dprint:
         
         """
         try:
+            if self.add_file_name:
+                # get last part of the file path
+                file_name = self.file_path.split("/")[-1]
+                # add file name to start of message
+                self.message = f"{file_name} -- " + self.message
+
             if self.add_timestamp:
-                self.message = f"{self.message}\n- {self.timestamp_format}\n"
-                self.message+= f"- Time since start: {self.time_diff_format}"
+                if self.message.endswith("\n"):
+                    self.message = self.message + f"- {self.timestamp_format}\n"
+                else:
+                    self.message = self.message + f"\n- {self.timestamp_format}\n"
+                self.message += f"- Time since start: {self.time_diff_format}"
                 
             if self.add_newline and not self.message.endswith("\n"):
                 self.message += "\n"
@@ -240,24 +256,22 @@ class Dprint:
 
             if not logger:
                 raise DprintingError("Logger not found.")
-            
-            if self.add_timestamp:
-                self.message = f"{self.message}\n- {self.timestamp_format}\n"
-                self.message+= f"- Time since start: {self.time_diff_format}"
-
-            if self.add_newline and not self.message.endswith("\n"):
-                self.message += "\n"
 
             if self.log_level == "info":
-                logger.info(self.message)
+                message = f"Info: {self.message}"
+                logger.info(message)
             elif self.log_level == "debug":
-                logger.debug(self.message)
+                message = f"Debug: {self.message}"
+                logger.debug(message)
             elif self.log_level == "warning":
-                logger.warning(self.message)
+                message = f"WARNING: {self.message}"
+                logger.warning(message)
             elif self.log_level == "error":
-                logger.error(self.message)
+                message = f"ERROR: {self.message}"
+                logger.error(message)
             elif self.log_level == "critical":
-                logger.critical(self.message)
+                message = f"CRITICAL!!!\n{self.message}\nEND CRITICAL\n"
+                logger.critical(message)
             else:
                 raise DprintingError(f"Invalid log level: {self.log_level}. "
                                      f"Valid levels are: {self.settings._valid_log_levels}")
@@ -274,7 +288,6 @@ class Dprint:
         """
         pass
 
-    
         
             
 

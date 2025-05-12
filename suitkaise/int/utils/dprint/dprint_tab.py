@@ -39,7 +39,8 @@
 # suitkaise/int/utils/dprint/dprint_tab.py
 
 """
-Module containing widget that provides UI to manage Dprint settings.
+Module containing widget that provides UI to manage Dprint settings,
+and displays printed Dprints with options to filter and sort them.
 
 This tab can be added to a tab in any Devwindow, or run as a standalone window.
 
@@ -52,11 +53,66 @@ from PyQt6.QtWidgets import (
 class DprintTab(QWidget):
     """
     Widget that provides UI to manage Dprint settings.
-    
+    This is not a main window, but rather a widget that can be added to a tab.
+
     """
 
     def __init__(self, parent=None):
+        """
+        Initialize the DprintTab widget, and set up the UI to adjust settings
+        and display printed Dprints.
+        
+        """
+
         super().__init__(parent)
-        self.setWindowTitle("DPrint Settings")
-        self.setGeometry(100, 100, 300, 200)
-        # Add UI elements here
+        
+        # settings to add
+        # - toggle printing to console
+        # - see available print levels
+        # - be notified when a print level is changed, added, or removed
+        # - set current print level
+
+        # - select/deselect tags to print
+        # - see a list of available tags
+        # - be notified when a tag is added or removed
+
+        # - toggle logging
+        # - see available log levels
+        
+        # - select/deselect dirs or files to print
+        #   - this is done in a tree, where each directory and file is a node with a checkbox
+        
+        # - toggle auto adding newlines at the end of each print
+        # - toggle use of shortened previews 
+        #   - (one "line" in the preview vs. different size lines to accommodate the text)
+        # - toggle auto adding time stamps and time since start
+        # - pick formats for the time stats with example previews
+        # - toggle auto adding file name to the print
+
+
+        # adding a Dprint to the tab
+        # - dprint needs to collect all relevant options as metadata
+        # - message
+        # - level
+        # - tags
+        # - file path
+        # - log level
+        # - time
+
+        # dprint will take all dprints regardless of if they printed or not. 
+ 
+        # sorting and filtering the Dprints
+        # - filter by time
+        # - filter by tag
+        # - filter by level
+        # - filter by file
+        # - filter by directory
+        # - filter by log_level
+
+
+
+
+
+
+
+    

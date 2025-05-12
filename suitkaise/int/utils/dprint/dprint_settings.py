@@ -102,6 +102,7 @@ class DprintSettingsRegistry:
         timestamp_format = sktime.CustomTime.YMD_HMS6
         auto_add_time_since_start = True
         time_diff_format = sktime.CustomTimeDiff.HMS6
+        auto_add_file_name = True
 
         # default settings for all DprintSettings instances
         self._default_settings = {
@@ -117,7 +118,8 @@ class DprintSettingsRegistry:
                 "auto_add_timestamp": auto_add_timestamp,
                 "timestamp_format": timestamp_format,
                 "auto_add_time_since_start": auto_add_time_since_start,
-                "time_diff_format": time_diff_format
+                "time_diff_format": time_diff_format,
+                "auto_add_file_name": auto_add_file_name
             },
             skdomain.SKDomain.EXTERNAL: {
                 "print_to_console": print_to_console,
@@ -131,7 +133,8 @@ class DprintSettingsRegistry:
                 "auto_add_timestamp": auto_add_timestamp,
                 "timestamp_format": timestamp_format,
                 "auto_add_time_since_start": auto_add_time_since_start,
-                "time_diff_format": time_diff_format
+                "time_diff_format": time_diff_format,
+                "auto_add_file_name": auto_add_file_name
             }
         }
         
@@ -370,6 +373,9 @@ class DprintSettings:
         self._auto_add_time_since_start = default_settings.get("auto_add_time_since_start", True)
         self._time_diff_format = default_settings.get("time_diff_format", sktime.CustomTimeDiff.HMS6)
 
+        # automatically add the file name to the printed statement
+        self._auto_add_file_name = default_settings.get("auto_add_file_name", True)
+
         # set the initialized flag to True
         self._initialized = True
 
@@ -385,7 +391,7 @@ class DprintSettings:
         """
         with cls._dprint_settings_creation_lock:
             domain = skdomain.get_domain()
-            module_path = paths.get_dir_path()
+            module_path = paths.get_file_path_of_caller()
 
             # check if there is an instance at a higher level directory
             for instance in cls._instances:
@@ -785,4 +791,18 @@ class DprintSettings:
                 self._time_diff_format = format
             else:
                 self._time_diff_format = sktime.CustomTimeDiff.HMS6
+
+
+    def set_auto_add_file_name(self, value: bool) -> None:
+        """
+        Set whether to automatically add the file name to printed statements.
+
+        Args:
+            value (bool): True to automatically add the file name, False otherwise.
+        
+        """
+        with self._dprint_settings_lock:
+            self._auto_add_file_name = value
+
+
         
