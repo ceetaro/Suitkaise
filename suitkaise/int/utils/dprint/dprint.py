@@ -56,8 +56,14 @@ that allows for customized printing options:
 - auto add timestamp and time since program start
 
 """
+import logging
+from typing import Optional, List, Dict, Any
 
+from suitkaise.int.utils.dprint.dprint_settings import DprintSettings, DprintSettingsRegistry
 
+class DprintingError(Exception):
+    """Custom exception for Dprint errors."""
+    pass
 
 class Dprint:
     """
@@ -75,4 +81,220 @@ class Dprint:
     To apply custom printing options, edit the DprintSettings.
 
     """
+
+    def __init__(self,
+                 message: str = "",
+                 level: Optional[int] = None,
+                 log_level: Optional[str] = None,
+                 tags: Optional[List[str]] = None,
+                 print_to_console: Optional[bool] = None,
+                 should_log: Optional[bool] = None,
+                 add_newline: Optional[bool] = None,
+                 add_time: Optional[bool] = None) -> None:
+        """
+        Print a message using Dprint.
+
+        Args:
+            level (int): The level of the print message. Default is 1.
+            tags (list[str]): List of tags to associate with the print message.
+            print_to_console (bool): Whether to print to console. Default is None.
+                If None, uses the default setting.
+            should_log (bool): Whether to log the message. Default is None.
+                If None, uses the default setting.
+            add_newline (bool): Whether to add a newline after the message. Default is None.
+                If None, uses the default setting.
+            add_time (bool): Whether to add a timestamp. Default is None.
+                If None, uses the default setting.
+        
+        """
+        self.message = message
+
+        from suitkaise.int.utils.path.get_paths import get_file_path_of_caller
+
+        self.file_path = get_file_path_of_caller()
+
+        self.settings = DprintSettings.get_instance()
+        if level is None:
+            level = self.settings._current_print_level
+        if self.level in self.settings._valid_print_levels:
+            self.level = self.settings._get_lowest_level()
+        else:
+            raise DprintingError(f"Invalid print level: {level}. "
+                                 f"Valid levels are: {self.settings._valid_print_levels}")
+        
+        if log_level is None:
+            print("Warning: log_msg_type is None. Defaulting to 'info'.")
+            self.log_level = "info"
+
+        elif log_level not in self.settings._valid_log_levels:
+            print(f"Warning: log_msg_type '{log_level}' is not valid. "
+                  f"Defaulting to 'info'.")
+            self.log_level = "info"
+
+        else:
+            self.log_level = log_level
+
+        self.tags = tags
+        invalid_tags = []
+        for tag in self.tags:
+            if tag not in self.settings._valid_tags:
+                invalid_tags.append(tag)
+
+        if invalid_tags:
+            raise DprintingError(f"Invalid tags: {invalid_tags}. "
+                                 f"Valid tags are: {self.settings._valid_tags.keys()}")
+        
+        self.print_to_console = print_to_console if print_to_console is not None \
+                                else self.settings._print_to_console
+        
+        self.should_log = should_log if should_log is not None \
+                          else self.settings._should_log
+        
+        self.add_newline = add_newline if add_newline is not None \
+                           else self.settings._auto_add_newlines
+        
+        if add_time is not None:
+            self.add_timestamp = add_time
+            self.add_time_since_start = add_time
+
+        else:
+            self.add_timestamp = self.settings._auto_add_timestamp
+            self.add_time_since_start = self.settings._auto_add_time_since_start
+        
+        self.timestamp_format = self.settings._timestamp_format   
+        self.time_diff_format = self.settings._time_diff_format  
+
+        printed = self._dprint()
+
+
+
+
+    def _dprint(self) -> bool:
+        """
+        Print a message to console, log, and or a Devwindow using the 
+        specified settings and attributes.
+        
+        """      
+        try:
+            level_included = False
+            if self.level >= self.settings._current_print_level:
+                level_included = True
+
+            tag_included = False
+            for tag in self.tags:
+                if tag in self.settings._tags_to_include:
+                    tag_included = True
+                    break
+
+            file_included = False
+            if self.file_path in self.settings._files_to_include:
+                file_included = True
+
+            if level_included and tag_included and file_included:
+                if self.print_to_console:
+                    printed = self._print_to_console()
+
+                if self.should_log and self.log_level:
+                    logged = self._log_message()
+
+                displayed = self._print_to_dprint_tab()
+
+                if printed and logged and displayed:
+                    return True
+                else:
+                    raise DprintingError("Failed to process Dprint message.")
+
+        except DprintingError as e:
+            print(f"Error Dprinting message '{self.message}': {e}")
+            return False
+        
+
+    def _print_to_console(self) -> bool:
+        """
+        Print the message to the console.
+        
+        """
+        try:
+            if self.add_timestamp:
+                self.message = f"{self.message}\n- {self.timestamp_format}\n"
+                self.message+= f"- Time since start: {self.time_diff_format}"
+                
+            if self.add_newline and not self.message.endswith("\n"):
+                self.message += "\n"
+
+            print(self.message)
+        except DprintingError as e:
+            print(f"Error printing message '{self.message}': {e}")
+            return False
+        return True
+
+    def _log_message(self) -> bool:
+        """
+        Log the message.
+        
+        """
+        try:
+            logger = logging.getLogger(self.file_path)
+            if not logger:
+                logger = self.settings._logger
+
+            if not logger:
+                raise DprintingError("Logger not found.")
+            
+            if self.add_timestamp:
+                self.message = f"{self.message}\n- {self.timestamp_format}\n"
+                self.message+= f"- Time since start: {self.time_diff_format}"
+
+            if self.add_newline and not self.message.endswith("\n"):
+                self.message += "\n"
+
+            if self.log_level == "info":
+                logger.info(self.message)
+            elif self.log_level == "debug":
+                logger.debug(self.message)
+            elif self.log_level == "warning":
+                logger.warning(self.message)
+            elif self.log_level == "error":
+                logger.error(self.message)
+            elif self.log_level == "critical":
+                logger.critical(self.message)
+            else:
+                raise DprintingError(f"Invalid log level: {self.log_level}. "
+                                     f"Valid levels are: {self.settings._valid_log_levels}")
+            
+        except DprintingError as e:
+            print(f"Error logging message '{self.message}': {e}")
+            return False
+        return True
+    
+    def _print_to_dprint_tab(self) -> bool:
+        """
+        Print the message to the Dprint tab.
+        
+        """
+        pass
+
+    
+        
+            
+
+
+        
+            
+            
+
+        
+        
+        
+
+
+
+        
+
+        
+
+        
+
+            
+
 

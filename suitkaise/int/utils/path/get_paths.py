@@ -94,3 +94,32 @@ def get_dir_path():
         str: The directory path of the current script.
     """
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_file_path_of_caller(frames_back: int = 2) -> str:
+    """
+    Get the file path of the calling function.
+
+    Args:
+        frames_back (int): The number of frames to go back in the call stack.
+            Default is 2 to skip the current function and the caller of this function.
+
+    Returns:
+        str: The file path of the calling function, or None if not found.
+        
+    """
+    import inspect
+    frame = inspect.currentframe()
+    for _ in range(frames_back):
+        if frame is None:
+            return None
+        frame = frame.f_back
+
+    if frame is None:
+        return None
+    
+    module = inspect.getmodule(frame)
+    if module is None:
+        return None
+    
+    return os.path.abspath(module.__file__)

@@ -36,7 +36,7 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/utils/dprint/script.py
+# suitkaise/int/utils/dprint/dprint_script.py
 
 """
 Standalone script to manage Dprints.

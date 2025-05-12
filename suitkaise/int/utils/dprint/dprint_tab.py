@@ -52,6 +52,7 @@ from PyQt6.QtWidgets import (
 class DprintTab(QWidget):
     """
     Widget that provides UI to manage Dprint settings.
+    
     """
 
     def __init__(self, parent=None):

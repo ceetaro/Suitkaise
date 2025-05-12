@@ -48,6 +48,7 @@ Dprints under a certain namespace.
 
 import os
 import threading
+import logging
 from typing import Optional, Any, Dict, List, Union, Tuple
 
 
@@ -277,6 +278,7 @@ class DprintSettings:
         
         """
         with cls._dprint_settings_creation_lock:
+            num_instances = len(cls._instances)
             domain = skdomain.get_domain()
             module_path = paths.get_dir_path()
 
@@ -311,6 +313,8 @@ class DprintSettings:
             # if we aren't at the max and don't have a conflicting instance in the same domain
             # create a new instance
             instance = super().__new__(cls)
+            logger_name = f"{domain.name}DprintSettings"
+            instance._logger = logging.getLogger(logger_name)
             instance._module_path = module_path
             instance._domain = domain
             instance._initialized = False
@@ -348,7 +352,6 @@ class DprintSettings:
         self._all_dirs, self._all_files = self._get_all_dirs_and_files(
             self._module_path, subdirs=True)
         
-        self._dirs_to_include = self._all_dirs.copy()
         self._files_to_include = self._all_files.copy()
 
         self._should_log = default_settings.get("should_log", False)
@@ -387,14 +390,17 @@ class DprintSettings:
             # check if there is an instance at a higher level directory
             for instance in cls._instances:
                 if instance._module_path == module_path:
-                    return instance
+                    if instance._domain == domain:
+                        return instance
                 # get rid of the last part of the path
                 module_path = os.path.dirname(module_path)
                 if not module_path:
                     break
 
-            # if no instance was found, create a new one
-            return cls()
+            # if no instance was found, raise an error
+            raise DprintSettingsError(
+                f"No DprintSettings instance found for domain {domain} at path {module_path}"
+            )
 
 
     def get_lock(self) -> threading.RLock:
@@ -418,6 +424,19 @@ class DprintSettings:
         # return the median print level
         return sorted(self._valid_print_levels)[len(self._valid_print_levels) // 2]
     
+    def _get_lowest_level(self) -> int:
+        """
+        Get the lowest print level from the valid print levels.
+
+        """
+        if not self._valid_print_levels:
+            raise DprintSettingsError(
+                "No valid print levels found. Please set valid print levels."
+            )
+        
+        # return the lowest print level
+        return min(self._valid_print_levels)
+    
     def _get_all_dirs_and_files(self,
                                 dir_path) -> Tuple[List[str], List[str]]:
         """
@@ -432,7 +451,7 @@ class DprintSettings:
             and a list of files.
         
         """
-        from suitkaise.int.utils.path.paths import get_dirs_and_files_from_path
+        from suitkaise.int.utils.path.get_paths import get_dirs_and_files_from_path
 
         # get the directories and files from the module path
         dirs, files = get_dirs_and_files_from_path(dir_path, subdirs=True)
@@ -591,8 +610,8 @@ class DprintSettings:
     def exclude_dir(self, dir_path: str,
                     subdirs: bool = False) -> None:
         """
-        Stop printing Dprints from a specific directory, its files,
-        and any subdirectories and their files.
+        Stop printing Dprints from a specific directory's files,
+        and optionally any subdirectories' files.
 
         Args:
             dir_path (str): The path of the directory to stop printing.
@@ -608,9 +627,6 @@ class DprintSettings:
         
         dirs, files = self._get_all_dirs_and_files(dir_path, subdirs=subdirs)
         with self._dprint_settings_lock:
-            for dir in dirs:
-                if dir in self._dirs_to_include:
-                    self._dirs_to_include.remove(dir)
             for file in files:
                 if file in self._files_to_include:
                     self._files_to_include.remove(file)
@@ -661,9 +677,6 @@ class DprintSettings:
         
         dirs, files = self._get_all_dirs_and_files(dir_path, subdirs=subdirs)
         with self._dprint_settings_lock:
-            for dir in dirs:
-                if dir not in self._dirs_to_include:
-                    self._dirs_to_include.append(dir)
             for file in files:
                 if file not in self._files_to_include:
                     self._files_to_include.append(file)
@@ -773,10 +786,3 @@ class DprintSettings:
             else:
                 self._time_diff_format = sktime.CustomTimeDiff.HMS6
         
-
-
-
-
-    
-
-    
