@@ -65,8 +65,16 @@ import os
 import sys
 import threading
 from typing import Optional
+from enum import Enum, auto
 
-from suitkaise.int.eventsys.data.enums.enums import SKDomain
+class SKDomain(Enum):
+    """
+    Enum for SK domains.
+
+    """
+    INTERNAL = auto() # internal, uses IntStation
+    EXTERNAL = auto() # external, uses ExtStation
+    UNKNOWN = auto() # unknown, uses UnknownStation
 
 def _get_calling_module(frames_back: int = 2) -> Optional[str]:
     """
@@ -105,7 +113,7 @@ def _get_calling_module(frames_back: int = 2) -> Optional[str]:
         del frame
 
 
-def _get_module_path(module_name: str) -> Optional[str]:
+def get_module_path(module_name: str) -> Optional[str]:
     """
     Get the file path of a module by its name.
 
@@ -117,15 +125,25 @@ def _get_module_path(module_name: str) -> Optional[str]:
 
     """
     try:
-       if module_name in sys.modules:
-            module = sys.modules[module_name]
-            return getattr(module, '__file__', None)
-       return None
+        # Get the module object from the module name
+        module = sys.modules.get(module_name)
+        if module is None:
+            return None
+        # Get the file path of the module
+        module_file = getattr(module, "__file__", None)
+        if module_file is None:
+            return None
+        # Normalize the file path (convert to absolute path)
+        module_file = os.path.normpath(module_file)
+
     except Exception as e:
         # Handle any exceptions that occur while getting the module path
-        print(f"Error in get_module_path: {e}")
+        print(f"Error in _get_module_path: {e}")
         return None
+
+
     
+
 
 def determine_domain(module_name: Optional[str] = None,
                module_file: Optional[str] = None,
@@ -156,7 +174,7 @@ def determine_domain(module_name: Optional[str] = None,
         
     # if no module file is provided, get the module file path
     if module_file is None:
-        module_file = _get_module_path(module_name)
+        module_file = get_module_path(module_name)
         if module_file is None:
             if 'suitkaise.int' in module_name or module_name.startswith('int.'):
                 return SKDomain.INTERNAL

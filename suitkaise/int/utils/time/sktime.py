@@ -74,7 +74,7 @@ def setup_time():
     # print start time
     st = get_start_time()
     print(f"Start time: "
-          f"{to_custom_time_format(st, CustomTimeFormats.YMD_HMS6)}")
+          f"{to_custom_time_format(st, CustomTime.YMD_HMS6)}")
 
     # print current timezone
     print(f"Current timezone: {current_timezone_str()}")
@@ -86,7 +86,7 @@ def setup_time():
 # ========================================================================
 
 
-class CustomTimeFormats(Enum):
+class CustomTime(Enum):
     """
     Enum for custom time formats.
 
@@ -95,7 +95,7 @@ class CustomTimeFormats(Enum):
     """
     YMD_HMS6 = "%Y-%m-%d %H:%M:%S.%f" # 2025-12-25 12:00:00.000000
 
-class CustomTimeDiffFormats(Enum):
+class CustomTimeDiff(Enum):
     """
     Enum for custom time difference formats.
 
@@ -211,8 +211,8 @@ def now(dprint: bool = False) -> float:
     time_now = time.time()
     if dprint and 'start_time' in globals():
         print("Created a new timestamp: "
-              f"{to_custom_time_format(time_now, CustomTimeFormats.YMD_HMS6)}")
-        print(f"{to_custom_time_diff_format(time_now - start_time, CustomTimeDiffFormats.HMS6)}"
+              f"{to_custom_time_format(time_now, CustomTime.YMD_HMS6)}")
+        print(f"{to_custom_time_diff_format(time_now - start_time, CustomTimeDiff.HMS6)}"
               " since start time.")
     return time_now
 
@@ -329,7 +329,7 @@ def elapsed(start: TimeValue, end: TimeValue = now()) -> Optional[float]:
     
     
 def to_custom_time_format(value: TimeValue, 
-                          fmt: CustomTimeFormats = CustomTimeFormats.YMD_HMS6
+                          fmt: CustomTime = CustomTime.YMD_HMS6
                           ) -> Optional[str]:
     """
     Convert a value to a custom format string.
@@ -350,7 +350,7 @@ def to_custom_time_format(value: TimeValue,
         return dt.astimezone(tz).strftime(fmt.value)
     
 def to_custom_time_diff_format(value: Union[int, float], 
-                               fmt: CustomTimeDiffFormats = CustomTimeDiffFormats.HMS6_2
+                               fmt: CustomTimeDiff = CustomTimeDiff.HMS6_2
                                ) -> Optional[str]:
     """
     Convert a time difference value to a custom format string.

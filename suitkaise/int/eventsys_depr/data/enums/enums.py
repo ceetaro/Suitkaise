@@ -107,16 +107,6 @@ class CompressionLevel(IntEnum):
     HIGH = 3 # high compression
 
 
-class SKDomain(Enum):
-    """
-    Enum for SK domains.
-
-    """
-    INTERNAL = auto() # internal, uses IntStation
-    EXTERNAL = auto() # external, uses ExtStation
-    UNKNOWN = auto() # unknown, uses UnknownStation
-
-
 class BridgeDirection(Enum):
     """
     Enum for the direction of communication across the event bridge.
