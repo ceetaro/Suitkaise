@@ -44,6 +44,7 @@ Module for managing themes that SK UI components can use.
 """
 
 import threading
+from typing import Callable, List, Optional, Dict, Type
 
 class SKThemeRegistry:
     """
@@ -54,14 +55,74 @@ class SKThemeRegistry:
     _sk_theme_registry_lock = threading.RLock()
 
     def __new__(cls):
-        """
-        Ensure that only one instance of SKThemeRegistry is created.
-        
-        """
+        """Ensure that only one instance of SKThemeRegistry is created."""
         with cls._sk_theme_registry_lock:
             if cls._sk_theme_registry is None:
                 cls._sk_theme_registry = super(SKThemeRegistry, cls).__new__(cls)
+                cls._sk_theme_registry._init_registry()
         return cls._sk_theme_registry
+    
+    def _init_registry(self):
+        """Initialize the registry with default values."""
+        self._themes = {} # theme name -> theme object
+        self._active_theme = None
+        self.theme_change_callbacks = [] # list of callbacks to call when theme changes
+
+    def register_theme(self, theme):
+        """Register a new theme, using theme.name for the name."""
+        with self._sk_theme_registry_lock:
+            if theme.name not in self._themes:
+                self._themes[theme.name] = theme
+                if self._active_theme is None:
+                    self.set_active_theme(theme.name)
+
+    def set_active_theme(self, theme_name):
+        """Set the active theme and notify listeners."""
+        if theme_name not in self._themes:
+            raise ValueError(f"Theme '{theme_name}' is not registered.")
+        with self._sk_theme_registry_lock:
+            self._active_theme = self._themes[theme_name]
+            self.notify_theme_change()
+
+    def get_active_theme(self):
+        """Get the currently active theme."""
+        return self._active_theme
+        
+    def get_theme(self, theme_name):
+        """Get a specific theme by name."""
+        return self._themes.get(theme_name)
+    
+    def list_themes(self):
+        """List all registered themes."""
+        return list(self._themes.keys())
+    
+
+    # NOTE: if callbacks need to change theme with different args as well,
+    #       convert to using FunctionInstances
+    def register_change_callback(self, callback: Callable):
+        """
+        Register a callback to be called when the theme changes.
+        
+        Make sure the callback accepts theme as first argument.
+
+        """
+        if callback not in self.theme_change_callbacks:
+            self.theme_change_callbacks.append(callback)
+
+    def unregister_change_callback(self, callback: Callable):
+        """Unregister a callback."""
+        if callback in self.theme_change_callbacks:
+            self.theme_change_callbacks.remove(callback)
+
+    def _notify_theme_change(self):
+        """Notify all registered callbacks of a theme change."""
+        for callback in self.theme_change_callbacks:
+            try:
+                callback(self._active_theme)
+            except Exception as e:
+                print(f"Error notifying theme change: {e}")
+
+
 
 class SKTheme:
     """
@@ -92,4 +153,18 @@ class SKTheme:
     
     """
 
-    
+    def __init__(self, name="Default Theme", desc="", author="Suitkaise"):
+        """
+        Initialize the theme with a name, description, and author.
+
+        Args:
+            name (str): The name of the theme.
+            desc (str): A description of the theme.
+            author (str): The author of the theme.
+        
+        """
+        self.name = name
+        self.desc = desc
+        self.author = author
+
+        # base colors

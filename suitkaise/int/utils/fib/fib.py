@@ -55,6 +55,8 @@ import importlib
 from typing import Any, Dict, Callable, Optional, List, Tuple, Union
 from functools import partial
 
+# TODO add registry to save FunctionInstances
+
 class FunctionInstance:
     """
     Container holding a function with specific arguments and metadata.
@@ -79,7 +81,8 @@ class FunctionInstance:
         self.func_name = func_name or getattr(func, '__name__', str(func))
 
 
-    def execute(self) -> Any:
+    def execute(self, args: Optional[Tuple] = None,
+                 kwargs: Optional[Dict[str, Any]] = None) -> Any:
         """Execute the function with its arguments."""
         return self.func(*self.args, **self.kwargs)
     
@@ -155,6 +158,34 @@ class FunctionInstanceBuilder:
             print("FunctionInstanceBuilder was not built. "
                   "Please call build() before exiting the context "
                   "if you would like to store the FunctionInstance.\n")
+            
+    def add_function_instance(self, func_instance: FunctionInstance) -> 'FunctionInstanceBuilder':
+        """
+        Add a FunctionInstance to the builder instead of a callable.
+        
+        Args:
+            func_instance: The FunctionInstance to add
+
+        Returns:
+            self for method chaining
+        """
+        if not isinstance(func_instance, FunctionInstance):
+            raise ValueError(f"Expected a FunctionInstance, got {type(func_instance)}")
+        
+        # Store function information
+        self.func = func_instance.func
+        self.module_name = func_instance.module_name
+        self.module_path = func_instance.module_path
+        self.func_name = func_instance.func_name
+        
+        # Store the arguments and kwargs
+        self.provided_args = list(func_instance.args)
+        self.provided_kwargs = func_instance.kwargs
+        
+        print(f"Using FunctionInstance {self.module_name}.{self.func_name}")
+        
+        return self
+    
 
     def add_callable(self, func: Callable) -> 'FunctionInstanceBuilder':
         """
@@ -171,6 +202,9 @@ class FunctionInstanceBuilder:
         
         if not callable(func):
             raise ValueError(f"Expected a callable function, got {type(func)}")
+        
+        if self.func:
+            raise ValueError("Function already set by another callable or FunctionInstance.\n")
             
         # Store function information
         self.func = func
