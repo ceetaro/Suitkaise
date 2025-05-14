@@ -49,6 +49,7 @@ Dprints under a certain namespace.
 import os
 import threading
 import logging
+import uuid
 from typing import Optional, Any, Dict, List, Union, Tuple
 
 
@@ -67,7 +68,7 @@ class DprintSettingsRegistry:
     and provides default settings for them to add onto.
 
     """
-    _instance = None
+    _dprint_settings_registry = None
     _dprint_settings_registry_lock = threading.RLock()
 
     def __new__(cls):
@@ -76,9 +77,9 @@ class DprintSettingsRegistry:
 
         """
         with cls._dprint_settings_registry_lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-            return cls._instance
+            if cls._dprint_settings_registry is None:
+                cls._dprint_settings_registry = super().__new__(cls)
+            return cls._dprint_settings_registry
 
     def __init__(self):
         if getattr(self, "_initialized", True):
@@ -147,9 +148,9 @@ class DprintSettingsRegistry:
 
         """
         with cls._dprint_settings_registry_lock:
-            if cls._instance is None:
-                cls._instance = cls()
-            return cls._instance
+            if cls._dprint_settings_registry is None:
+                cls._dprint_settings_registry = cls()
+            return cls._dprint_settings_registry
 
 
     def _register_default_tags(self) -> List[Dict[str, str]]:
@@ -266,7 +267,7 @@ class DprintSettings:
     Class that manages global Dprint settings.
 
     """
-    _instances = []
+    _settings_instances = []
     _max_instances = 2 # 1 for internal code, 1 for external code
     _dprint_settings_creation_lock = threading.RLock()
     
@@ -281,14 +282,14 @@ class DprintSettings:
         
         """
         with cls._dprint_settings_creation_lock:
-            num_instances = len(cls._instances)
+            num_instances = len(cls._settings_instances)
             domain = skdomain.get_domain()
             module_path = paths.get_dir_path()
 
             # check if there is an instance at a higher level directory
-            if cls._instances:
+            if cls._settings_instances:
                 current_path = module_path
-                for instance in cls._instances:
+                for instance in cls._settings_instances:
                     if instance._module_path == current_path:
                         return instance
                     # get rid of the last part of the path
@@ -296,12 +297,12 @@ class DprintSettings:
                     if not current_path:
                         break
             # check if there is an opening for a new instance in the current domain
-            if len(cls._instances) >= cls._max_instances:
+            if len(cls._settings_instances) >= cls._max_instances:
                 raise DprintSettingsError(
                     f"Maximum number of DprintSettings instances reached. "
-                    f"Max instances: {cls._max_instances}"
+                    f"Max instances: {cls._max_settings_instances}"
                 )
-            for instance in cls._instances:
+            for instance in cls._settings_instances:
                 if instance._domain == domain and domain == skdomain.SKDomain.INTERNAL:
                     raise DprintSettingsError(
                         "'suitkaise/int' can only have one DprintSettings instance. "
@@ -316,12 +317,13 @@ class DprintSettings:
             # if we aren't at the max and don't have a conflicting instance in the same domain
             # create a new instance
             instance = super().__new__(cls)
+            instance._id = uuid.uuid4()
             logger_name = f"{domain.name}DprintSettings"
             instance._logger = logging.getLogger(logger_name)
             instance._module_path = module_path
             instance._domain = domain
             instance._initialized = False
-            cls._instances.append(instance)
+            cls._settings_instances.append(instance)
         return instance
     
     
@@ -394,7 +396,7 @@ class DprintSettings:
             module_path = paths.get_file_path_of_caller()
 
             # check if there is an instance at a higher level directory
-            for instance in cls._instances:
+            for instance in cls._settings_instances:
                 if instance._module_path == module_path:
                     if instance._domain == domain:
                         return instance
@@ -461,6 +463,8 @@ class DprintSettings:
 
         # get the directories and files from the module path
         dirs, files = get_dirs_and_files_from_path(dir_path, subdirs=True)
+
+        return dirs, files
 
     def set_print_to_console(self, value: bool) -> None:
         """

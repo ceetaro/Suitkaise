@@ -46,16 +46,40 @@ This tab can be added to a tab in any Devwindow, or run as a standalone window.
 
 """
 
-from PyQt6.QtWidgets import (
-    QWidget,
-)
+import os
+from typing import List, Dict, Any, Optional, Tuple
 
-class DprintTab(QWidget):
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, 
+    QLabel, QCheckBox, QComboBox, QSpinBox, 
+    QPushButton, QTableWidget, QTableWidgetItem,
+    QGroupBox, QScrollArea, QTreeWidget, QTreeWidgetItem,
+    QSplitter, QLineEdit, QTextEdit, QSlider, QCompleter,
+    QFrame, QStackedWidget, QToolButton, QMenu, QDialog,
+)
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QColor, QBrush, QFont
+
+from suitkaise.int.utils.dprint.dprint_settings import DprintSettings, DprintSettingsError
+import suitkaise.int.utils.time.sktime as sktime
+import suitkaise.int.utils.domain.skdomain as skdomain
+
+class DprintTabError(Exception):
+    """Custom error for DPrintTab."""
+    pass
+
+class MessageListItem(QWidget):
+    pass
+    # expanded: bool
+
+class DprintTab(QFrame):
     """
     Widget that provides UI to manage Dprint settings.
     This is not a main window, but rather a widget that can be added to a tab.
 
     """
+    from suitkaise.int.utils.dprint.dprint import DprintMessage
+    message_received = pyqtSignal(DprintMessage)
 
     def __init__(self, parent=None):
         """
@@ -63,8 +87,364 @@ class DprintTab(QWidget):
         and display printed Dprints.
         
         """
+        super().__init__(parent)
+
+        try:
+            # try to get settings
+            self.settings = DprintSettings.get_instance()
+            if not self.settings:
+                raise DprintTabError("DprintSettings instance not found.")
+        except DprintSettingsError as e:
+            raise DprintTabError(f"DprintSettings error: {e}")
+
+        self.messages = [] # list of DprintMessage objects
+        self.filtered_messages = [] # list of filtered DprintMessage objects
+
+        self.init_ui()
+
+        # connect signal to slot
+        self.message_received.connect(self.add_message)
+
+        # create a timer to update the messages display
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.update_messages_display)
+        self.update_timer.start(1000)
+
+
+    def init_ui(self):
+        """Initialize UI components for the DprintTab widget."""
+
+        # main layout
+        self.main_widget = QWidget(self)
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_widget.setLayout(self.main_layout)
+
+        # create a vertical splitter between the message display and the settings
+        self.main_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.main_layout.addWidget(self.main_splitter)
+
+        # create the left panel for messages and filters
+        self.init_left_panel(self.main_splitter)
+
+    def init_left_panel(self):
+        """
+        Initialize the left panel of the DprintTab widget.
+
+        This panel contains 2 parts:
+        1. A header with a filter button (opens a dialog) and search bar.
+        2. A scroll area with a list of messages and their details.
+
+        Filters in the header include:
+        - Filter by time, has a toggle with newest/oldest
+          - also has a submenu that has an option to filter only in certain time range
+            - opens a generated timeline that allows the user to:
+            - enter timestamps manually
+            - move the start point or end point incrementally across the timeline
+            - search for or paste a "message" in the start time or end time
+              - timestamp of message will be used as the start or end point
+
+        - Filter by tags
+          - opens a dialog that displays tags in a 'inf' row, 5 column format
+            where each tag populates one cell
+          - clicking on the tag will select it
+          - can search for the tag to select it
+          - can select multiple tags
+          - select and deselect all options
+          - click and drag to select multiple tags
+        
+        - Filter by level
+          - opens a submenu that shows a min and max level
+            - if a level that is not in the range is selected,
+              it will default to the min or max level
+        
+        - Filter by file/directory
+            - opens a tree that allows you to select/deselect parts of 
+              file structure that this DprintTab is responsible for
+              - can select/deselect all
+              - can select/deselect all in a directory
+
+        - Filter by log level
+            - opens a submenu that shows all 5 log levels
+              - just select/deselect the levels there
+
+        Search bar:
+        - searches operate on the original message before it got 
+          formatted and printed in Dprint
+        - search for words in a message, file name, directory name,
+          tag, level, or log level
+        - can search words and phrases and messages will be filtered
+          out if they don't match the search
+        - if a file name matches the search, it will be brought to the top
+          of the list of messages, with a little indicator saying that
+          "this isnt a word match, but a file name match" that will filter
+          by file name like the filter dropdown. same for directory name
+        - can search for a tag, level, or log level. same concept as above
+        - time searching will not work here
+
+        Message display:
+        - scroll area that displays all messages, with the most recent
+          messages at the top
+        - message list might change depending on current filters
+        - each message has a little box, that when hovered, will
+          display the message's own metadata, that you can use to 
+          filter without having to open the dropdown
+        - each message will only show one line's worth of text,
+          and if all text does not fit on one line, then you can expand
+          the message to see all of it
+        - if filters are in place, then the active filters will show directly
+          next to the actual message, without having to hover over it
+        
+        
+        """
+
+        # == LEFT PANEL: Messages, Filters, and search bar ==
+        self.left_panel = QFrame()
+        self.left_layout = QVBoxLayout(self.left_panel)
+        self.left_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_panel.setLayout(self.left_layout)
+        # add the left panel to the left side of the splitter
+        self.main_splitter.addWidget(self.left_panel)
+
+        self.init_left_panel_header(self.left_layout)
+
+    def init_left_panel_header(self):
+        """
+        Initialize the header of the left panel of the DprintTab widget.
+        This header contains a filter dropdown and a search bar.
+
+        """
+
+        # create the header with filter dropdown and search bar
+        self.header_frame = QFrame()
+        self.header_layout = QHBoxLayout()
+        self.header_layout.setContentsMargins(0, 0, 0, 0)
+        self.header_frame.setLayout(self.header_layout)
+
+        # add to parent, left layout
+        self.left_layout.addWidget(self.header_frame)
+
+        # create filter button and dialog
+        self.init_left_panel_filter_system()
+
+    def init_left_panel_filter_system(self):
+        """
+        Initialize the filter system in the header of the left panel.
+        This dropdown allows the user to filter messages by time, tags, level,
+        file/directory, and log level.
+
+        """
+        # NOTE: add a filter icon and "filter by..." 
+        # to the filter button
+
+        # create filter button
+        self.filter_button = QPushButton()
+
+        self.filter_button.clicked.connect(self.toggle_filter_dialog)
+
+        # add the filter button to the header layout
+        self.header_layout.addWidget(self.filter_button)
+
+    
+
+class FilterDialog(QDialog):
+    """
+    Dialog for filtering messages in the DprintTab widget.
+
+    This dialog allows the user to filter messages by time, tags, level,
+    file/directory, and log level.
+
+    Can be toggled on and off by clicking the filter button in the header,
+    and therefore tracks its current state (open or closed).
+
+    """
+
+
+    def __init__(self, parent=None, settings=None, messages=None):
+        """Initialize the filter dialog."""
 
         super().__init__(parent)
+
+        self.setWindowTitle(f"Dprint -- Filter Messages")
+        self.setMinimumSize(680, 680)
+
+        self.settings = settings
+        if not self.settings:
+            raise DprintTabError("DprintSettings instance not found.")
+        self.messages = messages or []
+    
+        self.filter_state = {
+            "time": {
+                "sort_from": "newest",
+                "from_time": None,
+                "to_time": None,
+            },
+            "tags": {
+                "selected_tags": [],
+            },
+            "level": {
+                "min_level": None,
+                "max_level": None,
+            },
+            "log_level": {
+                "selected_levels": [],
+            },
+            "file": {
+                "selected_files": [],
+            }
+        }
+
+        # create the filter options
+        self.init_filter_dialog_ui()
+
+    
+    def init_filter_dialog_ui(self):
+        """
+        Init the filter options as outlined in init_left_panel.
+
+        This includes:
+        - Filter by time
+        - Filter by tags
+        - Filter by level
+        - Filter by file/directory
+        - Filter by log level
+        
+        """
+        # create main layout
+        self.main_layout = QVBoxLayout(self)
+
+
+        # create a custom tab widget for the filter options
+        self.filter_tab_widget = QTabWidget()
+        self.filter_tab_widget.setTabsClosable(False)
+        self.filter_tab_widget.setMovable(False)
+
+        # create tabs
+        self.time_tab = self.create_time_tab()
+        self.tags_tab = self.create_tags_tab()
+        self.levels_tab = self.create_levels_tab()
+        self.file_tab = self.create_file_tab()
+
+        # add tabs to the tab widget
+        self.filter_tab_widget.addTab(self.time_tab, "Time")
+        self.filter_tab_widget.addTab(self.tags_tab, "Tags")
+        self.filter_tab_widget.addTab(self.levels_tab, "Levels")
+        self.filter_tab_widget.addTab(self.file_tab, "File")
+
+        # add the tab widget to the main layout
+        self.main_layout.addWidget(self.filter_tab_widget)
+
+        # add buttons to the bottom of the dialog
+        self.button_layout = QHBoxLayout()
+        self.button_layout.addStretch()
+
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.cancel_changes)
+        self.button_layout.addWidget(self.cancel_button)
+
+        self.apply_button = QPushButton("Apply")
+        self.apply_button.clicked.connect(self.apply_changes)
+        self.button_layout.addWidget(self.apply_button)
+
+        self.close_button = QPushButton("Close")
+        self.close_button.clicked.connect(self.close)
+        self.button_layout.addWidget(self.close_button)
+
+        # add the button layout to the main layout
+        self.main_layout.addLayout(self.button_layout)
+
+
+    def create_time_tab(self):
+        """
+        Create the time filter tab.
+        This tab allows the user to filter messages by time.
+
+        """
+        # create the time tab
+        self.time_tab = QWidget()
+        self.time_tab_layout = QVBoxLayout(self.time_tab)
+
+        # input are for From and To fields
+        self.input_frame = QFrame()
+        self.input_layout = QHBoxLayout(self.input_frame)
+        self.time_tab_layout.addWidget(self.input_frame)
+
+        # toggle for sorting by newest or oldest
+        
+
+        # from section
+        self.from_section = QHBoxLayout()
+        self.from_label = QLabel("From")
+        self.from_section.addWidget(self.from_label)
+
+        self.from_paste_button = QPushButton("Paste") # NOTE: change to clipboard icon
+        self.from_paste_button.setToolTip("Paste a copied messsage, and use its time")
+        self.from_paste_button.clicked.connect(self.paste_time_format(clicked="from"))
+        self.from_section.addWidget(self.from_paste_button)
+
+        self.from_input_time_button = QPushButton("Enter Time") # NOTE: change to clock icon
+        self.from_input_time_button.setToolTip("Enter a time")
+        self.from_input_time_button.clicked.connect(self.open_input_time_popup(clicked="from"))
+        self.from_section.addWidget(self.from_input_time_button)
+
+
+        self.from_search_for_time_button = QPushButton("Search") # NOTE: change to search icon
+        self.from_search_for_time_button.setToolTip("Search for a message to use its time")
+        self.from_search_for_time_button.clicked.connect(self.open_search_for_time_popup(clicked="from"))
+        self.from_section.addWidget(self.from_search_for_time_button)
+
+        self.input_layout.addLayout(self.from_section)
+
+        # to section
+        self.to_section = QHBoxLayout(self.to_section)
+        self.to_label = QLabel("To")
+        self.to_section.addWidget(self.to_label)
+
+        # add another paste button
+        self.to_paste_button = QPushButton("Paste")
+        self.to_paste_button.setToolTip("Paste a copied messsage, and use its time")
+        self.to_paste_button.clicked.connect(self.paste_time_format(clicked="to"))
+        self.to_section.addWidget(self.to_paste_button)
+
+        self.to_input_time_button = QPushButton("Enter Time")
+        self.to_input_time_button.setToolTip("Enter a time")
+        self.to_input_time_button.clicked.connect(self.open_input_time_popup(clicked="to"))
+        self.to_section.addWidget(self.to_input_time_button)
+
+        self.to_search_for_time_button = QPushButton("Search")
+        self.to_search_for_time_button.setToolTip("Search for a message to use its time")
+        self.to_search_for_time_button.clicked.connect(self.open_search_for_time_popup(clicked="to"))
+        self.to_section.addWidget(self.to_search_for_time_button)
+
+        self.input_layout.addLayout(self.to_section)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
+
+
+        
+
+        
+
+
+
+        # NOTE: add items to the filter dropdown
+
         
         # settings to add
         # - toggle printing to console

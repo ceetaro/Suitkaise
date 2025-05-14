@@ -238,6 +238,20 @@ def get_start_time() -> float:
     global start_time
     return start_time if 'start_time' in globals() else None
 
+def get_time_since_start() -> Optional[float]:
+    """
+    Get the time since the start of the project.
+
+    Returns:
+        float: The time since start as a UNIX timestamp.
+
+    """
+    if 'start_time' in globals():
+        return now() - start_time
+    else:
+        return None
+    
+
 def to_datetime(value: TimeValue) -> Optional[datetime.datetime]:
     """
     Convert a value to a datetime object.

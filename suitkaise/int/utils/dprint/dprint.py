@@ -57,6 +57,8 @@ that allows for customized printing options:
 
 """
 import logging
+import uuid
+import suitkaise.int.utils.time.sktime as sktime
 from typing import Optional, List, Dict, Any
 
 from suitkaise.int.utils.dprint.dprint_settings import DprintSettings, DprintSettingsRegistry
@@ -64,6 +66,29 @@ from suitkaise.int.utils.dprint.dprint_settings import DprintSettings, DprintSet
 class DprintingError(Exception):
     """Custom exception for Dprint errors."""
     pass
+
+class DprintMessage:
+    """
+    Container for Dprints to send to DprintTab.
+    
+    """
+
+    def __init__(self, 
+                 original_message: str,
+                 level: int,
+                 tags: List[str],
+                 file_path: str,
+                 log_level: Optional[str] = None,
+                 timestamp: Optional[str] = None,
+                 time_since_start: Optional[str] = None):
+        self.message = original_message
+        self.level = level
+        self.tags = tags
+        self.file_path = file_path
+        self.log_level = log_level
+        self.timestamp = timestamp
+        self.time_since_start = time_since_start
+        self.id = uuid.uuid4()
 
 class Dprint:
     """
@@ -155,6 +180,9 @@ class Dprint:
         self.add_newline = add_newline if add_newline is not None \
                            else self.settings._auto_add_newlines
         
+        self.timestamp = sktime.now()
+        self.time_since_start = sktime.get_time_since_start()
+
         if add_time is not None:
             self.add_timestamp = add_time
             self.add_time_since_start = add_time
@@ -229,11 +257,13 @@ class Dprint:
                 self.message = f"{file_name} -- " + self.message
 
             if self.add_timestamp:
+                fmted_ts = sktime.to_custom_time_format(self.timestamp, self.timestamp_format)
+                fmted_td = sktime.to_custom_time_diff_format(self.time_since_start, self.time_diff_format)
                 if self.message.endswith("\n"):
-                    self.message = self.message + f"- {self.timestamp_format}\n"
+                    self.message = self.message + f"- {fmted_ts}\n"
                 else:
-                    self.message = self.message + f"\n- {self.timestamp_format}\n"
-                self.message += f"- Time since start: {self.time_diff_format}"
+                    self.message = self.message + f"\n- {fmted_ts}\n"
+                self.message += f"- Time since start: {fmted_td}\n"
                 
             if self.add_newline and not self.message.endswith("\n"):
                 self.message += "\n"
@@ -283,10 +313,37 @@ class Dprint:
     
     def _print_to_dprint_tab(self) -> bool:
         """
-        Print the message to the Dprint tab.
+        Print the message to the Dprint tab,
+        by converting the DPrint into a DprintMessage.
         
         """
-        pass
+        try:
+            from suitkaise.int.utils.dprint.dprint_tab import DprintTab
+            message = DprintMessage(
+                self.original_message,
+                self.level,
+                self.tags,
+                self.file_path,
+                self.log_level,
+                self.timestamp,
+                self.time_since_start
+            )
+
+            # returns the active tab instance linked to same settings or creates one 
+            dprint_tab = DprintTab.get_active_tab(self.settings._id)
+            if not dprint_tab:
+                raise DprintingError("DprintTab not found.")
+            
+            dprint_tab.message_received.emit(message)
+            return True
+        
+        except DprintingError as e:
+            print(f"Error sending message '{self.message}' to Dprint tab: {e}")
+            return False
+        
+
+
+        
 
         
             
