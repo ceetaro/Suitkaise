@@ -55,11 +55,11 @@ from typing import Callable, Dict, Optional, List, Any, Tuple
 
 import suitkaise.int.utils.fib.fib as fib
 
-class InitRegistryError(Exception):
+class ProcessingInitRegistryError(Exception):
     """Custom exception for errors in the InitializationRegistry."""
     pass
 
-class InitRegistry:
+class ProcessingInitRegistry:
     """
     Registry for process and thread initialization functions.
 

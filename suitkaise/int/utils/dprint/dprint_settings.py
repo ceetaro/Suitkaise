@@ -67,6 +67,8 @@ class DprintSettingsRegistry:
     Singleton that manages all DprintSettings instances and their settings,
     and provides default settings for them to add onto.
 
+    This will always need to be initialized and active, so make it a global singleton.
+
     """
     _dprint_settings_registry = None
     _dprint_settings_registry_lock = threading.RLock()
@@ -79,14 +81,16 @@ class DprintSettingsRegistry:
         with cls._dprint_settings_registry_lock:
             if cls._dprint_settings_registry is None:
                 cls._dprint_settings_registry = super().__new__(cls)
+                cls._init_dprint_settings_registry()
             return cls._dprint_settings_registry
 
-    def __init__(self):
-        if getattr(self, "_initialized", True):
-            return
+    def _init_dprint_settings_registry(self) -> None:
+        """
+        Manual init method to be called once when the singleton is first created.
         
-        # instance specific lock
-        self._dprint_settings_registry_lock = threading.RLock()
+        """
+        # no need for instance specific lock, as this is a singleton
+        # use the lock defined at the class level
         
         print_to_console = True
         valid_print_levels = [1, 2, 3, 4, 5]
@@ -138,8 +142,6 @@ class DprintSettingsRegistry:
                 "auto_add_file_name": auto_add_file_name
             }
         }
-        
-        self._initialized = True
 
     @classmethod
     def get_instance(cls) -> 'DprintSettingsRegistry':
@@ -267,69 +269,81 @@ class DprintSettings:
     Class that manages global Dprint settings.
 
     """
-    _settings_instances = []
-    _max_instances = 2 # 1 for internal code, 1 for external code
+    _internal_settings_instances = []
+    _external_settings_instances = []
+    _max_internal_instances = 1 # 1 for internal code
+    _max_external_instances = 1 # 1 for external code
     _dprint_settings_creation_lock = threading.RLock()
     
     def __new__(cls):
         """
-        Ensure that a maximum of 4 instances of DprintSettings are created.
-
-        If there is an instance at a higher level directory than the current
-        one trying to create an instance, return that instance instead.
-
-        If not, and there are less than 4 instances, create a new one.
+        Ensure that no more than the maximum number of instances are created
+        in each domain.
         
         """
         with cls._dprint_settings_creation_lock:
-            num_instances = len(cls._settings_instances)
             domain = skdomain.get_domain()
             module_path = paths.get_dir_path()
+            print(f"{module_path}")
 
-            # check if there is an instance at a higher level directory
-            if cls._settings_instances:
+            if cls._internal_settings_instances and domain == skdomain.SKDomain.INTERNAL:
                 current_path = module_path
-                for instance in cls._settings_instances:
+                for instance in cls._internal_settings_instances:
                     if instance._module_path == current_path:
                         return instance
                     # get rid of the last part of the path
                     current_path = os.path.dirname(current_path)
                     if not current_path:
                         break
+            elif cls._external_settings_instances and domain == skdomain.SKDomain.EXTERNAL:
+                current_path = module_path
+                for instance in cls._external_settings_instances:
+                    if instance._module_path == current_path:
+                        return instance
+                    # get rid of the last part of the path
+                    current_path = os.path.dirname(current_path)
+                    if not current_path:
+                        break
+        
+            # if we are here, we need to create a new instance
+
             # check if there is an opening for a new instance in the current domain
-            if len(cls._settings_instances) >= cls._max_instances:
+            if len(cls._internal_settings_instances) >= cls._max_internal_instances and \
+                domain == skdomain.SKDomain.INTERNAL:
                 raise DprintSettingsError(
                     f"Maximum number of DprintSettings instances reached. "
-                    f"Max instances: {cls._max_settings_instances}"
+                    f"Max instances: {cls._internal_settings_instances}"
                 )
-            for instance in cls._settings_instances:
-                if instance._domain == domain and domain == skdomain.SKDomain.INTERNAL:
-                    raise DprintSettingsError(
-                        "'suitkaise/int' can only have one DprintSettings instance. "
-                        "Please use the existing instance instead."
-                    )
-                elif instance._domain == domain and domain == skdomain.SKDomain.EXTERNAL:
-                    raise DprintSettingsError(
-                        "only one DprintSettings instance can be created in the external domain. "
-                        "(your imported project)"
-                    )
+            elif len(cls._external_settings_instances) >= cls._max_external_instances and \
+                domain == skdomain.SKDomain.EXTERNAL:
+                raise DprintSettingsError(
+                    f"Maximum number of DprintSettings instances reached. "
+                    f"Max instances: {cls._external_settings_instances}"
+                )
                 
             # if we aren't at the max and don't have a conflicting instance in the same domain
             # create a new instance
             instance = super().__new__(cls)
+            instance._init_dprint_settings()
             instance._id = uuid.uuid4()
             logger_name = f"{domain.name}DprintSettings"
             instance._logger = logging.getLogger(logger_name)
             instance._module_path = module_path
             instance._domain = domain
-            instance._initialized = False
-            cls._settings_instances.append(instance)
-        return instance
+            if domain == skdomain.SKDomain.INTERNAL:
+                cls._internal_settings_instances.append(instance)
+            elif domain == skdomain.SKDomain.EXTERNAL:
+                cls._external_settings_instances.append(instance)
+
+            return instance
     
     
-    def __init__(self):
-        if getattr(self, "_initialized", True):
-            return
+    def _init_dprint_settings(self) -> None:
+        """
+        Initialize the DprintSettings instance.
+        This method should be called once when the instance is created.
+
+        """
         
         # instance specific lock
         self._dprint_settings_lock = threading.RLock()
@@ -378,9 +392,6 @@ class DprintSettings:
         # automatically add the file name to the printed statement
         self._auto_add_file_name = default_settings.get("auto_add_file_name", True)
 
-        # set the initialized flag to True
-        self._initialized = True
-
     
     @classmethod
     def get_instance(cls) -> 'DprintSettings':
@@ -391,25 +402,10 @@ class DprintSettings:
         ensuring that it is in the same domain.
 
         """
-        with cls._dprint_settings_creation_lock:
-            domain = skdomain.get_domain()
-            module_path = paths.get_file_path_of_caller()
-
-            # check if there is an instance at a higher level directory
-            for instance in cls._settings_instances:
-                if instance._module_path == module_path:
-                    if instance._domain == domain:
-                        return instance
-                # get rid of the last part of the path
-                module_path = os.path.dirname(module_path)
-                if not module_path:
-                    break
-
-            # if no instance was found, raise an error
-            raise DprintSettingsError(
-                f"No DprintSettings instance found for domain {domain} at path {module_path}"
-            )
-
+        # same as __new__
+        # __new__ will handle the checking and creation of the instance
+        cls.__new__(cls)
+        
 
     def get_lock(self) -> threading.RLock:
         """
@@ -446,7 +442,7 @@ class DprintSettings:
         return min(self._valid_print_levels)
     
     def _get_all_dirs_and_files(self,
-                                dir_path) -> Tuple[List[str], List[str]]:
+                                dir_path: str) -> Tuple[List[str], List[str]]:
         """
         Get all directories and files at or below this
         DprintSettings instance's module path.
@@ -462,6 +458,7 @@ class DprintSettings:
         from suitkaise.int.utils.path.get_paths import get_dirs_and_files_from_path
 
         # get the directories and files from the module path
+        # we always want to get all subdirectories and their files
         dirs, files = get_dirs_and_files_from_path(dir_path, subdirs=True)
 
         return dirs, files
@@ -552,16 +549,16 @@ class DprintSettings:
             # default to light gray
             tag_color = "#D3D3D3"
         
-        tag_name = {
+        tag_name_dict = {
             "name": tag_name,
             "description": tag_description,
             "color": tag_color
         }
         with self._dprint_settings_lock:
             self._valid_tags.append(tag_name)
-            self._tags_to_include.append(tag_name["name"])
+            self._tags_to_include.append(tag_name)
 
-        print(f"Tag {tag_name['name']} registered successfully.")
+        print(f"Tag {tag_name} registered successfully.")
 
     def deregister_tag(self, tag_name: str) -> None:
         """

@@ -36,12 +36,29 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/utils/dprint/dprint_script.py
+# suitkaise/int/utils/dprint/dprint_mgr.py
 
 """
-Standalone script to manage Dprints.
-
-Uses dprint_mgr.py to run a standalone window right from this script.
+Module to initialize and manage Dprints for the system.
 
 """
+
+from suitkaise.int.utils.dprint.dprint import Dprint
+from suitkaise.int.utils.dprint.dprint_settings import DprintSettings, DprintSettingsRegistry
+from suitkaise.int.utils.dprint.dprint_tab import DprintTab
+
+def setup_dprint():
+    """
+    Function for setting up/initializing the Dprint system on startup.
+
+    1. Initialize the Dprint settings registry, so that we can register the
+    settings for internal and external Dprints.
+    
+    """
+
+    # Initialize the Dprint settings registry
+    global dprint_settings_registry
+    dprint_settings_registry = DprintSettingsRegistry.get_instance()
+
+
 

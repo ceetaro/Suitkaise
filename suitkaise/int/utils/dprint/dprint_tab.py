@@ -338,16 +338,16 @@ class FilterDialog(QDialog):
         self.button_layout = QHBoxLayout()
         self.button_layout.addStretch()
 
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.cancel_changes)
-        self.button_layout.addWidget(self.cancel_button)
-
         self.apply_button = QPushButton("Apply")
         self.apply_button.clicked.connect(self.apply_changes)
         self.button_layout.addWidget(self.apply_button)
 
+        self.cancel_button = QPushButton("Revert")
+        self.cancel_button.clicked.connect(self.revert_changes)
+        self.button_layout.addWidget(self.cancel_button)
+
         self.close_button = QPushButton("Close")
-        self.close_button.clicked.connect(self.close)
+        self.close_button.clicked.connect(self.close_filter_dialog)
         self.button_layout.addWidget(self.close_button)
 
         # add the button layout to the main layout
@@ -400,7 +400,6 @@ class FilterDialog(QDialog):
         self.to_label = QLabel("To")
         self.to_section.addWidget(self.to_label)
 
-        # add another paste button
         self.to_paste_button = QPushButton("Paste")
         self.to_paste_button.setToolTip("Paste a copied messsage, and use its time")
         self.to_paste_button.clicked.connect(self.paste_time_format(clicked="to"))
@@ -417,6 +416,147 @@ class FilterDialog(QDialog):
         self.to_section.addWidget(self.to_search_for_time_button)
 
         self.input_layout.addLayout(self.to_section)
+
+        # create timeline
+        self.create_time_tab_timeline()
+
+    def create_time_tab_timeline(self):
+        """Create the timeline for the time filter tab."""
+        # create the timeline
+        self.timeline_frame = QFrame()
+        self.timeline_layout = QVBoxLayout(self.timeline_frame)
+        self.timeline = PrecisionSlider #... implement correctly
+
+        self.timeline_bottom_part = QFrame()
+        self.timeline_bottom_layout = QHBoxLayout(self.timeline_bottom_part)
+
+        # this is where we show from what message to what message
+        # we might add more, so i split the layout into two parts
+
+
+    # def paste_time_format(self, clicked):
+    # def open_input_time_popup(self, clicked):
+    # def open_search_for_time_popup(self, clicked):
+
+    def create_tags_tab(self):
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class PrecisionSlider(QSlider):
+    """A custom slider that provides more precise control for fine adjustments."""
+    
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        
+        # Set smaller page step for finer control when clicking on the track
+        self.setPageStep(5)
+        
+        # Add properties to reduce jitter
+        self._last_value = 0
+        self._update_threshold = 1  # Only update when change is >= this amount
+        
+        # Same styling as before
+        self.setStyleSheet("""
+            QSlider::handle:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b4b4b4, stop:1 #8f8f8f);
+                border: 1px solid #5c5c5c;
+                width: 18px;  /* Larger handle is easier to control */
+                height: 18px;
+                margin: -9px 0;
+                border-radius: 9px;
+            }
+            QSlider::groove:horizontal {
+                background: #d6d6d6;
+                height: 6px;  /* Slightly thicker groove */
+                border-radius: 3px;
+            }
+        """)
+    
+    def mousePressEvent(self, event):
+        """Override to implement smoother clicking behavior."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Calculate position with better precision
+            val = self._pixelPosToRangeValue(event.position().x())
+            # Only update if the change is significant
+            if abs(val - self.value()) >= self._update_threshold:
+                self._last_value = val
+                self.setValue(val)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+    
+    def _pixelPosToRangeValue(self, pos):
+        """Convert pixel position to slider value with better precision."""
+        # Create a style option for the slider
+        option = QStyleOptionSlider()
+        self.initStyleOption(option)
+        
+        # Get the slider's style object
+        style = self.style()
+        
+        # Get the slider groove and handle rectangles
+        if style is None:
+            raise RuntimeError("Style object is None. Ensure the widget is properly initialized.")
+        groove_rect = style.subControlRect(QStyle.ComplexControl.CC_Slider, option, QStyle.SubControl.SC_SliderGroove, self)
+        handle_rect = style.subControlRect(QStyle.ComplexControl.CC_Slider, option, QStyle.SubControl.SC_SliderHandle, self)
+        
+        # Calculate the slider length and range
+        slider_length = groove_rect.width()
+        slider_min = self.minimum()
+        slider_max = self.maximum()
+        
+        # Calculate the position adjusted for handle width
+        handle_width = handle_rect.width()
+        available_space = slider_length - handle_width
+        
+        # Calculate the relative position (0.0 to 1.0)
+        if available_space > 0:
+            # Adjust for handle position and constrain within valid range
+            adjusted_pos = max(0, min(pos - groove_rect.x() - handle_width / 2, available_space))
+            pos_ratio = adjusted_pos / available_space
+            return int(slider_min + pos_ratio * (slider_max - slider_min))
+        
+        return slider_min
+
+    def mouseMoveEvent(self, event):
+        """Override to implement dragging behavior with less jitter."""
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            # Calculate position with better precision
+            val = self._pixelPosToRangeValue(event.position().x())
+            # Only update if the change is significant
+            if abs(val - self._last_value) >= self._update_threshold:
+                self._last_value = val
+                self.setValue(val)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+
 
 
 
