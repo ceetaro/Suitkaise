@@ -5,10 +5,11 @@ description = "Development assistance, code visualization, and more."
 authors = [
     {name = "Casey Eddings",email = "caseyeddings@gmail.com"}
 ]
-license = {text = "MIT"}
+license = {text = "Apache-2.0, GNU GPLv3"}
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "pyqt6 (>=6.9.0,<7.0.0)",
 ]
 
 

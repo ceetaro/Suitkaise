@@ -36,7 +36,7 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/scan.py
+# suitkaise/scan.py
 
 """
 Placeholder scanning script to copy file structures and contents to the clipboard.
@@ -117,7 +117,6 @@ class DirectoryScanner(QMainWindow):
     def setup_search(self):
         """Sets up the search bar and results dropdown."""
         self.create_search_paths()
-        self.setup_search_timer()
         self.setup_search()
 
 

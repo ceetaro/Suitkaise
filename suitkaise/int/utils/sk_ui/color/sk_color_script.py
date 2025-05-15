@@ -36,11 +36,9 @@
 #
 # -------------------------------------------------------------------------------------
 
-# tests/eventsys/core/station/test_bus_station.py
-
-# Main file being tested: suitkaise/eventsys/core/station/bus_station.py
+# suitkaise/int/utils/sk_ui/color/sk_color_script.py
 
 """
-
+Standalone script to generate colors.
 
 """

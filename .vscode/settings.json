@@ -1,0 +1,10 @@
+{
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.analysis.diagnosticMode": "workspace",
+}

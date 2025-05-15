@@ -1,40 +1,4 @@
- # -------------------------------------------------------------------------------------
-# Copyright 2025 Casey Eddings
-# Copyright (C) 2025 Casey Eddings
-#
-# This file is a part of the Suitkaise application, available under either
-# the Apache License, Version 2.0 or the GNU General Public License v3.
-#
-# ~~ Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
-#
-#       Licensed under the Apache License, Version 2.0 (the "License");
-#       you may not use this file except in compliance with the License.
-#       You may obtain a copy of the License at
-#
-#           http://www.apache.org/licenses/LICENSE-2.0
-#
-#       Unless required by applicable law or agreed to in writing, software
-#       distributed under the License is distributed on an "AS IS" BASIS,
-#       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#       See the License for the specific language governing permissions and
-#       limitations under the License.
-#
-# ~~ GNU General Public License, Version 3 (http://www.gnu.org/licenses/gpl-3.0.html)
-#
-#       This program is free software: you can redistribute it and/or modify
-#       it under the terms of the GNU General Public License as published by
-#       the Free Software Foundation, either version 3 of the License, or
-#       (at your option) any later version.
-#
-#       This program is distributed in the hope that it will be useful,
-#       but WITHOUT ANY WARRANTY; without even the implied warranty of
-#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#       GNU General Public License for more details.
-#
-#       You should have received a copy of the GNU General Public License
-#       along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# -------------------------------------------------------------------------------------
+# add license here
 
 # suitkaise/int/utils/sk_ui/color/sk_color.py
 
@@ -56,6 +20,7 @@ for use later on.
 """
 
 import threading
+from typing import Union, Optional
 
 
 class SKColorRegistry:
@@ -84,6 +49,13 @@ class SKColorRegistry:
         """Initialize the registry with default values."""
         self._colors = {}  # color name -> color object
         self._suitkaise_colors = {}  # color name -> color object
+
+    @classmethod
+    def get_instance(cls):
+        """Get the singleton instance of SKColorRegistry."""
+        if cls._sk_color_registry is None:
+            cls._sk_color_registry = cls()
+        return cls._sk_color_registry
 
 
     def register_color(self, color_name, color):
@@ -130,7 +102,7 @@ class SKColorRegistry:
         self.register_color(color_name, color)
 
 
-    def get(self, color_name):
+    def get(self, color_name: str) -> Optional['SKColor']:
         """
         Get a color from the registry.
         
@@ -139,8 +111,12 @@ class SKColorRegistry:
         
         """
         with self._sk_color_registry_lock:
-            return self._colors.get(color_name)
-        
+            color = self._colors.get(color_name, None)
+            if not color:
+                for color_key in self._suitkaise_colors:  # Use a different variable name
+                    if color_key.endswith(color_name):
+                        return self._suitkaise_colors[color_key]
+            return color
         
     def remove(self, color_name):
         """
@@ -161,8 +137,12 @@ class SKColorRegistry:
         
         """
         with self._sk_color_registry_lock:
-            return color_name in self._colors
-        return False
+            registered = color_name in self._colors
+            if not registered:
+                for color_key in self._suitkaise_colors:  # For consistency
+                    if color_key.endswith(color_name):
+                        return True
+            return registered
             
 
 
@@ -219,10 +199,299 @@ class SKColor:
                    hex string, RGB tuple, or a common color name.
 
         """
-        self.color = self._validate_color(color)
-        self.hex_color = self._to_hex(self.color)
+        self.color = self._to_hex(color)
+        self.color_info = {
+            'color': self.color, # hex value
+            'original': color, # ex. 'Pine Green'
+            'modifiers': [], # ex. 'lighter', 'darker', 'more red', opacity, etc.
+            'contrasting': False, # ex. 'contrasting'
+            'opacity': 100, # percent
+        }
+    
+    def _to_hex(self, color):
+        """
+        Convert a color to its hex representation.
+        
+        Args:
+            color: The color to convert. This can be a hex string, RGB tuple,
+                an SKColor object, or a common color name.
+        
+        Returns:
+            A hex color string in the format '#RRGGBB'.
+        """
+        # If it's already an SKColor, get its hex value
+        if isinstance(color, SKColor):
+            return color.color
+            
+        # If it's a hex color already
+        if isinstance(color, str) and color.startswith('#'):
+            # Normalize shorthand hex (#RGB) to full form (#RRGGBB)
+            if len(color) == 4:
+                return '#' + ''.join([c*2 for c in color[1:]])
+            # Return normalized full-form hex
+            elif len(color) == 7:
+                return color.lower()
+            else:
+                raise ValueError(f"Invalid hex color format: {color}")
+                
+        # If it's an RGB tuple
+        elif isinstance(color, tuple) and len(color) == 3:
+            # Validate RGB values
+            if not all(0 <= c <= 255 for c in color):
+                raise ValueError(f"RGB values must be between 0 and 255: {color}")
+            return self._rgb_to_hex(color)
+            
+        # If it's a color name
+        elif isinstance(color, str):
+            # Try to get from registry
+            color_reg = SKColorRegistry()
+            registered_color = color_reg.get(color)
+            if registered_color:
+                # If it's an SKColor object, get its hex value
+                if isinstance(registered_color, SKColor):
+                    return registered_color.color
+                # Otherwise assume it's a hex string
+                return registered_color
+            else:
+                raise ValueError(f"Color name not found in registry: {color}")
+        
+        # Invalid format
+        else:
+            raise ValueError(f"Invalid color format: {color}")
+        
+        
+    def _hex_to_rgb(self, hex_color):
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip('#')
+        
+        # Handle shorthand hex (#RGB)
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+            
+        # Convert to RGB
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
+    def _rgb_to_hex(self, rgb):
+        """Convert RGB tuple to hex color."""
+        return '#{:02x}{:02x}{:02x}'.format(*rgb)
+
+    def _clamp(self, value, min_val=0, max_val=255):
+        """Clamp a value between min and max."""
+        return max(min_val, min(max_val, value))
+    
+    def _to_sk_color(self, color: str) -> 'SKColor':
+        """
+        Convert a color to an SKColor object.
+        
+        Args:
+            color: The color to convert. This can be a hex string, RGB tuple,
+                or a common color name.
+        
+        Returns:
+            An SKColor object.
+        """
+        return SKColor(color)
+
+
+    def lighter(self, percent: int) -> 'SKColor':
+        """
+        Lighten color by a percentage.
+
+        Args:
+            percent: The percentage to lighten the color by.
+        
+        """
+        self.color_info['modifiers'].append({
+            'mod_name': 'lighter',
+            'percent': percent,
+        })
+
+        # apply the modifiers to the color
+        rgb = self._hex_to_rgb(self.color)
+        lighter_rgb = self._apply_lighter(rgb, percent)
+        self.color = self._rgb_to_hex(lighter_rgb)
+
+        return self
+    
+    def darker(self, percent: int) -> 'SKColor':
+        """
+        Darken color by a percentage.
+        
+        Args:
+            percent: The percentage to darken the color by.
+        
+        """
+        self.color_info['modifiers'].append({
+            'mod_name': 'darker',
+            'percent': percent,
+        })
+
+        # apply the modifiers to the color
+        rgb = self._hex_to_rgb(self.color)
+        darker_rgb = self._apply_darker(rgb, percent)
+        self.color = self._rgb_to_hex(darker_rgb)
+
+        return self
+    
+    def more(self, more_color: Union[str, 'SKColor'], percent: int) -> 'SKColor':
+        """
+        Add more of a color to the current color.
+        
+        Args:
+            color: The color to add more of.
+            percent: The percentage to add.
+
+        """
+        # see if more_color is a registered color
+        if isinstance(more_color, str):
+            color_reg = SKColorRegistry()
+            if color_reg.is_registered(more_color):
+                more_color = color_reg.get(more_color) # type: ignore
+            else:
+                more_color = self._to_sk_color(more_color)
+
+        self.color_info['modifiers'].append({
+            'mod_name': 'more',
+            'color': more_color,
+            'percent': percent,
+        })
+
+        # apply the modifiers to the color
+        rgb = self._hex_to_rgb(self.color)
+        more_rgb = self._apply_more(rgb, more_color, percent)
+        self.color = self._rgb_to_hex(more_rgb)
+
+        return self
+    
+    def less(self, less_color: Union[str, 'SKColor'], percent: int) -> 'SKColor':
+        """
+        Remove some of a color from the current color.
+        
+        Args:
+            color: The color to remove some of.
+            percent: The percentage to remove.
+
+        """
+        # see if less_color is a registered color
+        if isinstance(less_color, str):
+            color_reg = SKColorRegistry()
+            if color_reg.is_registered(less_color):
+                less_color = color_reg.get(less_color) # type: ignore
+            else:
+                less_color = self._to_sk_color(less_color)
+
+        self.color_info['modifiers'].append({
+            'mod_name': 'less',
+            'color': less_color,
+            'percent': percent,
+        })
+
+        # apply the modifiers to the color
+        rgb = self._hex_to_rgb(self.color)
+        less_rgb = self._apply_less(rgb, less_color, percent)
+        self.color = self._rgb_to_hex(less_rgb)
+
+        return self
+    
+    def contrasting(self) -> 'SKColor':
+        """
+        Make the color its contrasting/complementary color.
+        
+        """
+        self.color_info['contrasting'] = True
+
+        # apply the modifiers to the color
+        rgb = self._hex_to_rgb(self.color)
+        contrasting_rgb = self._apply_contrasting(rgb)
+        self.color = self._rgb_to_hex(contrasting_rgb)
+
+        return self
     
 
+    def opacity(self, percent: int) -> 'SKColor':
+        """
+        Set the opacity of the color.
+        
+        Args:
+            percent: The percentage to set the opacity to.
+        
+        """
+        # clamp percent
+        percent = self._clamp(percent, 0, 100)
+        self.color_info['opacity'] = percent
 
+        # no mod, but stores metadata for alpha encoding later
 
+        return self
+    
+
+    def _apply_lighter(self, rgb, percent):
+        """Apply the lighter modifier to the color."""
+        return tuple(self._clamp(int(c + (255 - c) * percent / 100)) for c in rgb)
+    
+    def _apply_darker(self, rgb, percent):
+        """Apply the darker modifier to the color."""
+        return tuple(self._clamp(int(c - c * percent / 100)) for c in rgb)
+    
+    def _apply_more(self, rgb, target_color, percent):
+        """
+        Move the color towards the target color by a percentage.
+        
+        Args:
+            rgb: The current RGB tuple
+            target_color: An SKColor object or string/hex/RGB representing the target color
+            percent: Percentage to move towards the target (0-100)
+            
+        Returns:
+            A new RGB tuple moved towards the target color
+
+        """
+        
+        # Get the target RGB values
+        target_rgb = self._hex_to_rgb(target_color.color)
+        
+        # For each component, move a percentage of the distance towards the target
+        result = []
+        for curr, target in zip(rgb, target_rgb):
+            # Calculate the distance to move
+            distance = target - curr
+            # Move by the specified percentage of that distance
+            new_value = curr + distance * (percent / 100)
+            # Ensure the result is in the valid range
+            result.append(self._clamp(int(new_value)))
+        
+        return tuple(result)
+    
+    def _apply_less(self, rgb, target_color, percent):
+        """
+        Move the color away from the target color by a percentage.
+        
+        Args:
+            rgb: The current RGB tuple
+            target_color: An SKColor object or string/hex/RGB representing the target color
+            percent: Percentage to move away from the target (0-100)
+            
+        Returns:
+            A new RGB tuple moved away from the target color
+
+        """
+        
+        # Get the target RGB values
+        target_rgb = self._hex_to_rgb(target_color.color)
+        
+        # For each component, move a percentage of the distance away from the target
+        result = []
+        for curr, target in zip(rgb, target_rgb):
+            # Calculate the direction and distance to move away
+            distance = curr - target
+            # Move by the specified percentage further in the same direction
+            new_value = curr + distance * (percent / 100)
+            # Ensure the result is in the valid range
+            result.append(self._clamp(int(new_value)))
+        
+        return tuple(result)
+    
+    def _apply_contrasting(self, rgb):
+        """Create a contrasting color."""
+        return tuple(255 - c for c in rgb) # Invert the color
+    
