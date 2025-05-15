@@ -46,6 +46,10 @@ Module for managing themes that SK UI components can use.
 import threading
 from typing import Callable, List, Optional, Dict, Type
 
+from suitkaise.int.utils.fib.fib import FunctionInstance, FunctionInstanceBuilder
+from suitkaise.int.utils.sk_ui.color.sk_color import SKColor, SKColorRegistry
+from suitkaise.int.utils.sk_ui.color.register_sk_colors import register_sk_colors
+
 class SKThemeRegistry:
     """
     Singleton registry to manage all registered themes.
@@ -82,7 +86,7 @@ class SKThemeRegistry:
             raise ValueError(f"Theme '{theme_name}' is not registered.")
         with self._sk_theme_registry_lock:
             self._active_theme = self._themes[theme_name]
-            self.notify_theme_change()
+            self._notify_theme_change()
 
     def get_active_theme(self):
         """Get the currently active theme."""
@@ -96,23 +100,33 @@ class SKThemeRegistry:
         """List all registered themes."""
         return list(self._themes.keys())
     
-
-    # NOTE: if callbacks need to change theme with different args as well,
-    #       convert to using FunctionInstances
-    def register_change_callback(self, callback: Callable):
+    def register_change_callback(self, callback: FunctionInstance):
         """
         Register a callback to be called when the theme changes.
         
         Make sure the callback accepts theme as first argument.
 
         """
-        if callback not in self.theme_change_callbacks:
-            self.theme_change_callbacks.append(callback)
+        with self._sk_theme_registry_lock:
+            with FunctionInstanceBuilder() as fib:
+                fib.add_function_instance(callback)
+                fib.add_argument("theme", self._active_theme, override_value=True)
+                
+                theme_change_callback = fib.build()
 
-    def unregister_change_callback(self, callback: Callable):
+            self.theme_change_callbacks.append(theme_change_callback)
+
+
+    def unregister_change_callback(self, callback_name: str):
         """Unregister a callback."""
-        if callback in self.theme_change_callbacks:
-            self.theme_change_callbacks.remove(callback)
+        with self._sk_theme_registry_lock:
+            for callback in self.theme_change_callbacks:
+                if callback.func_name == callback_name:
+                    self.theme_change_callbacks.remove(callback)
+                    break
+            else:
+                raise ValueError(f"Callback '{callback_name}' not found.")
+            
 
     def _notify_theme_change(self):
         """Notify all registered callbacks of a theme change."""
@@ -168,3 +182,5 @@ class SKTheme:
         self.author = author
 
         # base colors
+        self.main_bkg_color = "#708090"
+

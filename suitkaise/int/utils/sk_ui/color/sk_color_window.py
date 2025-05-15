@@ -39,6 +39,11 @@
 # suitkaise/int/utils/sk_ui/color/sk_color_script.py
 
 """
-Standalone script to generate colors.
+A widget that can be added to any window to work with SKColors.
+
+Features:
+- Color wheel
 
 """
+
+

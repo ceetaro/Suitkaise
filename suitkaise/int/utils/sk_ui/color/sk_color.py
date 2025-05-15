@@ -22,6 +22,8 @@ for use later on.
 import threading
 from typing import Union, Optional
 
+from suitkaise.int.utils.sk_ui.color.register_sk_colors import register_sk_colors
+
 
 class SKColorRegistry:
     """
@@ -50,6 +52,8 @@ class SKColorRegistry:
         self._colors = {}  # color name -> color object
         self._suitkaise_colors = {}  # color name -> color object
 
+        register_sk_colors()  # Register default colors
+
     @classmethod
     def get_instance(cls):
         """Get the singleton instance of SKColorRegistry."""
@@ -62,6 +66,8 @@ class SKColorRegistry:
         """Register a new color, using color_name for the name."""
         with self._sk_color_registry_lock:
             if color_name not in self._colors:
+                # capitalize the first letter of each word in color_name
+                color_name = color_name.title()
                 self._colors[color_name] = color
             else:
                 raise ValueError(f"Color '{color_name}' is already registered.")
@@ -71,6 +77,8 @@ class SKColorRegistry:
     def deregister_color(self, color_name):
         """Deregister a color, using color_name for the name."""
         with self._sk_color_registry_lock:
+            # capitalize the first letter of each word in color_name
+            color_name = color_name.title()
             if color_name in self._colors:
                 del self._colors[color_name]
             else:
@@ -85,6 +93,8 @@ class SKColorRegistry:
         
         """
         with self._sk_color_registry_lock:
+            # capitalize the first letter of each word in color_name
+            color_name = color_name.title()
             color_name = "Suitkaise." + color_name
             if color_name not in self._suitkaise_colors:
                 self._suitkaise_colors[color_name] = color
@@ -111,6 +121,8 @@ class SKColorRegistry:
         
         """
         with self._sk_color_registry_lock:
+            # capitalize the first letter of each word in color_name
+            color_name = color_name.title()
             color = self._colors.get(color_name, None)
             if not color:
                 for color_key in self._suitkaise_colors:  # Use a different variable name
@@ -137,6 +149,8 @@ class SKColorRegistry:
         
         """
         with self._sk_color_registry_lock:
+            # capitalize the first letter of each word in color_name
+            color_name = color_name.title()
             registered = color_name in self._colors
             if not registered:
                 for color_key in self._suitkaise_colors:  # For consistency
