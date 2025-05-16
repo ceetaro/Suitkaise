@@ -55,7 +55,17 @@ import importlib
 from typing import Any, Dict, Callable, Optional, List, Tuple, Union
 from functools import partial
 
-# TODO add registry to save FunctionInstances
+class FunctionInstanceRegistry:
+    """
+    Registry for FunctionInstance objects.
+
+    Only one registry can exist in the internal execution space,
+    and only one can exist in the external execution space.
+
+    (Essentially a singleton for Suitkaise source code and a
+    different singleton for user imported code)
+    
+    """
 
 class FunctionInstance:
     """
@@ -76,6 +86,7 @@ class FunctionInstance:
         self.func = func
         self.args = args if args is not None else ()
         self.kwargs = kwargs if kwargs is not None else {}
+        self.return_type = None
         self.module_path = module_path
         self.module_name = module_name or getattr(func, '__module__', None)
         self.func_name = func_name or getattr(func, '__name__', str(func))
@@ -124,6 +135,14 @@ class FunctionInstance:
         
         return cls(func, args, kwargs, module_name, func_name)
     
+    def get_args(self) -> Tuple:
+        """Get the arguments of the function."""
+        return self.args
+    
+    def get_kwargs(self) -> Dict[str, Any]:
+        """Get the keyword arguments of the function."""
+        return self.kwargs
+    
 
 class FunctionInstanceBuilder:
     """
@@ -144,6 +163,7 @@ class FunctionInstanceBuilder:
         self.func_name = None
         self.provided_args = [] # only args given to FIB
         self.provided_kwargs = {} # only kwargs given to FIB
+        self.return_type = None
         self.signature = None
         self.param_info = {} # maps param names to their metadata
         self.built = False
@@ -181,6 +201,7 @@ class FunctionInstanceBuilder:
         # Store the arguments and kwargs
         self.provided_args = list(func_instance.args)
         self.provided_kwargs = func_instance.kwargs
+        self.return_type = func_instance.return_type
         
         print(f"Using FunctionInstance {self.module_name}.{self.func_name}")
         
@@ -211,6 +232,9 @@ class FunctionInstanceBuilder:
         self.module_name = func.__module__
         self.func_name = func.__name__
         
+        # get return type
+        self.return_type = getattr(func, '__annotations__', {}).get('return', None)
+
         # Get the module path
         module_obj = sys.modules.get(self.module_name)
         self.module_path = getattr(module_obj, '__file__', None)
@@ -418,6 +442,26 @@ class FunctionInstanceBuilder:
             self.add_argument(param_name, value, override_value, kwargs_only=True)
         
         return self
+    
+    def update_argument(self,
+                        param_name: str,
+                        value: Any) -> 'FunctionInstanceBuilder':
+        """
+        Update an argument that already exists in the function instance.
+
+        Args:
+            param_name: The name of the parameter to update
+            value: The new value to assign to the parameter
+
+        """
+        if param_name in self.param_info:
+            self.add_argument(param_name, value, override_value=True)
+            print(f"Updated argument '{param_name}' to {value}")
+            return self
+        else:
+            print(f"Argument '{param_name}' not found in function signature.\n")
+            return self
+
     
     def validate(self) -> bool:
         """

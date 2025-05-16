@@ -36,7 +36,7 @@
 #
 # -------------------------------------------------------------------------------------
 
-# suitkaise/int/main.py
+# suitkaise/main.py
 
 """
 Main module for running the Suitkaise application.
@@ -56,6 +56,14 @@ import suitkaise.int.time.sktime as sktime
 
 def main():
     sktime.setup_time()
+
+    global internal # a dictionary to store variables for SK source code
+    internal = {}
+    internal['function_instance_registry'] = None # placeholder for int main to use
+
+    global external # a dictionary to store variables for user imported projects
+    external = {}
+    external['function_instance_registry'] = None # placeholder for ext main
 
 
 

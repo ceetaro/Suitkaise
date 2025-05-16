@@ -51,7 +51,7 @@ execution.
 """
 
 import threading
-from typing import Callable, Dict, Optional, List, Any, Tuple
+from typing import Callable, Dict, Optional, List, Any, Tuple, Union
 
 import suitkaise.int.utils.fib.fib as fib
 
@@ -72,26 +72,165 @@ class ProcessingInitRegistry:
     be used to toggle them on or off during initialization.
     
     """
-    _instance = None
-    _init_registry_lock = threading.RLock()
+    _processing_init_registry = None
+    _processing_init_registry_lock = threading.Lock()
 
     def __new__(cls):
         with cls._init_registry_lock:
             if cls._instance is None:
-                cls._instance = super(InitRegistry, cls).__new__(cls)
-                cls._instance._initialized = False
+                cls._instance = super(ProcessingInitRegistry, cls).__new__(cls)
+                cls._init_processing_init_registry()
             return cls._instance
         
-    def __init__(self):
-        if getattr(self, '_initialized', False):
-            return
-        
+    def _init_processing_init_registry(self):
+        """
+        Initialize the ProcessingInitRegistry instance.
+
+        This method is called only once when the singleton instance is created.
+
+        """
         # registry for process initialization functions
         self.process_initializers = {}
 
         # registry for thread initialization functions
         self.thread_initializers = {}
 
-        self._initialized = True
-
         print("InitRegistry initialized.")
+
+    def register_process_initializer(self, func: Callable, 
+                                     name: str = None,
+                                     priority: int = 100) -> None:
+        """
+        Register a process initialization function.
+
+        Args:
+            func (Callable): The function to register.
+            name (str, optional): The name of the function. If None, the function's 
+                __name__ attribute will be used.
+            priority (int, optional): The priority of the function. The first function
+                called to initialize is the lowest number.
+
+        """
+        with self._processing_init_registry_lock:
+            if priority not in self.process_initializers:
+                self.process_initializers[priority] = []
+
+            func_name = name if name else func.__name__
+            self.process_initializers[priority].append((func_name, func))
+            print(f"Registered process initializer: {func_name} with priority {priority}")
+
+
+    def register_thread_initializer(self, func: Callable,
+                                    name: str = None,
+                                    priority: int = 100) -> None:
+            """
+            Register a thread initialization function.
+    
+            Args:
+                func (Callable): The function to register.
+                name (str, optional): The name of the function. If None, the function's 
+                    __name__ attribute will be used.
+                priority (int, optional): The priority of the function. The first function
+                    called to initialize is the lowest number.
+    
+            """
+            with self._processing_init_registry_lock:
+                if priority not in self.thread_initializers:
+                    self.thread_initializers[priority] = []
+    
+                func_name = name if name else func.__name__
+                self.thread_initializers[priority].append((func_name, func))
+                print(f"Registered thread initializer: {func_name} with priority {priority}")
+
+
+    def deregister_process_initializer(self,
+                                       initializer: Union[Callable, str]) -> None:
+        """
+        Unregister a process initializer function.
+
+        Args:
+            initializer (Union[Callable, str]): The function or name of the function to deregister.
+
+        """
+        with self._processing_init_registry_lock:
+            for priority, initializers in self.process_initializers.items():
+                for i, (name, func) in enumerate(initializers):
+                    if func == initializer or name == initializer:
+                        del initializers[i]
+                        print(f"Deregistered process initializer: {name}")
+                        return
+                    
+            raise ProcessingInitRegistryError(f"Process initializer {initializer} not found.")
+        
+    
+    def deregister_thread_initializer(self,
+                                       initializer: Union[Callable, str]) -> None:
+        """
+        Unregister a thread initializer function.
+
+        Args:
+            initializer (Union[Callable, str]): The function or name of the function to deregister.
+
+        """
+        with self._processing_init_registry_lock:
+            for priority, initializers in self.thread_initializers.items():
+                for i, (name, func) in enumerate(initializers):
+                    if func == initializer or name == initializer:
+                        del initializers[i]
+                        print(f"Deregistered thread initializer: {name}")
+                        return
+                    
+            raise ProcessingInitRegistryError(f"Thread initializer {initializer} not found.")
+        
+
+    def execute_process_initializers(self) -> Dict[str, Any]:
+        """
+        Execute all registered process initialization functions in order of priority.
+
+        """
+        results = {}
+
+        # sort the initializers by priority
+        sorted_priorities = sorted(self.process_initializers.keys())
+
+        for priority in sorted_priorities:
+            initializers = self.process_initializers[priority]
+
+            for name, func in initializers:
+                try:
+                    result = func()
+                    results[name] = result
+                    print(f"Executed process initializer: {name}")
+                except Exception as e:
+                    raise ProcessingInitRegistryError(f"Error executing process initializer {name}: {e}")
+                
+        return results
+    
+    def execute_thread_initializers(self) -> Dict[str, Any]:
+        """
+        Execute all registered thread initialization functions in order of priority.
+
+        """
+        results = {}
+
+        # sort the initializers by priority
+        sorted_priorities = sorted(self.thread_initializers.keys())
+
+        for priority in sorted_priorities:
+            initializers = self.thread_initializers[priority]
+
+            for name, func in initializers:
+                try:
+                    result = func()
+                    results[name] = result
+                    print(f"Executed thread initializer: {name}")
+                except Exception as e:
+                    raise ProcessingInitRegistryError(f"Error executing thread initializer {name}: {e}")
+                
+        return results
+                    
+        
+    
+                    
+
+
