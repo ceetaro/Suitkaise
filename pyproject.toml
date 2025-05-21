@@ -1,18 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "suitkaise"
 version = "0.1.0"
 description = "Development assistance, code visualization, and more."
 authors = [
-    {name = "Casey Eddings",email = "caseyeddings@gmail.com"}
+    {name = "Casey Eddings", email = "caseyeddings@gmail.com"}
 ]
 license = {text = "Apache-2.0, GNU GPLv3"}
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
-    "pyqt6 (>=6.9.0,<7.0.0)",
+    "pyqt6>=6.9.0,<7.0.0",
 ]
-
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"

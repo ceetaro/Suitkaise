@@ -1,0 +1,34 @@
+# virtual environment
+venv/
+venv311/
+.venv/
+.venv311/
+env/
+ENV/
+
+# python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# local dev settings
+.env
+.vscode/settings.json.user
+
+# testings
+.coverage
+htmlcov/
+.pytest_cache/
+
+# jupyter
+.ipynb_checkpoints
+
+# IDE specific
+.idea/
+*.swp
+*.swo
