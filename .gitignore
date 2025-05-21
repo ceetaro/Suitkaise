@@ -28,6 +28,9 @@ htmlcov/
 # jupyter
 .ipynb_checkpoints
 
+# macOS
+.DS_Store
+
 # IDE specific
 .idea/
 *.swp
