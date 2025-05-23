@@ -13,8 +13,9 @@ Module for creating and managing global variables and registries.
 """
 import os
 import sys
-from typing import Optional
+from typing import Optional, Any, Dict, List, Union
 from pathlib import Path
+from enum import IntEnum
 
 from suitkaise.skglobals._project_indicators import project_indicators
 
@@ -22,16 +23,17 @@ class SKGlobalError(Exception):
     """Custom exception for SKGlobal."""
     pass
 
+class SKGlobalValueError(SKGlobalError):
+    """Custom exception for SKGlobal value errors."""
+    pass
+
+class SKGlobalLevelError(SKGlobalError):
+    """Custom exception for SKGlobal level errors."""
+    pass
+
 class PlatformNotFoundError(Exception):
     """Custom exception for platform not found."""
     pass
-
-import os
-import sys
-from pathlib import Path
-from typing import Optional
-
-from suitkaise.skglobals._project_indicators import project_indicators
 
 def get_project_root(name: Optional[str] = None) -> str:
     """
@@ -114,29 +116,71 @@ def get_project_root(name: Optional[str] = None) -> str:
 
     raise SKGlobalError(f"Project root not found for path: {path}")
 
-class TopLevel:
-    pass
-
+class GlobalLevel(IntEnum):
+    """
+    Enum for global variable levels.
+    
+    """
+    TOP = 0
+    UNDER = 1
 
 class SKGlobal:
-    pass
-
-class SKGlobalVar:
-    pass
-
-class GlobalStorage:
-    pass
-
-def main():
     """
-    Main function to run the SKGlobal module.
-    
-    This function is a placeholder for future implementation.
+    Base class for creating global variables and shared storage.
+
+    Includes SKGlobal.edit, a function that opens a global variable
+    for editing without having to call "global var_name".
     
     """
-    root = get_project_root()
-    print(f"Project root: {root}")
+    
+    def __init__(self,
+                 level: GlobalLevel = GlobalLevel.TOP,
+                 path: Optional[str] = None,
+                 name: Optional[str] = None,
+                 value: Optional[Any] = None,
+                 auto_sync: bool = True,
+                 auto_create: bool = True,
+                 remove_at: Optional[float] = None) -> Tuple[Optional[Any], Optional[SKFunction]]:
+        """
+        Create, and initialize a global variable.
+
+        Args:
+            level (GlobalLevel): level to store the global variable.
+                - this can either be GlobalLevel.TOP or GlobalLevel.UNDER
+                - if under, use path to specify the parent
+            path (str, optional): path to store the global variable.
+            name (str, optional): name to give the global variable.
+            value (Any, optional): value to initialize the global variable with.
+            auto_sync (bool): if True, the global variable will be
+                automatically synchronized with other processes.
+            auto_create (bool): if True, the global variable will be
+                automatically created if it does not exist.
+                - if False, can return an executable SKFunction instance.
+            remove_at (float, optional): if set, the global variable
+                will be removed after this time.
+                - this is useful for temporary global variables
+                - if None, the global variable will not be removed.
+            
+        Returns:
+            Tuple: the global variable's value and an SKFunction instance
+                if auto_create is False.
+
+        Raises:
+            SKGlobalError: if the global variable cannot be created.
+            ValueError: if the level is not valid.
+
+        """
+        pass
+        
 
 
-if __name__ == "__main__":
-    main()
+class SKGlobalStorage:
+    """
+    Container to store and manage global variables.
+
+    Includes a method to write global variables to a file and load them back
+    on next startup in the specified path's directory under a global_storage.sk file.
+    (JSON file created automatically if not already present)
+    
+    """
+    

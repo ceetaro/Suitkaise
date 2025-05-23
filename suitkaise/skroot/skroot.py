@@ -166,9 +166,15 @@ class SKRoot(RootProperties):
         with cls._instance_lock:
             path = str(Path(path).resolve())
 
+            if not os.path.exists(path):
+                raise SKRootError(f"Path does not exist: {path}")
+            
+            if not os.path.isdir(path):
+                raise SKRootError(f"Path is not a directory: {path}")
+
             # roots have to be at the same level, so we can just use the dirname
             if cls._top_level is None:
-                cls._top_level = cls._get_project_root()
+                cls._top_level = get_project_root()
 
             # if this path is at the top level
             if path == cls._top_level:
@@ -182,7 +188,7 @@ class SKRoot(RootProperties):
                 
             elif path != cls._top_level:
                 if cls._root_level is None:
-                    cls._root_level = path
+                    cls._root_level = path # set the root level for the first time
                     cls._main_root = MainRoot(cls._top_level)
 
                 if equalpaths(path, cls._root_level):
@@ -209,7 +215,11 @@ class SKRoot(RootProperties):
 
 
 class MainRoot(RootProperties):
-    pass
+    """
+    Manager for SKRoot instances that resides at the project root and operates
+    in the background. Singleton pattern.
+    
+    """
 
 class SKLeaf(RootProperties):
     pass
