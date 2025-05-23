@@ -214,9 +214,11 @@ class SKRej(Rej):
     _valid_roots: Set[SKRoot | SKLeaf] = set()
     _instances: Dict[str, 'SKRej'] = {}
 
-    def __new__(cls, name: str, root: SKRoot | SKLeaf) -> 'SKRej':
+    def __new__(cls, name: str, level: SKRoot | SKLeaf) -> 'SKRej':
         if name not in cls._instances and root is not None:
             cls._instances[name] = super().__new__(cls)
-            cls._instances[name]._origin = root
+            cls._instances[name]._level = level
         return cls._instances[name]
+    
+
 
