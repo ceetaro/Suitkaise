@@ -22,6 +22,10 @@ class ExternalSerializer(SerializerProtocol):
     def name(self) -> str:
         return "external"
     
+    @property
+    def mode(self) -> str:
+        return "external"
+    
     def serialize(self, obj: Any) -> bytes:
         """Serialize an object to bytes for external use."""
         valid_types = (dict, list, str, int, float, bool, type(None))
@@ -40,7 +44,7 @@ class ExternalSerializer(SerializerProtocol):
         except Exception as e:
             raise DeserializationError(f"Deserialization failed: {e}") from e
         
-    def _serializable(self, obj: Any) -> bool:
+    def is_serializable(self, obj: Any) -> bool:
         """Check if the object is serializable."""
         valid_types = (dict, list, str, int, float, bool, type(None))
         return isinstance(obj, valid_types)

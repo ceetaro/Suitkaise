@@ -1,0 +1,23 @@
+{
+  "path": "/Users/ctaro/Suitkaise/temp_sync_test",
+  "level": "UNDER",
+  "auto_sync": true,
+  "multiprocessing_available": false,
+  "current_process_id": "95901",
+  "created_at": 1748129989.141523,
+  "last_saved": 1748129989.141523,
+  "storage": {
+    "local_data": {
+      "hierarchy_test": {
+        "name": "hierarchy_test",
+        "value": "synced_value",
+        "created_at": 1748129989.1411781,
+        "_stored_by_process": "95901",
+        "_stored_at": 1748129989.1411788,
+        "_storage_path": "/Users/ctaro/Suitkaise/temp_sync_test"
+      }
+    },
+    "cross_process_data": {}
+  },
+  "cross_process_storage": {}
+}
