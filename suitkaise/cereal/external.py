@@ -39,4 +39,9 @@ class ExternalSerializer(SerializerProtocol):
             return json.loads(data.decode('utf-8'))
         except Exception as e:
             raise DeserializationError(f"Deserialization failed: {e}") from e
+        
+    def _serializable(self, obj: Any) -> bool:
+        """Check if the object is serializable."""
+        valid_types = (dict, list, str, int, float, bool, type(None))
+        return isinstance(obj, valid_types)
 

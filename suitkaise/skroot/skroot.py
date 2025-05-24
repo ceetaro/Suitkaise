@@ -31,12 +31,11 @@ import weakref
 import threading
 
 from suitkaise.skglobals.skglobals import (
-    SKGlobal, SKGlobalVar, GlobalLevel, get_project_root)
+    SKGlobal, GlobalLevel, get_project_root)
 
-
-
-    # go up the directory tree until we find the root
-    # check for common files that indicate the root of the project
+def equalpaths(path1: str | Path, path2: str | Path) -> bool:
+    """Check if two paths are equal."""
+    return str(Path(path1).resolve()) == str(Path(path2).resolve())
 
 class SKRootError(Exception):
     """Custom exception for SKRoot."""
@@ -116,8 +115,6 @@ class RootProperties:
         """Check if this root/leaf is a child of another root/leaf."""
         return other.contains(self.path) and self.path != other.path
     
-    def equals(self, path1)
-    
     def __repr__(self) -> str:
         """String representation of the root/leaf."""
         return f"{self.__class__.__name__}('{self.name}', {self.path})"
@@ -146,12 +143,10 @@ class SKRoot(RootProperties):
     """
     _instances: Dict[str, 'SKRoot'] = {} # can be one or multiple
     _instance_lock = threading.RLock() # lock for thread safety
-    _top_level: Optional[str] = None # the top level of the project
-    _instance_at_top_level: Optional[bool] = None # if an instance is at the top level
     _root_level: Optional[str] = None # level where roots have to be created
     _main_root: Optional['MainRoot'] = None # main root if SKRoot not at top level
 
-    def __new__(cls, path: str | Path, name: Optional[str] = None) -> 'SKRoot':
+    def __new__(cls, path: str | Path, name: Optional[str] = None) -> 'SKRoot' | 'MainRoot':
         """
         Create a new SKRoot instance or return an existing one.
 
@@ -160,56 +155,27 @@ class SKRoot(RootProperties):
             name (Optional[str]): The name of the root.
 
         Returns:
-            SKRoot: The created or existing SKRoot instance.
+            SKRoot or MainRoot: The SKRoot instance or MainRoot instance.
         
         """
         with cls._instance_lock:
-            path = str(Path(path).resolve())
+            resolved_path = str(Path(path).resolve())
+            project_root = get_project_root(resolved_path)
 
-            if not os.path.exists(path):
-                raise SKRootError(f"Path does not exist: {path}")
+            if not os.path.exists(resolved_path):
+                raise SKRootError(f"Path does not exist: {resolved_path}")
+            if not os.path.isdir(resolved_path):
+                raise SKRootError(f"Path is not a directory: {resolved_path}")
+
             
-            if not os.path.isdir(path):
-                raise SKRootError(f"Path is not a directory: {path}")
-
-            # roots have to be at the same level, so we can just use the dirname
-            if cls._top_level is None:
-                cls._top_level = get_project_root()
-
-            # if this path is at the top level
-            if path == cls._top_level:
-                if not cls._instance_at_top_level:
-                    cls._instance_at_top_level = True
-                    instance = super().__new__(cls)
-                    return instance
-                else:
-                    # return the single instance
-                    return cls._instances.get(path)
-                
-            elif path != cls._top_level:
-                if cls._root_level is None:
-                    cls._root_level = path # set the root level for the first time
-                    cls._main_root = MainRoot(cls._top_level)
-
-                if equalpaths(path, cls._root_level):
-                    if path not in cls._instances:
-                        # create a new instance at the root level
-                        instance = super().__new__(cls)
-                        cls._instances[path] = instance
-                    else:
-                        # return the existing instance at the root level
-                        return cls._instances[path]
-                else:
-                    raise SKRootLevelError(
-                        f"Cannot create multiple SKRoots at the same level: {path}"
-                    )
                 
             
-        
+class SKLeaf(RootProperties):
+    pass     
             
         
         
-
+SKPath = str | Path | SKRoot | SKLeaf
                  
 
 
@@ -221,22 +187,8 @@ class MainRoot(RootProperties):
     
     """
 
-class SKLeaf(RootProperties):
-    pass
 
 
-SKPath = str | Path | SKRoot | SKLeaf
 
-def equalpaths(path1: SKPath, path2: SKPath) -> bool:
-    """
-    Check if two paths are equal.
 
-    Args:
-        path1 (str | Path): The first path.
-        path2 (str | Path): The second path.
 
-    Returns:
-        bool: True if the paths are equal, False otherwise.
-    
-    """
-    return os.path.normpath(str(path1)) == os.path.normpath(str(path2))

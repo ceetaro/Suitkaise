@@ -16,11 +16,13 @@ default_serializer = Cereal()
 # expose main functions
 serialize = default_serializer.serialize
 deserialize = default_serializer.deserialize
+serializable = default_serializer.serializable
 
 __all__ = [
     'Cereal',
     'serialize',
     'deserialize',
+    'serializable',
     'CerealError',
     'SerializationError',
     'DeserializationError',

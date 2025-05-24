@@ -33,5 +33,13 @@ class InternalSerializer(SerializerProtocol):
             return cloudpickle.loads(data)
         except Exception as e:
             raise DeserializationError(f"Deserialization failed: {e}")
+        
+    def _serializable(self, obj: Any) -> bool:
+        """Check if the object is serializable."""
+        try:
+            cloudpickle.dumps(obj)
+            return True
+        except Exception:
+            return False
 
     
