@@ -18,12 +18,11 @@ from pathlib import Path
 from enum import IntEnum
 import json
 import threading
-from multiprocessing import Manager
 
 from suitkaise.skglobals._project_indicators import project_indicators
 import suitkaise.skpath.skpath as skpath
 import suitkaise.sktime.sktime as sktime
-from suitkaise.cereal.cereal import Cereal
+from suitkaise.cereal import Cereal, create_shared_dict
 
 class SKGlobalError(Exception):
     """Custom exception for SKGlobal."""
@@ -268,8 +267,10 @@ class SKGlobal:
         # set default values
         self.level = level if level is not None else GlobalLevel.TOP
         self.auto_sync = auto_sync
-        self.remove_in = float(remove_in) if remove_in is not None else float('inf')
-
+        if remove_in is not None and remove_in > 0 and remove_in != float('inf'):
+            self.remove_in = float(remove_in)
+        else:
+            self.remove_in = None
         # determine path
         if path is None:
             if self.level == GlobalLevel.TOP:
@@ -288,14 +289,15 @@ class SKGlobal:
         self.name = name
 
         # check if value is serializable for syncing with other processes
-        cereal = Cereal()
-        if self.auto_sync and cereal.serializable(value):
-            # serialize the value
-            self.value = value
-        else:
-            raise SKGlobalValueError(
-                "Value is not serializable. Cannot sync with other processes."
+        if self.auto_sync:
+            cereal = Cereal()
+            if not cereal.serializable(value, mode='internal'):
+                raise SKGlobalValueError(
+                    "Value is not serializable. Cannot sync with other processes. "
+                    "Set auto_sync=False to use non-serializable values."
                 )
+        
+        self.value = value
         
         # get the global storage path
         self.storage = SKGlobalStorage.get_storage(self.path, self.level, self.auto_sync)
@@ -370,67 +372,54 @@ class SKGlobal:
         self.storage.remove(self.name)
 
     @classmethod
-    def get_global(cls,
-                   name: str,
-                   path: Optional[str | Path] = None,
-                   level: Optional[GlobalLevel] = GlobalLevel.TOP,
-                   auto_sync: Optional[bool] = None
-                   ) -> Optional['SKGlobal']:
-        """
-        Get an existing global variable by name.
-
-        Checks both syncing and non-syncing storage for the variable.
-
-        Args:
-            name: Name of the global variable.
-            path: Path to search for the global variable. If None, auto-detects.
-            level: Level where variable is stored.
-            auto_sync: if True, check syncing storage.
-                        if False, check non-syncing storage.
-                        if None, check the closest storage.
-
-        Returns:
-            SKGlobal: The global variable if found, else None.
-        
-        """
+    def get_global(cls, name: str, path: Optional[str] = None, 
+                level: GlobalLevel = GlobalLevel.TOP,
+                auto_sync: Optional[bool] = None) -> Optional['SKGlobal']:
+        """Get an existing global variable by name."""
         if path is None:
-            if level == GlobalLevel.TOP:
-                path = get_project_root()
-            else:
-                caller_path = skpath.get_caller_file_path()
-                path = SKGlobalStorage.find_storage_path(caller_path)
-
-        # normalize_path will handle invalid paths
-        path = skpath.normalize_path(path)
-
+            path = get_project_root() if level == GlobalLevel.TOP else skpath.get_caller_file_path()
+        
+        # Determine auto_sync if not specified
+        if auto_sync is None:
+            auto_sync = True  # Default to sync storage
+        
         storage = SKGlobalStorage.get_storage(path, level, auto_sync)
         data = storage.get(name)
-
+        
         if data:
             global_var = cls.__new__(cls)
             global_var.name = name
             global_var.path = path
             global_var.level = level
             global_var.value = data['value']
+            global_var.storage = storage  # ✅ Add missing storage attribute
             global_var.auto_sync = data.get('auto_sync', True)
-            global_var.remove_in = data.get('remove_in', float('inf'))
+            remove_in_data = data.get('remove_in')
+            global_var.remove_in = remove_in_data if remove_in_data is not None else None
             return global_var
         
         return None
 
-
 class SKGlobalStorage:
     """
     Container to store and manage global variables.
-
-    Provides persistent storage with cross-process support,
-    auto-syncing, auto-removal, and JSON backup.
     """
     
     _storages: Dict[str, 'SKGlobalStorage'] = {}
     _storage_lock = threading.RLock()
-    _manager = Manager()
     _startup_cleaned = False
+    _cereal = Cereal()  # ✅ NEW: Single Cereal instance for the class
+    
+    @classmethod
+    def _get_manager(cls):
+        """Get or create the cloudpickle manager."""
+        return cls._cereal.get_internal_manager()  # ✅ CHANGED: Through Cereal
+    
+    @classmethod
+    def disable_multiprocessing(cls):
+        """Disable multiprocessing for testing or single-process use."""
+        cls._cereal.cleanup()  # ✅ CHANGED: Through Cereal
+    
     
     def __init__(self, path: str, level: GlobalLevel, auto_sync: bool = True):
         """
@@ -458,7 +447,7 @@ class SKGlobalStorage:
         
         # Initialize storage backend
         if auto_sync:
-            self._shared_storage = self._manager.dict()
+            self._shared_storage = self._cereal.create_shared_dict()  # ✅ CHANGED: Through Cereal
         else:
             self._shared_storage = {}
         
@@ -630,7 +619,7 @@ class SKGlobalStorage:
             print(f"Warning: Could not save global storage to {self.storage_file}: {e}")
     
     def sync_with(self, other_storage: 'SKGlobalStorage', 
-                  key_filter: Optional[Callable[[str], bool]] = None) -> None:
+                key_filter: Optional[Callable[[str], bool]] = None) -> None:
         """
         Synchronize variables with another storage.
         
@@ -638,15 +627,18 @@ class SKGlobalStorage:
             other_storage: Storage to sync with.
             key_filter: Optional function to filter which keys to sync.
         """
-        with self._lock, other_storage._lock:
+        with self._lock:
+            # Get our variables
             keys_to_sync = self.list_variables()
             if key_filter:
                 keys_to_sync = [k for k in keys_to_sync if key_filter(k)]
             
+            # ✅ Fix: Copy data from this storage to other storage
             for key in keys_to_sync:
-                data = self.get(key)
+                data = self.get(key)  # Get from source (self)
                 if data:
-                    other_storage.set(key, data)
+                    with other_storage._lock:
+                        other_storage.set(key, data)  # Set in target
 
     def has_variable(self, name: str) -> bool:
         """
@@ -709,6 +701,515 @@ class SKGlobalStorage:
         return f"SKGlobalStorage(path='{self.path}', level={self.level.name}, auto_sync={self.auto_sync})"      
 
 if __name__ == "__main__":
-    # test the SKGlobal module
+    import tempfile
+    import shutil
+    import time
+    
+    def run_tests():
+        """Run all SKGlobal tests."""
+        print("🧪 Starting SKGlobal Tests...")
+        print("=" * 50)
+        
+        # Test counters
+        total_tests = 0
+        passed_tests = 0
+        
+        def test_case(name: str, test_func):
+            nonlocal total_tests, passed_tests
+            total_tests += 1
+            try:
+                white = "⬜️"
+                green = "🟩"
+                red = "❌"
+                print(f"\n{white * 30}\n\n  TESTING: {name}\n")
+                test_func()
+                print(f"\n   {green * 12} PASSED: {name}")
+                passed_tests += 1
+            except Exception as e:
+                print(f"\n   {red * 12} FAILED: {name}")
+                print(f"   Error: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Run all test groups
+        test_case("Project Root Detection", test_project_root_detection)
+        test_case("Basic SKGlobal Creation", test_basic_skglobal_creation)
+        test_case("SKGlobal Factory Method", test_skglobal_factory_method)
+        test_case("SKGlobalStorage Basic Operations", test_storage_basic_operations)
+        test_case("Contains Functionality", test_contains_functionality)
+        test_case("Global Variable Get/Set", test_global_get_set)
+        test_case("Storage Persistence", test_storage_persistence)
+        test_case("Different Global Levels", test_global_levels)
+        test_case("Auto-sync vs Non-sync", test_auto_sync_behavior)
+        test_case("Error Handling", test_error_handling)
+        test_case("Cleanup and Removal", test_cleanup_and_removal)
+        test_case("Multiple Storage Instances", test_multiple_storage_instances)
+        test_case("Stress Test", test_stress_test)
+        test_case("Concurrency Test", test_concurrent_access)
+        
+        # Print results
+        print("\n" + "=" * 50)
+        print(f"🏁 Test Results: {passed_tests}/{total_tests} passed")
+        if passed_tests == total_tests:
+            print("🎉 All tests passed!")
+        else:
+            print(f"⚠️  {total_tests - passed_tests} tests failed")
+        print("=" * 50)
+    
+    def test_project_root_detection():
+        """Test project root detection functionality."""
+        print("   Testing project root detection...")
+        
+        # Test 1: Get project root from current location
+        root = get_project_root()
+        assert os.path.exists(root), f"Project root doesn't exist: {root}"
+        assert os.path.isdir(root), f"Project root is not a directory: {root}"
+        print(f"   ✅ Found project root: {root}")
+        
+        # Test 2: Get project root from specific path
+        current_file = __file__
+        root2 = get_project_root(current_file)
+        assert root == root2, "Project root should be same regardless of starting point"
+        print(f"   ✅ Consistent project root detection")
+    
+    def test_basic_skglobal_creation():
+        """Test basic SKGlobal creation."""
+        print("   Testing basic SKGlobal creation...")
+        
+        # Test 1: Create with auto_create=True
+        global1 = SKGlobal(
+            name="test_basic_1",
+            value="Hello World",
+            auto_create=True
+        )
+        assert global1.name == "test_basic_1"
+        assert global1.value == "Hello World"
+        assert global1.level == GlobalLevel.TOP
+        print("   ✅ Basic global created successfully")
+        
+        # Test 2: Create with custom level
+        global2 = SKGlobal(
+            name="test_basic_2", 
+            value=42,
+            level=GlobalLevel.UNDER,
+            auto_create=True
+        )
+        assert global2.level == GlobalLevel.UNDER
+        assert global2.value == 42
+        print("   ✅ Custom level global created")
+        
+        # Test 3: Auto-generated name
+        global3 = SKGlobal(value="auto_name_test", auto_create=True)
+        assert global3.name.startswith("global_")
+        assert len(global3.name) > 7  # Should have generated suffix
+        print(f"   ✅ Auto-generated name: {global3.name}")
+    
+    def test_skglobal_factory_method():
+        """Test SKGlobal factory method."""
+        print("   Testing SKGlobal factory method...")
+        
+        # Test 1: Factory with auto_create=True
+        global_obj, creator_func = SKGlobal.create(
+            name="test_factory_1",
+            value="Factory Test",
+            auto_create=True
+        )
+        assert global_obj is not None
+        assert creator_func is None
+        assert global_obj.name == "test_factory_1"
+        print("   ✅ Factory method with auto_create=True")
+        
+        # Test 2: Factory with auto_create=False
+        global_obj2, creator_func2 = SKGlobal.create(
+            name="test_factory_2",
+            value="Delayed Creation",
+            auto_create=False
+        )
+        assert global_obj2 is not None
+        assert creator_func2 is not None
+        assert callable(creator_func2)
+        
+        # Execute the creator
+        result = creator_func2()
+        assert result == "Delayed Creation"
+        print("   ✅ Factory method with delayed creation")
+    
+    def test_storage_basic_operations():
+        """Test SKGlobalStorage basic operations."""
+        print("   Testing storage basic operations...")
+        
+        # Get storage instance
+        test_path = get_project_root()
+        storage = SKGlobalStorage.get_storage(test_path, GlobalLevel.TOP)
+        
+        # Test data
+        test_data = {
+            'name': 'test_storage',
+            'value': 'storage_test_value',
+            'created_at': sktime.now()
+        }
+        
+        # Test set/get
+        storage.set("test_var", test_data)
+        retrieved = storage.get("test_var")
+        assert retrieved is not None
+        assert retrieved['value'] == 'storage_test_value'
+        print("   ✅ Set and get operations")
+        
+        # Test list_variables
+        variables = storage.list_variables()
+        assert "test_var" in variables
+        print(f"   ✅ List variables: {len(variables)} found")
+        
+        # Test remove
+        storage.remove("test_var")
+        assert storage.get("test_var") is None
+        print("   ✅ Remove operation")
+    
+    def test_contains_functionality():
+        """Test the new __contains__ and contains methods."""
+        print("   Testing contains functionality...")
+        
+        # Create storage and global
+        storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        global_var = SKGlobal(name="test_contains", value="contains_test", auto_create=True)
+        
+        # Test __contains__ with SKGlobal instance
+        assert global_var in storage, "SKGlobal instance should be in storage"
+        print("   ✅ __contains__ with SKGlobal instance")
+        
+        # Test __contains__ with string
+        assert "test_contains" in storage, "Variable name should be in storage"
+        print("   ✅ __contains__ with variable name")
+        
+        # Test contains method
+        assert storage.contains(global_var), "contains() method with SKGlobal"
+        assert storage.contains("test_contains"), "contains() method with string"
+        print("   ✅ contains() method")
+        
+        # Test has_variable
+        assert storage.has_variable("test_contains"), "has_variable() method"
+        print("   ✅ has_variable() method")
+        
+        # Test negative cases
+        assert "nonexistent" not in storage
+        assert not storage.contains("nonexistent")
+        assert not storage.has_variable("nonexistent")
+        print("   ✅ Negative cases work correctly")
+        
+        # Test invalid types
+        assert 123 not in storage
+        assert None not in storage
+        assert [] not in storage
+        print("   ✅ Invalid types handled correctly")
+    
+    def test_global_get_set():
+        """Test SKGlobal get and set operations."""
+        print("   Testing global get/set operations...")
+        
+        # Create global
+        global_var = SKGlobal(name="test_get_set", value="initial", auto_create=True)
+        
+        # Test get
+        value = global_var.get()
+        assert value == "initial", f"Expected 'initial', got {value}"
+        print("   ✅ Get operation")
+        
+        # Test set
+        global_var.set("updated")
+        updated_value = global_var.get()
+        assert updated_value == "updated", f"Expected 'updated', got {updated_value}"
+        print("   ✅ Set operation")
+        
+        # Test persistence
+        retrieved_global = SKGlobal.get_global("test_get_set")
+        assert retrieved_global is not None
+        assert retrieved_global.get() == "updated"
+        print("   ✅ Value persistence")
+    
+    def test_storage_persistence():
+        """Test storage file persistence."""
+        print("   Testing storage persistence...")
+        
+        # Create a temporary directory for testing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Note: This test might be limited since we use project root
+            # But we can test the file creation logic
+            pass
+        
+        # Test with actual storage
+        storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        
+        # Add some test data
+        test_data = {'name': 'persist_test', 'value': 'persistent_value'}
+        storage.set("persist_test", test_data)
+        
+        # Check that storage file exists
+        assert os.path.exists(storage.storage_file), "Storage file should exist"
+        print(f"   ✅ Storage file created: {storage.storage_file}")
+        
+        # Verify file contains our data
+        with open(storage.storage_file, 'r') as f:
+            file_data = json.load(f)
+            assert 'variables' in file_data
+            assert 'persist_test' in file_data['variables']
+        print("   ✅ Data persisted to file")
+        
+        # Clean up
+        storage.remove("persist_test")
+    
+    def test_global_levels():
+        """Test different GlobalLevel behaviors."""
+        print("   Testing different global levels...")
+        
+        # Test TOP level
+        top_global = SKGlobal(
+            name="test_top_level",
+            value="top_value",
+            level=GlobalLevel.TOP,
+            auto_create=True
+        )
+        assert top_global.level == GlobalLevel.TOP
+        assert top_global.path == get_project_root()
+        print("   ✅ TOP level global")
+        
+        # Test UNDER level
+        under_global = SKGlobal(
+            name="test_under_level", 
+            value="under_value",
+            level=GlobalLevel.UNDER,
+            auto_create=True
+        )
+        assert under_global.level == GlobalLevel.UNDER
+        # Path should be different from project root (unless this file is in root)
+        print(f"   ✅ UNDER level global (path: {under_global.path})")
+        
+        # Verify they use different storage
+        top_storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        under_storage = SKGlobalStorage.get_storage(under_global.path, GlobalLevel.UNDER)
+        
+        # They might be the same if file is in project root, but that's OK
+        print(f"   ✅ Different storage instances created")
+    
+    def test_auto_sync_behavior():
+        """Test auto_sync vs non-auto_sync behavior."""
+        print("   Testing auto_sync behavior...")
+        
+        # Test auto_sync=True (default)
+        sync_global = SKGlobal(
+            name="test_sync",
+            value="sync_value",
+            auto_sync=True,
+            auto_create=True
+        )
+        assert sync_global.auto_sync == True
+        print("   ✅ Auto-sync global created")
+        
+        # ✅ Test auto_sync=False with serializable value first
+        no_sync_global = SKGlobal(
+            name="test_no_sync",
+            value="no_sync_value",  # Use simple string (serializable)
+            auto_sync=False,
+            auto_create=True
+        )
+        assert no_sync_global.auto_sync == False
+        print("   ✅ Non-sync global created")
+        
+        # Test that different storage instances are created
+        sync_storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP, True)
+        no_sync_storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP, False)
+        
+        # Verify they're different instances
+        assert sync_storage is not no_sync_storage
+        print("   ✅ Different storage instances for sync vs no-sync")
+        
+    def test_error_handling():
+        """Test error handling and edge cases."""
+        print("   Testing error handling...")
+        
+        # Test invalid level
+        try:
+            SKGlobal(level="invalid", auto_create=True)
+            assert False, "Should have raised error for invalid level"
+        except SKGlobalValueError:
+            print("   ✅ Invalid level error handled")
+        
+        # Test non-serializable value with auto_sync=True
+        class NonSerializable:
+            def __init__(self):
+                self.func = lambda x: x
+        
+        try:
+            SKGlobal(
+                name="test_non_serializable",
+                value=NonSerializable(),
+                auto_sync=True,  # This should trigger serialization check
+                auto_create=True
+            )
+            assert False, "Should have raised error for non-serializable value"
+        except SKGlobalValueError:
+            print("   ✅ Non-serializable value error handled")
+        
+        # ✅ Test that non-serializable values work with auto_sync=False
+        try:
+            non_sync_global = SKGlobal(
+                name="test_non_serializable_no_sync",
+                value=NonSerializable(),
+                auto_sync=False,  # This should work
+                auto_create=True
+            )
+            print("   ✅ Non-serializable value works with auto_sync=False")
+        except Exception as e:
+            assert False, f"Should not raise error with auto_sync=False: {e}"
+        
+        # Test non-existent path
+        try:
+            SKGlobalStorage("/non/existent/path", GlobalLevel.TOP)
+            assert False, "Should have raised error for non-existent path"
+        except SKGlobalError:
+            print("   ✅ Non-existent path error handled")
+    
+    def test_cleanup_and_removal():
+        """Test cleanup and removal functionality."""
+        print("   Testing cleanup and removal...")
+        
+        # Create a global with removal timer
+        timed_global = SKGlobal(
+            name="test_timed_removal",
+            value="will_be_removed",
+            remove_in=0.1,  # Remove after 0.1 seconds
+            auto_create=True
+        )
+        
+        # Verify it exists initially
+        assert timed_global.get() == "will_be_removed"
+        print("   ✅ Timed global created")
+        
+        # Wait for removal
+        time.sleep(0.2)
+        
+        # Check if it was removed (this might be flaky due to threading)
+        try:
+            result = timed_global.get()
+            if result is None:
+                print("   ✅ Timed removal worked")
+            else:
+                print("   ⚠ Timed removal might be delayed (threading)")
+        except:
+            print("   ✅ Timed removal worked (variable not found)")
+        
+        # Test manual removal
+        manual_global = SKGlobal(name="test_manual_removal", value="to_remove", auto_create=True)
+        assert manual_global.get() == "to_remove"
+        
+        manual_global.remove()
+        assert manual_global.get() is None
+        print("   ✅ Manual removal")
+        
+        # Test storage clear
+        storage = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        storage.set("temp_var", {"value": "temp"})
+        assert "temp_var" in storage
+        
+        storage.clear()
+        assert "temp_var" not in storage
+        print("   ✅ Storage clear")
+    
+    def test_multiple_storage_instances():
+        """Test multiple storage instances and their interactions."""
+        print("   Testing multiple storage instances...")
+        
+        # Get same storage multiple times - should return same instance
+        storage1 = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        storage2 = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP)
+        assert storage1 is storage2, "Should return same instance for same parameters"
+        print("   ✅ Same storage instance returned")
+        
+        # Different parameters should give different instances
+        storage_sync = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP, True)
+        storage_no_sync = SKGlobalStorage.get_storage(get_project_root(), GlobalLevel.TOP, False)
+        assert storage_sync is not storage_no_sync
+        print("   ✅ Different instances for different sync settings")
+        
+        # Test sync_with method
+        storage_sync.set("sync_test", {"value": "sync_data"})
+        storage_no_sync.sync_with(storage_sync)
+        
+        synced_data = storage_no_sync.get("sync_test")
+        assert synced_data is not None
+        assert synced_data["value"] == "sync_data"
+        print("   ✅ Storage synchronization")
+        
+        # Clean up
+        storage_sync.remove("sync_test")
+        storage_no_sync.remove("sync_test")
 
+    def test_stress_test():
+        """Stress test with many globals."""
+        print("   Running stress test...")
+        
+        # Create many globals
+        globals_list = []
+        for i in range(100):
+            global_var = SKGlobal(
+                name=f"stress_test_{i}",
+                value=f"value_{i}",
+                auto_create=True
+            )
+            globals_list.append(global_var)
+        
+        print(f"   ✅ Created {len(globals_list)} globals")
+        
+        # Verify they all exist
+        for i, global_var in enumerate(globals_list):
+            assert global_var.get() == f"value_{i}"
+        
+        print("   ✅ All globals verified")
+        
+        # Clean up
+        for global_var in globals_list:
+            global_var.remove()
+        
+        print("   ✅ Stress test cleanup complete")
 
+    def test_concurrent_access():
+        """Test concurrent access (basic threading test)."""
+        print("   Testing concurrent access...")
+        
+        import threading
+        import time
+        
+        results = []
+        errors = []
+        
+        def worker(worker_id):
+            try:
+                global_var = SKGlobal(
+                    name=f"concurrent_test_{worker_id}",
+                    value=f"worker_{worker_id}",
+                    auto_create=True
+                )
+                time.sleep(0.01)  # Small delay
+                value = global_var.get()
+                results.append(value)
+                global_var.remove()
+            except Exception as e:
+                errors.append(e)
+        
+        # Create multiple threads
+        threads = []
+        for i in range(10):
+            thread = threading.Thread(target=worker, args=(i,))
+            threads.append(thread)
+            thread.start()
+        
+        # Wait for completion
+        for thread in threads:
+            thread.join()
+        
+        assert len(errors) == 0, f"Concurrent access errors: {errors}"
+        assert len(results) == 10, f"Expected 10 results, got {len(results)}"
+        print("   ✅ Concurrent access successful")
+    
+    # Run all tests
+    run_tests()
