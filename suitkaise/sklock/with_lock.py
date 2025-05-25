@@ -5,28 +5,17 @@
 """
 Module containing the withlock decorator and the SKLock class decorator.
 
+withlock is a decorator that automatically locks the function it decorates.
+SKLock is the class version of withlock.
+
+these use context managers to ensure that locks are used when class or instance
+variables get modified, to ensure thread safety. they know when to lock and when to unlock
+by scanning an ast node.
+
 """
 
-import threading
-
-from suitkaise.rej.skrej import SKRej
-from suitkaise.skglobals.skglobals import SKGlobal, GlobalLevel
-
-
-
-
-class SKLock:
-    pass
-
-class LockRej(SKRej(level=SKGlobal(GlobalLevel.TOP))):
-
-
-
-class WithLock:
-    """
-    pass
-    
-    """
+# NEEDS:
+# 
 
 
 

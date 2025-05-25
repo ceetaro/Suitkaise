@@ -1,6 +1,12 @@
 # add license here
 
 # suitkaise/rej/rej.py
+
+"""
+Module with classes that create basic registration systems.
+
+"""
+
 from typing import (
     Any, Dict, Optional, Type, Union, 
     List, Callable, TypeVar, Generic, Set
@@ -24,3 +30,8 @@ class OnDuplicate(Enum):
     IGNORE = auto()
     RAISE_ERROR = auto()
 
+class Rej:
+    pass
+
+class RejSingleton(Rej):
+  pass
