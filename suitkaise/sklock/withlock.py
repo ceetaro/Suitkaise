@@ -6,7 +6,9 @@
 Module containing the withlock decorator and the SKLock class decorator.
 
 withlock is a decorator that automatically locks the function it decorates.
-SKLock is the class version of withlock.
+SKLock is the class version of withlock, that scans the class for methods that 
+modify class or instance variables, and automatically applies the withlock to 
+those methods.
 
 these use context managers to ensure that locks are used when class or instance
 variables get modified, to ensure thread safety. they know when to lock and when to unlock

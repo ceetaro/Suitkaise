@@ -3,17 +3,17 @@
   "level": "UNDER",
   "auto_sync": true,
   "multiprocessing_available": false,
-  "current_process_id": "95901",
-  "created_at": 1748129989.141523,
-  "last_saved": 1748129989.141523,
+  "current_process_id": "449",
+  "created_at": 1748389873.085089,
+  "last_saved": 1748389873.085089,
   "storage": {
     "local_data": {
       "hierarchy_test": {
         "name": "hierarchy_test",
         "value": "synced_value",
-        "created_at": 1748129989.1411781,
-        "_stored_by_process": "95901",
-        "_stored_at": 1748129989.1411788,
+        "created_at": 1748389873.084786,
+        "_stored_by_process": "449",
+        "_stored_at": 1748389873.084787,
         "_storage_path": "/Users/ctaro/Suitkaise/temp_sync_test"
       }
     },

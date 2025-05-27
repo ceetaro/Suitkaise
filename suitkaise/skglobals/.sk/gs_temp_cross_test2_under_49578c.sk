@@ -3,9 +3,9 @@
   "level": "UNDER",
   "auto_sync": true,
   "multiprocessing_available": false,
-  "current_process_id": "95901",
-  "created_at": 1748129989.1386409,
-  "last_saved": 1748129989.1386409,
+  "current_process_id": "449",
+  "created_at": 1748389873.082582,
+  "last_saved": 1748389873.082582,
   "storage": {
     "local_data": {},
     "cross_process_data": {}
@@ -14,23 +14,23 @@
     "/Users/ctaro/Suitkaise/temp_cross_test1": {
       "cross_test": {
         "value": "cross_storage_value",
-        "_stored_by_process": "95901",
-        "_stored_at": 1748129989.137581,
+        "_stored_by_process": "449",
+        "_stored_at": 1748389873.081558,
         "_storage_path": "/Users/ctaro/Suitkaise/temp_cross_test1",
         "_received_from_storage": "/Users/ctaro/Suitkaise/temp_cross_test1",
-        "_received_at": 1748129989.138294
+        "_received_at": 1748389873.082231
       }
     },
     "/Users/ctaro/Suitkaise/temp_sync_test": {
       "hierarchy_test": {
         "name": "hierarchy_test",
         "value": "synced_value",
-        "created_at": 1748129967.9692101,
-        "_stored_by_process": "95851",
-        "_stored_at": 1748129967.9692109,
+        "created_at": 1748129989.1411781,
+        "_stored_by_process": "95901",
+        "_stored_at": 1748129989.1411788,
         "_storage_path": "/Users/ctaro/Suitkaise/temp_sync_test",
         "_received_from_storage": "/Users/ctaro/Suitkaise/temp_sync_test",
-        "_received_at": 1748129989.138638
+        "_received_at": 1748389873.0825799
       }
     }
   }

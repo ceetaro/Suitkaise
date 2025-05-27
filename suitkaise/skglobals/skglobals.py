@@ -28,6 +28,8 @@ import suitkaise.skpath.skpath as skpath
 import suitkaise.sktime.sktime as sktime
 from suitkaise.cereal import Cereal, create_shared_dict
 
+# TODO make sure .sk files are created in the project root directory, not the current directory
+
 class SKGlobalError(Exception):
     """Custom exception for SKGlobal."""
     pass
@@ -547,6 +549,7 @@ class SKGlobalStorage:
     _cereal = Cereal()
     
     @classmethod
+    @skpath.autopath()
     def get_storage(cls, path: str, auto_sync: bool = True) -> 'SKGlobalStorage':
         """
         Get or create directory-based storage.
@@ -569,6 +572,21 @@ class SKGlobalStorage:
                 cls._storages[key] = cls(path, auto_sync)
             
             return cls._storages[key]
+        
+    @classmethod
+    def get_top_level_storage(cls, auto_sync: bool = True) -> 'SKGlobalStorage':
+        """
+        Get or create the top-level storage for the project root directory.
+        
+        Args:
+            auto_sync: Whether to enable cross-process synchronization.
+            
+        Returns:
+            SKGlobalStorage: The top-level storage instance.
+
+        """
+        project_root = get_project_root()
+        return cls.get_storage(project_root, auto_sync)
     
     def __init__(self, path: str, auto_sync: bool = True):
         """Initialize directory-based storage with two-tier system."""
@@ -888,7 +906,7 @@ class SKGlobalStorage:
         """Get comprehensive information about this storage instance."""
         return {
             'path': self.path,
-            'level': self.level.name,
+            'level': self.level,
             'auto_sync': self.auto_sync,
             'multiprocessing_available': self._multiprocessing_available,
             'storage_file': self.storage_file,
