@@ -509,7 +509,7 @@ class SKRoot:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super(SKRoot, cls).__new__(cls)
-                cls._init_skroot(cls._instance)
+                cls._instance._init_skroot()
         return cls._instance
     
     def _init_skroot(self):
@@ -546,7 +546,7 @@ class SKRoot:
                     cls._instance._cleanup()
 
                 cls._instance = cls.__new__(cls)
-                cls._instance._init_skroot(cls._instance)
+                cls._instance._init_skroot()
 
             return cls._instance
         
@@ -661,7 +661,7 @@ class SKRoot:
         resource = self.branches[branch_name].find_resource('.'.join(parts[1:]))
         return resource if isinstance(resource, SKLeaf) else None
     
-    def find_resource(self, path: str) -> Optional[Union[SKBranch, SKLeaf]]:
+    def find_resource(self, path: str) -> Optional[SKBranch | SKLeaf]:
         """
         Find any resource (branch or leaf) by hierarchical path.
         
@@ -802,7 +802,7 @@ class SKRoot:
                 'name': branch.name,
                 'path': branch.path, 
                 'description': branch.description,
-                'children_count': len(branch.children),
+                'children_count': len(branch.child_branches),
                 'leaves_count': len(branch.leaves),
                 'access_count': branch.access_count
             } for name, branch in self.branches.items()},

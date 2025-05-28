@@ -185,28 +185,61 @@ def autopath(path: Union[str, Path] = None, path_param_name: str = None):
 
 def get_caller_file_path() -> str:
     """
-    Get the path of the file that called this function, skipping this module.
+    Get the path of the file that called this function, skipping all suitkaise module files.
+    
+    This function walks up the call stack until it finds a file that's not part of the
+    suitkaise package, returning the first non-suitkaise file it encounters.
     
     Returns:
-        str: Normalized path of the calling file.
+        str: Normalized path of the first non-suitkaise calling file.
     """
-    current_file = __file__
     frame = inspect.currentframe()
     try:
         # Start from the caller's frame
         caller_frame = frame.f_back
         
-        # Keep going up the stack until we find a frame that's not this file
+        # Keep going up the stack until we find a frame that's not from suitkaise
         while caller_frame is not None:
             caller_path = caller_frame.f_globals.get('__file__')
-            if caller_path and caller_path != current_file:
-                return _normalize_path(caller_path)
+            
+            if caller_path:
+                # Normalize the path to check consistently
+                normalized_caller_path = _normalize_path(caller_path)
+                
+                # Check if this file is part of the suitkaise package
+                # Look for 'suitkaise' in the path components
+                if not _is_suitkaise_file(normalized_caller_path):
+                    return normalized_caller_path
+            
             caller_frame = caller_frame.f_back
         
-        # Fallback if we can't find a different file
-        return _normalize_path(current_file)
+        # Fallback if we can't find a non-suitkaise file
+        # This shouldn't happen in normal usage, but provides safety
+        return _normalize_path(__file__)
     finally:
         del frame
+
+
+def _is_suitkaise_file(file_path: str) -> bool:
+    """
+    Check if a file path belongs to the suitkaise package.
+    
+    Args:
+        file_path: Normalized file path to check
+        
+    Returns:
+        bool: True if the file is part of suitkaise package, False otherwise  
+    """
+    # Convert to Path for easier manipulation
+    path = Path(file_path)
+    
+    # Check if 'suitkaise' appears in any of the path parts
+    # This handles both development and installed package scenarios:
+    # - Development: /Users/ctaro/Suitkaise/suitkaise/skglobals/skglobals.py
+    # - Installed: /path/to/site-packages/suitkaise/skglobals/skglobals.py
+    path_parts = [part.lower() for part in path.parts]
+    
+    return 'suitkaise' in path_parts
 
 # Convenience functions for common path operations
 def resolve_path(path: Union[str, Path] = None) -> Path:

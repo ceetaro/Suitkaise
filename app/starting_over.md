@@ -15,13 +15,35 @@ since we have unique needs for how registries function in our system (one at a t
 
 lets create a custom serializer that uses cloudpickle for internal process communication, and a custom protobuf serializer for external serialization. Lets ensure that both will handle edge cases, signal running threads to stop and gather data so it can be serialized, and correctly serialize complex and dynamic objects.
 
+## ADDED: SKGlobal and SKGlobalStorage
 ## SKRoot (IntRoot and ExtRoot moved to app specific)
 
-Object that signifies a 
+Resource and project structure manager.
 
 ## SKFunction (formerly FunctionInstance) and SKFunctionBuilder
 
 instead of using callables that require args and kwargs to be passed every time, we will standardize how functions are used, referenced, and passed in code.
+
+Why are SKFunctions better?
+
+SKFunctions make it easier to manage and create instances of functions with complicated arguments.
+Instead of manually creating the arg tuple, you can simply add an argument by its parameter name and
+SKFunction will automatically handle it from there.
+
+with callables:
+stored_callable: {
+  'callable': my_function(),
+  'args': (args),
+  'kwargs': {kwargs}
+}
+and then having to do:
+class.stored_callable['callable'](*stored_callable['args'], **stored_callable['kwargs'])
+
+or unpack and then call,
+
+you can just do:
+my_function = SKFunction.get_function('my_function')
+my_function.execute()
 
 We already made a version of this with FunctionInstance and FunctionInstanceBuilder, but we should develop this further.
 
