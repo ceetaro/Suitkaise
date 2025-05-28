@@ -433,6 +433,19 @@ class TestAutoSyncBehavior(unittest.TestCase):
 
 class TestErrorHandling(unittest.TestCase):
     """Test error handling and edge cases."""
+    @classmethod
+    def setUpClass(cls):
+        """Set up once for the entire test class."""
+        # Reset SKPickle state before tests
+        from suitkaise.cereal.skpickle import SKPickle
+        SKPickle.reset_state()
+    
+    @classmethod 
+    def tearDownClass(cls):
+        """Clean up after all tests."""
+        from suitkaise.cereal.skpickle import SKPickle
+        SKPickle.shutdown_manager()
+        time.sleep(0.2)  # Give processes time to clean up
     
     def test_invalid_level(self):
         """Test invalid level error."""

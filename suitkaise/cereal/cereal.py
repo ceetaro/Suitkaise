@@ -165,22 +165,15 @@ class Cereal:
 
 
 
-def serializable(obj: Any) -> bool:
-    """
-    Check if an object/value is serializable.
-    
-    This checks both internal and external serialization modes.
+# Use the existing default_serializer instance
+def serializable(obj: Any, mode: str = 'internal') -> bool:
+    """Check if an object is serializable in the specified mode."""
+    return default_serializer.serializable(obj, mode)
 
-    If you want to check if an object is serializable in a specific mode,
-    use: 
-    
-    ```python
-    Cereal().serializable(obj, mode='internal' or 'external').
-    
-    """
-    c1 = Cereal().serializable(obj, mode='internal')
-    c2 = Cereal().serializable(obj, mode='external')
-    return c1 and c2
+def serializable_both(obj: Any) -> bool:
+    """Check if object is serializable in both modes."""
+    return (default_serializer.serializable(obj, 'internal') and 
+            default_serializer.serializable(obj, 'external'))
     
 if __name__ == "__main__":
     # Example usage

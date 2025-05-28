@@ -59,7 +59,6 @@ from suitkaise.skglobals import (
 from suitkaise.skpath import (
     autopath,
     normalize_path,
-    resolve_path,
     get_caller_file_path,
 )
 
@@ -90,7 +89,6 @@ __all__ = [
     'get_global',
     'autopath',
     'normalize_path',
-    'resolve_path',
     'get_caller_file_path',
     'now',
     'sleep',

@@ -289,9 +289,9 @@ class RemovalManager:
                         key = f"{schedule.storage_path}::{schedule.variable_name}"
                         self._scheduled_removals.pop(key, None)
                 
-                # Process removals (outside lock to avoid deadlock)
-                for schedule in removals_to_process:
-                    self._execute_removal(schedule)
+                    # Process removals
+                    for schedule in removals_to_process:
+                        self._execute_removal(schedule)
                 
                 # Sleep briefly before next check
                 self._shutdown_event.wait(0.1)
@@ -549,7 +549,6 @@ class SKGlobalStorage:
     _cereal = Cereal()
     
     @classmethod
-    @skpath.autopath()
     def get_storage(cls, path: str, auto_sync: bool = True) -> 'SKGlobalStorage':
         """
         Get or create directory-based storage.
@@ -562,7 +561,10 @@ class SKGlobalStorage:
             SKGlobalStorage: The storage instance for this directory.
         """
         # Normalize path
-        path = str(Path(path).resolve())
+        try:
+            path = skpath.normalize_path(path, strict=True)
+        except skpath.AutopathError as e:
+            raise SKGlobalError(f"Invalid storage path: {path}") from e
         
         with cls._storage_lock:
             # Create unique key for this directory and sync setting
@@ -597,11 +599,7 @@ class SKGlobalStorage:
             raise SKGlobalError(f"Storage path does not exist: {path}")
         
         # Normalize path after validation
-        self.path = skpath.normalize_path(path)
-        
-        # Double-check normalized path exists
-        if not os.path.exists(self.path):
-            raise SKGlobalError(f"Normalized storage path does not exist: {self.path}")
+        self.path = skpath.normalize_path(path, strict=True)
         
         # Auto-detect level based on path
         project_root = get_project_root()
@@ -1091,6 +1089,13 @@ class SKGlobalStorage:
         return (f"SKGlobalStorage(path='{self.path}', level={self.level.name}, "
                 f"auto_sync={self.auto_sync}, multiprocessing={multiprocessing_status})")
 
+
+# API for global variable management
+
+def get_skglobal(name: str) -> Optional[Any]:
+    """Get a global variable value."""
+    g = SKGlobal.get_global(name, level=GlobalLevel.TOP)
+    return g.get() if g else None
 
 # Module cleanup
 def _cleanup_on_exit():

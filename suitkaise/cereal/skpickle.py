@@ -171,24 +171,33 @@ class SKPickle:
         
     @classmethod
     def shutdown_manager(cls):
-        """
-        Shutdown the singleton manager instance if it exists.
-        
-        This is useful for cleaning up resources when done with multiprocessing.
-        After calling this, get_manager() will create a new instance if called again.
-
-        """
+        """Improved shutdown with timeout and error handling."""
         if cls._manager_instance is not None:
             with cls._lock:
                 if cls._manager_instance is not None:
                     try:
+                        # Give manager time to finish operations
+                        import time
+                        time.sleep(0.1)
+                        
+                        # Shutdown with timeout
                         cls._manager_instance.shutdown()
-                    except Exception:
-                        # Ignore shutdown errors
-                        pass
+                        
+                        # Wait for process to actually terminate
+                        if hasattr(cls._manager_instance, '_process'):
+                            cls._manager_instance._process.join(timeout=1.0)
+                            
+                    except Exception as e:
+                        # Force terminate if graceful shutdown fails
+                        try:
+                            if hasattr(cls._manager_instance, '_process'):
+                                cls._manager_instance._process.terminate()
+                        except:
+                            pass
                     finally:
                         cls._manager_instance = None
                         cls._manager_failed = False
+
 
     @classmethod
     @contextmanager
@@ -343,7 +352,14 @@ class SKPickle:
             return True
         except Exception:
             return False
-    
+        
+    @classmethod
+    def reset_manager_state(cls):
+        """Reset manager state for recovery."""
+        with cls._lock:
+            cls._manager_failed = False
+            cls._fallback_mode = False
+        
     @classmethod
     def serialize(cls, obj: Any) -> bytes:
         """Serialize an object into bytes using cloudpickle."""

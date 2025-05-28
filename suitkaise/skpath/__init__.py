@@ -11,7 +11,6 @@ for functions that need to work with file paths.
 
 Main functions:
     normalize_path: Convert path to normalized POSIX string
-    resolve_path: Convert path to absolute Path object  
     get_caller_file_path: Get path of calling file
     get_current_file_path: Get path of current file
     get_current_directory: Get directory of current file
@@ -39,7 +38,6 @@ Usage:
 from suitkaise.skpath.skpath import (
     # Main path functions
     normalize_path,
-    resolve_path,
     get_caller_file_path,
     get_current_file_path,
     get_current_directory,
@@ -61,7 +59,6 @@ __version__ = "0.1.0"
 __all__ = [
     # Path functions
     'normalize_path',
-    'resolve_path', 
     'get_caller_file_path',
     'get_current_file_path',
     'get_current_directory',

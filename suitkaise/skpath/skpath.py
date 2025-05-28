@@ -14,44 +14,37 @@ if path is None, the @autopath decorator will fill it with the current file's pa
 import os
 import inspect
 from pathlib import Path
-from typing import Union
 import hashlib
 
 class AutopathError(Exception):
     """Custom exception for autopath decorator."""
     pass
 
-def _resolve_path(path: Union[str, Path]) -> Path:
-    """
-    Resolve a path to an absolute Path object.
-    
-    Args:
-        path: The path to resolve. If None or empty, uses current file.
+def _normalize_path(path: str | Path, allow_fallback: bool = True) -> str:
+    """Normalize path, with optional fallback control."""
+    if not path:
+        if allow_fallback:
+            path = __file__
+        else:
+            raise AutopathError("Empty path provided and fallback disabled")
         
-    Returns:
-        Path: Resolved absolute path.
-    """
-    if not path or not os.path.exists(path):
-        path = __file__
+    normpath = str(Path(path).resolve().absolute())
 
-    return Path(path).resolve().absolute()
-
-def _normalize_path(path: Union[str, Path]) -> str:
-    """
-    Normalize a path to a POSIX-style string.
-    
-    Args:
-        path: The path to normalize. If None or empty, uses current file.
+    if not os.path.exists(normpath):
+        if allow_fallback:
+            # Use __file__ directly instead of recursing
+            fallback_path = str(Path(__file__).resolve().absolute())
+            if os.path.exists(fallback_path):
+                normpath = fallback_path
+            else:
+                raise AutopathError(f"Path '{normpath}' does not exist and fallback path is also invalid")
+        else:
+            raise AutopathError(f"Path '{normpath}' does not exist and fallback disabled")
         
-    Returns:
-        str: Normalized POSIX path string.
-    """
-    if not path or not os.path.exists(path):
-        path = __file__
+    return normpath
 
-    return _resolve_path(path).as_posix()
-
-def autopath(path: Union[str, Path] = None, path_param_name: str = None):
+    
+def autopath(path: str | Path = None, path_param_name: str = None, strict: bool = False):
     """
     Decorator to automatically send a resolved and normalized path to
     the decorated function. Sends current file's path if no path is
@@ -89,7 +82,7 @@ def autopath(path: Union[str, Path] = None, path_param_name: str = None):
             caller_path = path
         
         # Normalize the path once
-        normalized_path = _normalize_path(caller_path)
+        normalized_path = _normalize_path(caller_path, allow_fallback=not strict)
 
         def wrapper(*args, **kwargs):
             # Find the path parameter name if not specified
@@ -147,7 +140,7 @@ def autopath(path: Union[str, Path] = None, path_param_name: str = None):
                     provided_path = args[param_index]
                     if isinstance(provided_path, (str, Path)):
                         try:
-                            args[param_index] = _normalize_path(provided_path)
+                            args[param_index] = _normalize_path(provided_path, allow_fallback=not strict)
                         except (OSError, ValueError) as e:
                             raise AutopathError(f"Invalid path '{provided_path}' provided to "
                                               f"parameter '{param_name}' in function '{func.__name__}': {e}")
@@ -171,7 +164,7 @@ def autopath(path: Union[str, Path] = None, path_param_name: str = None):
                     provided_path = kwargs[param_name]
                     if isinstance(provided_path, (str, Path)):
                         try:
-                            kwargs[param_name] = _normalize_path(provided_path)
+                            kwargs[param_name] = _normalize_path(provided_path, allow_fallback=not strict)
                         except (OSError, ValueError) as e:
                             raise AutopathError(f"Invalid path '{provided_path}' provided to "
                                               f"parameter '{param_name}' in function '{func.__name__}': {e}")
@@ -241,34 +234,15 @@ def _is_suitkaise_file(file_path: str) -> bool:
     
     return 'suitkaise' in path_parts
 
-# Convenience functions for common path operations
-def resolve_path(path: Union[str, Path] = None) -> Path:
-    """
-    Resolve a path to an absolute Path object.
-    
-    Args:
-        path: The path to resolve. If None, uses caller's file path.
-        
-    Returns:
-        Path: Resolved absolute path.
-    """
-    if path is None or not os.path.exists(path):
+def normalize_path(path: str | Path = None, strict: bool = False) -> str:
+    """Public normalize_path with strict mode."""
+    if path is None:
         path = get_caller_file_path()
-    return Path(path).resolve().absolute()
+        path = _normalize_path(path, allow_fallback=not strict)
+    else:
+        path = _normalize_path(path, allow_fallback=not strict)
 
-def normalize_path(path: Union[str, Path] = None) -> str:
-    """
-    Normalize a path to a POSIX-style string.
-    
-    Args:
-        path: The path to normalize. If None, uses caller's file path.
-        
-    Returns:
-        str: Normalized POSIX path string.
-    """
-    if path is None or not os.path.exists(path):
-        path = get_caller_file_path()
-    return _resolve_path(path).as_posix()
+    return path
 
 def get_current_file_path() -> str:
     """
@@ -424,7 +398,6 @@ if __name__ == "__main__":
     print("-" * 40)
     print(f"Current file path: {get_current_file_path()}")
     print(f"Current directory: {get_current_directory()}")
-    print(f"Resolved path: {resolve_path()}")
     print(f"Normalized path: {normalize_path()}")
     print(f"Equal paths: {equalpaths('/tmp/test', '/tmp/test')}")
     print(f"ID: {id('/tmp/test')}")
