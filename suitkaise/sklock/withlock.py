@@ -14,6 +14,8 @@ these use context managers to ensure that locks are used when class or instance
 variables get modified, to ensure thread safety. they know when to lock and when to unlock
 by scanning an ast node.
 
+also, we can add another decorator that can handle deadlocks or waiting for locks to be released.
+
 """
 
 # NEEDS:
