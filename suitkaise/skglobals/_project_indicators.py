@@ -122,8 +122,7 @@ project_indicators = {
             "necessary": {
                 "file_groups{'license'}",
                 "file_groups{'readme'}",
-                "file_groups{'requirements'}",
-                "__init__.py"
+                "file_groups{'requirements'}"
             },
             "indicators": {
                 "setup.py",
@@ -132,7 +131,8 @@ project_indicators = {
                 "tox.ini",
                 "file_groups{'env'}",
                 ".gitignore",
-                ".dockerignore"
+                ".dockerignore",
+                "__init__.py"
             },
             "weak_indicators": {
                 "Makefile",

@@ -8,6 +8,10 @@ Time utilities for Suitkaise.
 """
 import time
 
+class SKTimeError(Exception):
+    """Error class for errors that occur when something goes wrong in SKTime."""
+    pass
+
 def now() -> float:
     """Get the current unix time."""
     return time.time()
@@ -27,7 +31,9 @@ def elapsed(start_time: float, end_time: float) -> float:
     Returns:
         float: The elapsed time in seconds.
     """
-    return end_time - start_time
+    if end_time < start_time:
+        raise SKTimeError("End time must be greater than start time.")
+    pass
 
 class Stopwatch:
     """
@@ -80,4 +86,17 @@ class Stopwatch:
         self.end_time = now()
         return elapsed(self.start_time, self.end_time) - self.paused_time
     
+    def get_current_time(self) -> float:
+        """Get the current elapsed time without stopping the stopwatch."""
+        if self.start_time is None:
+            raise RuntimeError("Stopwatch has not been started.")
+        current_time = now()
+        if self._pause_start is not None:
+            return self._pause_start - self.start_time - self.paused_time
+        return current_time - self.start_time - self.paused_time
+    
+def main():
+    print(now())
 
+if __name__ == '__main__':
+    main()

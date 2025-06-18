@@ -14,14 +14,20 @@ Module for creating and managing global variables and registries.
 
 import os
 import sys
-from typing import Optional, Any, Dict, List, Tuple, Callable, Union
+from typing import Optional, Any, Dict, List, Tuple, Callable
 from pathlib import Path
 from enum import IntEnum
 import json
 import threading
-import time
 import atexit
-from dataclasses import dataclass
+import fcntl
+import contextlib
+import shutil
+import weakref
+import hashlib
+from dataclasses import dataclass, field
+from collections import defaultdict
+
 
 from suitkaise.skglobals._project_indicators import project_indicators
 import suitkaise.skpath.skpath as skpath
@@ -42,6 +48,18 @@ class SKGlobalLevelError(SKGlobalError):
     """Custom exception for SKGlobal level errors."""
     pass
 
+class SKGlobalStorageError(SKGlobalError):
+    """Custom exception for SKGlobalStorage errors."""
+    pass
+
+class SKGlobalSyncError(SKGlobalError):
+    """Custom exception for SKGlobal synchronization errors."""
+    pass
+
+class SKGlobalTransactionError(SKGlobalError):
+    """Custom exception for SKGlobal transaction errors."""
+    pass
+
 class PlatformNotFoundError(Exception):
     """Custom exception for platform not found."""
     pass
@@ -53,6 +71,314 @@ class RemovalSchedule:
     storage_path: str
     removal_timestamp: float
     created_at: float
+
+@dataclass
+class StorageStats:
+    """Statistics for storage usage."""
+    reads: int = 0
+    writes: int = 0
+    errors: int = 0
+    last_accessed: float = field(default_factory=sktime.now)
+    cache_hits: int = 0
+    cache_misses: int = 0
+
+    def record_read(self):
+        self.reads += 1
+        self.last_accessed = sktime.now()
+
+    def record_write(self):
+        self.writes += 1
+        self.last_accessed = sktime.now()
+
+    def record_error(self):
+        self.errors += 1
+        self.last_accessed = sktime.now()
+    
+    def record_cache_hit(self):
+        self.cache_hits += 1
+    
+    def record_cache_miss(self):
+        self.cache_misses += 1    
+
+@contextlib.contextmanager
+def file_lock(filepath: str, timeout: float = 5.0):
+    """Context manager for cross process file locking."""
+    lock_file = f"{filepath}.lock"
+    lock_fd = None
+
+    try:
+        # Ensure the lock file directory exists
+        lock_fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+
+        start_time = sktime.now()
+        while sktime.now() - start_time < timeout:
+            try:
+                # Try to acquire the lock
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                yield lock_fd
+                return
+            except (IOError, BlockingIOError, OSError):
+                # If we can't acquire the lock, wait briefly and retry
+                sktime.sleep(0.1)
+
+        raise SKGlobalError(f"Timeout while trying to acquire lock on {lock_file}")
+    
+    finally:
+        if lock_fd is not None:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)  # Release the lock
+                os.close(lock_fd)
+            except:
+                # If we can't release the lock, just ignore it
+                pass
+
+        # cleanup lock file
+        try:
+            os.unlink(lock_file)
+        except:
+            pass
+
+class StorageTransaction:
+    """Wrapper for storage operations with rollback support."""
+
+    def __init__(self, storage: 'SKGlobalStorage', name: str, data: dict):
+        self.storage = storage
+        self.name = name
+        self.data = data
+        self.rollback_data = {}
+        self.completed = False
+        self.transaction_id = hashlib.md5(f"{storage.path}:{name}:{sktime.now()}".encode()).hexdigest()[:8]
+
+    def execute(self):
+        """Execute transaction and rollback if it fails."""
+        if self.completed:
+            raise SKGlobalTransactionError("Transaction already completed.")
+        
+        try:
+            # prepare the rollback data
+            self._prepare_rollback()
+
+            # execute operations
+            self._execute_local()
+            if self.storage.level == GlobalLevel.UNDER:
+                self._execute_top_sync()
+
+            # persist changes and mark as completed
+            self._persist_changes()
+
+            self.completed = True
+
+        except Exception as e:
+            print(f"Warning: Transaction {self.transaction_id} failed, rolling back: {e}")
+            self._rollback()
+            raise SKGlobalTransactionError(f"Storage transaction failed: {e}") from e
+        
+    def _prepare_rollback(self):
+        """Prepare data for potential rollback."""
+        # Add null safety checks
+        if (self.storage._storage is not None and 
+            'local_data' in self.storage._storage and
+            self.name in self.storage._storage['local_data']):
+            self.rollback_data['local'] = dict(self.storage._storage['local_data'][self.name])
+
+        if (self.storage._top_storage and 
+            self.storage._top_storage._storage is not None and
+            'local_data' in self.storage._top_storage._storage):
+            path_key = f"{self.storage.path}::{self.name}"
+            if path_key in self.storage._top_storage._storage['local_data']:
+                self.rollback_data['top'] = dict(self.storage._top_storage._storage['local_data'][path_key])
+
+    def _execute_local(self):
+        """Execute local storage operations."""
+        if self.storage._storage is None:
+            raise SKGlobalTransactionError("Storage is not initialized.")
+        self.storage._storage['local_data'][self.name] = self.data
+        
+
+    def _execute_top_sync(self):
+        """Execute synchronization with top-level storage."""
+        """Execute TOP storage sync."""
+        if self.storage._top_storage:
+            path_key = f"{self.storage.path}::{self.name}"
+            with self.storage._top_storage._lock:
+                self.storage._top_storage._storage['local_data'][path_key] = self.data
+
+    def _persist_changes(self):
+        """Persist all changes to disk."""
+        # Save TOP first (most critical)
+        if self.storage._top_storage:
+            self.storage._top_storage._save_to_file()
+        
+        # Then save local
+        self.storage._save_to_file()
+
+    def _rollback(self):
+        """Rollback changes on failure."""
+        try:
+            if 'local' in self.rollback_data:
+                self.storage._storage['local_data'][self.name] = self.rollback_data['local']
+            elif self.name in self.storage._storage['local_data']:
+                self.storage._storage['local_data'].pop(self.name, None)
+
+            if 'top' in self.rollback_data and self.storage._top_storage:
+                path_key = f"{self.storage.path}::{self.name}"
+                with self.storage._top_storage._lock:
+                    self.storage._top_storage._storage['local_data'][path_key] = self.rollback_data['top']
+
+        except Exception as e:
+            print(f"Critical: Rollback failed for transaction {self.transaction_id}: {e}")
+
+class SimpleCache:
+    """Simple, LRU style cache for storage data."""
+
+    def __init__(self, max_size: int = 100):
+        self.max_size = max_size
+        self.cache: Dict[str, Any] = {}
+        self.access_order: List[str] = []
+        self._lock = threading.RLock()
+
+    def get(self, key: str) -> Optional[Any]:
+        """Get an item from the cache."""
+        with self._lock:
+            if key in self.cache:
+                # Move to end to mark as most recently used
+                self.access_order.remove(key)
+                self.access_order.append(key)
+                return self.cache[key]
+            return None
+        
+    def put(self, key: str, value: Any):
+        """Put item in cache."""
+        with self._lock:
+            if key in self.cache:
+                # Update existing
+                self.cache[key] = value
+                self.access_order.remove(key)
+                self.access_order.append(key)
+            else:
+                # Add new
+                if len(self.cache) >= self.max_size:
+                    # Remove least recently used
+                    lru_key = self.access_order.pop(0)
+                    del self.cache[lru_key]
+                
+                self.cache[key] = value
+                self.access_order.append(key)
+
+    def clear(self):
+        """Clear cache."""
+        with self._lock:
+            self.cache.clear()
+            self.access_order.clear()
+
+    def size(self) -> int:
+        """Get current cache size."""
+        with self._lock:
+            return len(self.cache)
+        
+class ResourceManager:
+    """Centralized resource management for SKGlobals."""
+
+    def __init__(self):
+        self._active_storages = weakref.WeakValueDictionary()
+        self._removal_manager: Optional['RemovalManager'] = None
+        self._cleanup_registered = False
+        self._lock = threading.RLock()
+        self._stats = defaultdict(StorageStats)
+
+    def register_storage(self, storage: 'SKGlobalStorage'):
+        """Register a storage instance."""
+        with self._lock:
+            key = f"{storage.path}_{storage.auto_sync}"
+            self._active_storages[key] = storage
+
+            if not self._cleanup_registered:
+                atexit.register(self.cleanup_all)
+                self._cleanup_registered = True
+
+    def get_stats(self) -> Dict[str, StorageStats]:
+        """Get resource usage statistics."""
+        with self._lock:
+            return dict(self._stats)
+        
+    def record_operation(self, storage_path: str, operation: str):
+        """Record a storage operation for stats."""
+        with self._lock:
+            stats = self._stats[storage_path]
+            if operation == 'read':
+                stats.record_read()
+            elif operation == 'write':
+                stats.record_write()
+            elif operation == 'error':
+                stats.record_error()
+            elif operation == 'cache_hit':
+                stats.record_cache_hit()
+            elif operation == 'cache_miss':
+                stats.record_cache_miss()
+
+    def cleanup_all(self):
+        """Clean up all resources."""
+        print("Info: Starting resource cleanup...")
+        
+        # Instead of full cleanup, just save data and clear caches
+        with self._lock:
+            storages_to_cleanup = list(self._active_storages.values())
+        
+        for storage in storages_to_cleanup:
+            try:
+                # Save data but don't destroy storage structure
+                storage._save_to_file()
+                storage._cache.clear()
+            except Exception as e:
+                print(f"Warning: Storage save failed: {e}")
+        
+        # Cleanup removal manager
+        if self._removal_manager:
+            try:
+                self._removal_manager.shutdown()
+            except Exception as e:
+                print(f"Warning: RemovalManager shutdown failed: {e}")
+    
+    def health_check(self) -> Dict[str, Any]:
+        """Perform health check on all managed resources."""
+        health_report = {
+            'status': 'healthy',
+            'active_storages': 0,
+            'total_operations': 0,
+            'total_errors': 0,
+            'issues': []
+        }
+        
+        try:
+            with self._lock:
+                health_report['active_storages'] = len(self._active_storages)
+                
+                for path, stats in self._stats.items():
+                    health_report['total_operations'] += stats.reads + stats.writes
+                    health_report['total_errors'] += stats.errors
+                    
+                    # Check for concerning error rates
+                    total_ops = stats.reads + stats.writes
+                    if total_ops > 0 and stats.errors / total_ops > 0.1:  # >10% error rate
+                        health_report['issues'].append(f"High error rate for {path}: {stats.errors}/{total_ops}")
+                        health_report['status'] = 'degraded'
+                
+                # Check removal manager
+                if self._removal_manager:
+                    scheduled = self._removal_manager.get_scheduled_removals()
+                    if len(scheduled) > 100:  # Too many pending removals
+                        health_report['issues'].append(f"Too many pending removals: {len(scheduled)}")
+                        health_report['status'] = 'degraded'
+        
+        except Exception as e:
+            health_report['status'] = 'unhealthy'
+            health_report['issues'].append(f"Health check failed: {e}")
+        
+        return health_report
+
+# Global resource manager instance
+_resource_manager = ResourceManager()
+
 
 def get_project_root(start_path: Optional[str] = None) -> str:
     """
@@ -169,6 +495,9 @@ def get_project_root(start_path: Optional[str] = None) -> str:
 
     indicators = preprocess_indicators(project_indicators)
     
+    # Variables to track potential roots
+    potential_roots = []
+    
     # Walk up the directory tree
     max_depth = 20  # Prevent infinite loops
     depth = 0
@@ -180,6 +509,7 @@ def get_project_root(start_path: Optional[str] = None) -> str:
             
         score = 0
         required_files_found = False
+        found_indicators = []
 
         # Check files in current directory
         files = file_children(current)
@@ -188,17 +518,20 @@ def get_project_root(start_path: Optional[str] = None) -> str:
             for pattern_set in indicators['common_proj_root_files']['necessary']:
                 if matches_pattern(filename, pattern_set):
                     required_files_found = True
+                    found_indicators.append(f"necessary:{filename}")
                     break
             
             # Check indicator files
             for pattern_set in indicators['common_proj_root_files']['indicators']:
                 if matches_pattern(filename, pattern_set):
                     score += 3
+                    found_indicators.append(f"indicator:{filename}")
                     
             # Check weak indicator files  
             for pattern_set in indicators['common_proj_root_files']['weak_indicators']:
                 if matches_pattern(filename, pattern_set):
                     score += 1
+                    found_indicators.append(f"weak:{filename}")
 
         # Check directories in current directory
         dirs = dir_children(current)
@@ -207,15 +540,41 @@ def get_project_root(start_path: Optional[str] = None) -> str:
             for pattern_set in indicators['common_proj_root_dirs']['strong_indicators']:
                 if matches_pattern(dirname, pattern_set):
                     score += 10
+                    found_indicators.append(f"strong_dir:{dirname}")
                     
             # Check indicator directories
             for pattern_set in indicators['common_proj_root_dirs']['indicators']:
                 if matches_pattern(dirname, pattern_set):
                     score += 3
+                    found_indicators.append(f"indicator_dir:{dirname}")
 
-        # If we found required files and sufficient score, this is likely the root
-        if required_files_found and score >= 15:  # Lowered threshold for more flexibility
-            return current
+        # If we found required files and sufficient score, this could be the root
+        if required_files_found and score >= 15:
+            # Check for strong main project indicators
+            strong_main_indicators = ['setup.py', 'pyproject.toml', 'setup.cfg', 'Cargo.toml', 'package.json']
+            has_strong_file_indicator = any(filename in strong_main_indicators for filename in files)
+            has_git_dir = '.git' in dirs
+            
+            # Calculate priority score for this potential root
+            priority_score = score
+            if has_strong_file_indicator:
+                priority_score += 50  # Big bonus for main project files
+            if has_git_dir:
+                priority_score += 30  # Big bonus for git repository
+            
+            # Store this as a potential root
+            potential_roots.append({
+                'path': current,
+                'score': score,
+                'priority_score': priority_score,
+                'depth': depth,
+                'has_strong_indicators': has_strong_file_indicator or has_git_dir,
+                'indicators': found_indicators
+            })
+            
+            # If this has very strong indicators, prefer it immediately
+            if has_strong_file_indicator or has_git_dir:
+                return current
 
         # Move up one directory
         parent = os.path.dirname(current)
@@ -224,8 +583,15 @@ def get_project_root(start_path: Optional[str] = None) -> str:
         current = parent
         depth += 1
 
-    raise SKGlobalError(f"Project root not found starting from path: {start_path}")
+    # If we found potential roots, pick the best one
+    if potential_roots:
+        # Sort by priority score (highest first), then by depth (closer to start)
+        potential_roots.sort(key=lambda x: (-x['priority_score'], x['depth']))
+        best_root = potential_roots[0]
+        return best_root['path']
 
+    # If no potential roots found, raise error
+    raise SKGlobalError(f"Project root not found starting from path: {start_path}")
 
 class GlobalLevel(IntEnum):
     """Enum for global variable levels."""
@@ -253,13 +619,14 @@ class RemovalManager:
         self._scheduled_removals: Dict[str, RemovalSchedule] = {}
         self._cleanup_thread: Optional[threading.Thread] = None
         self._shutdown_event = threading.Event()
+        self._shutdown_complete = threading.Event()
         self._initialized = True
         
         # Start cleanup thread
         self._start_cleanup_thread()
         
-        # Register cleanup on exit
-        atexit.register(self.shutdown)
+        # Register with resource manager
+        _resource_manager._removal_manager = self
     
     def _start_cleanup_thread(self):
         """Start the background cleanup thread."""
@@ -289,15 +656,18 @@ class RemovalManager:
                         key = f"{schedule.storage_path}::{schedule.variable_name}"
                         self._scheduled_removals.pop(key, None)
                 
-                    # Process removals
-                    for schedule in removals_to_process:
+                # Process removals
+                for schedule in removals_to_process:
+                    try:
                         self._execute_removal(schedule)
+                    except Exception as e:
+                        print(f"Error: Failed to execute scheduled removal for {schedule.variable_name}: {e}")
                 
                 # Sleep briefly before next check
                 self._shutdown_event.wait(0.1)
                 
             except Exception as e:
-                print(f"Warning: RemovalManager cleanup error: {e}")
+                print(f"Error: RemovalManager cleanup worker error: {e}")
                 self._shutdown_event.wait(1.0)
     
     def _execute_removal(self, schedule: RemovalSchedule):
@@ -308,10 +678,13 @@ class RemovalManager:
             if storage:
                 storage.remove_variable(schedule.variable_name, synchronized=True)
         except Exception as e:
-            print(f"Warning: Failed to execute scheduled removal for {schedule.variable_name}: {e}")
+            print(f"Error: Failed to execute scheduled removal for {schedule.variable_name}: {e}")
     
     def schedule_removal(self, variable_name: str, storage_path: str, remove_in_seconds: float):
         """Schedule a variable for removal."""
+        if remove_in_seconds <= 0:
+            raise SKGlobalValueError("remove_in_seconds must be positive")
+            
         current_time = sktime.now()
         removal_time = current_time + remove_in_seconds
         
@@ -340,12 +713,45 @@ class RemovalManager:
         with self._lock:
             return list(self._scheduled_removals.values())
     
-    def shutdown(self):
-        """Shutdown the removal manager."""
+    def shutdown(self, timeout: float = 5.0):
+        """Proper shutdown with timeout."""
+        if self._shutdown_event.is_set():
+            return  # Already shutting down
+        
+        print("Info: Shutting down RemovalManager...")
+        
+        # Signal shutdown
         self._shutdown_event.set()
+        
+        # Wait for cleanup thread to finish
         if self._cleanup_thread and self._cleanup_thread.is_alive():
-            self._cleanup_thread.join(timeout=1.0)
+            self._cleanup_thread.join(timeout=timeout)
+            
+            if self._cleanup_thread.is_alive():
+                print("Warning: RemovalManager cleanup thread did not shut down cleanly")
+        
+        # Process any remaining removals immediately
+        self._process_remaining_removals()
+        
+        self._shutdown_complete.set()
+        print("Info: RemovalManager shutdown complete")
 
+    def _process_remaining_removals(self):
+        """Process any remaining scheduled removals immediately."""
+        try:
+            with self._lock:
+                rem = list(self._scheduled_removals.values())
+                self._scheduled_removals.clear()
+
+            for schedule in rem:
+                try:
+                    self._execute_removal(schedule)
+                except Exception as e:
+                    print(f"Error: Failed to execute remaining scheduled removal for {schedule.variable_name}: {e}")
+
+        except Exception as e:
+            print(f"Error: Failed to process remaining removals: {e}")
+                    
 
 class SKGlobal:
     """
@@ -354,6 +760,7 @@ class SKGlobal:
     Variables are stored in a two-tier system:
     - TOP level: Project root storage that aggregates all UNDER storages
     - UNDER level: Directory-specific storage that syncs with TOP
+
     """
 
     def __init__(self,
@@ -375,6 +782,7 @@ class SKGlobal:
             auto_sync: If True, automatically sync with other processes.
             auto_create: If True, create immediately. If False, return creator function.
             remove_in: Number of seconds that global variable stays in memory.
+
         """
         # Validate inputs
         if level is not None and not isinstance(level, GlobalLevel):
@@ -430,7 +838,11 @@ class SKGlobal:
         self.value = value
         
         # Get the global storage
-        self.storage = SKGlobalStorage.get_storage(self.path, self.auto_sync)
+        try:
+            self.storage = SKGlobalStorage.get_storage(self.path, self.auto_sync)
+        except Exception as e:
+            print(f"Error: Failed to get storage for path '{self.path}': {e}")
+            raise SKGlobalError(f"Failed to initialize storage: {e}") from e
 
         if auto_create:
             self._create_global_variable()
@@ -443,6 +855,7 @@ class SKGlobal:
         
         Returns:
             Tuple: (SKGlobal_instance, creator_function) or (SKGlobal_instance, None)
+
         """
         instance = cls(level, path, name, value, auto_sync, False, remove_in)  # auto_create=False
         
@@ -472,66 +885,90 @@ class SKGlobal:
             'created_by_process': current_process_id
         }
 
-        self.storage.set_local(self.name, vardata)
+        try:
+            self.storage.set_local(self.name, vardata)
 
-        # Schedule removal if specified
-        if self.remove_in:
-            removal_manager = RemovalManager()
-            removal_manager.schedule_removal(self.name, self.path, self.remove_in)
+            # Schedule removal if specified
+            if self.remove_in:
+                removal_manager = RemovalManager()
+                removal_manager.schedule_removal(self.name, self.path, self.remove_in)
+        except Exception as e:
+            print(f"Error: Failed to create global variable '{self.name}': {e}")
+            raise SKGlobalError(f"Failed to create global variable: {e}") from e
+
 
     def get(self) -> Any:
         """Get the value of the global variable."""
-        data = self.storage.get_local(self.name)
-        if data is None:
-            # Check cross-process data
-            data = self.storage.get_cross_process(self.name)
-        return data['value'] if data else None
+        try:
+            data = self.storage.get_local(self.name)
+            if data is None:
+                # Check cross-process data
+                data = self.storage.get_cross_process(self.name)
+            return data['value'] if data else None
+        except Exception as e:
+            print(f"Error: Failed to get global variable '{self.name}': {e}")
+            return None
     
     def set(self, value: Any) -> None:
         """Set the value of the global variable."""
-        self.value = value
-        data = self.storage.get_local(self.name)
-        if data:
-            data['value'] = value
-            data['last_updated'] = sktime.now()
-            self.storage.set_local(self.name, data)
+        try:
+            self.value = value
+            data = self.storage.get_local(self.name)
+            if data:
+                data['value'] = value
+                data['last_updated'] = sktime.now()
+                self.storage.set_local(self.name, data)
+            else:
+                # If data doesn't exist, create it
+                self._create_global_variable()
+        except Exception as e:
+            print(f"Error: Failed to set global variable '{self.name}': {e}")
+            raise SKGlobalError(f"Failed to set global variable: {e}") from e
 
     def remove(self) -> None:
         """Remove the global variable from storage."""
-        # Cancel scheduled removal
-        if self.remove_in:
-            removal_manager = RemovalManager()
-            removal_manager.cancel_removal(self.name, self.path)
-        
-        self.storage.remove_variable(self.name)
+        try:
+            # Cancel scheduled removal
+            if self.remove_in:
+                removal_manager = RemovalManager()
+                removal_manager.cancel_removal(self.name, self.path)
+            
+            self.storage.remove_variable(self.name)
+        except Exception as e:
+            print(f"Error: Failed to remove global variable '{self.name}': {e}")
+            raise SKGlobalError(f"Failed to remove global variable: {e}") from e
 
     @classmethod
     def get_global(cls, name: str, path: Optional[str] = None, 
                 level: GlobalLevel = GlobalLevel.TOP,
                 auto_sync: Optional[bool] = None) -> Optional['SKGlobal']:
         """Get an existing global variable by name."""
-        if path is None:
-            path = get_project_root() if level == GlobalLevel.TOP else skpath.get_caller_file_path()
-        
-        if auto_sync is None:
-            auto_sync = True
-        
-        storage = SKGlobalStorage.get_storage(path, auto_sync)
-        data = storage.get_local(name)
-        
-        if data:
-            global_var = cls.__new__(cls)
-            global_var.name = name
-            global_var.path = path
-            global_var.level = level
-            global_var.value = data['value']
-            global_var.storage = storage
-            global_var.auto_sync = data.get('auto_sync', True)
-            remove_in_data = data.get('remove_in')
-            global_var.remove_in = remove_in_data if remove_in_data is not None else None
-            return global_var
-        
-        return None
+        try:
+            if path is None:
+                path = get_project_root() if level == GlobalLevel.TOP else skpath.get_caller_file_path()
+            
+            if auto_sync is None:
+                auto_sync = True
+            
+            storage = SKGlobalStorage.get_storage(path, auto_sync)
+            data = storage.get_local(name)
+            
+            if data:
+                global_var = cls.__new__(cls)
+                global_var.name = name
+                global_var.path = path
+                global_var.level = level
+                global_var.value = data['value']
+                global_var.storage = storage
+                global_var.auto_sync = data.get('auto_sync', True)
+                remove_in_data = data.get('remove_in')
+                global_var.remove_in = remove_in_data if remove_in_data is not None else None
+                return global_var
+            
+            return None
+        except Exception as e:
+            print(f"Error: Failed to get global variable '{name}': {e}")
+            return None
 
 
 class SKGlobalStorage:
@@ -541,6 +978,7 @@ class SKGlobalStorage:
     Each directory gets:
     - storage: Direct data (local_data + cross_process_data by process)
     - cross_process_storage: Data from other directories (organized by path)
+
     """
     
     _storages: Dict[str, 'SKGlobalStorage'] = {}
@@ -559,6 +997,7 @@ class SKGlobalStorage:
 
         Returns:
             SKGlobalStorage: The storage instance for this directory.
+
         """
         # Normalize path
         try:
@@ -596,40 +1035,53 @@ class SKGlobalStorage:
 
         # Validate path exists before normalization
         if not os.path.exists(path):
-            raise SKGlobalError(f"Storage path does not exist: {path}")
+            raise SKGlobalStorageError(f"Storage path does not exist: {path}")
         
         # Normalize path after validation
-        self.path = skpath.normalize_path(path, strict=True)
+        try:
+            self.path = skpath.normalize_path(path, strict=True)
+        except Exception as e:
+            raise SKGlobalStorageError(f"Failed to normalize path '{path}': {e}") from e
         
         # Auto-detect level based on path
-        project_root = get_project_root()
-        if self.path == project_root:
-            self.level = GlobalLevel.TOP
-            self._top_storage = None  # This IS the top storage
-        else:
+        try:
+            project_root = get_project_root()
+            if self.path == project_root:
+                self.level = GlobalLevel.TOP
+                self._top_storage = None  # This IS the top storage
+            else:
+                self.level = GlobalLevel.UNDER
+                # Get reference to THE top storage (singleton)
+                self._top_storage = SKGlobalStorage.get_storage(project_root, auto_sync)
+        except Exception as e:
+            print(f"Error: Failed to determine storage level for path '{path}': {e}")
+            # Default to UNDER level if we can't determine
             self.level = GlobalLevel.UNDER
-            # Get reference to THE top storage (singleton)
-            self._top_storage = SKGlobalStorage.get_storage(project_root, auto_sync)
+            self._top_storage = None
         
         self.auto_sync = auto_sync
         self._current_process_id = str(os.getpid())
+        self._resources_to_cleanup = []
+        
+        # Performance features
+        self._cache = SimpleCache(max_size=100)
+        self._stats = StorageStats()
         
         # Initialize two-tier storage system
         if auto_sync:
             try:
-                # Tier 1: Direct storage (local + cross-process data for THIS directory)
                 self._storage = self._cereal.create_shared_dict()
                 self._storage['local_data'] = self._cereal.create_shared_dict()
                 self._storage['cross_process_data'] = self._cereal.create_shared_dict()
                 
-                # Tier 2: Cross-storage data (from OTHER directories via TOP)
                 self._cross_process_storage = self._cereal.create_shared_dict()
                 
                 self._multiprocessing_available = hasattr(self._storage, '_manager')
                 if not self._multiprocessing_available:
                     print(f"Warning: Multiprocessing not available for storage at {self.path}")
             except Exception as e:
-                print(f"Warning: Failed to create shared storage: {e}")
+                print(f"Error: Failed to create shared storage for '{self.path}': {e}")
+                # CRITICAL: Ensure _storage is never None
                 self._storage = {
                     'local_data': {},
                     'cross_process_data': {}
@@ -647,10 +1099,40 @@ class SKGlobalStorage:
         self._lock = threading.RLock()
         
         # Create storage file path
-        self.storage_file = self._create_storage_file_path()
+        try:
+            self.storage_file = self._create_storage_file_path()
+        except Exception as e:
+            print(f"Error: Failed to create storage file path: {e}")
+            # Create a fallback storage file path
+            self.storage_file = os.path.join(os.path.dirname(self.path), f"fallback_storage_{os.getpid()}.sk")
         
         # Load existing data from storage file
-        self._load_from_file()
+        try:
+            self._load_from_file()
+        except Exception as e:
+            print(f"Error: Failed to load storage from file '{self.storage_file}': {e}")
+            # Continue with empty storage rather than failing
+        
+        # Register for cleanup
+        _resource_manager.register_storage(self)
+
+        if self._storage is None:
+            raise SKGlobalStorageError(f"Storage initialization failed for path: {self.path}")
+
+    def _validate_storage_data(self, data: dict) -> bool:
+        """Validate storage data integrity."""
+        required_fields = ['path', 'level', 'storage']
+        
+        for field in required_fields:
+            if field not in data:
+                print(f"Error: Storage validation failed: Missing required field: {field}")
+                return False
+        
+        if data['path'] != self.path:
+            print(f"Error: Storage validation failed: Path mismatch: expected {self.path}, got {data['path']}")
+            return False
+        
+        return True
     
     @classmethod   
     def _ensure_clean_startup(cls):
@@ -662,6 +1144,7 @@ class SKGlobalStorage:
             except Exception as e:
                 print(f"Warning: Failed to clean startup state: {e}")
                 cls._startup_cleaned = False
+
 
     @classmethod
     def _reset_all_loaded_statuses(cls):
@@ -692,6 +1175,9 @@ class SKGlobalStorage:
 
     def set_local(self, name: str, data: Dict[str, Any]) -> None:
         """Set local data in this storage and sync up to TOP if needed."""
+        if not name or not isinstance(data, dict):
+            raise SKGlobalValueError("Invalid name or data for set_local")
+            
         with self._lock:
             try:
                 # Add metadata
@@ -702,28 +1188,58 @@ class SKGlobalStorage:
                     '_storage_path': self.path
                 }
                 
-                self._storage['local_data'][name] = enhanced_data
+                # Use transaction for atomicity
+                transaction = StorageTransaction(self, name, enhanced_data)
+                transaction.execute()
                 
-                # If UNDER storage, sync up to TOP storage
-                if self.level == GlobalLevel.UNDER and self._top_storage:
-                    with self._top_storage._lock:
-                        path_key = f"{self.path}::{name}"
-                        self._top_storage._storage['local_data'][path_key] = enhanced_data
-                        self._top_storage._save_to_file()
+                # Update cache
+                self._cache.put(name, enhanced_data)
                 
-                self._save_to_file()
+                # Record statistics
+                self._stats.record_write()
+                _resource_manager.record_operation(self.path, 'write')
+                
+            except SKGlobalStorageError:
+                # Re-raise storage errors
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
+                raise
             except Exception as e:
-                print(f"Warning: Failed to set local data: {e}")
-                self._save_to_file()
+                print(f"Error: Failed to set local data for '{name}': {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
+                raise SKGlobalStorageError(f"Failed to set local data: {e}") from e
+            
 
     def get_local(self, name: str) -> Optional[Dict[str, Any]]:
         """Get local data from this storage."""
         with self._lock:
             try:
+                # Check cache first
+                cached_data = self._cache.get(name)
+                if cached_data is not None:
+                    self._stats.record_cache_hit()
+                    _resource_manager.record_operation(self.path, 'cache_hit')
+                    self._stats.record_read()
+                    _resource_manager.record_operation(self.path, 'read')
+                    return dict(cached_data)
+                
+                # Cache miss - check storage
+                self._stats.record_cache_miss()
+                _resource_manager.record_operation(self.path, 'cache_miss')
+                
                 if name in self._storage['local_data']:
-                    return dict(self._storage['local_data'][name])
+                    data = dict(self._storage['local_data'][name])
+                    # Update cache
+                    self._cache.put(name, data)
+                    self._stats.record_read()
+                    _resource_manager.record_operation(self.path, 'read')
+                    return data
+                    
             except Exception as e:
-                print(f"Warning: Failed to get local data: {e}")
+                print(f"Error: Failed to get local data for '{name}': {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
         return None
 
     def set_cross_process(self, name: str, data: Dict[str, Any], from_process_id: str) -> None:
@@ -744,8 +1260,16 @@ class SKGlobalStorage:
                 
                 self._storage['cross_process_data'][from_process_id][name] = enhanced_data
                 self._save_to_file()
+                
+                self._stats.record_write()
+                _resource_manager.record_operation(self.path, 'write')
+                
             except Exception as e:
-                print(f"Warning: Failed to set cross-process data: {e}")
+                print(f"Error: Failed to set cross-process data for '{name}': {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
+                raise SKGlobalStorageError(f"Failed to set cross-process data: {e}") from e
+
 
     def get_cross_process(self, name: str, from_process_id: str = None) -> Optional[Dict[str, Any]]:
         """Get cross-process data for same variable from other processes."""
@@ -754,15 +1278,22 @@ class SKGlobalStorage:
                 if from_process_id:
                     if (from_process_id in self._storage['cross_process_data'] and
                         name in self._storage['cross_process_data'][from_process_id]):
+                        self._stats.record_read()
+                        _resource_manager.record_operation(self.path, 'read')
                         return dict(self._storage['cross_process_data'][from_process_id][name])
                 else:
                     # Return from any process (first found)
                     for process_id, process_data in self._storage['cross_process_data'].items():
                         if name in process_data:
+                            self._stats.record_read()
+                            _resource_manager.record_operation(self.path, 'read')
                             return dict(process_data[name])
             except Exception as e:
-                print(f"Warning: Failed to get cross-process data: {e}")
+                print(f"Error: Failed to get cross-process data for '{name}': {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
         return None
+    
 
     def receive_from_other_storage(self, source_path: str, name: str, data: Dict[str, Any]) -> None:
         """Receive data from another storage via TOP."""
@@ -782,8 +1313,16 @@ class SKGlobalStorage:
                 
                 self._cross_process_storage[source_path][name] = enhanced_data
                 self._save_to_file()
+                
+                self._stats.record_write()
+                _resource_manager.record_operation(self.path, 'write')
+                
             except Exception as e:
-                print(f"Warning: Failed to receive data from other storage: {e}")
+                print(f"Error: Failed to receive data from other storage: {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
+                raise SKGlobalStorageError(f"Failed to receive data from other storage: {e}") from e
+
 
     def get_from_other_storage(self, source_path: str, name: str) -> Optional[Dict[str, Any]]:
         """Get data from another storage."""
@@ -791,9 +1330,13 @@ class SKGlobalStorage:
             try:
                 if (source_path in self._cross_process_storage and
                     name in self._cross_process_storage[source_path]):
+                    self._stats.record_read()
+                    _resource_manager.record_operation(self.path, 'read')
                     return dict(self._cross_process_storage[source_path][name])
             except Exception as e:
-                print(f"Warning: Failed to get data from other storage: {e}")
+                print(f"Error: Failed to get data from other storage: {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
         return None
 
     def sync_from_top(self, source_path: str = None) -> Dict[str, int]:
@@ -811,24 +1354,31 @@ class SKGlobalStorage:
         
         synced_count = {}
         
-        with self._top_storage._lock:
-            for key, value in self._top_storage._storage['local_data'].items():
-                if "::" in key:  # Data from other UNDER storages
-                    key_source_path, var_name = key.split("::", 1)
-                    
-                    # Skip our own data
-                    if key_source_path == self.path:
-                        continue
-                    
-                    # Filter by source if specified
-                    if source_path and key_source_path != source_path:
-                        continue
-                    
-                    # Store in cross-process storage
-                    self.receive_from_other_storage(key_source_path, var_name, dict(value))
-                    synced_count[key_source_path] = synced_count.get(key_source_path, 0) + 1
+        try:
+            with self._top_storage._lock:
+                for key, value in self._top_storage._storage['local_data'].items():
+                    if "::" in key:  # Data from other UNDER storages
+                        key_source_path, var_name = key.split("::", 1)
+                        
+                        # Skip our own data
+                        if key_source_path == self.path:
+                            continue
+                        
+                        # Filter by source if specified
+                        if source_path and key_source_path != source_path:
+                            continue
+                        
+                        # Store in cross-process storage
+                        self.receive_from_other_storage(key_source_path, var_name, dict(value))
+                        synced_count[key_source_path] = synced_count.get(key_source_path, 0) + 1
+        except Exception as e:
+            print(f"Error: Failed to sync from top storage: {e}")
+            raise SKGlobalSyncError(f"Sync from top failed: {e}") from e
         
         return synced_count
+
+
+
 
     def remove_variable(self, name: str, synchronized: bool = False) -> None:
         """
@@ -840,6 +1390,9 @@ class SKGlobalStorage:
         """
         with self._lock:
             try:
+                # Remove from cache
+                self._cache.put(name, None)  # Invalidate cache entry
+                
                 # Remove from local data
                 if name in self._storage['local_data']:
                     del self._storage['local_data'][name]
@@ -856,21 +1409,34 @@ class SKGlobalStorage:
                 
                 # If UNDER storage, also remove from TOP storage
                 if self.level == GlobalLevel.UNDER and self._top_storage:
-                    with self._top_storage._lock:
-                        path_key = f"{self.path}::{name}"
-                        if path_key in self._top_storage._storage['local_data']:
-                            del self._top_storage._storage['local_data'][path_key]
-                        self._top_storage._save_to_file()
+                    try:
+                        with self._top_storage._lock:
+                            path_key = f"{self.path}::{name}"
+                            if path_key in self._top_storage._storage['local_data']:
+                                del self._top_storage._storage['local_data'][path_key]
+                            self._top_storage._save_to_file()
+                    except Exception as e:
+                        print(f"Error: Failed to remove from top storage: {e}")
                 
                 self._save_to_file()
                 
                 # Cancel scheduled removal if not synchronized
                 if not synchronized:
-                    removal_manager = RemovalManager()
-                    removal_manager.cancel_removal(name, self.path)
+                    try:
+                        removal_manager = RemovalManager()
+                        removal_manager.cancel_removal(name, self.path)
+                    except Exception as e:
+                        print(f"Error: Failed to cancel scheduled removal: {e}")
+                
+                self._stats.record_write()
+                _resource_manager.record_operation(self.path, 'write')
                     
             except Exception as e:
-                print(f"Warning: Failed to remove variable: {e}")
+                print(f"Error: Failed to remove variable '{name}': {e}")
+                self._stats.record_error()
+                _resource_manager.record_operation(self.path, 'error')
+                raise SKGlobalStorageError(f"Failed to remove variable: {e}") from e
+            
 
     def list_all_data(self) -> Dict[str, Any]:
         """List all data available in this storage."""
@@ -879,7 +1445,16 @@ class SKGlobalStorage:
             'cross_process_data': {},
             'cross_storage_data': {},
             'path': self.path,
-            'level': self.level.name
+            'level': self.level.name,
+            'statistics': {
+                'reads': self._stats.reads,
+                'writes': self._stats.writes,
+                'errors': self._stats.errors,
+                'cache_hits': self._stats.cache_hits,
+                'cache_misses': self._stats.cache_misses,
+                'cache_size': self._cache.size(),
+                'last_access': self._stats.last_accessed
+            }
         }
         
         with self._lock:
@@ -896,7 +1471,7 @@ class SKGlobalStorage:
                     result['cross_storage_data'][source_path] = list(storage_data.keys())
                     
             except Exception as e:
-                print(f"Warning: Failed to list data: {e}")
+                print(f"Error: Failed to list storage data: {e}")
         
         return result
 
@@ -909,12 +1484,64 @@ class SKGlobalStorage:
             'multiprocessing_available': self._multiprocessing_available,
             'storage_file': self.storage_file,
             'current_process_id': self._current_process_id,
-            'data_summary': self.list_all_data()
+            'data_summary': self.list_all_data(),
+            'performance': {
+                'cache_hit_rate': (self._stats.cache_hits / max(1, self._stats.cache_hits + self._stats.cache_misses)) * 100,
+                'error_rate': (self._stats.errors / max(1, self._stats.reads + self._stats.writes)) * 100,
+                'total_operations': self._stats.reads + self._stats.writes
+            }
         }
 
     def is_multiprocessing_enabled(self) -> bool:
         """Check if this storage instance has multiprocessing enabled."""
         return self.auto_sync and self._multiprocessing_available
+
+    def clear_cache(self):
+        """Clear the storage cache."""
+        self._cache.clear()
+
+    def cleanup(self):
+        """Clean up all resources associated with this storage."""
+        try:
+            # Save any pending data
+            self._save_to_file()
+            
+            # Clear cache
+            self._cache.clear()
+            
+            # Cleanup shared memory resources
+            if hasattr(self._storage, '_manager'):
+                try:
+                    self._storage._manager.shutdown()
+                except:
+                    pass
+            
+            # Cleanup any file handles
+            for resource in self._resources_to_cleanup:
+                try:
+                    if hasattr(resource, 'close'):
+                        resource.close()
+                except:
+                    pass
+            
+            # DON'T set _storage to None - this breaks singleton reuse!
+            # Only clear the data, not the structure
+            if self._storage is not None:
+                self._storage['local_data'].clear()
+                self._storage['cross_process_data'].clear()
+            
+            if self._cross_process_storage is not None:
+                self._cross_process_storage.clear()
+            
+        except Exception as e:
+            print(f"Warning: Cleanup failed for storage {self.path}: {e}")
+    
+    def __del__(self):
+        """Ensure cleanup on garbage collection."""
+        try:
+            self.cleanup()
+        except:
+            pass
 
     def _create_storage_file_path(self) -> str:
         """Create the storage file path."""
@@ -930,20 +1557,32 @@ class SKGlobalStorage:
     @classmethod
     def _get_sk_dir(cls) -> str:
         """Get or create the .sk directory path."""
-        root = get_project_root()
-        sk_dir = os.path.join(root, '.sk')
-        os.makedirs(sk_dir, exist_ok=True)
-        return sk_dir
+        try:
+            root = get_project_root()
+            sk_dir = os.path.join(root, '.sk')
+            os.makedirs(sk_dir, exist_ok=True)
+            return sk_dir
+        except Exception as e:
+            print(f"Error: Failed to create .sk directory: {e}")
+            # Fallback to current directory
+            fallback_dir = os.path.join(os.getcwd(), '.sk')
+            os.makedirs(fallback_dir, exist_ok=True)
+            return fallback_dir
+        
 
     def _load_from_file(self) -> bool:
         """Load stored variables from JSON file."""
+        if not os.path.exists(self.storage_file):
+            return False
+            
         try:
-            if os.path.exists(self.storage_file):
+            with file_lock(self.storage_file):
                 with open(self.storage_file, 'r') as f:
                     data = json.load(f)
                 
                 # Validate file format
-                if data.get('path') != self.path:
+                if not self._validate_storage_data(data):
+                    print(f"Warning: Storage file validation failed: {self.storage_file}")
                     return False
                 
                 # Load storage data
@@ -953,8 +1592,10 @@ class SKGlobalStorage:
                         for name, var_data in storage_data['local_data'].items():
                             try:
                                 self._storage['local_data'][name] = var_data
+                                # Populate cache with loaded data
+                                self._cache.put(name, var_data)
                             except Exception as e:
-                                print(f"Warning: Failed to load local variable {name}: {e}")
+                                print(f"Error: Failed to load local variable {name}: {e}")
                     
                     if 'cross_process_data' in storage_data:
                         for process_id, process_data in storage_data['cross_process_data'].items():
@@ -967,7 +1608,7 @@ class SKGlobalStorage:
                                 for name, var_data in process_data.items():
                                     self._storage['cross_process_data'][process_id][name] = var_data
                             except Exception as e:
-                                print(f"Warning: Failed to load cross-process data for {process_id}: {e}")
+                                print(f"Error: Failed to load cross-process data for {process_id}: {e}")
                 
                 # Load cross-storage data
                 if 'cross_process_storage' in data:
@@ -981,65 +1622,104 @@ class SKGlobalStorage:
                             for name, var_data in source_data.items():
                                 self._cross_process_storage[source_path][name] = var_data
                         except Exception as e:
-                            print(f"Warning: Failed to load cross-storage data from {source_path}: {e}")
+                            print(f"Error: Failed to load cross-storage data from {source_path}: {e}")
                 
                 return True
-        except (json.JSONDecodeError, OSError, KeyError) as e:
-            print(f"Warning: Could not load storage file {self.storage_file}: {e}")
-        
-        return False
+                
+        except Exception as e:
+            print(f"Error: Failed to load storage file {self.storage_file}: {e}")
+            return False
 
     def _save_to_file(self) -> None:
-        """Save current variables to JSON file."""
-        try:
-            with self._lock:
-                # Convert storage data to serializable format
-                storage_data = {}
-                cross_storage_data = {}
-                
-                try:
-                    # Convert storage to dict
-                    storage_data = {
-                        'local_data': dict(self._storage['local_data']) if self._storage['local_data'] else {},
-                        'cross_process_data': {}
+        """Save current variables to JSON file with file locking and validation."""
+        if self._storage is None:
+            print("Warning: Cannot save - storage not initialized")
+            return
+        
+        max_retries = 3
+        retry_delay = 0.1
+        
+        for attempt in range(max_retries):
+            try:
+                with self._lock:
+                    # Convert storage data to serializable format
+                    storage_data = {}
+                    cross_storage_data = {}
+                    
+                    try:
+                        # Convert storage to dict
+                        storage_data = {
+                            'local_data': dict(self._storage['local_data']) if self._storage['local_data'] else {},
+                            'cross_process_data': {}
+                        }
+                        
+                        # Convert cross-process data
+                        for process_id, process_data in self._storage['cross_process_data'].items():
+                            storage_data['cross_process_data'][process_id] = dict(process_data) if process_data else {}
+                        
+                        # Convert cross-storage data
+                        for source_path, source_data in self._cross_process_storage.items():
+                            cross_storage_data[source_path] = dict(source_data) if source_data else {}
+                            
+                    except Exception as e:
+                        print(f"Error: Failed to convert storage to dict: {e}")
+                        storage_data = {'local_data': {}, 'cross_process_data': {}}
+                        cross_storage_data = {}
+                    
+                    data = {
+                        "path": self.path,
+                        "level": self.level.name,
+                        "auto_sync": self.auto_sync,
+                        "multiprocessing_available": self._multiprocessing_available,
+                        "current_process_id": self._current_process_id,
+                        "created_at": sktime.now(),
+                        "last_saved": sktime.now(),
+                        "storage": storage_data,
+                        "cross_process_storage": cross_storage_data,
+                        "statistics": {
+                            "reads": self._stats.reads,
+                            "writes": self._stats.writes,
+                            "errors": self._stats.errors,
+                            "cache_hits": self._stats.cache_hits,
+                            "cache_misses": self._stats.cache_misses
+                        }
                     }
                     
-                    # Convert cross-process data
-                    for process_id, process_data in self._storage['cross_process_data'].items():
-                        storage_data['cross_process_data'][process_id] = dict(process_data) if process_data else {}
-                    
-                    # Convert cross-storage data
-                    for source_path, source_data in self._cross_process_storage.items():
-                        cross_storage_data[source_path] = dict(source_data) if source_data else {}
+                    # Use file locking for atomic operations
+                    with file_lock(self.storage_file):
+                        # Create backup if original exists
+                        if os.path.exists(self.storage_file):
+                            backup_file = self.storage_file + '.backup'
+                            shutil.copy2(self.storage_file, backup_file)
                         
-                except Exception as e:
-                    print(f"Warning: Could not convert storage to dict: {e}")
-                    storage_data = {'local_data': {}, 'cross_process_data': {}}
-                    cross_storage_data = {}
-                
-                data = {
-                    "path": self.path,
-                    "level": self.level.name,
-                    "auto_sync": self.auto_sync,
-                    "multiprocessing_available": self._multiprocessing_available,
-                    "current_process_id": self._current_process_id,
-                    "created_at": sktime.now(),
-                    "last_saved": sktime.now(),
-                    "storage": storage_data,
-                    "cross_process_storage": cross_storage_data
-                }
-                
-                # Atomic write operation
-                temp_file = self.storage_file + '.tmp'
-                with open(temp_file, 'w') as f:
-                    json.dump(data, f, indent=2, default=str)
-                
-                # Replace original file atomically
-                os.replace(temp_file, self.storage_file)
-                
-        except (OSError, TypeError) as e:
-            # Log warning but don't crash the application
-            print(f"Warning: Could not save global storage to {self.storage_file}: {e}")
+                        # Atomic write operation
+                        temp_file = self.storage_file + f'.tmp.{os.getpid()}'
+                        
+                        with open(temp_file, 'w') as f:
+                            json.dump(data, f, indent=2, default=str)
+                        
+                        # Validate written data
+                        with open(temp_file, 'r') as f:
+                            validated_data = json.load(f)
+                            if not self._validate_storage_data(validated_data):
+                                raise ValueError("Data validation failed after write")
+                        
+                        # Replace original file atomically
+                        os.replace(temp_file, self.storage_file)
+                    
+                    # Success - return
+                    return
+                    
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(f"Warning: Save attempt {attempt + 1} failed, retrying: {e}")
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    continue
+                else:
+                    # This is a CRITICAL error - don't swallow it
+                    print(f"Error: Failed to save storage after {max_retries} attempts: {e}")
+                    raise SKGlobalStorageError(f"Failed to save storage after {max_retries} attempts: {e}") from e
+
 
     def sync_with(self, other_storage: 'SKGlobalStorage', 
                 key_filter: Optional[Callable[[str], bool]] = None) -> None:
@@ -1063,7 +1743,8 @@ class SKGlobalStorage:
                     if data:
                         other_storage.receive_from_other_storage(self.path, key, data)
             except Exception as e:
-                print(f"Warning: Sync operation failed: {e}")
+                print(f"Error: Sync operation failed: {e}")
+                raise SKGlobalSyncError(f"Sync operation failed: {e}") from e
 
     def has_variable(self, name: str) -> bool:
         """Check if a variable with the given name exists."""
@@ -1088,136 +1769,111 @@ class SKGlobalStorage:
         multiprocessing_status = "enabled" if self._multiprocessing_available else "disabled"
         return (f"SKGlobalStorage(path='{self.path}', level={self.level.name}, "
                 f"auto_sync={self.auto_sync}, multiprocessing={multiprocessing_status})")
+    
+    def reset_for_testing(self):
+        """Reset storage state for testing purposes."""
+        with self._lock:
+            if self._storage is not None:
+                self._storage['local_data'].clear()
+                self._storage['cross_process_data'].clear()
+            
+            if self._cross_process_storage is not None:
+                self._cross_process_storage.clear()
+                
+            self._cache.clear()
+            
+            # Reset stats
+            self._stats = StorageStats()
 
+    @classmethod
+    def reset_all_storages_for_testing(cls):
+        """Reset all singleton storages for testing."""
+        with cls._storage_lock:
+            for storage in cls._storages.values():
+                if hasattr(storage, 'reset_for_testing'):
+                    storage.reset_for_testing()
 
 # API for global variable management
+
+def create_global(name: str, value: Any = None, level: GlobalLevel = GlobalLevel.TOP, 
+                 path: Optional[str] = None, auto_sync: bool = True, 
+                 remove_in: Optional[float] = None) -> SKGlobal:
+    """
+    Convenience function to create a global variable.
+    
+    Args:
+        name: Name of the global variable
+        value: Initial value
+        level: Storage level (TOP or UNDER)
+        path: Storage path (None for auto-detection)
+        auto_sync: Enable cross-process synchronization
+        remove_in: Seconds before automatic removal
+        
+    Returns:
+        SKGlobal: The created global variable
+    """
+    return SKGlobal(
+        level=level,
+        path=path,
+        name=name,
+        value=value,
+        auto_sync=auto_sync,
+        auto_create=True,
+        remove_in=remove_in
+    )
+
+def get_global(name: str, path: Optional[str] = None, 
+              level: GlobalLevel = GlobalLevel.TOP,
+              auto_sync: Optional[bool] = None) -> Optional[SKGlobal]:
+    """
+    Convenience function to get an existing global variable.
+    
+    Args:
+        name: Name of the global variable
+        path: Storage path (None for auto-detection)
+        level: Storage level (TOP or UNDER)
+        auto_sync: Enable cross-process synchronization
+        
+    Returns:
+        SKGlobal or None: The global variable if found
+    """
+    return SKGlobal.get_global(name, path, level, auto_sync)
 
 def get_skglobal(name: str) -> Optional[Any]:
     """Get a global variable value."""
     g = SKGlobal.get_global(name, level=GlobalLevel.TOP)
     return g.get() if g else None
 
+def get_system_stats() -> Dict[str, Any]:
+    """Get comprehensive system statistics for all SKGlobal components."""
+    return {
+        'resource_manager': _resource_manager.get_stats(),
+        'health_check': _resource_manager.health_check(),
+        'removal_manager': {
+            'scheduled_removals': len(RemovalManager().get_scheduled_removals())
+        }
+    }
+
+def health_check() -> Dict[str, Any]:
+    """Perform a health check on the SKGlobal system."""
+    return _resource_manager.health_check()
+
+# Context manager for safe usage
+@contextlib.contextmanager
+def skglobal_session(cleanup_on_exit: bool = True):
+    """Context manager for safe SKGlobal usage."""
+    try:
+        yield
+    finally:
+        if cleanup_on_exit:
+            _resource_manager.cleanup_all()
+
 # Module cleanup
 def _cleanup_on_exit():
     """Clean up resources on module exit."""
     try:
-        removal_manager = RemovalManager()
-        removal_manager.shutdown()
-    except Exception:
-        pass
+        _resource_manager.cleanup_all()
+    except Exception as e:
+        print(f"Error: Module cleanup failed: {e}")
 
 atexit.register(_cleanup_on_exit)
-
-
-if __name__ == "__main__":
-    import tempfile
-    import shutil
-    
-    def run_tests():
-        """Run basic functionality tests."""
-        print("🧪 Starting SKGlobal Hierarchical Storage Tests...")
-        print("=" * 60)
-        
-        # Test counters
-        passed = 0
-        total = 0
-        
-        def test(name: str, test_func):
-            nonlocal passed, total
-            total += 1
-            try:
-                print(f"\n🔍 Testing: {name}")
-                test_func()
-                print(f"   ✅ PASSED: {name}")
-                passed += 1
-            except Exception as e:
-                print(f"   ❌ FAILED: {name}")
-                print(f"   Error: {e}")
-                import traceback
-                traceback.print_exc()
-        
-        # Test project root detection
-        def test_project_root():
-            root = get_project_root()
-            assert os.path.exists(root), f"Project root doesn't exist: {root}"
-            print(f"   Project root: {root}")
-        
-        test("Project Root Detection", test_project_root)
-        
-        # Test basic storage creation
-        def test_storage_creation():
-            storage = SKGlobalStorage.get_storage(get_project_root(), auto_sync=True)
-            assert storage.level == GlobalLevel.TOP
-            print(f"   Storage info: {storage.get_storage_info()}")
-        
-        test("Storage Creation", test_storage_creation)
-        
-        # Test basic global creation
-        def test_basic_global():
-            global_var = SKGlobal(
-                name="test_basic",
-                value="Hello Hierarchical World",
-                auto_create=True
-            )
-            assert global_var.get() == "Hello Hierarchical World"
-            global_var.remove()
-        
-        test("Basic Global Variable", test_basic_global)
-        
-        # Test hierarchical storage
-        def test_hierarchical_storage():
-            # Create TOP storage
-            top_storage = SKGlobalStorage.get_storage(get_project_root(), auto_sync=True)
-            
-            # Create test data
-            test_data = {
-                'name': 'hierarchical_test',
-                'value': 'hierarchical_value',
-                'created_at': sktime.now()
-            }
-            
-            top_storage.set_local("hierarchical_test", test_data)
-            retrieved = top_storage.get_local("hierarchical_test")
-            assert retrieved is not None
-            assert retrieved['value'] == 'hierarchical_value'
-            
-            # Clean up
-            top_storage.remove_variable("hierarchical_test")
-        
-        test("Hierarchical Storage", test_hierarchical_storage)
-        
-        # Test removal manager
-        def test_removal_manager():
-            removal_manager = RemovalManager()
-            
-            # Create a global with timed removal
-            global_var = SKGlobal(
-                name="test_removal",
-                value="will_be_removed",
-                remove_in=0.1,
-                auto_create=True
-            )
-            
-            # Check it exists
-            assert global_var.get() == "will_be_removed"
-            
-            # Check scheduled removals
-            scheduled = removal_manager.get_scheduled_removals()
-            assert len(scheduled) >= 1
-            
-            # Manual cleanup
-            global_var.remove()
-        
-        test("Removal Manager", test_removal_manager)
-        
-        # Print results
-        print("\n" + "=" * 60)
-        print(f"🏁 Test Results: {passed}/{total} passed")
-        if passed == total:
-            print("🎉 All basic tests passed!")
-        else:
-            print(f"⚠️  {total - passed} tests failed")
-        print("=" * 60)
-    
-    # Run the tests
-    run_tests()
