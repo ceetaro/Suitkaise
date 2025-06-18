@@ -33,7 +33,7 @@ def elapsed(start_time: float, end_time: float) -> float:
     """
     if end_time < start_time:
         raise SKTimeError("End time must be greater than start time.")
-    pass
+    return end_time - start_time
 
 class Stopwatch:
     """
