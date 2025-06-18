@@ -39,3 +39,6 @@ htmlcov/
 # failed sk versions
 app_depr/
 .app_depr/
+
+# .sk files
+.sk/
