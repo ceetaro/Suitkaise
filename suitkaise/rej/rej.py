@@ -249,7 +249,7 @@ class Rej(Generic[T]):
         
         Args:
             key: The key to update
-            item: The new item to store
+            item: The new item to store 
             
         Returns:
             True if the key existed and was updated, False if key didn't exist

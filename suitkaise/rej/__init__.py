@@ -38,7 +38,7 @@ Usage examples:
     same_reg = RejSingleton.get_registry("functions")
     func = same_reg.get("my_func")
 """
-
+from typing import List
 from suitkaise.rej.rej import (
     # Main classes
     Rej,
@@ -88,7 +88,7 @@ def getrej(name: str, **kwargs) -> RejSingleton:
     """
     return RejSingleton.get_registry(name, **kwargs)
 
-def listrej() -> list[str]:
+def listrej() -> List[str]:
     """
     Get a list of all singleton registry names that exist.
     

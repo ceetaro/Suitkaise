@@ -20,7 +20,6 @@ from enum import IntEnum
 import json
 import threading
 import atexit
-import fcntl
 import contextlib
 import shutil
 import weakref
@@ -28,6 +27,10 @@ import hashlib
 from dataclasses import dataclass, field
 from collections import defaultdict
 
+if sys.platform == 'win32':
+    import msvcrt
+else:
+    import fcntl
 
 from suitkaise.skglobals._project_indicators import project_indicators
 import suitkaise.skpath.skpath as skpath
@@ -113,8 +116,13 @@ def file_lock(filepath: str, timeout: float = 5.0):
         start_time = sktime.now()
         while sktime.now() - start_time < timeout:
             try:
+                if sys.platform == 'win32':
+                    # Windows uses msvcrt for file locking
+                    msvcrt.locking(lock_fd, msvcrt.LK_NBLCK, 1)
+                else:
                 # Try to acquire the lock
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
                 yield lock_fd
                 return
             except (IOError, BlockingIOError, OSError):
@@ -126,10 +134,13 @@ def file_lock(filepath: str, timeout: float = 5.0):
     finally:
         if lock_fd is not None:
             try:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)  # Release the lock
+                # Platform-specific unlocking
+                if sys.platform == 'win32':
+                    msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
                 os.close(lock_fd)
             except:
-                # If we can't release the lock, just ignore it
                 pass
 
         # cleanup lock file
@@ -196,21 +207,54 @@ class StorageTransaction:
         
 
     def _execute_top_sync(self):
-        """Execute synchronization with top-level storage."""
-        """Execute TOP storage sync."""
-        if self.storage._top_storage:
-            path_key = f"{self.storage.path}::{self.name}"
-            with self.storage._top_storage._lock:
+        """Execute TOP storage sync with better error handling."""
+        if not self.storage._top_storage:
+            return
+            
+        # Validate TOP storage structure
+        if (not self.storage._top_storage._storage or 
+            'local_data' not in self.storage._top_storage._storage):
+            raise SKGlobalTransactionError("TOP storage not properly initialized")
+            
+        path_key = f"{self.storage.path}::{self.name}"
+        
+        with self.storage._top_storage._lock:
+            try:
+                # Create backup of current state for rollback
+                old_value = self.storage._top_storage._storage['local_data'].get(path_key)
+                self.rollback_data['top_old'] = old_value
+                
+                # Apply change
                 self.storage._top_storage._storage['local_data'][path_key] = self.data
+                
+            except Exception as e:
+                raise SKGlobalTransactionError(f"TOP sync failed: {e}")
 
     def _persist_changes(self):
-        """Persist all changes to disk."""
-        # Save TOP first (most critical)
-        if self.storage._top_storage:
-            self.storage._top_storage._save_to_file()
+        """Atomic persistence with coordination."""
+        # Use coordination file to signal persistence state
+        coordination_file = f"{self.storage.storage_file}.coord"
         
-        # Then save local
-        self.storage._save_to_file()
+        try:
+            # Signal persistence start
+            with open(coordination_file, 'w') as f:
+                f.write("persisting")
+            
+            # Persist both atomically
+            if self.storage._top_storage:
+                self.storage._top_storage._save_to_file()
+            self.storage._save_to_file()
+            
+            # Signal completion
+            os.remove(coordination_file)
+            
+        except Exception as e:
+            # Cleanup coordination file on failure
+            try:
+                os.remove(coordination_file)
+            except:
+                pass
+            raise
 
     def _rollback(self):
         """Rollback changes on failure."""
@@ -1713,7 +1757,7 @@ class SKGlobalStorage:
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"Warning: Save attempt {attempt + 1} failed, retrying: {e}")
-                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    sktime.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
                     continue
                 else:
                     # This is a CRITICAL error - don't swallow it

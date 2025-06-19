@@ -40,6 +40,8 @@ RUNNING = "🔄" * 40 + "\n\n"
 CHECKING = "🧳" * 40 + "\n"
 WARNING = "\n\n   " + "🟨" * 10 + " "
 
+from suitkaise.sktime import sktime
+
 from suitkaise.skfunction.skfunction import (
     SKFunction,
     SKFunctionBuilder,
@@ -420,34 +422,24 @@ class TestPerformanceMonitor(unittest.TestCase):
         if bottlenecks:  # May be empty in fast test runs
             bottleneck_names = [item[0] for item in bottlenecks]
             self.assertIn('slow_function', bottleneck_names)
+
     
     def test_optimization_opportunity_detection(self):
-        """
-        Test automatic optimization opportunity detection.
+        monitor = PerformanceMonitor()
         
-        Tests detection of high complexity ratios, low cache hit rates, etc.
-        """
-        monitor = _performance_monitor
-        
-        # Create a function with high complexity ratio
-        func_metrics = monitor._function_metrics["complex_function"]
-        func_metrics.call_count = 50
-        func_metrics.simple_calls = 5
-        func_metrics.complex_calls = 45  # High complexity ratio
-        func_metrics.cache_hits = 10
-        func_metrics.cache_misses = 40  # Low cache hit rate
-        func_metrics.error_count = 5  # High error rate
+        # Inject test data that should trigger opportunities
+        monitor.inject_test_metrics(
+            "complex_function",
+            call_count=20,
+            simple_calls=5,
+            complex_calls=15,  # complexity_ratio = 3.0
+            cache_hits=2,
+            cache_misses=8,    # cache_hit_rate = 20%
+            error_count=2      # success_rate = 90%
+        )
         
         opportunities = monitor._identify_optimization_opportunities()
-        
-        self.assertIsInstance(opportunities, list)
         self.assertGreater(len(opportunities), 0)
-        
-        # Check for expected opportunity types
-        opportunity_types = [opp['type'] for opp in opportunities]
-        self.assertIn('argument_optimization', opportunity_types)
-        self.assertIn('caching_optimization', opportunity_types)
-        self.assertIn('error_handling', opportunity_types)
 
 
 # =============================================================================

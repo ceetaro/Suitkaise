@@ -163,32 +163,3 @@ class Cereal:
         """
         self._serializers[name] = serializer
 
-
-
-# Use the existing default_serializer instance
-def serializable(obj: Any, mode: str = 'internal') -> bool:
-    """Check if an object is serializable in the specified mode."""
-    return default_serializer.serializable(obj, mode)
-
-def serializable_both(obj: Any) -> bool:
-    """Check if object is serializable in both modes."""
-    return (default_serializer.serializable(obj, 'internal') and 
-            default_serializer.serializable(obj, 'external'))
-    
-if __name__ == "__main__":
-    # Example usage
-    my_obj = {"key": "value"}
-    is_serializable = serializable(my_obj)
-    print(f"Is the object serializable? {is_serializable}")
-
-    class MyClass:
-        def __init__(self, value: str):
-            self.value = value
-
-    obj2 = MyClass("Hello")
-    is_serializable2 = serializable(obj2)
-    print(f"Is the object serializable? {is_serializable2}")
-    
-    print("Internal serialization:")
-    print(f"Is obj 2 serializable? {Cereal().serializable(obj2, mode='internal')}")
-
