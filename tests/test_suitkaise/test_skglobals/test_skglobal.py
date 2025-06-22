@@ -38,7 +38,6 @@ from suitkaise.skglobal.skglobal import (
     StorageTransaction,
     SimpleCache,
     StorageStats,
-    get_project_root,
     SKGlobalError,
     SKGlobalValueError,
     SKGlobalLevelError,

@@ -34,7 +34,7 @@ if sys.platform == 'win32':
 else:
     import fcntl
 
-from suitkaise.skglobal._project_indicators import project_indicators
+from suitkaise.skpath._project_indicators import project_indicators
 import suitkaise.skpath.skpath as skpath
 from suitkaise.cereal import Cereal, create_shared_dict
 
@@ -60,10 +60,6 @@ class SKGlobalSyncError(SKGlobalError):
 
 class SKGlobalTransactionError(SKGlobalError):
     """Custom exception for SKGlobal transaction errors."""
-    pass
-
-class PlatformNotFoundError(Exception):
-    """Custom exception for platform not found."""
     pass
 
 @dataclass
@@ -423,219 +419,6 @@ class ResourceManager:
 _resource_manager = ResourceManager()
 
 
-def get_project_root(start_path: Optional[str] = None) -> str:
-    """
-    Get the project root of your project based on common indicators.
-    
-    Args:
-        start_path: Path to start searching from. If None, uses caller's file path.
-        
-    Returns:
-        str: Path to the project root.
-        
-    Raises:
-        SKGlobalError: If project root cannot be found.
-    """
-    if start_path is None:
-        start_path = skpath.get_caller_file_path()
-    
-    # Start from the directory containing the file
-    if os.path.isfile(start_path):
-        current = os.path.dirname(start_path)
-    else:
-        current = start_path
-
-    def dir_children(path: str) -> List[str]:
-        """Get directory children of a path."""
-        try:
-            return [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-        except (OSError, PermissionError):
-            return []
-
-    def file_children(path: str) -> List[str]:
-        """Get file children of a path."""
-        try:
-            return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-        except (OSError, PermissionError):
-            return []
-
-    def preprocess_indicators(indicators: dict) -> dict:
-        """Resolve string references in indicators."""
-        processed = {k: v.copy() if isinstance(v, dict) else v for k, v in indicators.items()}
-        
-        # Process file group references
-        for section_name in ['common_proj_root_files']:
-            if section_name not in processed:
-                continue
-                
-            section = processed[section_name]
-            for key, values in section.items():
-                if not isinstance(values, set):
-                    values = set(values)
-                
-                new_values = set()
-                for value in values:
-                    if isinstance(value, str) and value.startswith("file_groups{") and value.endswith("}"):
-                        # Extract group name: "file_groups{'license'}" -> "license"
-                        group_name = value[12:-2].strip("'\"")
-                        if group_name in processed.get('file_groups', {}):
-                            new_values.update(processed['file_groups'][group_name])
-                    else:
-                        new_values.add(value)
-                section[key] = new_values
-        
-        # Process dir group references  
-        for section_name in ['common_proj_root_dirs']:
-            if section_name not in processed:
-                continue
-                
-            section = processed[section_name]
-            for key, values in section.items():
-                if not isinstance(values, set):
-                    values = set(values)
-                
-                new_values = set()
-                for value in values:
-                    if isinstance(value, str) and value.startswith("dir_groups{") and value.endswith("}"):
-                        # Extract group name: "dir_groups{'test'}" -> "test"
-                        group_name = value[11:-2].strip("'\"")
-                        if group_name in processed.get('dir_groups', {}):
-                            new_values.update(processed['dir_groups'][group_name])
-                    else:
-                        new_values.add(value)
-                section[key] = new_values
-        
-        return processed
-
-    def matches_pattern(name: str, patterns: set) -> bool:
-        """Check if a name matches any pattern in the set."""
-        for pattern in patterns:
-            if pattern.endswith('.*'):
-                # Handle patterns like "README.*"
-                prefix = pattern[:-2]
-                if name.startswith(prefix):
-                    return True
-            elif pattern.endswith('*'):
-                # Handle patterns like "requirements*"
-                prefix = pattern[:-1]
-                if name.startswith(prefix):
-                    return True
-            elif pattern == name:
-                # Exact match
-                return True
-        return False
-
-    # Get platform-specific OS paths to stop at
-    platform = sys.platform
-    if platform == 'win32':
-        common_ospaths = set(project_indicators['common_ospaths']['windows'])
-    elif platform == 'linux':
-        common_ospaths = set(project_indicators['common_ospaths']['linux'])
-    elif platform == 'darwin':
-        common_ospaths = set(project_indicators['common_ospaths']['macOS'])
-    else:
-        raise PlatformNotFoundError(f"Unsupported platform: {platform}")
-
-    indicators = preprocess_indicators(project_indicators)
-    
-    # Variables to track potential roots
-    potential_roots = []
-    
-    # Walk up the directory tree
-    max_depth = 20  # Prevent infinite loops
-    depth = 0
-    
-    while depth < max_depth:
-        # Stop if we've reached an OS-level directory
-        if os.path.basename(current) in common_ospaths or current in common_ospaths:
-            break
-            
-        score = 0
-        required_files_found = False
-        found_indicators = []
-
-        # Check files in current directory
-        files = file_children(current)
-        for filename in files:
-            # Check necessary files
-            for pattern_set in indicators['common_proj_root_files']['necessary']:
-                if matches_pattern(filename, pattern_set):
-                    required_files_found = True
-                    found_indicators.append(f"necessary:{filename}")
-                    break
-            
-            # Check indicator files
-            for pattern_set in indicators['common_proj_root_files']['indicators']:
-                if matches_pattern(filename, pattern_set):
-                    score += 3
-                    found_indicators.append(f"indicator:{filename}")
-                    
-            # Check weak indicator files  
-            for pattern_set in indicators['common_proj_root_files']['weak_indicators']:
-                if matches_pattern(filename, pattern_set):
-                    score += 1
-                    found_indicators.append(f"weak:{filename}")
-
-        # Check directories in current directory
-        dirs = dir_children(current)
-        for dirname in dirs:
-            # Check strong indicator directories
-            for pattern_set in indicators['common_proj_root_dirs']['strong_indicators']:
-                if matches_pattern(dirname, pattern_set):
-                    score += 10
-                    found_indicators.append(f"strong_dir:{dirname}")
-                    
-            # Check indicator directories
-            for pattern_set in indicators['common_proj_root_dirs']['indicators']:
-                if matches_pattern(dirname, pattern_set):
-                    score += 3
-                    found_indicators.append(f"indicator_dir:{dirname}")
-
-        # If we found required files and sufficient score, this could be the root
-        if required_files_found and score >= 15:
-            # Check for strong main project indicators
-            strong_main_indicators = ['setup.py', 'pyproject.toml', 'setup.cfg', 'Cargo.toml', 'package.json']
-            has_strong_file_indicator = any(filename in strong_main_indicators for filename in files)
-            has_git_dir = '.git' in dirs
-            
-            # Calculate priority score for this potential root
-            priority_score = score
-            if has_strong_file_indicator:
-                priority_score += 50  # Big bonus for main project files
-            if has_git_dir:
-                priority_score += 30  # Big bonus for git repository
-            
-            # Store this as a potential root
-            potential_roots.append({
-                'path': current,
-                'score': score,
-                'priority_score': priority_score,
-                'depth': depth,
-                'has_strong_indicators': has_strong_file_indicator or has_git_dir,
-                'indicators': found_indicators
-            })
-            
-            # If this has very strong indicators, prefer it immediately
-            if has_strong_file_indicator or has_git_dir:
-                return current
-
-        # Move up one directory
-        parent = os.path.dirname(current)
-        if parent == current:  # Reached filesystem root
-            break
-        current = parent
-        depth += 1
-
-    # If we found potential roots, pick the best one
-    if potential_roots:
-        # Sort by priority score (highest first), then by depth (closer to start)
-        potential_roots.sort(key=lambda x: (-x['priority_score'], x['depth']))
-        best_root = potential_roots[0]
-        return best_root['path']
-
-    # If no potential roots found, raise error
-    raise SKGlobalError(f"Project root not found starting from path: {start_path}")
-
 class GlobalLevel(IntEnum):
     """Enum for global variable levels."""
     TOP = 0
@@ -845,7 +628,7 @@ class SKGlobal:
         # Determine path
         if path is None:
             if self.level == GlobalLevel.TOP:
-                self.path = get_project_root()
+                self.path = skpath.get_project_root()
             else:
                 caller_path = skpath.get_caller_file_path()
                 self.path = os.path.dirname(caller_path)
@@ -1001,7 +784,7 @@ class SKGlobal:
         """Get an existing global variable by name."""
         try:
             if path is None:
-                path = get_project_root() if level == GlobalLevel.TOP else skpath.get_caller_file_path()
+                path = skpath.get_project_root() if level == GlobalLevel.TOP else skpath.get_caller_file_path()
             
             if auto_sync is None:
                 auto_sync = True
@@ -1083,7 +866,7 @@ class SKGlobalStorage:
             SKGlobalStorage: The top-level storage instance.
 
         """
-        project_root = get_project_root()
+        project_root = skpath.get_project_root()
         return cls.get_storage(project_root, auto_sync)
     
     def __init__(self, path: str, auto_sync: bool = True):
@@ -1102,7 +885,7 @@ class SKGlobalStorage:
         
         # Auto-detect level based on path
         try:
-            project_root = get_project_root()
+            project_root = skpath.get_project_root()
             if self.path == project_root:
                 self.level = GlobalLevel.TOP
                 self._top_storage = None  # This IS the top storage
@@ -1669,7 +1452,7 @@ class SKGlobalStorage:
     def _get_sk_dir(cls) -> str:
         """Get or create the .sk directory path."""
         try:
-            root = get_project_root()
+            root = skpath.get_project_root()
             sk_dir = os.path.join(root, '.sk')
             os.makedirs(sk_dir, exist_ok=True)
             return sk_dir

@@ -1,6 +1,6 @@
 # add license here
 
-# suitkaise/skglobal/_project_indicators.py
+# suitkaise/skpath/_project_indicators.py
 
 project_indicators = {
         "common_ospaths": {

@@ -38,15 +38,11 @@ from suitkaise.skglobal.skglobal import (
     SKGlobal,
     SKGlobalStorage,
     GlobalLevel,
-    
-    # Utility functions
-    get_project_root,
-    
+
     # Exceptions
     SKGlobalError,
     SKGlobalValueError,
     SKGlobalLevelError,
-    PlatformNotFoundError,
 )
 
 # Version info
@@ -59,14 +55,10 @@ __all__ = [
     'SKGlobalStorage', 
     'GlobalLevel',
     
-    # Utility functions
-    'get_project_root',
-    
     # Exceptions
     'SKGlobalError',
     'SKGlobalValueError',
     'SKGlobalLevelError',
-    'PlatformNotFoundError',
     
     # Version
     '__version__',
