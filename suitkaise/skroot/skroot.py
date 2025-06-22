@@ -34,7 +34,7 @@ from pathlib import Path
 from enum import Enum
 import threading
 
-from suitkaise.skglobals import SKGlobal, GlobalLevel, get_project_root
+from suitkaise.skglobal import SKGlobal, GlobalLevel, get_project_root
 import suitkaise.skpath.skpath as skpath
 import suitkaise.sktime.sktime as sktime
 

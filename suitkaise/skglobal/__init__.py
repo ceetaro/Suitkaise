@@ -1,9 +1,9 @@
 # add license here
 
-# suitkaise/skglobals/__init__.py
+# suitkaise/skglobal/__init__.py
 
 """
-SKGlobals - Global variable management with cross-process support.
+SKGlobal - Global variable management with cross-process support.
 
 This module provides tools for creating and managing global variables 
 that can be shared across processes and threads, with automatic persistence
@@ -33,7 +33,7 @@ Usage:
     
 """
 
-from suitkaise.skglobals.skglobals import (
+from suitkaise.skglobal.skglobal import (
     # Main classes
     SKGlobal,
     SKGlobalStorage,

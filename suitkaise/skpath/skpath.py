@@ -47,7 +47,6 @@ def _normalize_path(path: str | Path, allow_fallback: bool = True) -> str:
         # Convert to string first and handle cross-platform path separators
         path_str = str(path)
         
-        # Fix for cross-platform separator issues - normalize separators first
         # Replace backslashes with forward slashes on Unix-like systems
         if os.name == 'posix' and '\\' in path_str:
             path_str = path_str.replace('\\', '/')

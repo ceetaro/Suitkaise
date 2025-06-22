@@ -25,10 +25,10 @@ import threading
 from typing import Any, Dict, Optional, List, Callable, TypeVar, Generic, Union
 from enum import Enum, auto
 from dataclasses import dataclass, field
+import time
 
-from suitkaise.skglobals import SKGlobal, GlobalLevel
+from suitkaise.skglobal import SKGlobal, GlobalLevel
 from suitkaise.cereal import Cereal
-from suitkaise.sktime import sktime
 
 T = TypeVar('T')
 
@@ -108,8 +108,8 @@ class Rej(Generic[T]):
             
             This helps you understand when items were added, how often they're used, etc.
             """
-            created_at: float = field(default_factory=sktime.now)
-            modified_at: float = field(default_factory=sktime.now)
+            created_at: float = field(default_factory=time.time)
+            modified_at: float = field(default_factory=time.time)
             access_count: int = 0
             created_by_process: str = field(default_factory=lambda: str(__import__('os').getpid()))
             is_serializable: bool = False
@@ -120,7 +120,7 @@ class Rej(Generic[T]):
             
             def record_modification(self):
                 """Mark that this item was modified (updated in registry)."""
-                self.modified_at = sktime.now()
+                self.modified_at = time.time()
 
 
     
@@ -151,7 +151,7 @@ class Rej(Generic[T]):
         self._cereal = Cereal() if self.auto_serialize_check else None
         
         # Registry info
-        self.created_at = sktime.now()
+        self.created_at = time.time()
         
     def register(self, key: str, item: T, metadata: Optional[Dict] = None) -> str:
         """

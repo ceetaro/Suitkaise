@@ -1,6 +1,6 @@
 # add license here
 
-# suitkaise/skglobals/skglobals.py
+# suitkaise/skglobal/skglobal.py
 
 """
 Module for creating and managing global variables and registries.
@@ -17,6 +17,8 @@ import sys
 from typing import Optional, Any, Dict, List, Tuple, Callable
 from pathlib import Path
 from enum import IntEnum
+import time
+import uuid
 import json
 import threading
 import atexit
@@ -32,12 +34,9 @@ if sys.platform == 'win32':
 else:
     import fcntl
 
-from suitkaise.skglobals._project_indicators import project_indicators
+from suitkaise.skglobal._project_indicators import project_indicators
 import suitkaise.skpath.skpath as skpath
-import suitkaise.sktime.sktime as sktime
 from suitkaise.cereal import Cereal, create_shared_dict
-
-# TODO make sure .sk files are created in the project root directory, not the current directory
 
 class SKGlobalError(Exception):
     """Custom exception for SKGlobal."""
@@ -81,21 +80,21 @@ class StorageStats:
     reads: int = 0
     writes: int = 0
     errors: int = 0
-    last_accessed: float = field(default_factory=sktime.now)
+    last_accessed: float = field(default_factory=time.time)
     cache_hits: int = 0
     cache_misses: int = 0
 
     def record_read(self):
         self.reads += 1
-        self.last_accessed = sktime.now()
+        self.last_accessed = time.time()
 
     def record_write(self):
         self.writes += 1
-        self.last_accessed = sktime.now()
+        self.last_accessed = time.time()
 
     def record_error(self):
         self.errors += 1
-        self.last_accessed = sktime.now()
+        self.last_accessed = time.time()
     
     def record_cache_hit(self):
         self.cache_hits += 1
@@ -113,8 +112,8 @@ def file_lock(filepath: str, timeout: float = 5.0):
         # Ensure the lock file directory exists
         lock_fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_RDWR)
 
-        start_time = sktime.now()
-        while sktime.now() - start_time < timeout:
+        start_time = time.time()
+        while time.time() - start_time < timeout:
             try:
                 if sys.platform == 'win32':
                     # Windows uses msvcrt for file locking
@@ -127,7 +126,7 @@ def file_lock(filepath: str, timeout: float = 5.0):
                 return
             except (IOError, BlockingIOError, OSError):
                 # If we can't acquire the lock, wait briefly and retry
-                sktime.sleep(0.1)
+                time.sleep(0.1)
 
         raise SKGlobalError(f"Timeout while trying to acquire lock on {lock_file}")
     
@@ -158,7 +157,7 @@ class StorageTransaction:
         self.data = data
         self.rollback_data = {}
         self.completed = False
-        self.transaction_id = hashlib.md5(f"{storage.path}:{name}:{sktime.now()}".encode()).hexdigest()[:8]
+        self.transaction_id = hashlib.md5(f"{storage.path}:{name}:{time.time()}".encode()).hexdigest()[:8]
 
     def execute(self):
         """Execute transaction and rollback if it fails."""
@@ -686,7 +685,7 @@ class RemovalManager:
         """Background worker that handles scheduled removals."""
         while not self._shutdown_event.is_set():
             try:
-                current_time = sktime.now()
+                current_time = time.time()
                 removals_to_process = []
                 
                 with self._lock:
@@ -729,7 +728,7 @@ class RemovalManager:
         if remove_in_seconds <= 0:
             raise SKGlobalValueError("remove_in_seconds must be positive")
             
-        current_time = sktime.now()
+        current_time = time.time()
         removal_time = current_time + remove_in_seconds
         
         schedule = RemovalSchedule(
@@ -814,7 +813,8 @@ class SKGlobal:
                  value: Optional[Any] = None,
                  auto_sync: bool = True,
                  auto_create: bool = True,
-                 remove_in: Optional[float] = None):
+                 remove_in: Optional[float] = None,
+                 persistent: bool = True):
         """
         Create and initialize a global variable.
 
@@ -826,6 +826,7 @@ class SKGlobal:
             auto_sync: If True, automatically sync with other processes.
             auto_create: If True, create immediately. If False, return creator function.
             remove_in: Number of seconds that global variable stays in memory.
+            persistent: If True, save to disk. If False, keep in memory only.
 
         """
         # Validate inputs
@@ -835,6 +836,7 @@ class SKGlobal:
         # Set default values
         self.level = level if level is not None else GlobalLevel.TOP
         self.auto_sync = auto_sync
+        self.persistent = persistent
         if remove_in is not None and remove_in > 0 and remove_in != float('inf'):
             self.remove_in = float(remove_in)
         else:
@@ -852,7 +854,7 @@ class SKGlobal:
 
         # Set name, generate if not provided
         if name is None:
-            name = f"global_{int(sktime.now() * 1000000) % 1000000}"
+            name = f"global_{int(time.time() * 1000000) % 1000000}"
         self.name = name
 
 
@@ -888,12 +890,20 @@ class SKGlobal:
             print(f"Error: Failed to get storage for path '{self.path}': {e}")
             raise SKGlobalError(f"Failed to initialize storage: {e}") from e
 
+        # Validate name uniqueness before creating
+        if auto_create:
+            try:
+                self.storage.validate_unique_name(self.name)
+            except Exception as e:
+                print(f"Error: Name validation failed for '{self.name}': {e}")
+                raise
+
         if auto_create:
             self._create_global_variable()
 
     @classmethod
     def create(cls, level=GlobalLevel.TOP, path=None, name=None, value=None, 
-            auto_sync=True, auto_create=True, remove_in=None):
+            auto_sync=True, auto_create=True, remove_in=None, persistent=True):
         """
         Factory method to create SKGlobal with optional delayed creation.
         
@@ -901,7 +911,7 @@ class SKGlobal:
             Tuple: (SKGlobal_instance, creator_function) or (SKGlobal_instance, None)
 
         """
-        instance = cls(level, path, name, value, auto_sync, False, remove_in)  # auto_create=False
+        instance = cls(level, path, name, value, auto_sync, False, remove_in, persistent)  # auto_create=False
         
         if auto_create:
             instance._create_global_variable()
@@ -915,7 +925,8 @@ class SKGlobal:
     def _create_global_variable(self):
         """Internal method to create the global variable in storage."""
         current_process_id = str(os.getpid())
-        current_time = sktime.now()
+        current_time = time.time()
+        gvar_id = str(uuid.uuid4())[:8]  # Generate short unique ID
         
         vardata = {
             'name': self.name,
@@ -926,7 +937,8 @@ class SKGlobal:
             'created_at': current_time,
             'last_updated': current_time,
             'remove_in': self.remove_in,
-            'created_by_process': current_process_id
+            'created_by_process': current_process_id,
+            'persistent': self.persistent
         }
 
         try:
@@ -960,7 +972,7 @@ class SKGlobal:
             data = self.storage.get_local(self.name)
             if data:
                 data['value'] = value
-                data['last_updated'] = sktime.now()
+                data['last_updated'] = time.time()
                 self.storage.set_local(self.name, data)
             else:
                 # If data doesn't exist, create it
@@ -1005,6 +1017,7 @@ class SKGlobal:
                 global_var.value = data['value']
                 global_var.storage = storage
                 global_var.auto_sync = data.get('auto_sync', True)
+                global_var.persistent = data.get('persistent', True)
                 remove_in_data = data.get('remove_in')
                 global_var.remove_in = remove_in_data if remove_in_data is not None else None
                 return global_var
@@ -1163,6 +1176,60 @@ class SKGlobalStorage:
         if self._storage is None:
             raise SKGlobalStorageError(f"Storage initialization failed for path: {self.path}")
 
+    def check_name_exists_globally(self, name: str) -> bool:
+        """Check if a variable name exists anywhere in the global system."""
+        # Check current storage first
+        if self.has_variable(name):
+            return True
+        
+        # If this is UNDER storage, check TOP storage for conflicts
+        if self.level == GlobalLevel.UNDER and self._top_storage:
+            with self._top_storage._lock:
+                # Check direct TOP storage variables
+                if name in self._top_storage._storage['local_data']:
+                    return True
+                
+                # Check all UNDER storage variables (stored as path::name)
+                for key in self._top_storage._storage['local_data'].keys():
+                    if "::" in key:
+                        _, var_name = key.split("::", 1)
+                        if var_name == name:
+                            return True
+        
+        # If this is TOP storage, check all UNDER storage entries
+        elif self.level == GlobalLevel.TOP:
+            with self._lock:
+                # Check entries that came from UNDER storages (path::name format)
+                for key in self._storage['local_data'].keys():
+                    if "::" in key:
+                        _, var_name = key.split("::", 1)  
+                        if var_name == name:
+                            return True
+        
+        return False
+
+    def validate_unique_name(self, name: str) -> None:
+        """Validate that a variable name is unique across the entire system."""
+        if self.check_name_exists_globally(name):
+            raise SKGlobalValueError(
+                f"Global variable '{name}' already exists in the system. "
+                f"Choose a different name to avoid conflicts."
+            )
+
+    def has_non_persistent_data(self) -> bool:
+        """Check if storage contains any non-persistent variables."""
+        with self._lock:
+            for var_data in self._storage['local_data'].values():
+                if not var_data.get('persistent', True):
+                    return True
+        return False
+
+    def should_persist_to_file(self) -> bool:
+        """Determine if this storage should save to file."""
+        if self.has_non_persistent_data():
+            return True  # We'll filter in _save_to_file()
+        return True  # Normal persistent behavior
+
     def _validate_storage_data(self, data: dict) -> bool:
         """Validate storage data integrity."""
         required_fields = ['path', 'level', 'storage']
@@ -1228,7 +1295,7 @@ class SKGlobalStorage:
                 enhanced_data = {
                     **data,
                     '_stored_by_process': self._current_process_id,
-                    '_stored_at': sktime.now(),
+                    '_stored_at': time.time(),
                     '_storage_path': self.path
                 }
                 
@@ -1299,7 +1366,7 @@ class SKGlobalStorage:
                 enhanced_data = {
                     **data,
                     '_received_from_process': from_process_id,
-                    '_received_at': sktime.now()
+                    '_received_at': time.time()
                 }
                 
                 self._storage['cross_process_data'][from_process_id][name] = enhanced_data
@@ -1352,7 +1419,7 @@ class SKGlobalStorage:
                 enhanced_data = {
                     **data,
                     '_received_from_storage': source_path,
-                    '_received_at': sktime.now()
+                    '_received_at': time.time()
                 }
                 
                 self._cross_process_storage[source_path][name] = enhanced_data
@@ -1686,27 +1753,44 @@ class SKGlobalStorage:
         for attempt in range(max_retries):
             try:
                 with self._lock:
-                    # Convert storage data to serializable format
+                    # Convert storage data to serializable format, filtering non-persistent
                     storage_data = {}
                     cross_storage_data = {}
                     
                     try:
-                        # Convert storage to dict
+                        # Filter persistent data only
+                        persistent_local_data = {}
+                        for name, var_data in self._storage['local_data'].items():
+                            if var_data.get('persistent', True):  # Default to persistent if not specified
+                                persistent_local_data[name] = var_data
+                        
                         storage_data = {
-                            'local_data': dict(self._storage['local_data']) if self._storage['local_data'] else {},
+                            'local_data': persistent_local_data,
                             'cross_process_data': {}
                         }
                         
-                        # Convert cross-process data
+                        # Convert cross-process data (also filter for persistence)
                         for process_id, process_data in self._storage['cross_process_data'].items():
-                            storage_data['cross_process_data'][process_id] = dict(process_data) if process_data else {}
-                        
-                        # Convert cross-storage data
-                        for source_path, source_data in self._cross_process_storage.items():
-                            cross_storage_data[source_path] = dict(source_data) if source_data else {}
+                            persistent_process_data = {}
+                            for name, var_data in process_data.items():
+                                if var_data.get('persistent', True):
+                                    persistent_process_data[name] = var_data
                             
+                            if persistent_process_data:  # Only add if there's persistent data
+                                storage_data['cross_process_data'][process_id] = persistent_process_data
+                        
+                        # Convert cross-storage data (filter for persistence)
+                        for source_path, source_data in self._cross_process_storage.items():
+                            persistent_source_data = {}
+                            for name, var_data in source_data.items():
+                                if var_data.get('persistent', True):
+                                    persistent_source_data[name] = var_data
+                            
+                            if persistent_source_data:  # Only add if there's persistent data
+                                cross_storage_data[source_path] = persistent_source_data
+                                
                     except Exception as e:
-                        print(f"Error: Failed to convert storage to dict: {e}")
+                        print(f"Error: Failed to filter persistent data: {e}")
                         storage_data = {'local_data': {}, 'cross_process_data': {}}
                         cross_storage_data = {}
                     
@@ -1716,8 +1800,8 @@ class SKGlobalStorage:
                         "auto_sync": self.auto_sync,
                         "multiprocessing_available": self._multiprocessing_available,
                         "current_process_id": self._current_process_id,
-                        "created_at": sktime.now(),
-                        "last_saved": sktime.now(),
+                        "created_at": time.time(),
+                        "last_saved": time.time(),
                         "storage": storage_data,
                         "cross_process_storage": cross_storage_data,
                         "statistics": {
@@ -1757,7 +1841,7 @@ class SKGlobalStorage:
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"Warning: Save attempt {attempt + 1} failed, retrying: {e}")
-                    sktime.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
                     continue
                 else:
                     # This is a CRITICAL error - don't swallow it
@@ -1841,7 +1925,7 @@ class SKGlobalStorage:
 
 def create_global(name: str, value: Any = None, level: GlobalLevel = GlobalLevel.TOP, 
                  path: Optional[str] = None, auto_sync: bool = True, 
-                 remove_in: Optional[float] = None) -> SKGlobal:
+                 remove_in: Optional[float] = None, persistent: bool = True) -> SKGlobal:
     """
     Convenience function to create a global variable.
     
@@ -1852,6 +1936,7 @@ def create_global(name: str, value: Any = None, level: GlobalLevel = GlobalLevel
         path: Storage path (None for auto-detection)
         auto_sync: Enable cross-process synchronization
         remove_in: Seconds before automatic removal
+        persistent: If True, save to disk. If False, memory only.
         
     Returns:
         SKGlobal: The created global variable
@@ -1863,7 +1948,8 @@ def create_global(name: str, value: Any = None, level: GlobalLevel = GlobalLevel
         value=value,
         auto_sync=auto_sync,
         auto_create=True,
-        remove_in=remove_in
+        remove_in=remove_in,
+        persistent=persistent
     )
 
 def get_global(name: str, path: Optional[str] = None, 
@@ -1911,6 +1997,282 @@ def skglobal_session(cleanup_on_exit: bool = True):
     finally:
         if cleanup_on_exit:
             _resource_manager.cleanup_all()
+
+# Test cleanup utilities
+def get_sk_file_info() -> Dict[str, Any]:
+    """
+    Get information about existing .sk files.
+    
+    Returns:
+        Dict with file information including count, sizes, and file list
+    """
+    try:
+        sk_dir = SKGlobalStorage._get_sk_dir()
+        
+        if not os.path.exists(sk_dir):
+            return {
+                'sk_directory': sk_dir,
+                'exists': False,
+                'file_count': 0,
+                'files': [],
+                'total_size_bytes': 0
+            }
+        
+        files = []
+        total_size = 0
+        
+        for filename in os.listdir(sk_dir):
+            if filename.endswith('.sk') or filename.endswith('.sk.backup') or filename.endswith('.lock'):
+                filepath = os.path.join(sk_dir, filename)
+                try:
+                    stat_info = os.stat(filepath)
+                    file_info = {
+                        'name': filename,
+                        'path': filepath,
+                        'size_bytes': stat_info.st_size,
+                        'modified_time': stat_info.st_mtime,
+                        'type': 'storage' if filename.endswith('.sk') else 
+                               'backup' if filename.endswith('.backup') else 'lock'
+                    }
+                    files.append(file_info)
+                    total_size += stat_info.st_size
+                except (OSError, PermissionError) as e:
+                    files.append({
+                        'name': filename,
+                        'path': filepath,
+                        'error': str(e),
+                        'type': 'error'
+                    })
+        
+        return {
+            'sk_directory': sk_dir,
+            'exists': True,
+            'file_count': len(files),
+            'files': files,
+            'total_size_bytes': total_size,
+            'total_size_mb': round(total_size / (1024 * 1024), 2)
+        }
+        
+    except Exception as e:
+        return {
+            'error': f"Failed to get file info: {e}",
+            'sk_directory': None,
+            'exists': False,
+            'file_count': 0,
+            'files': []
+        }
+
+def cleanup_test_files(dry_run: bool = False, force: bool = False) -> Dict[str, Any]:
+    """
+    Clean up .sk files, typically used after testing.
+    
+    Args:
+        dry_run: If True, don't actually delete files, just report what would be deleted
+        force: If True, attempt to delete files even if they seem to be in use
+        
+    Returns:
+        Dict with cleanup results
+    """
+    results = {
+        'success': False,
+        'files_deleted': [],
+        'files_failed': [],
+        'total_deleted': 0,
+        'total_failed': 0,
+        'bytes_freed': 0,
+        'dry_run': dry_run
+    }
+    
+    try:
+        # Get file info first
+        file_info = get_sk_file_info()
+        
+        if not file_info['exists'] or file_info['file_count'] == 0:
+            results['success'] = True
+            results['message'] = "No .sk files found to clean up"
+            return results
+        
+        sk_dir = file_info['sk_directory']
+        
+        # First, try to gracefully shutdown any active storages
+        if not dry_run:
+            try:
+                _resource_manager.cleanup_all()
+                time.sleep(0.1)  # Brief pause to let cleanup complete
+            except Exception as e:
+                print(f"Warning: Resource cleanup failed: {e}")
+        
+        # Process each file
+        for file_info_item in file_info['files']:
+            filepath = file_info_item['path']
+            filename = file_info_item['name']
+            file_size = file_info_item.get('size_bytes', 0)
+            
+            try:
+                if dry_run:
+                    results['files_deleted'].append({
+                        'name': filename,
+                        'path': filepath,
+                        'size_bytes': file_size,
+                        'action': 'would_delete'
+                    })
+                    results['bytes_freed'] += file_size
+                else:
+                    # Check if file is currently locked (another process using it)
+                    if not force and filename.endswith('.sk'):
+                        lock_file = filepath + '.lock'
+                        if os.path.exists(lock_file):
+                            results['files_failed'].append({
+                                'name': filename,
+                                'path': filepath,
+                                'reason': 'File appears to be in use (lock file exists)'
+                            })
+                            continue
+                    
+                    # Attempt to delete
+                    os.remove(filepath)
+                    results['files_deleted'].append({
+                        'name': filename,
+                        'path': filepath,
+                        'size_bytes': file_size,
+                        'action': 'deleted'
+                    })
+                    results['bytes_freed'] += file_size
+                    
+            except (OSError, PermissionError) as e:
+                results['files_failed'].append({
+                    'name': filename,
+                    'path': filepath,
+                    'reason': str(e)
+                })
+        
+        results['total_deleted'] = len(results['files_deleted'])
+        results['total_failed'] = len(results['files_failed'])
+        results['success'] = True
+        
+        # Try to remove the .sk directory if it's empty
+        if not dry_run and results['total_deleted'] > 0:
+            try:
+                if not os.listdir(sk_dir):  # Directory is empty
+                    os.rmdir(sk_dir)
+                    results['directory_removed'] = True
+            except (OSError, PermissionError):
+                results['directory_removed'] = False
+        
+        return results
+        
+    except Exception as e:
+        results['error'] = f"Cleanup failed: {e}"
+        return results
+
+def cleanup_all_sk_files(confirm: bool = False) -> Dict[str, Any]:
+    """
+    Aggressively clean up ALL .sk files and directories.
+    
+    Args:
+        confirm: Must be True to actually perform cleanup (safety check)
+        
+    Returns:
+        Dict with cleanup results
+    """
+    if not confirm:
+        return {
+            'success': False,
+            'error': 'Must set confirm=True to perform aggressive cleanup',
+            'message': 'Use cleanup_test_files() for safer cleanup'
+        }
+    
+    # First try graceful cleanup
+    results = cleanup_test_files(dry_run=False, force=True)
+    
+    # If that didn't work, try more aggressive approaches
+    if results['total_failed'] > 0:
+        try:
+            sk_dir = SKGlobalStorage._get_sk_dir()
+            
+            # Use shutil.rmtree to remove everything
+            if os.path.exists(sk_dir):
+                shutil.rmtree(sk_dir, ignore_errors=True)
+                results['aggressive_cleanup'] = True
+                results['message'] = 'Used aggressive cleanup (shutil.rmtree)'
+        except Exception as e:
+            results['aggressive_cleanup_error'] = str(e)
+    
+    return results
+
+# Context manager for automatic test cleanup
+@contextlib.contextmanager
+def test_session(cleanup_on_exit: bool = True, cleanup_on_enter: bool = False):
+    """
+    Context manager for testing that handles .sk file cleanup.
+    
+    Args:
+        cleanup_on_exit: Clean up files when exiting context
+        cleanup_on_enter: Clean up files when entering context
+        
+    Example:
+        with test_session() as session:
+            # Create and test globals
+            my_global = create_global("test_var", "test_value")
+            # Files automatically cleaned up on exit
+    """
+    session_info = {
+        'start_time': time.time(),
+        'cleanup_results': None
+    }
+    
+    try:
+        # Cleanup on enter if requested
+        if cleanup_on_enter:
+            cleanup_results = cleanup_test_files()
+            session_info['initial_cleanup'] = cleanup_results
+        
+        yield session_info
+        
+    finally:
+        # Cleanup on exit if requested
+        if cleanup_on_exit:
+            try:
+                cleanup_results = cleanup_test_files()
+                session_info['cleanup_results'] = cleanup_results
+                session_info['end_time'] = time.time()
+                session_info['duration'] = session_info['end_time'] - session_info['start_time']
+                
+                if cleanup_results['success']:
+                    print(f"Test session cleanup: {cleanup_results['total_deleted']} files deleted, "
+                          f"{cleanup_results['bytes_freed']} bytes freed")
+                else:
+                    print(f"Test session cleanup had issues: {cleanup_results.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                print(f"Error during test session cleanup: {e}")
+
+# Utility function to print file info in a readable format
+def print_sk_file_info():
+    """Print information about .sk files in a human-readable format."""
+    info = get_sk_file_info()
+    
+    print(f"\n=== SKGlobal File Information ===")
+    print(f"Directory: {info['sk_directory']}")
+    print(f"Exists: {info['exists']}")
+    
+    if info['exists']:
+        print(f"File count: {info['file_count']}")
+        print(f"Total size: {info.get('total_size_mb', 0)} MB")
+        
+        if info['file_count'] > 0:
+            print(f"\nFiles:")
+            for file_info in info['files']:
+                if file_info.get('error'):
+                    print(f"  ❌ {file_info['name']} - Error: {file_info['error']}")
+                else:
+                    size_kb = round(file_info['size_bytes'] / 1024, 1)
+                    file_type = file_info['type']
+                    print(f"  📁 {file_info['name']} ({size_kb} KB, {file_type})")
+    else:
+        print("No .sk directory found")
+    
+    print("=" * 35)
 
 # Module cleanup
 def _cleanup_on_exit():

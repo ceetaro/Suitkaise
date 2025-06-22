@@ -37,7 +37,7 @@ Quick start:
 """
 
 # Import main components
-from suitkaise import skglobals
+from suitkaise import skglobal
 from suitkaise import skpath
 from suitkaise import sktime
 from suitkaise import cereal
@@ -48,7 +48,7 @@ __author__ = "Suitkaise Team"
 __description__ = "A comprehensive Python library for project management utilities"
 
 # Expose main public APIs for convenience
-from suitkaise.skglobals import (
+from suitkaise.skglobal import (
     SKGlobal,
     GlobalLevel,
     get_project_root,
@@ -76,7 +76,7 @@ from suitkaise.cereal import (
 # Main public API
 __all__ = [
     # Modules
-    'skglobals',
+    'skglobal',
     'skpath', 
     'sktime',
     'cereal',

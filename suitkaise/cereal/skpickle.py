@@ -20,10 +20,8 @@ from multiprocessing import reduction
 import threading
 from typing import Optional, Any, Dict, List, Callable, Type, Tuple
 from contextlib import contextmanager
-import inspect
-import pickle
+import time
 
-import suitkaise.sktime.sktime as sktime
 
 class SKPickleError(Exception):
     """Base exception for SKPickle errors."""
@@ -772,7 +770,7 @@ def _init_common_serializers():
     
     # Threading RLock
     def serialize_rlock(lock):
-        return {'type': 'RLock', 'created_at': sktime.now()}
+        return {'type': 'RLock', 'created_at': time.time()}
     
     def deserialize_rlock(data):
         return threading.RLock()
@@ -786,7 +784,7 @@ def _init_common_serializers():
     
     # Threading Lock
     def serialize_lock(lock):
-        return {'type': 'Lock', 'created_at': sktime.now()}
+        return {'type': 'Lock', 'created_at': time.time()}
     
     def deserialize_lock(data):
         return threading.Lock()
@@ -800,7 +798,7 @@ def _init_common_serializers():
     
     # Threading Condition
     def serialize_condition(condition):
-        return {'type': 'Condition', 'created_at': sktime.now()}
+        return {'type': 'Condition', 'created_at': time.time()}
     
     def deserialize_condition(data):
         return threading.Condition()
@@ -817,7 +815,7 @@ def _init_common_serializers():
         return {
             'type': 'Event', 
             'is_set': event.is_set(),
-            'created_at': sktime.now()
+            'created_at': time.time()
         }
     
     def deserialize_event(data):
@@ -839,7 +837,7 @@ def _init_common_serializers():
         return {
             'type': 'Semaphore',
             'value': 1,  # Default, can't easily get current value
-            'created_at': sktime.now()
+            'created_at': time.time()
         }
     
     def deserialize_semaphore(data):
@@ -861,7 +859,7 @@ def _init_common_serializers():
             return {
                 'type': 'BoundedSemaphore',
                 'value': 1,  # Default
-                'created_at': sktime.now()
+                'created_at': time.time()
             }
         
         def deserialize_bounded_semaphore(data):
@@ -882,7 +880,7 @@ def _init_common_serializers():
                 'type': 'Pattern',
                 'pattern': pattern.pattern,
                 'flags': pattern.flags,
-                'created_at': sktime.now()
+                'created_at': time.time()
             }
         
         def deserialize_pattern(data):

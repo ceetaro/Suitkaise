@@ -89,7 +89,6 @@ from collections import defaultdict, deque
 
 from suitkaise.rej.rej import Rej, RejSingleton
 from suitkaise.cereal import Cereal
-import suitkaise.sktime.sktime as sktime
 
 AnyFunction = Union[Callable, 'SKFunction']
 
@@ -204,7 +203,7 @@ class PerformanceMetrics:
         # Store execution time in history
         self.execution_times.append({
             'time': execution_time,
-            'timestamp': sktime.now(),
+            'timestamp': time.time(),
             'error': had_error,
             'simple': was_simple,
             'named_args': used_named_args
@@ -267,13 +266,13 @@ class PerformanceCache:
                     self._access_times.pop(key, None)
             
             self._argument_merge_cache[cache_key] = result
-            self._access_times[cache_key] = sktime.now()
+            self._access_times[cache_key] = time.time()
     
     def get_cached_argument_merge(self, cache_key: str) -> Optional[Tuple]:
         """Get cached argument merge result."""
         with self._lock:
             if cache_key in self._argument_merge_cache:
-                self._access_times[cache_key] = sktime.now()
+                self._access_times[cache_key] = time.time()
                 return self._argument_merge_cache[cache_key]
             return None
     
@@ -309,7 +308,7 @@ class PerformanceMonitor:
     
     def start_call_monitoring(self, function_name: str) -> Dict[str, Any]:
         """Thread-safe call monitoring start."""
-        start_time = sktime.now()
+        start_time = time.time()
         start_memory = None
         
         # Atomic memory check
@@ -330,7 +329,7 @@ class PerformanceMonitor:
     
     def end_call_monitoring(self, context: Dict[str, Any], had_error: bool = False, 
                         was_simple: bool = True, used_named_args: bool = False):
-        execution_time = sktime.now() - context['start_time']
+        execution_time = time.time() - context['start_time']
         function_name = context['function_name']
         memory_usage = 0
         
@@ -356,7 +355,7 @@ class PerformanceMonitor:
             self._function_metrics[function_name].record_execution(
                 execution_time, had_error, was_simple, used_named_args, memory_usage
             )
-            self._function_access_times[function_name] = sktime.now()
+            self._function_access_times[function_name] = time.time()
             
             # ✅ ADD THIS: Update system-wide metrics
             self._system_metrics.record_execution(
@@ -484,7 +483,7 @@ class PerformanceMonitor:
             metrics.total_execution_time = kwargs.get('total_execution_time', 1.0)
             
             self._function_metrics[function_name] = metrics
-            self._function_access_times[function_name] = sktime.now()
+            self._function_access_times[function_name] = time.time()
 
             
     def debug_function_metrics(self) -> Dict[str, Any]:
@@ -543,7 +542,7 @@ class SKFunction:
             return_type: Optional[str] = None
 
             # Creation context
-            created_at: float = field(default_factory=sktime.now)
+            created_at: float = field(default_factory=time.time)
             created_by_process: str = field(default_factory=lambda: str(__import__('os').getpid()))
 
             # Serialization info
