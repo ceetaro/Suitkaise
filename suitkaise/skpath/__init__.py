@@ -14,6 +14,7 @@ Main functions:
     get_caller_file_path: Get path of calling file
     get_current_file_path: Get path of current file
     get_current_directory: Get directory of current file
+    get_project_root: Get the root directory of the project
     equalpaths: Check if two paths are equivalent
     id: Generate reproducible ID from path
     idshort: Generate short ID from path
@@ -41,6 +42,7 @@ from suitkaise.skpath.skpath import (
     get_caller_file_path,
     get_current_file_path,
     get_current_directory,
+    get_project_root,
     equalpaths,
     id,
     idshort,
@@ -62,6 +64,7 @@ __all__ = [
     'get_caller_file_path',
     'get_current_file_path',
     'get_current_directory',
+    'get_project_root',
     'equalpaths',
     'id',
     'idshort',

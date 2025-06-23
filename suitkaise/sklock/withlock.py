@@ -16,6 +16,9 @@ by scanning an ast node.
 
 also, we can add another decorator that can handle deadlocks or waiting for locks to be released.
 
+lets also add lock tracking if possible, tracking when locks are acquired and released,
+and when they are held by which threads.
+
 """
 
 # NEEDS:

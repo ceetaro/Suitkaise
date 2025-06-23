@@ -51,7 +51,6 @@ __description__ = "A comprehensive Python library for project management utiliti
 from suitkaise.skglobal import (
     SKGlobal,
     GlobalLevel,
-    get_project_root,
     create_global,
     get_global,
 )
@@ -60,6 +59,7 @@ from suitkaise.skpath import (
     autopath,
     normalize_path,
     get_caller_file_path,
+    get_project_root,
 )
 
 from suitkaise.sktime import (

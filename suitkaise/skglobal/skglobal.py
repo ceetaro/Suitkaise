@@ -597,7 +597,7 @@ class SKGlobal:
                  auto_sync: bool = True,
                  auto_create: bool = True,
                  remove_in: Optional[float] = None,
-                 persistent: bool = True):
+                 persistent: bool = False):
         """
         Create and initialize a global variable.
 
@@ -736,17 +736,17 @@ class SKGlobal:
             raise SKGlobalError(f"Failed to create global variable: {e}") from e
 
 
-    def get(self) -> Any:
+    def get(self, default_value: Any = None) -> Any:
         """Get the value of the global variable."""
         try:
             data = self.storage.get_local(self.name)
             if data is None:
                 # Check cross-process data
                 data = self.storage.get_cross_process(self.name)
-            return data['value'] if data else None
+            return data['value'] if data else default_value
         except Exception as e:
             print(f"Error: Failed to get global variable '{self.name}': {e}")
-            return None
+            return default_value
     
     def set(self, value: Any) -> None:
         """Set the value of the global variable."""
@@ -780,7 +780,8 @@ class SKGlobal:
     @classmethod
     def get_global(cls, name: str, path: Optional[str] = None, 
                 level: GlobalLevel = GlobalLevel.TOP,
-                auto_sync: Optional[bool] = None) -> Optional['SKGlobal']:
+                auto_sync: Optional[bool] = None,
+                default_value: Any = None) -> Optional['SKGlobal']:
         """Get an existing global variable by name."""
         try:
             if path is None:
@@ -805,10 +806,10 @@ class SKGlobal:
                 global_var.remove_in = remove_in_data if remove_in_data is not None else None
                 return global_var
             
-            return None
+            return default_value
         except Exception as e:
             print(f"Error: Failed to get global variable '{name}': {e}")
-            return None
+            return default_value
 
 
 class SKGlobalStorage:
@@ -1737,7 +1738,8 @@ def create_global(name: str, value: Any = None, level: GlobalLevel = GlobalLevel
 
 def get_global(name: str, path: Optional[str] = None, 
               level: GlobalLevel = GlobalLevel.TOP,
-              auto_sync: Optional[bool] = None) -> Optional[SKGlobal]:
+              auto_sync: Optional[bool] = None,
+              default_value: Any = None) -> Optional[SKGlobal]:
     """
     Convenience function to get an existing global variable.
     

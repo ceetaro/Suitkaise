@@ -29,6 +29,8 @@ from unittest.mock import patch, MagicMock
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from suitkaise.skpath import get_project_root
+
 from suitkaise.skglobal.skglobal import (
     SKGlobal, 
     SKGlobalStorage, 
@@ -1969,7 +1971,7 @@ class TestFilePersistence(unittest.TestCase):
         
     def test_storage_file_format(self):
         """Test storage file format and validation."""
-        global_var = SKGlobal(name="format_test", value="format_data")
+        global_var = SKGlobal(name="format_test", value="format_data", persistent=True)
         self.test_globals.append(global_var)
         
         storage = global_var.storage
