@@ -2,6 +2,9 @@
 
 # suitkaise/sktime/sktime.py
 
+# TODO NOTE: SEE "SKtime Module Code Review" chat to continue implementation and improvements
+# change callables to skfunctions that can store the timing metadata?
+from __future__ import annotations
 """
 Time utilities for Suitkaise.
 
@@ -13,6 +16,7 @@ This module provides comprehensive timing functionality including:
 - Time formatting functions
 
 """
+import sys
 import time
 import signal
 import statistics
@@ -47,40 +51,21 @@ def now() -> float:
 
 
 def sleep(seconds: float) -> None:
-    """
-    Sleep for a given number of seconds.
-    
-    Args:
-        seconds (float): Number of seconds to sleep
-        
-    Example:
-        sleep(0.1)  # Sleep for 100 milliseconds
-    """
+    """Sleep for a given number of seconds with input validation."""
+    if not isinstance(seconds, (int, float)):
+        raise SKTimeError(f"Sleep duration must be a number, got {type(seconds)}")
+    if seconds < 0:
+        raise SKTimeError(f"Sleep duration cannot be negative: {seconds}")
+    if seconds > 86400:  # More than 24 hours
+        raise SKTimeError(f"Sleep duration too long (max 24 hours): {seconds}")
     time.sleep(seconds)
 
-
 def elapsed(start_time: float, end_time: float) -> float:
-    """
-    Calculate the elapsed time between two timestamps.
-
-    Args:
-        start_time (float): The start time timestamp
-        end_time (float): The end time timestamp
-
-    Returns:
-        float: The elapsed time in seconds
-
-    Raises:
-        SKTimeError: If end_time is less than start_time
-        
-    Example:
-        start = now()
-        sleep(1.0)
-        end = now()
-        duration = elapsed(start, end)  # ~1.0
-    """
+    """Calculate elapsed time with better validation."""
+    if not isinstance(start_time, (int, float)) or not isinstance(end_time, (int, float)):
+        raise SKTimeError("Start and end times must be numbers")
     if end_time < start_time:
-        raise SKTimeError("End time must be greater than start time.")
+        raise SKTimeError(f"End time ({end_time}) must be greater than start time ({start_time})")
     return end_time - start_time
 
 
@@ -193,44 +178,53 @@ def fmtdate(date_input: Union[float, datetime.datetime, str],
 
 def _parse_date_input(date_input: Union[float, datetime.datetime, str], 
                      timezone: Optional[str] = None) -> datetime.datetime:
-    """
-    Parse various date input formats into datetime object.
-    
-    Args:
-        date_input: Date input in various formats
-        timezone: Target timezone name
+    """Parse various date input formats into datetime object with better error handling."""
+    try:
+        if isinstance(date_input, datetime.datetime):
+            dt = date_input
+        elif isinstance(date_input, (int, float)):
+            # Add bounds checking for timestamps
+            if date_input < 0 or date_input > 4102444800:  # Year 2100
+                raise SKTimeError(f"Timestamp out of reasonable range: {date_input}")
+            dt = datetime.datetime.fromtimestamp(date_input)
+        elif isinstance(date_input, str):
+            if not date_input.strip():
+                raise SKTimeError("Empty date string provided")
+            # Try to parse ISO format string
+            try:
+                dt = datetime.datetime.fromisoformat(date_input.replace('Z', '+00:00'))
+            except ValueError:
+                # Try common formats
+                formats = [
+                    "%Y-%m-%d %H:%M:%S",
+                    "%Y-%m-%d %H:%M:%S.%f", 
+                    "%Y-%m-%d",
+                    "%m/%d/%Y %H:%M:%S",
+                    "%m/%d/%Y",
+                    "%d/%m/%Y %H:%M:%S",
+                    "%d/%m/%Y"
+                ]
+                for fmt in formats:
+                    try:
+                        dt = datetime.datetime.strptime(date_input, fmt)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    raise SKTimeError(f"Unable to parse date string: {date_input}")
+        else:
+            raise SKTimeError(f"Unsupported date input type: {type(date_input)}")
         
-    Returns:
-        datetime.datetime: Parsed datetime object
-    """
-    if isinstance(date_input, datetime.datetime):
-        dt = date_input
-    elif isinstance(date_input, (int, float)):
-        dt = datetime.datetime.fromtimestamp(date_input)
-    elif isinstance(date_input, str):
-        # Try to parse ISO format string
-        try:
-            dt = datetime.datetime.fromisoformat(date_input.replace('Z', '+00:00'))
-        except ValueError:
-            # Try common formats
-            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y"]:
-                try:
-                    dt = datetime.datetime.strptime(date_input, fmt)
-                    break
-                except ValueError:
-                    continue
-            else:
-                raise SKTimeError(f"Unable to parse date string: {date_input}")
-    else:
-        raise SKTimeError(f"Unsupported date input type: {type(date_input)}")
-    
-    # Handle timezone conversion if needed
-    if timezone and timezone.upper() == "UTC":
-        # Convert to UTC if not already timezone-aware
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=datetime.timezone.utc)
-    
-    return dt
+        # Handle timezone conversion if needed
+        if timezone and timezone.upper() == "UTC":
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+        
+        return dt
+    except Exception as e:
+        if isinstance(e, SKTimeError):
+            raise
+        raise SKTimeError(f"Failed to parse date input '{date_input}': {e}") from e
 
 
 def _format_relative_date(target_dt: datetime.datetime, 
@@ -583,46 +577,42 @@ def date_range(start: Union[float, str], end: Union[float, str],
 
 
 def timeout_after(seconds: float):
-    """
-    Decorator to add timeout to functions.
-    
-    Args:
-        seconds (float): Timeout in seconds
-        
-    Returns:
-        Callable: Function decorator
-        
-    Example:
-        @timeout_after(5.0)
-        def slow_function():
-            sleep(10)  # Will raise SKTimeError after 5 seconds
-            return "Done"
-    """
+    """Decorator to add timeout to functions with cross-platform support."""
     def decorator(func):
         def wrapper(*args, **kwargs):
-            def timeout_handler(signum, frame):
-                raise SKTimeError(f"Function '{func.__name__}' timed out after {seconds} seconds")
-            
-            # Set timeout (Unix-like systems only)
-            try:
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(int(seconds))
+            if sys.platform == 'win32':
+                # Use threading-based timeout for Windows
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(func, *args, **kwargs)
+                    try:
+                        return future.result(timeout=seconds)
+                    except concurrent.futures.TimeoutError:
+                        raise SKTimeError(f"Function '{func.__name__}' timed out after {seconds} seconds")
+            else:
+                # Unix-like systems can use signals
+                def timeout_handler(signum, frame):
+                    raise SKTimeError(f"Function '{func.__name__}' timed out after {seconds} seconds")
                 
                 try:
-                    result = func(*args, **kwargs)
-                    return result
-                finally:
-                    signal.alarm(0)  # Cancel alarm
-                    signal.signal(signal.SIGALRM, old_handler)
+                    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(int(seconds))
                     
-            except AttributeError:
-                # Windows doesn't have SIGALRM, use basic timing check
-                start = now()
-                result = func(*args, **kwargs)
-                if elapsed(start, now()) > seconds:
-                    raise SKTimeError(f"Function '{func.__name__}' exceeded timeout of {seconds} seconds")
-                return result
-                
+                    try:
+                        result = func(*args, **kwargs)
+                        return result
+                    finally:
+                        signal.alarm(0)
+                        signal.signal(signal.SIGALRM, old_handler)
+                        
+                except AttributeError:
+                    # Fallback if signal not available
+                    start = now()
+                    result = func(*args, **kwargs)
+                    if elapsed(start, now()) > seconds:
+                        raise SKTimeError(f"Function '{func.__name__}' exceeded timeout of {seconds} seconds")
+                    return result
+                    
         return wrapper
     return decorator
 
@@ -783,9 +773,11 @@ class LapTime(NamedTuple):
     total_time: float
     name: str = ""
 
-
-def timethis(store_in_global: str = None,
-             return_timing: bool = False, 
+# TODO all times are posted in the timing registry automatically if one exists, otherwise standalone
+# TODO do this by adding a global_timethis decorator. the regular timethis will just get the time,
+# TODO and users must use the global_timethis to store globally. they must also create a timing registry
+# TODO manually before. additionally, lets add automatic statistics to the timing registry if we dont already!
+def timethis(return_timing: bool = False, 
              store_on_function: bool = True,
              callback: Callable = None,
              print_result: bool = False,
@@ -1026,6 +1018,7 @@ def timethis(store_in_global: str = None,
     return decorator
 
 
+
 def _calculate_timing_stats(timings: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Calculate statistics from a list of timing records.
@@ -1147,41 +1140,26 @@ class TimingRegistry:
     """
     
     def __init__(self, registry_name: str = "default_timing"):
-        """
-        Initialize timing registry.
-        
-        Args:
-            registry_name (str): Name of the registry (creates or gets existing)
-        """
         self.registry_name = registry_name
-        # Get or create the RejSingleton registry for timing data
-        self._rej_registry = RejSingleton.get_registry(
+        self._lock = threading.Lock()  # Add thread safety
+        self._registry = RejSingleton.get_registry(
             f"timing_{registry_name}",
-            on_duplicate=Rej.Ruleset.OnDuplicate.OVERWRITE,  # Allow updating timing lists
-            auto_serialize_check=True  # Ensure cross-process compatibility
+            on_duplicate=Rej.Ruleset.OnDuplicate.OVERWRITE,
+            auto_serialize_check=True
         )
+
     
     def record_timing(self, timing_info: Dict[str, Any]):
-        """
-        Record a timing measurement.
-        
-        Args:
-            timing_info: Timing data dictionary with function_name, duration, etc.
-        """
-        func_name = timing_info['function_name']
-        
-        # Get existing timing list or create new one
-        existing_timings = self._rej_registry.get(func_name) or []
-        
-        # Add new timing
-        existing_timings.append(timing_info)
-        
-        # Store back in registry
-        self._rej_registry.register(func_name, existing_timings)
+        """Thread-safe timing recording."""
+        with self._lock:
+            func_name = timing_info['function_name']
+            existing_timings = self._registry.get(func_name) or []
+            existing_timings.append(timing_info)
+            self._registry.register(func_name, existing_timings)
     
     def get_function_timings(self, func_name: str) -> List[Dict[str, Any]]:
         """Get all timing records for a specific function."""
-        return self._rej_registry.get(func_name) or []
+        return self._registry.get(func_name) or []
     
     def get_function_stats(self, func_name: str) -> Dict[str, Any]:
         """Get statistical summary for a specific function."""
@@ -1190,15 +1168,18 @@ class TimingRegistry:
     
     def get_all_functions(self) -> List[str]:
         """Get list of all tracked function names."""
-        return self._rej_registry.list_keys()
+        with self._lock:
+            return self._registry.list_keys()
     
     def clear_function(self, func_name: str) -> bool:
         """Clear timing data for a specific function."""
-        return self._rej_registry.remove(func_name)
+        with self._lock:
+            return self._registry.remove(func_name)
     
     def clear_all(self):
         """Clear all timing data."""
-        self._rej_registry.clear()
+        with self._lock:
+            self._registry.clear()
     
     def find_functions(self, filter_func: Callable[[str, List[Dict]], bool]) -> Dict[str, List[Dict]]:
         """
@@ -1221,20 +1202,20 @@ class TimingRegistry:
                 lambda name, timings: statistics.mean([t['duration'] for t in timings]) > 1.0
             )
         """
-        return self._rej_registry.find(filter_func)
+        return self._registry.find(filter_func)
     
     def get_registry_info(self) -> Dict[str, Any]:
         """Get comprehensive information about this timing registry."""
-        base_info = self._rej_registry.get_info()
+        base_info = self._registry.get_info()
         
         # Add timing-specific statistics
         all_timings = []
-        for timings_list in self._rej_registry.list_items().values():
+        for timings_list in self._registry.list_items().values():
             all_timings.extend(timings_list)
         
         timing_stats = {
             'total_function_calls': len(all_timings),
-            'unique_functions': len(self._rej_registry),
+            'unique_functions': len(self._registry),
             'registry_name': self.registry_name
         }
         
@@ -1332,7 +1313,7 @@ class TimingRegistry:
                     for func_name, func_data in import_data['functions'].items():
                         timings = func_data.get('timings', [])
                         if timings:
-                            self._rej_registry.register(func_name, timings)
+                            self._registry.register(func_name, timings)
                     
                     print(f"✅ Loaded timing data for {len(import_data['functions'])} functions from SKGlobal '{key}'")
                 else:
@@ -1377,7 +1358,7 @@ class TimingRegistry:
     @property
     def rej_registry(self) -> RejSingleton:
         """Access the underlying RejSingleton registry for advanced operations."""
-        return self._rej_registry
+        return self._registry
     
     def get_function_timings(self, func_name: str) -> List[Dict[str, Any]]:
         """Get all timing records for a specific function."""
@@ -2064,45 +2045,19 @@ class Timer:
         self._last_lap_time = 0.0
 
     def pause(self):
-        """
-        Pause the timer.
-        
-        Time spent paused will not count toward elapsed time.
-        Timer must be running and not already paused.
-        
-        Raises:
-            RuntimeError: If timer not started or already paused
-            
-        Example:
-            timer.start()
-            work()
-            timer.pause()
-            break_time()  # This time won't count
-            timer.resume()
-        """
+        """Pause with better error message."""
         if not self._is_running:
-            raise RuntimeError("Timer has not been started.")
+            raise RuntimeError(f"Timer has not been started. Call start() first.")
         if self._pause_start is not None:
-            raise RuntimeError("Timer is already paused.")
+            raise RuntimeError(f"Timer is already paused since {self._pause_start}.")
         self._pause_start = now()
 
     def resume(self):
-        """
-        Resume the timer from a paused state.
-        
-        Adds the pause duration to total paused time and continues timing.
-        Timer must be currently paused.
-        
-        Raises:
-            RuntimeError: If timer not paused
-            
-        Example:
-            timer.pause()
-            break_time()
-            timer.resume()  # Continue timing where we left off
-        """
+        """Resume with better error message.""" 
+        if not self._is_running:
+            raise RuntimeError("Timer has not been started. Call start() first.")
         if self._pause_start is None:
-            raise RuntimeError("Timer is not paused.")
+            raise RuntimeError("Timer is not paused. Call pause() first.")
         self.paused_time += elapsed(self._pause_start, now())
         self._pause_start = None
 
@@ -2539,3 +2494,6 @@ def quick_time(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
     result = func(*args, **kwargs)
     end = now()
     return result, elapsed(start, end)
+
+
+

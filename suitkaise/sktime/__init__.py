@@ -25,7 +25,6 @@ from suitkaise.sktime.sktime import (
     now,
     sleep,
     elapsed,
-    Stopwatch
 )
 
 # Version info
@@ -36,6 +35,5 @@ __all__ = [
     'now',
     'sleep',
     'elapsed',
-    'Stopwatch',
     '__version__',
 ]
