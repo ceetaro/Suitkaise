@@ -421,14 +421,14 @@ def train_model(processed_data, model_type, learning_rate, epochs):
     return trained_model
 
 # create reusable presets for different trials
-image_processing = skfunction.create_preset("image_classifier", preprocess_data, {
+image_processing = skfunction.create("image_classifier", preprocess_data, {
     "model_type": "CNN",
     "batch_size": 32,
     "normalize": True
 })
 
 # use the same function base callable but with different param values!
-nlp_processing = skfunction.create_preset("text_classifier", preprocess_data, {
+nlp_processing = skfunction.create("text_classifier", preprocess_data, {
     "model_type": "Transformer", 
     "batch_size": 16,
     "normalize": False
@@ -483,12 +483,13 @@ def inference_pipeline(image_data):
 And a simpler example:
 ```python
 # Let's say you run a small business and need different reports
-from suitkaise import skfunction, sktree
+from suitkaise import skfunction, sktree, autopath
 
 # Step 1: Define a flexible report function
+@autopath(defaultpath="./reports/misc")
 def generate_sales_report(store_name, start_date, end_date, 
                          format="PDF", include_charts=True, 
-                         email_to=None, save_location="./reports/"):
+                         email_to=None, save_location_path=None):
     """
     Creates a sales report - normally takes 2-3 minutes to run
     """
@@ -498,7 +499,7 @@ def generate_sales_report(store_name, start_date, end_date,
     return f"Report saved to {save_location}"
 
 # Step 2: Create presets for different stores (avoid repetition!)
-downtown_store = skfunction.create_preset("downtown_reports", generate_sales_report, {
+downtown_store = skfunction.create("downtown_reports", generate_sales_report, {
     "store_name": "Downtown Branch",
     "format": "PDF",
     "include_charts": True,
@@ -506,7 +507,7 @@ downtown_store = skfunction.create_preset("downtown_reports", generate_sales_rep
     "save_location": "./reports/downtown/"
 })
 
-mall_store = skfunction.create_preset("mall_reports", generate_sales_report, {
+mall_store = skfunction.create("mall_reports", generate_sales_report, {
     "store_name": "Mall Location", 
     "format": "Excel",
     "include_charts": False,  # Mall manager prefers Excel
@@ -527,7 +528,7 @@ downtown_report.call(start_date="2024-01-01", end_date="2024-01-31")
 # Automatically uses: PDF format, includes charts, emails to right person, saves to right folder
 
 # ✅ Different computers/processes can run the same reports:
-# On your laptop, your server, your assistant's computer - same exact setup
+# On your laptop, your server, your assistant's computer - same exact setup (just make sure to include .sk files that have the persistent data!)
 
 # ✅ Override settings when needed:
 # Emergency report with different format
@@ -549,9 +550,9 @@ def monthly_report_batch():
     
     print("All monthly reports completed!")
 
-# ✅ Add caching so you don't regenerate identical reports:
-@skfunction.cache_results(save_to_file=True)
-def cached_annual_report(store_name, year):
+# ✅ Add caching and/or saving so you don't regenerate identical reports:
+@skfunction.cache_results(save_to_file="file/to/save/to") # or just skfunction.save_results("file/to/save/to")
+def saved_annual_report(store_name, year):
     # Annual reports take 20+ minutes - cache them!
     return generate_sales_report(
         store_name=store_name,
@@ -580,40 +581,39 @@ The beginner-friendly part: You don't need to understand multiprocessing, serial
 -------
 report
 
-reports is Suitkaises custom logging module, that keeps the original logging formula, but adds more convenience methods to auto log some common statements.
+reports is Suitkaise's custom logging module, that keeps the original logging formula, but adds more convenience methods to auto log some common statements.
 
 ```python
-from suitkaise import report
+from suitkaise import report, skpath
 
-# report from this file (rpr = reporter)
-rpr = report.from_current_file()
+# report from this file (rptr = reporter)
+rptr = report.from_current_file()
 # or from another file (like a parent file)
-target_file = report.get_file_path("parent_dir/main_dependent_file")
-rpr = report.from_other_file(target_file)
+target_file = skpath.SKPath("parent_dir/main_dependent_file")
+rptr = report.from_other_file(target_file)
 
-# report from this key
-rpr = report.from_this_key("Event_Bus")
+# report from a keyword instead of a file path
+rptr = report.from_this_key("Event_Bus")
 
 # using context manager to quickly use a different reporter
 # if not a valid in project file path (and not a valid path at all) assumes entry is key
 # you could just create another reporter, but...
-# this removes the "rq" reporter from memory and
-# looks and feels more intuitive
+# this removes the "rq" reporter from memory and looks and feels more intuitive
 except exception as e:
     with report.Quickly("a/different/file/path") as rq:
         rq.error(f"{Value1} was set to None so {Value2} was not initialized. {e}")
 
 # create 2 different reporters
-report_as_event_bus = report.from_this_key("Event_Bus")
-rpr = report.from_current_file()
+bus_rptr = report.from_this_key("Event_Bus")
+rptr = report.from_current_file()
 
 # use them for the same message and they will log from different sources
 # can report the same major error to different sources
-rpr.error(f"{Value1} was set to None so {Value2} was not initialized.")
-report_as_event_bus.error(f"{Value1} was set to None so {Value2} was not initialized.")
+rptr.error(f"{Value1} was set to None so {Value2} was not initialized.")
+bus_rptr.error(f"{Value1} was set to None so {Value2} was not initialized.")
 
 # toggling what reports you see
-paths = report.get_all_project_paths()
+paths = skpath.get_all_project_paths(except_paths="this/one/path/i/dont/want", as_str=True)
 # supports strings and lists of strings
 reporters_to_listen_to = [
     paths,
@@ -622,8 +622,10 @@ reporters_to_listen_to = [
 ]
 report.listen_to(reporters_to_listen_to)
 
+# -------------------------
 # basic report functions
 from suitkaise import report
+import time
 
 # all reports take a float timestamp as an argument and convert it into a time and date depending on set rules
 report.set_date_threshold(num_of_seconds, format_to_use)
@@ -637,7 +639,7 @@ report.set_time_threshold(60, "seconds")
 # which assumes to measure in --h --m --.----------s if value is greater than 3600, for example
 
 # standard logging
-report.info("message", info, end=False, time)
+report.info("message", info, end=True, time=time.time())
 report.debug()
 report.warning()
 report.error()
@@ -658,7 +660,7 @@ report.savedFile()
 report.loadedObject()
 report.loadedFile()
 
-# general status
+# general status (will add more)
 report.scanning()
 report.scanned()
 report.queued()
@@ -676,7 +678,7 @@ with report.Quickly("any_valid_key_or_path", info, end=True) as rq:
 # Looks like "ERROR: number1 was set to None so registry2 was not initialized. (Class: MyClass, Function: __init__)
 
 # or with existing reporter:
-rpr.error("message", info, end=TrueOrFalse)
+rptr.error("message", info, end=TrueOrFalse)
 
 
 # Thats the basic concept for sk logging functionality
@@ -768,7 +770,7 @@ an_skpath = {
     "np": "a/normalized/path/up_to_your_project_root"
 }
 ```
-All skpath operations return this 2 path dict, and all sk modules accept this dict. Converting this object to a string will return ONLY the absolute path (as to work with other standard path modules and standard programming concepts)
+All skpath operations return this 2 path dict, and all sk modules accept this dict. Converting this object to a string will return ONLY the absolute path (as to work with other standard path modules and standard programming concepts). this object has methods for comparison as well as the aforementioned string conversion.
 
 ```python
 from suitkaise import skpath
@@ -799,6 +801,18 @@ if equalpaths(path1, path2):
 # generate a reproducible ID for your path (shorter identification than whole path)
 my_path_id = path_id(my_path)
 my_path_shortened_id = path_idshort(my_path)
+
+# get all project paths
+proj_path_list = skpath.get_all_project_paths(except_paths="this/one/path/i/dont/want")
+# as abspath strings instead of skpaths
+proj_path_list = skpath.get_all_project_paths(except_paths="this/one/path/i/dont/want", as_str=True)
+# including all .gitignore and .skignore paths
+proj_path_list = skpath.get_all_project_paths(except_paths="this/one/path/i/dont/want", dont_ignore=True)
+
+# get a nested dictionary representing your project structure
+proj_structure = skpath.get_project_structure()
+# or a printable, formatted version: (custom_root allows you to only format some of the structure)
+fmted_structure = skpath.get_formatted_project_structure(custom_root=None)
 ```
 
 Finally, skpath has the autopath decorator, which will automatically convert valid paths to SKPaths before running a function. Any parameter with "path" in the name will attempt to convert a valid path to an SKPath object. if the param value is not a valid path, leaves it as is.
@@ -819,7 +833,7 @@ def process_file(path: str | SKPath = None)
 # relative path will convert to an SKPath automatically before being used
 process_file("my/relative/path")
 
-# standard autopath functionality, but function doesn't accept SKPath
+# standard autopath functionality, but function doesn't accept SKPath type!
 @autopath()
 def process_file(path: str = None) # only accepts strings!
     print(f"Processing {path}...")
@@ -850,7 +864,7 @@ def save_to_file(data: Any = None, path: str | SKPath = None) -> bool:
 # later...
 
 # user forgets to add path, or just wants to save all data to same file
-saved_to_file = save_to_file(data=data) # -> still saves to my/default/path!
+saved_to_file = save_to_file(data) # -> still saves to my/default/path!
 
 # NOTE: autofill WILL be ignored if defaultpath is used and has a valid path value!
 # autofill WILL be ignored below!
