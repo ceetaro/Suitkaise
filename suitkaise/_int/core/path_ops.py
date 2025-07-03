@@ -23,7 +23,7 @@ import fnmatch
 import inspect
 import hashlib
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Union, Tuple
+from typing import Dict, List, Set, Optional, Union, Tuple, Any
 
 # Get the actual suitkaise module base path for robust checking
 _SUITKAISE_BASE_PATH = Path(__file__).resolve().parent.parent
@@ -100,6 +100,15 @@ def _get_non_sk_caller_file_path() -> Optional[Path]:
         return None
     finally:
         del frame
+
+# TODO update any inits or other imports that use this newly added function
+def _get_module_file_path(obj: Any) -> Optional[Path]:
+    """Get the file path of the module for an object."""
+    if hasattr(obj, '__module__'):
+        module = inspect.getmodule(obj)
+        if module and hasattr(module, '__file__'):
+            return Path(module.__file__).resolve()
+    return None
 
 
 def _is_suitkaise_module(file_path: Path) -> bool:

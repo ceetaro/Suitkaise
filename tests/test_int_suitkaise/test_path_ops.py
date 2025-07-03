@@ -22,6 +22,7 @@ try:
         _get_caller_file_path,
         _get_non_sk_caller_file_path,
         _is_suitkaise_module,
+        _get_module_file_path,
         _IndicatorExpander,
         _ProjectRootDetector,
         _get_project_root,
@@ -301,6 +302,31 @@ def test_project_root_detection():
         print_result(False, f"Project root detection failed: {e}")
     
     print()
+
+def test_module_file_path():
+    """Test module file path detection."""
+    if not IMPORTS_SUCCESSFUL:
+        print_warning("Skipping module file path tests - imports failed")
+        return
+        
+    print_test("Module File Path Detection")
+    
+    try:
+        # Test _get_module_file_path with current file
+        module_path = _get_module_file_path(Path(__file__))
+        print_info("Current module file path", str(module_path))
+        print_result(module_path.exists(), "Module file exists")
+        print_result(module_path.is_file(), "Module path is a file")
+        
+        # Test with a non-existent path
+        non_existent = _get_module_file_path(Path("/this/path/definitely/does/not/exist.py"))
+        print_result(non_existent is None, "Non-existent path returns None")
+        
+    except Exception as e:
+        print_result(False, f"Module file path detection failed: {e}")
+    
+    print()
+
 
 
 def test_forced_root_system():
@@ -600,6 +626,7 @@ def run_all_tests():
         test_caller_detection()
         test_module_detection()
         test_indicator_expander()
+        test_module_file_path()
         test_project_root_detection()
         test_forced_root_system()
         test_path_utilities()

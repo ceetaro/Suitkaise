@@ -20,6 +20,7 @@ from .api import (
     # Convenience functions
     get_project_root,
     get_caller_path, 
+    get_module_path,
     get_current_dir,
     get_cwd,
     equalpaths,
@@ -49,7 +50,8 @@ __all__ = [
     
     # Convenience functions
     'get_project_root',
-    'get_caller_path', 
+    'get_caller_path',
+    'get_module_path', 
     'get_current_dir',
     'get_cwd',
     'equalpaths',

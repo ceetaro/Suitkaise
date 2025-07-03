@@ -26,6 +26,7 @@ try:
         SKPath,
         get_project_root,
         get_caller_path,
+        get_module_path,
         get_current_dir,
         get_cwd,
         equalpaths,
@@ -460,6 +461,34 @@ def test_convenience_functions():
     
     print()
 
+
+def test_get_module_path():
+    """Test get_module_path function."""
+    if not API_IMPORTS_SUCCESSFUL:
+        print_warning("Skipping get_module_path tests - imports failed")
+        return
+        
+    print_test("get_module_path Function")
+    
+    try:
+        # Test with current module
+        module_path = get_module_path(__name__)
+        print_result(isinstance(module_path, SKPath), "get_module_path returns SKPath")
+        print_result(module_path.exists(), "Module path exists")
+        expected_file = Path(__file__).resolve()
+        print_result(module_path.ap == str(expected_file), "Module path matches current file")
+        
+        # Test with non-existent module
+        try:
+            invalid_module_path = get_module_path("non_existent_module")
+            print_result(False, "get_module_path should raise for non-existent module")
+        except ImportError:
+            print_result(True, "get_module_path raises ImportError for non-existent module")
+        
+    except Exception as e:
+        print_result(False, f"get_module_path failed: {e}")
+    
+    print()
 
 def test_path_comparison_functions():
     """Test path comparison utility functions."""
@@ -972,6 +1001,7 @@ def run_all_api_tests():
         
         # Convenience function tests
         test_convenience_functions()
+        test_get_module_path()
         test_path_comparison_functions()
         test_path_id_functions()
         

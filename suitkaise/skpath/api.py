@@ -27,6 +27,7 @@ try:
         _get_project_root,
         _get_cwd,
         _get_current_dir,
+        _get_module_file_path,
         _equal_paths,
         _path_id,
         _get_all_project_paths,
@@ -339,6 +340,35 @@ def get_caller_path() -> SKPath:
     if caller_file is None:
         raise RuntimeError("Could not detect caller file path")
     return SKPath(caller_file)
+
+def get_module_path(obj: Any) -> Optional[SKPath]:
+    """
+    Get an object's module file path as an SKPath.
+    This is useful for introspection or debugging to find where an object is defined.
+
+    Args:
+        obj: The object to inspect
+
+    Returns:
+        SKPath object for the module file, or None if not found
+
+    Example:
+    ```python
+        from suitkaise.skpath import get_module_file_path
+
+        class MyClass:
+            pass
+
+        module_path = get_module_file_path(MyClass)
+        if module_path:
+            print(module_path.ap)  # Absolute path of the module file
+            print(module_path.np)  # Normalized path relative to project root
+    
+    """
+    module_file = _get_module_file_path(obj)
+    if module_file is None:
+        return None
+    return SKPath(module_file)
 
 def get_current_dir() -> SKPath:
     """
