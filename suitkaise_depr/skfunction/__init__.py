@@ -55,7 +55,7 @@ Usage examples:
     result = my_func.call()
 """
 
-from suitkaise.skfunction.skfunction import (
+from suitkaise_depr.skfunction.skfunction import (
     # Main classes
     SKFunction,
     SKFunctionBuilder,
@@ -188,7 +188,7 @@ def clear_registry() -> int:
         count = clear_registry()
         print(f"Removed {count} functions from registry")
     """
-    from suitkaise.rej import RejSingleton
+    from suitkaise_depr.rej import RejSingleton
     
     try:
         skfrej = RejSingleton.get_registry("SKFunctions")
@@ -208,7 +208,7 @@ def registry_info() -> dict:
         print(f"Registry has {info['total_items']} functions")
         print(f"Functions: {info['keys']}")
     """
-    from suitkaise.rej import RejSingleton
+    from suitkaise_depr.rej import RejSingleton
     
     try:
         skfrej = RejSingleton.get_registry("SKFunctions")

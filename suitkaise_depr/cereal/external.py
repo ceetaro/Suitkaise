@@ -4,8 +4,8 @@
 import json
 from typing import Any, Dict
 
-from suitkaise.cereal.protocols import SerializerProtocol
-from suitkaise.cereal.exceptions import (
+from suitkaise_depr.cereal.protocols import SerializerProtocol
+from suitkaise_depr.cereal.exceptions import (
     SerializationError, DeserializationError, UnsupportedTypeError)
 
 class ExternalSerializer(SerializerProtocol):

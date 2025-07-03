@@ -39,7 +39,7 @@ Usage examples:
     func = same_reg.get("my_func")
 """
 from typing import List
-from suitkaise.rej.rej import (
+from suitkaise_depr.rej.rej import (
     # Main classes
     Rej,
     RejSingleton,

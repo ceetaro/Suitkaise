@@ -87,8 +87,8 @@ from contextlib import contextmanager
 from enum import Enum, auto
 from collections import defaultdict, deque
 
-from suitkaise.rej.rej import Rej, RejSingleton
-from suitkaise.cereal import Cereal
+from suitkaise_depr.rej.rej import Rej, RejSingleton
+from suitkaise_depr.cereal import Cereal
 
 AnyFunction = Union[Callable, 'SKFunction']
 

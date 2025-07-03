@@ -27,8 +27,8 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 import time
 
-from suitkaise.skglobal import SKGlobal, GlobalLevel
-from suitkaise.cereal import Cereal
+from suitkaise_depr.skglobal import SKGlobal, GlobalLevel
+from suitkaise_depr.cereal import Cereal
 
 T = TypeVar('T')
 
@@ -573,7 +573,7 @@ class RejSingleton(Rej[T]):
     def __getstate__(self):
         """Prepare RejSingleton for cross-process serialization."""
         try:
-            from suitkaise.cereal.skpickle import enhanced_getstate
+            from suitkaise_depr.cereal.skpickle import enhanced_getstate
             return enhanced_getstate(self)
         except ImportError:
             # Fallback if enhanced_getstate is not available
@@ -588,7 +588,7 @@ class RejSingleton(Rej[T]):
     def __setstate__(self, state):
         """Restore RejSingleton after cross-process deserialization."""
         try:
-            from suitkaise.cereal.skpickle import enhanced_setstate
+            from suitkaise_depr.cereal.skpickle import enhanced_setstate
             enhanced_setstate(self, state)
         except ImportError:
             # Fallback if enhanced_setstate is not available

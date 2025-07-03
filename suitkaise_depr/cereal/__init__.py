@@ -2,9 +2,9 @@
 
 # suitkaise/cereal/__init__.py
 from typing import Any
-from suitkaise.cereal.cereal import Cereal
-from suitkaise.cereal.skpickle import SKPickle
-from suitkaise.cereal.exceptions import (
+from suitkaise_depr.cereal.cereal import Cereal
+from suitkaise_depr.cereal.skpickle import SKPickle
+from suitkaise_depr.cereal.exceptions import (
     CerealError,
     SerializationError,
     DeserializationError,

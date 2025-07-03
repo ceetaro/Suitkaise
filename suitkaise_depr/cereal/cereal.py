@@ -5,10 +5,10 @@
 from typing import Any, Dict, Optional, Type, Union
 from multiprocessing.managers import DictProxy, ListProxy
 
-from suitkaise.cereal.protocols import SerializerProtocol
-from suitkaise.cereal.exceptions import SerializerNotFoundError
-from suitkaise.cereal.internal import InternalSerializer
-from suitkaise.cereal.external import ExternalSerializer
+from suitkaise_depr.cereal.protocols import SerializerProtocol
+from suitkaise_depr.cereal.exceptions import SerializerNotFoundError
+from suitkaise_depr.cereal.internal import InternalSerializer
+from suitkaise_depr.cereal.external import ExternalSerializer
 
 class Cereal:
     """

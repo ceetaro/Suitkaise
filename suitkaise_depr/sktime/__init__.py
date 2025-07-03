@@ -21,7 +21,7 @@ Usage:
     print(f"Elapsed: {elapsed:.2f} seconds")
 """
 
-from suitkaise.sktime.sktime import (
+from suitkaise_depr.sktime.sktime import (
     now,
     sleep,
     elapsed,

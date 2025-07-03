@@ -36,7 +36,7 @@ Usage:
     clean_path = normalize_path("/some/messy/../path")
 """
 
-from suitkaise.skpath.skpath import (
+from suitkaise_depr.skpath.skpath import (
     # Main path functions
     normalize_path,
     get_caller_file_path,

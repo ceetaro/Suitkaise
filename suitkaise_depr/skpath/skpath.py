@@ -17,7 +17,7 @@ import sys
 import inspect
 from pathlib import Path
 import hashlib
-from suitkaise.skpath._project_indicators import project_indicators
+from suitkaise_depr.skpath._project_indicators import project_indicators
 
 class AutopathError(Exception):
     """Custom exception for autopath decorator."""
@@ -328,11 +328,11 @@ def _is_suitkaise_file(file_path: str) -> bool:
     
     # Method 1: Try to import suitkaise and get its actual location
     try:
-        import suitkaise
+        import suitkaise_depr
         
         # Case A: Regular package with __file__
-        if hasattr(suitkaise, '__file__') and suitkaise.__file__:
-            suitkaise_root = Path(suitkaise.__file__).parent
+        if hasattr(suitkaise_depr, '__file__') and suitkaise_depr.__file__:
+            suitkaise_root = Path(suitkaise_depr.__file__).parent
             try:
                 path.relative_to(suitkaise_root)
                 return True  # File is within the actual suitkaise package
@@ -340,8 +340,8 @@ def _is_suitkaise_file(file_path: str) -> bool:
                 return False  # File is outside the package
         
         # Case B: Namespace package with __path__
-        elif hasattr(suitkaise, '__path__'):
-            for pkg_path in suitkaise.__path__:
+        elif hasattr(suitkaise_depr, '__path__'):
+            for pkg_path in suitkaise_depr.__path__:
                 try:
                     path.relative_to(Path(pkg_path))
                     return True

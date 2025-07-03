@@ -1,16 +1,8 @@
-Revamping SKGlobal to incorporate SKTree (formerly SKRoot).
-
-we should revamp skglobal to incorporate sktree as an option on how to structure global, xprocess storage. that way, we can use the cleaner, more magical sktree concept that makes directories and files in your project smart global containers. 
-
-- tree system first: a main concern of the old skglobal is that it is over engineered for simpler needs or single process programs.
-- with a design that creates containers for you, you dont have to declare top vs local storage.
--- auto sync automatically happens if there are multiple processes or scripts created through xprocess.
-- isolate skfunction as its core functionality does not depend on skglobal
-- revamp Cereal by splitting into Cereal (for internal xprocessing) and CerealBox (for external, cross language or network communication) (Not yet covered in this MarkDown)
-
-what is xprocess (and skthreading)? xprocess is suitkaise's process and thread manager. it allows you to create new processes similar to multiprocessing, but also allows you to add tasks to complete when initializing every new process/thread. additionally, it will automatically sync serializable data to other processes (through the process that contains what is right now called "top level storage"). it also automatically handles process crashes or blocks due to errors, is able to report processes' statuses, recall processes, auto create background threads in processes, etc. 
+Revamping Suitkaise
 
 NOTE: code is conceptual, and in the ballpark of what I want it to look like. Syntax may be wrong and code may be incorrect.
+
+what is xprocess (and skthreading)? xprocess is suitkaise's process and thread manager. it allows you to create new processes similar to multiprocessing, but also allows you to add tasks to complete when initializing every new process/thread. additionally, it will automatically sync serializable data to other processes (through the process that contains what is right now called "top level storage"). it also automatically handles process crashes or blocks due to errors, is able to report processes' statuses, recall processes, auto create background threads in processes, etc. 
 
 goal with xprocess (with some other ideas mixed in that are covered below)
 
@@ -872,5 +864,509 @@ saved_to_file = save_to_file(data) # -> still saves to my/default/path!
 ```
 
 ----------
-sktime
+sktime - an expansion on basic timing functionality
+
+```python
+from suitkaise import sktime
+
+# get current time (same as time.time())
+now = sktime.now()
+# longer, clearer alias
+now = sktime.get_current_time()
+
+# sleep for n seconds
+sktime.sleep(2)
+
+# sleep after yawning twice
+
+# setup to sleep for 3 seconds after yawning 4 times
+# log_sleep will tell you when sleep occurs due to yawn if set to true
+_yawn = sktime.Yawn(3, 4, log_sleep=True)
+
+# doesnt sleep
+_yawn.yawn()
+# doesnt sleep
+_yawn.yawn()
+# doesnt sleep
+_yawn.yawn()
+# sleeps for 3 seconds!
+_yawn.yawn()
+
+# later...
+# doesnt sleep
+_yawn.yawn()
+# doesnt sleep
+_yawn.yawn()
+# doesnt sleep
+_yawn.yawn()
+# sleeps for 3 seconds!
+_yawn.yawn()
+
+# time operations with a stopwatch
+sw = sktime.Stopwatch()
+
+# start the stopwatch
+sw.start()
+sktime.sleep(2)
+
+# pause the stopwatch
+sw.pause()
+sktime.sleep(999)
+
+# resume the stopwatch
+sw.resume()
+sktime.sleep(3)
+
+# lap the stopwatch (about 5 seconds will be the result here)
+sw.lap()
+lap1 = sw.get_laptime(1)
+
+sktime.sleep(2)
+
+# stop the stopwatch
+sw.stop()
+
+# get results
+total = sw.total_time
+lap2 = sw.get_laptime(2)
+
+# time execution with a decorator or context manager
+timer = sktime.Timer()
+
+@sktime.timethis(timer)
+def do_work():
+    # do some work
+
+# when function finishes, time is logged to timer.
+counter = 0
+while counter < 100:
+    do_work()
+
+last_time = timer.mostrecent
+mean_time = timer.mean
+median_time = timer.median
+max_time = timer.longest
+min_time = timer.shortest
+std = timer.std
+time36 = timer.get_time(36)
+
+# using context manager without and with Timer initialization
+
+# without initalization, we only get most recent result
+counter = 0
+while counter < 100:
+    with sktime.Timer() as timer:
+            do_work()
+
+# will only get most recent result
+result = timer.result
+
+# with initialization, we get access to full statistics
+_timer = sktime.Timer()
+
+counter = 0
+while counter < 100:
+with _timer.TimeThis() as timer:
+    do_work()
+
+last_time = _timer.mostrecent
+mean_time = _timer.mean
+median_time = _timer.median
+max_time = _timer.longest
+min_time = _timer.shortest
+std = _timer.std
+
+if _timer.times >= 82:
+    time82 = _timer.get_time(82)
+```
+
+----------
+circuit - easy upgrades to incremental, conditional while looping and timeout after failing attempts
+
+```python
+from suitkaise import Circuit
+
+objs_to_check = a bunch of dicts
+index = 0
+
+# create a Circuit object
+circ = Circuit(shorts=4)
+
+# while we have a flowing circuit
+while circ.flowing:
+    current_obj = objs_to_check[index]
+
+    for item in current_obj.items():
+        # we should only add up to 3 LargeSizedObjs total across all dicts
+        if isinstance(item, LargeSizedObj):
+            # short the circuit. if this circuit shorts 4 times, it will break
+            circ.short()
+        if isinstance(item, ComplexObject):
+            # immediately break the circuit
+            circ.break()
+
+        # if the circuit has broken (opposite of flowing, flowing gets set to False)
+        if circ.broken:
+            break
+
+    # check if circuit has broken.
+    if circ.broken:
+        pass
+    else:
+        dicts_with_valid_items.append(current_obj)
+    index += 1
+
+------------
+# sleeping after a circuit break
+
+while program.running:
+    circ = Circuit(100)
+
+    while circ.flowing:
+        current_mem_usage = mem_mgr.get_current_usage()
+
+        if current_mem_usage > max_mem_threshold:
+            # will sleep execution for 5 seconds if circ.break() is called here
+            circ.break(5)
+
+        if current_mem_usage > recc_mem_threshold:
+            # will sleep execution for 0.05 seconds if this short causes a break
+            circ.short(0.05)
+            print(f"Shorted circuit {circ.times_shorted} times.")
+
+        # if circ.broken (or "if not circ.flowing")
+        if circ.broken:
+            print("Pausing execution because memory usage exceeds max threshold.")
+```
+
+----------
+fdprint - a super formatter that can format any standard data type, date and time, and more
+
+fdprint (format/debug print) is a tool that allows users to automatically print data in better formats, formatted for better display or better debugging.
+
+```python
+my_list = [
+    "hello",
+    "world",
+    "this",
+    "is",
+    "a",
+    "test",
+    "of",
+    "the",
+    "list",
+    "functionality"
+]
+
+my_dict = {
+    "key1": "value1",
+    "key2": "value2",
+    "key3": "value3",
+    "key4": "value4",
+    "key5": "value5"
+}
+
+my_set = {
+    "apple",
+    "banana",
+    "cherry",
+    "date",
+    "elderberry"
+}
+
+my_tuple = (
+    "first",
+    "second",
+    "third",
+    "fourth",
+    "fifth"
+)
+
+my_int = 42
+my_float = 3.14
+my_bool = True
+my_none = None
+my_bytes = b"byte string"
+my_complex = 1 + 2j
+my_range = range(10)
+my_dict_of_lists = {
+    "list1": ["item1", "item2", "item3"],
+    "list2": ["item4", "item5", "item6"]
+}
+my_dict_of_sets = {
+    "set1": {"item1", "item2", "item3"},
+    "set2": {"item4", "item5", "item6"}
+}
+my_dict_of_tuples = {
+    "tuple1": ("item1", "item2", "item3"),
+    "tuple2": ("item4", "item5", "item6")
+}
+
+def nlprint(*args, **kwargs):
+    """
+    Print each argument on a new line.
+    
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments (not used).
+    """
+    for arg in args:
+        try:
+            print(arg)
+        except Exception as e:
+            print(f"Error printing argument {arg}: {e}")
+
+
+nlprint(
+    my_list,
+    my_dict,
+    my_set,
+    my_tuple,
+    my_int,
+    my_float,
+    my_bool,
+    my_none,
+    my_bytes,
+    my_complex,
+    my_range,
+    my_frozenset,
+    my_bytearray,
+    my_dict_of_lists,
+    my_dict_of_sets,
+    my_dict_of_tuples
+)
+
+```
+
+result:
+['hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality']
+{'key1': 'value1', 'key2': 'value2', 'key3': 'value3', 'key4': 'value4', 'key5': 'value5'}
+{'banana', 'apple', 'cherry', 'elderberry', 'date'}
+('first', 'second', 'third', 'fourth', 'fifth')
+42
+3.14
+True
+None
+b'byte string'
+(1+2j)
+range(0, 10)
+{'list1': ['item1', 'item2', 'item3'], 'list2': ['item4', 'item5', 'item6']}
+{'set1': {'item2', 'item1', 'item3'}, 'set2': {'item4', 'item6', 'item5'}}
+{'tuple1': ('item1', 'item2', 'item3'), 'tuple2': ('item4', 'item5', 'item6')}
+
+result with fmt for display:
+hello, world, this, is, a, test, of, the, list, functionality
+
+key1: value1
+key2: value2
+key3: value3 
+key4: value4
+key5: value5
+
+banana, apple, cherry, elderberry, date
+
+(first, second, third, fourth, fifth)
+
+42
+3.14
+True
+None
+byte string
+1 + 2j
+0, 10
+
+
+list1: item1, item2, item3
+list2: item4, item5, item6
+
+and with color to more easily see what is being printed.
+
+result with fmt for debugging:
+(list) [
+    
+    'hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality'
+
+        ] (list)
+
+(dict) {
+
+   'key1': 'value1', 
+   'key2': 'value2', 
+   'key3': 'value3', 
+   'key4': 'value4', 
+   'key5': 'value5'
+
+} (dict)
+
+(set) {
+    
+    'banana', 'apple', 'cherry', 'elderberry', 'date'
+
+} (set)
+
+(tuple) (
+    
+    'first', 'second', 'third', 'fourth', 'fifth'
+
+) (tuple)
+
+(int) 42
+(float) 3.14
+(bool) True
+(None) None
+(bytes) 'byte string'
+(complex) ( 1 + 2j )
+(range) 0, 10
+
+(dict) {
+
+    (list) ['item1', 'item2', 'item3'],
+    (list) ['item4', 'item5', 'item6']
+
+} (dict)
+
+and with color to more easily see what is being printed.
+
+```python
+from suitkaise import fdprint as fd
+import time
+
+# its as easy as...
+value1 = {
+    "dict": {a dict}
+    "list": []
+}
+
+fd.fprint("This is value1: {value1}", value1)
+
+# printing dates or times
+now = time.time()
+
+# print using our default time format (see report section for more details)
+fd.fprint("Printing {value1} at {time:now}", (value1, now))
+# or...
+# print using our default date format
+fd.fprint("Printing {value1} at {date:now}", (value1, now))
+
+# using custom time and date formats
+
+# print using hours, minutes, seconds and microseconds
+fd.fprint("Printing {value1} at {hms6:now}", (value1, now))
+# print using date and timezone
+fd.fprint("Printing {value1} at {datePST:now}", (value1, now))
+
+# using debugging formats automatically
+fd.dprint("Your message with vars", (tuple of vars), priority level 1-5)
+
+# toggling if debug messages should be printed
+
+# will only print messages at level 2 or higher
+fd.set_dprint_level(2)
+```
+
+----------
+sklock - autolocking, smart locking, and easy lock tracking
+
+```python
+import sklock
+
+# use sklock to enable lock tracking
+# log_access logs when and what aquires this class's lock
+# decorator creates a special lock or reentrant lock that can track who accesses it
+@sklock.rlock(log_access=True)
+class MyClass():
+
+    # use this decorator to ensure that sklock exists
+    @sklock.ensure()
+    def __init__(self):
+        self.level = 3
+        self.threshold = 0.5
+
+    # automatically use the sklock for this entire method
+    # log_access tells user when something uses lock or tries to use lock for just this function
+    @sklock.withlock(log_access=True)
+    def set_level(self, level: int):
+        if level:
+            self.level = level
+
+    # use a context manager if you only want to use lock some of the time
+    def set_threshold(self, threshold: float):
+        with sklock.Use():
+            if threshold and 0 <= threshold <= 1:
+                self.threshold = threshold
+
+# using these decorators with multiple locks
+class TwoLockClass:
+
+    def __init__(self):
+        self._lock1 = sklock.RLock()
+        self._lock2 = sklock.Lock()
+        self.level = 3
+        self.threshold = 0.5
+        self.brightness = 50
+
+    @sklock.withlock(self._lock1, log_access=True)
+    def set_level(self, level: int):
+        if level:
+            self.level = level
+
+    def set_threshold(self, threshold: float):
+        with sklock.Use(self._lock2):
+            if threshold and 0 <= threshold <= 1:
+                self.threshold = threshold  
+
+# handling deadlocks gracefully
+# setting wait to any positive number will allow things to wait a set time to see if lock opens
+    @sklock.withlock(self._lock1, log_access=True, wait=1.5)
+    def set_brightness(self, brightness: int):
+        # set the brightness
+
+    # getting lock history and current lock status
+    hist = sklock.get_lock_history()
+    is_locked = sklock.get_current_lock_status()
+
+    # if multiple locks are in use, specify what lock you would like to focus on
+    hist = sklock.get_lock_history(self._lock1)
+
+    
+
+# debugging or gathering general current lock information
+
+# at start of file
+sklock.track()
+
+# later on
+sklock.get_lock_information()
+# returns all sklocks, name of what they are locking, name of what is currently using them (if in use)
+```
+
+Question: should i include anything else to improve the sklock concept?
+
+----------
+cerial (formerly cereal), Cerial and CerialBox - better serialization and the serialization engine Suitkaise runs on itself
+
+cerial is the internal magic powering the seamless cross processing. for now, we will focus on internal serialization using cloudpickle as a base.
+
+Cerial is for internal serialization between processes, CerialBox is for external network or cross language serialization.
+
+Question: are there any legal blockades with using cloudpickle as a base for my serialization engine? do i need to contact them and obtain permission?
+
+we will use cloudpickle as a base, and turn it into cerial (mix of the words serial and cereal for some flair)
+
+differences between cloudpickle and Cerial (internal, cross process serialization):
+
+- Cerial is built with extra features on top of cloudpickle to handle extra complex objects. It uses __setstate__ and __getstate__ to handle the deconstruction and reconstruction of these objects.
+
+These include:
+- special functions (lambdas, generators, etc.)
+- threading locks
+- other common NSOs (non-serializable objects)
+- all suitkaise specific complex objects
+- and more that I think of
+
+Question: anything else I should include?
+
+Additionally, it overrides the standard pickler that multiprocessing.Manager uses, allowing us further freedom while using our global storages. It also handles the automatic intialization and cleanup of custom Managers.
+
+Cerial will function internally as our main serialization engine, but users can also import it and use it to serialize objects themselves if they would like to use it outside of the suitkaise environment, as I want this to be a better version of current serialization methods, once again at the cost of overhead.
 

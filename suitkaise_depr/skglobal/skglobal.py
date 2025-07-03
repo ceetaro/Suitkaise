@@ -34,9 +34,9 @@ if sys.platform == 'win32':
 else:
     import fcntl
 
-from suitkaise.skpath._project_indicators import project_indicators
-import suitkaise.skpath.skpath as skpath
-from suitkaise.cereal import Cereal, create_shared_dict
+from suitkaise_depr.skpath._project_indicators import project_indicators
+import suitkaise_depr.skpath.skpath as skpath
+from suitkaise_depr.cereal import Cereal, create_shared_dict
 
 class SKGlobalError(Exception):
     """Custom exception for SKGlobal."""

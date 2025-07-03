@@ -33,7 +33,7 @@ Usage:
     
 """
 
-from suitkaise.skglobal.skglobal import (
+from suitkaise_depr.skglobal.skglobal import (
     # Main classes
     SKGlobal,
     SKGlobalStorage,

@@ -6,9 +6,9 @@ import cloudpickle
 from typing import Any, Dict
 from multiprocessing.managers import DictProxy, ListProxy
 
-from suitkaise.cereal.protocols import SerializerProtocol
-from suitkaise.cereal.exceptions import SerializationError, DeserializationError
-from suitkaise.cereal.skpickle import SKPickle
+from suitkaise_depr.cereal.protocols import SerializerProtocol
+from suitkaise_depr.cereal.exceptions import SerializationError, DeserializationError
+from suitkaise_depr.cereal.skpickle import SKPickle
 
 class InternalSerializer(SerializerProtocol):
     """

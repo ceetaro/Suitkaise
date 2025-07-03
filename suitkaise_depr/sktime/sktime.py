@@ -27,9 +27,9 @@ import os
 from typing import Tuple, Any, Callable, Optional, Dict, List, Union, NamedTuple
 from contextlib import contextmanager
 
-import suitkaise.skfunction.skfunction as skfunction
-from suitkaise.skglobal.skglobal import create_global, get_global, SKGlobalError, GlobalLevel
-from suitkaise.rej.rej import RejSingleton, Rej
+import suitkaise_depr.skfunction.skfunction as skfunction
+from suitkaise_depr.skglobal.skglobal import create_global, get_global, SKGlobalError, GlobalLevel
+from suitkaise_depr.rej.rej import RejSingleton, Rej
 
 
 class SKTimeError(Exception):
