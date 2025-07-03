@@ -880,6 +880,17 @@ now = sktime.get_current_time()
 # sleep for n seconds
 sktime.sleep(2)
 
+# find the difference between 2 times
+time1 = now
+time2 = now - 72
+
+# order doesn't matter! result: 72
+time_diff = sktime.elapsed(time2, time1)
+
+# if only one time is added, assumes second time is current time
+# result: still 72!
+time_diff = sktime.elapsed(time2)
+
 # sleep after yawning twice
 
 # setup to sleep for 3 seconds after yawning 4 times

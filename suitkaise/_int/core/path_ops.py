@@ -886,12 +886,16 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
     return all_paths
 
 
-def _get_project_structure(force_root: Optional[Union[str, Path]] = None) -> Dict:
+def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
+                          except_paths: Optional[Union[str, List[str]]] = None,
+                          dont_ignore: bool = False) -> Dict:
     """
     Get a nested dictionary representing the project structure.
     
     Args:
         force_root: Custom root directory (defaults to detected project root)
+        except_paths: Paths to exclude from results
+        dont_ignore: Include paths that would normally be ignored
         
     Returns:
         Nested dictionary representing directory structure
@@ -904,16 +908,55 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None) -> Dic
     if root is None or not root.exists():
         return {}
     
+    # Convert except_paths to set for faster lookup
+    if except_paths is None:
+        except_set = set()
+    elif isinstance(except_paths, str):
+        except_set = {except_paths}
+    else:
+        except_set = set(except_paths)
+    
+    # Default ignore patterns
+    ignore_patterns = {
+        '__pycache__', '.git', '.pytest_cache', '.mypy_cache',
+        'node_modules', '.venv', 'venv', 'env', '.env',
+        'dist', 'build', '*.egg-info'
+    } if not dont_ignore else set()
+    
+    # Add patterns from .gitignore and .dockerignore files
+    if not dont_ignore:
+        gitignore_path = root / '.gitignore'
+        dockerignore_path = root / '.dockerignore'
+        
+        ignore_patterns.update(_parse_gitignore_file(gitignore_path))
+        ignore_patterns.update(_parse_gitignore_file(dockerignore_path))
+    
+    def should_ignore(path: Path) -> bool:
+        """Check if path should be ignored."""
+        path_name = path.name
+        
+        # Check except_paths
+        if path_name in except_set:
+            return True
+        
+        # Check ignore patterns
+        if not dont_ignore:
+            for pattern in ignore_patterns:
+                if fnmatch.fnmatch(path_name.lower(), pattern.lower()):
+                    return True
+        
+        return False
+    
     def build_structure(path: Path) -> Dict:
         """Recursively build structure dictionary."""
         structure = {}
         
         try:
             for item in path.iterdir():
+                if should_ignore(item):
+                    continue
+                    
                 if item.is_dir():
-                    # Skip common ignore patterns
-                    if item.name.startswith('.') or item.name in {'__pycache__', 'node_modules'}:
-                        continue
                     structure[item.name] = build_structure(item)
                 else:
                     structure[item.name] = 'file'
@@ -927,7 +970,9 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None) -> Dic
 
 def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
                                 max_depth: int = 3,
-                                show_files: bool = True) -> str:
+                                show_files: bool = True,
+                                except_paths: Optional[Union[str, List[str]]] = None,
+                                dont_ignore: bool = False) -> str:
     """
     Get a formatted string representation of the project structure.
 
@@ -937,6 +982,8 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         force_root: Custom root directory (defaults to detected project root)
         max_depth: Maximum depth to display (prevents huge output)
         show_files: Whether to show files or just directories
+        except_paths: Paths to exclude from results
+        dont_ignore: Include paths that would normally be ignored
         
     Returns:
         Formatted string representing directory structure
@@ -949,6 +996,45 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
     if root is None or not root.exists():
         return "No project root found"
     
+    # Convert except_paths to set for faster lookup
+    if except_paths is None:
+        except_set = set()
+    elif isinstance(except_paths, str):
+        except_set = {except_paths}
+    else:
+        except_set = set(except_paths)
+    
+    # Default ignore patterns
+    ignore_patterns = {
+        '__pycache__', '.git', '.pytest_cache', '.mypy_cache',
+        'node_modules', '.venv', 'venv', 'env', '.env',
+        'dist', 'build', '*.egg-info'
+    } if not dont_ignore else set()
+    
+    # Add patterns from .gitignore and .dockerignore files
+    if not dont_ignore:
+        gitignore_path = root / '.gitignore'
+        dockerignore_path = root / '.dockerignore'
+        
+        ignore_patterns.update(_parse_gitignore_file(gitignore_path))
+        ignore_patterns.update(_parse_gitignore_file(dockerignore_path))
+    
+    def should_ignore(path: Path) -> bool:
+        """Check if path should be ignored."""
+        path_name = path.name
+        
+        # Check except_paths
+        if path_name in except_set:
+            return True
+        
+        # Check ignore patterns
+        if not dont_ignore:
+            for pattern in ignore_patterns:
+                if fnmatch.fnmatch(path_name.lower(), pattern.lower()):
+                    return True
+        
+        return False
+    
     def format_tree(path: Path, prefix: str = "", depth: int = 0) -> List[str]:
         """Recursively format the tree structure."""
         if depth > max_depth:
@@ -959,8 +1045,10 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         try:
             # Get directory contents, separated into dirs and files
             items = list(path.iterdir())
-            dirs = [item for item in items if item.is_dir() and not item.name.startswith('.')]
-            files = [item for item in items if item.is_file() and not item.name.startswith('.')] if show_files else []
+            
+            # Filter out ignored items
+            dirs = [item for item in items if item.is_dir() and not should_ignore(item)]
+            files = [item for item in items if item.is_file() and not should_ignore(item)] if show_files else []
             
             # Sort for consistent output
             dirs.sort(key=lambda x: x.name.lower())
