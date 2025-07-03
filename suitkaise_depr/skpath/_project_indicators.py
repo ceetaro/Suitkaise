@@ -29,8 +29,12 @@ project_indicators = {
             "license": {
                 "LICENSE",
                 "LICENSE.*",
+                "LICENCE",
+                "LICENCE.*",
                 "license",
-                "license.*"
+                "license.*",
+                "licence",
+                "licence.*",
             },
             "readme": {
                 "README",
