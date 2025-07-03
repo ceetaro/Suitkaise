@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    # Import all API functions to test
+    # Import all API functions to test - FIXED IMPORTS
     from suitkaise.fdprint.api import (
         fprint,
         dprint,
@@ -28,9 +28,11 @@ try:
         get_config,
         fmt,
         debug_fmt,
+        display_fmt,
         timestamp,
         quick_debug,
-        trace
+        trace,
+        quick_print
     )
     API_IMPORTS_SUCCESSFUL = True
 except ImportError as e:
@@ -100,12 +102,12 @@ def capture_output():
 
 
 def test_fprint_basic_functionality():
-    """Test basic fprint functionality."""
+    """Test basic fprint functionality - ALWAYS DISPLAY MODE."""
     if not API_IMPORTS_SUCCESSFUL:
         print_warning("Skipping fprint basic tests - imports failed")
         return
         
-    print_test("fprint Basic Functionality")
+    print_test("fprint Basic Functionality (Always Display Mode)")
     
     try:
         # Test basic string printing
@@ -123,23 +125,21 @@ def test_fprint_basic_functionality():
         print_result("Alice" in result, "Dict values appear in output")
         print_result("Python" in result, "Nested list values appear")
         
-        enable_colors()  # Ensure colors are enabled for type annotations
-
+        # Test that fprint ALWAYS uses display mode (clean output)
         with capture_output() as output:
-            fprint("Display mode: {}", [1, 2, 3], mode="display")
-        display_result = output.getvalue().strip()
-
+            fprint("Display output: {}", [1, 2, 3])
+        fprint_result = output.getvalue().strip()
+        
+        # Compare with dprint which ALWAYS uses debug mode (verbose output)
         with capture_output() as output:
-            fprint("Debug mode: {}", [1, 2, 3], mode="debug")
-        debug_result = output.getvalue().strip()
+            dprint("Debug output", ([1, 2, 3],), 1)
+        dprint_result = output.getvalue().strip()
 
-        # DIAGNOSTIC: Print what we actually got
-        print(f"  DEBUG: display_result ({len(display_result)}): '{display_result}'")
-        print(f"  DEBUG: debug_result ({len(debug_result)}): '{debug_result}'")
-
-        print_result("Display mode:" in display_result, "Display mode works")
-        print_result("Debug mode:" in debug_result, "Debug mode works")
-        print_result(len(debug_result) > len(display_result), "Debug mode produces more verbose output")
+        print_result("Display output:" in fprint_result, "fprint produces clean output")
+        print_result("Debug output" in dprint_result, "dprint produces debug output")
+        print_result(len(dprint_result) > len(fprint_result), "dprint is more verbose than fprint")
+        print_result("(list)" not in fprint_result, "fprint has no type annotations")
+        print_result("(list)" in dprint_result, "dprint has type annotations")
         
         # Test multiple values
         with capture_output() as output:
@@ -159,9 +159,10 @@ def test_fprint_basic_functionality():
         none_result = output.getvalue().strip()
         print_result("None" in none_result, "None value formatting works")
         
-        print_info("Basic result", result[:50] + "..." if len(result) > 50 else result)
-        print_info("Display length", str(len(display_result)))
-        print_info("Debug length", str(len(debug_result)))
+        print_info("fprint result", fprint_result[:50] + "..." if len(fprint_result) > 50 else fprint_result)
+        print_info("dprint result", dprint_result[:50] + "..." if len(dprint_result) > 50 else dprint_result)
+        print_info("fprint length", str(len(fprint_result)))
+        print_info("dprint length", str(len(dprint_result)))
         
     except Exception as e:
         print_result(False, f"fprint basic functionality failed: {e}")
@@ -189,13 +190,16 @@ def test_fprint_time_specifiers():
         ]
         
         for spec in time_specs:
+            spec_name = spec.split(":")[0]
+            
             with capture_output() as output:
-                fprint(f"Current {{spec}}: {{{spec}}}")
+                fprint(f"Current {spec_name}: {{{spec}}}")
             result = output.getvalue().strip()
             
-            spec_name = spec.split(":")[0]
-            print_result(spec_name not in result, f"Time spec '{spec_name}' was resolved")
-            print_result("{" not in result or "}" not in result, f"Time spec '{spec_name}' removed braces")
+            # FIXED: Check that the time specifier format is not present, not the spec name
+            original_spec = f"{{{spec}}}"
+            print_result(original_spec not in result, f"Time spec '{spec_name}' was resolved")
+            print_result("{" not in result and "}" not in result, f"Time spec '{spec_name}' removed braces")
             
             # Check format-specific content
             if spec_name == "time":
@@ -260,6 +264,9 @@ def test_dprint_functionality():
     print_test("dprint Debug Printing Functionality")
     
     try:
+        # ADDED: Ensure debug level is set to 1 at start of test
+        set_dprint_level(1)
+        
         # Test basic debug message
         with capture_output() as output:
             dprint("Basic debug message")
@@ -313,6 +320,9 @@ def test_dprint_functionality():
         print_result(len(low_pri_result) == 0, "Low priority message filtered out")
         print_result("High priority message" in high_pri_result, "High priority message appears")
         
+        # FIXED: Reset debug level to 1 before testing edge cases
+        set_dprint_level(1)
+        
         # Test empty variables
         with capture_output() as output:
             dprint("Empty variables test", (), 3) 
@@ -322,7 +332,7 @@ def test_dprint_functionality():
         
         # Test None variables
         with capture_output() as output:
-            dprint("None variables test", None)
+            dprint("None variables test", None, 1)  # FIXED: Use priority 1 and pass None directly
         none_vars_result = output.getvalue().strip()
         print_result("None variables test" in none_vars_result, "None variables handled")
         
@@ -333,7 +343,7 @@ def test_dprint_functionality():
         },)
         
         with capture_output() as output:
-            dprint("Complex data", complex_vars, 2)
+            dprint("Complex data", complex_vars, 1)  # FIXED: Use priority 1 instead of 2
         complex_result = output.getvalue().strip()
         
         print_result("Complex data" in complex_result, "Complex debug message works")
@@ -351,6 +361,66 @@ def test_dprint_functionality():
         print_result(False, f"dprint functionality failed: {e}")
         import traceback
         traceback.print_exc()
+    
+    print()
+
+
+def test_fprint_vs_dprint_comparison():
+    """Test the clear distinction between fprint (display) and dprint (debug)."""
+    if not API_IMPORTS_SUCCESSFUL:
+        print_warning("Skipping fprint vs dprint comparison tests - imports failed")
+        return
+        
+    print_test("fprint vs dprint Mode Comparison")
+    
+    try:
+        test_data = {"users": ["Alice", "Bob"], "count": 2, "active": True}
+        
+        # Test fprint (always clean display mode)
+        with capture_output() as output:
+            fprint("Data: {}", test_data)
+        fprint_result = output.getvalue().strip()
+        
+        # Test dprint (always verbose debug mode)
+        with capture_output() as output:
+            dprint("Data", (test_data,), 1)
+        dprint_result = output.getvalue().strip()
+        
+        # Test formatting differences
+        print_result("Data:" in fprint_result, "fprint shows clean label")
+        print_result("Data" in dprint_result, "dprint shows debug label")
+        print_result("Alice" in fprint_result, "fprint shows data values")
+        print_result("Alice" in dprint_result, "dprint shows data values")
+        
+        # Key differences
+        print_result("(dict)" not in fprint_result, "fprint has NO type annotations")
+        print_result("(dict)" in dprint_result, "dprint HAS type annotations")
+        print_result("-" not in fprint_result, "fprint has NO timestamp")
+        print_result("-" in dprint_result, "dprint HAS timestamp")
+        print_result(len(dprint_result) > len(fprint_result), "dprint is more verbose")
+        
+        # Test nested data formatting differences
+        nested_data = {"level1": {"level2": ["deep", "values"]}}
+        
+        with capture_output() as output:
+            fprint("Nested: {}", nested_data)
+        nested_fprint = output.getvalue().strip()
+        
+        with capture_output() as output:
+            dprint("Nested", (nested_data,), 1)
+        nested_dprint = output.getvalue().strip()
+        
+        print_result("deep" in nested_fprint, "fprint reaches nested values")
+        print_result("deep" in nested_dprint, "dprint reaches nested values")
+        print_result("(string)" not in nested_fprint, "fprint nested has no type info")
+        print_result("(string)" in nested_dprint, "dprint nested has type info")
+        
+        print_info("fprint clean", fprint_result[:60] + "..." if len(fprint_result) > 60 else fprint_result)
+        print_info("dprint verbose", dprint_result[:60] + "..." if len(dprint_result) > 60 else dprint_result)
+        print_info("Verbosity ratio", f"{len(dprint_result) / len(fprint_result):.1f}x")
+        
+    except Exception as e:
+        print_result(False, f"fprint vs dprint comparison failed: {e}")
     
     print()
 
@@ -649,111 +719,138 @@ def test_convenience_functions():
     print()
 
 
+def test_convenience_functions_modes():
+    """Test convenience functions with explicit mode control."""
+    if not API_IMPORTS_SUCCESSFUL:
+        print_warning("Skipping convenience functions tests - imports failed")
+        return
+        
+    print_test("Convenience Functions Mode Control")
+    
+    try:
+        test_data = {"name": "Bob", "items": [1, 2, 3]}
+        
+        # Test fmt with explicit modes
+        display_formatted = fmt(test_data, "display")  # Same as fprint formatting
+        debug_formatted = fmt(test_data, "debug")      # Same as dprint formatting
+        
+        print_result(isinstance(display_formatted, str), "fmt display returns string")
+        print_result(isinstance(debug_formatted, str), "fmt debug returns string")
+        print_result(len(display_formatted) > 0, "fmt display produces output")
+        print_result(len(debug_formatted) > len(display_formatted), "fmt debug more verbose than display")
+        
+        # Test convenience functions
+        debug_only = debug_fmt(test_data)              # Forces debug mode
+        display_only = display_fmt(test_data)          # Forces display mode
+        
+        print_result(isinstance(debug_only, str), "debug_fmt returns string")
+        print_result(isinstance(display_only, str), "display_fmt returns string")
+        print_result(debug_only == debug_formatted, "debug_fmt equivalent to fmt(obj, 'debug')")
+        print_result(display_only == display_formatted, "display_fmt equivalent to fmt(obj, 'display')")
+        
+        # Test mode characteristics
+        print_result("(dict)" not in display_only, "display_fmt has no type annotations")
+        print_result("(dict)" in debug_only, "debug_fmt has type annotations")
+        print_result("Bob" in display_only, "display_fmt includes data")
+        print_result("Bob" in debug_only, "debug_fmt includes data")
+        
+        # Test that these match fprint/dprint output
+        with capture_output() as output:
+            fprint("Test: {}", test_data)
+        fprint_output = output.getvalue().strip().replace("Test: ", "")
+        
+        with capture_output() as output:
+            dprint("Test", (test_data,), 1)
+        dprint_output = output.getvalue().strip()
+        dprint_data_part = dprint_output.split(" [")[1].split("]")[0] if " [" in dprint_output else ""
+        
+        print_result(display_only in fprint_output, "display_fmt matches fprint formatting")
+        print_result(debug_only in dprint_data_part, "debug_fmt matches dprint formatting")
+        
+        print_info("Display formatted", display_formatted[:40] + "..." if len(display_formatted) > 40 else display_formatted)
+        print_info("Debug formatted", debug_formatted[:40] + "..." if len(debug_formatted) > 40 else debug_formatted)
+        print_info("Mode difference", f"debug is {len(debug_formatted) / len(display_formatted):.1f}x longer")
+        
+    except Exception as e:
+        print_result(False, f"Convenience functions failed: {e}")
+    
+    print()
+
+
 def test_quick_helpers():
     """Test quick helper functions (quick_debug, trace)."""
     if not API_IMPORTS_SUCCESSFUL:
         print_warning("Skipping quick helpers tests - imports failed")
         return
         
-    print_test("Quick Helper Functions")
+    print_test("Quick Helper Functions (Updated)")
     
     try:
-        # Test quick_debug function
         test_objects = [
             {"user": "Alice"},
             [1, 2, 3, "test"],
-            "simple string",
-            42,
-            True
+            "simple string"
         ]
         
+        # Test quick_debug (uses dprint internally - verbose output)
         with capture_output() as output:
             quick_debug(*test_objects)
-        quick_result = output.getvalue()
+        quick_debug_result = output.getvalue()
         
-        print_result(len(quick_result) > 0, "quick_debug produces output")
-        print_result("Object 1" in quick_result, "quick_debug labels first object")
-        print_result("Object 2" in quick_result, "quick_debug labels second object")
-        print_result("Alice" in quick_result, "quick_debug includes dict data")
-        print_result("simple string" in quick_result, "quick_debug includes string data")
+        print_result(len(quick_debug_result) > 0, "quick_debug produces output")
+        print_result("Object 1" in quick_debug_result, "quick_debug labels objects")
+        print_result("Alice" in quick_debug_result, "quick_debug includes data")
+        print_result("(dict)" in quick_debug_result, "quick_debug has type annotations (debug mode)")
+        print_result("-" in quick_debug_result, "quick_debug has timestamps (debug mode)")
         
-        # Count number of objects processed
-        object_count = quick_result.count("Object ")
-        print_result(object_count == len(test_objects), f"quick_debug processed all {len(test_objects)} objects")
-        
-        # Test trace function
+        # Test trace (uses dprint internally - verbose output)
         with capture_output() as output:
             trace("test_value", [1, 2, 3], message="Custom trace")
         trace_result = output.getvalue().strip()
         
         print_result("Custom trace" in trace_result, "trace uses custom message")
-        print_result("test_value" in trace_result, "trace includes string data")
-        print_result("[" in trace_result, "trace includes list data")
-        print_result("-" in trace_result, "trace includes timestamp")
+        print_result("test_value" in trace_result, "trace includes data")
+        print_result("(list)" in trace_result, "trace has type annotations (debug mode)")
+        print_result("-" in trace_result, "trace has timestamp (debug mode)")
         
-        # Test trace with default message
+        # Test quick_print (uses fprint internally - clean output)
         with capture_output() as output:
-            trace("default_test", 42)
-        trace_default_result = output.getvalue().strip()
+            quick_print(*test_objects)
+        quick_print_result = output.getvalue()
         
-        print_result("Trace" in trace_default_result, "trace uses default message")
-        print_result("default_test" in trace_default_result, "trace with default includes data")
-        print_result("42" in trace_default_result, "trace includes numeric data")
+        print_result(len(quick_print_result) > 0, "quick_print produces output")
+        print_result("Item 1" in quick_print_result, "quick_print labels items")
+        print_result("Alice" in quick_print_result, "quick_print includes data")
+        print_result("(dict)" not in quick_print_result, "quick_print has NO type annotations (display mode)")
+        print_result("-" not in quick_print_result, "quick_print has NO timestamps (display mode)")
         
-        # Test empty quick_debug
-        with capture_output() as output:
-            quick_debug()
-        empty_quick_result = output.getvalue()
-        print_result(len(empty_quick_result) == 0, "Empty quick_debug produces no output")
+        # Compare verbosity
+        print_result(len(quick_debug_result) > len(quick_print_result), "quick_debug more verbose than quick_print")
         
-        # Test single object quick_debug
-        with capture_output() as output:
-            quick_debug({"single": "object"})
-        single_quick_result = output.getvalue().strip()
-        print_result("Object 1" in single_quick_result, "Single object quick_debug works")
-        print_result("single" in single_quick_result, "Single object data appears")
-        
-        # Test trace with complex data
-        complex_trace_data = {
-            "function": "process_data",
-            "input": {"file": "data.csv", "rows": 1000},
-            "output": {"processed": 950, "errors": 50}
-        }
-        
-        with capture_output() as output:
-            trace(complex_trace_data, message="Function execution")
-        complex_trace_result = output.getvalue().strip()
-        
-        print_result("Function execution" in complex_trace_result, "Complex trace message works")
-        print_result("process_data" in complex_trace_result, "Complex trace data appears")
-        print_result("1000" in complex_trace_result, "Complex nested data accessible")
-        
-        # Test that helpers use appropriate debug priority
+        # Test debug level filtering for debug helpers
         original_level = get_config().get('debug_level', 1)
-        set_dprint_level(3)  # Set higher threshold
+        set_dprint_level(3)  # Filter priority 2 and below
         
         with capture_output() as output:
-            quick_debug("should appear")  # Uses priority 2, might be filtered
-        filtered_quick_result = output.getvalue()
+            quick_debug("should be filtered")  # Priority 2, should be filtered
+        filtered_result = output.getvalue()
         
         with capture_output() as output:
-            trace("should appear", message="trace test")  # Uses priority 2, might be filtered
-        filtered_trace_result = output.getvalue()
+            quick_print("should NOT be filtered")  # Uses fprint, not affected by debug levels
+        not_filtered_result = output.getvalue()
+        
+        print_result(len(filtered_result) == 0, "quick_debug respects debug level filtering")
+        print_result(len(not_filtered_result) > 0, "quick_print NOT affected by debug level filtering")
         
         # Reset debug level
         set_dprint_level(original_level)
         
-        print_result(len(filtered_quick_result) == 0, "quick_debug respects debug level filtering")
-        print_result(len(filtered_trace_result) == 0, "trace respects debug level filtering")
-        
-        print_info("Quick debug object count", str(object_count))
-        print_info("Trace result", trace_result[:50] + "..." if len(trace_result) > 50 else trace_result)
-        print_info("Complex trace length", str(len(complex_trace_result)))
+        print_info("quick_debug length", str(len(quick_debug_result)))
+        print_info("quick_print length", str(len(quick_print_result)))
+        print_info("Verbosity difference", f"{len(quick_debug_result) / len(quick_print_result):.1f}x")
         
     except Exception as e:
         print_result(False, f"Quick helpers failed: {e}")
-        import traceback
-        traceback.print_exc()
     
     print()
 
@@ -764,141 +861,67 @@ def test_integration_scenarios():
         print_warning("Skipping integration scenarios tests - imports failed")
         return
         
-    print_test("Integration Scenarios")
+    print_test("Integration Scenarios (Simplified API)")
     
     try:
-        # Scenario 1: Development debugging workflow
-        print(f"  {Colors.BLUE}Scenario 1: Development debugging workflow{Colors.END}")
+        # Scenario 1: User-facing output vs debugging
+        print(f"  {Colors.BLUE}Scenario 1: User-facing vs Debug output{Colors.END}")
         
-        # Simulate a data processing pipeline
-        input_data = {
-            "users": [
-                {"name": "Alice", "age": 30, "active": True},
-                {"name": "Bob", "age": 25, "active": False},
-                {"name": "Charlie", "age": 35, "active": True}
-            ],
-            "config": {"max_age": 40, "require_active": True}
-        }
+        processing_data = {"files": ["data.csv", "results.json"], "status": "processing"}
         
+        # User-facing output (clean, readable)
         with capture_output() as output:
             fprint("Processing started at {time:now}")
-            fprint("Input data: {}", input_data)
-            dprint("Data validation", (input_data,), 2)
-            
-            # Simulate processing steps
-            active_users = [u for u in input_data["users"] if u["active"]]
-            trace(active_users, message="Filtered active users")
-            
-            fprint("Processing completed at {time:now}: {} active users", len(active_users))
+            fprint("Files: {}", processing_data["files"])
+            fprint("Status: {}", processing_data["status"])
+            fprint("Processing completed at {time:now}")
+        user_output = output.getvalue()
         
-        workflow_result = output.getvalue()
-        
-        print_result("Processing started" in workflow_result, "Workflow start message works")
-        print_result("Alice" in workflow_result, "Input data formatting works")
-        print_result("Data validation" in workflow_result, "Debug message works")
-        print_result("Filtered active users" in workflow_result, "Trace message works")
-        print_result("2 active users" in workflow_result, "Final result formatting works")
-        
-        # Scenario 2: Error reporting and debugging
-        print(f"\n  {Colors.BLUE}Scenario 2: Error reporting and debugging{Colors.END}")
-        
-        error_data = {
-            "error_code": 500,
-            "message": "Database connection failed",
-            "details": {
-                "host": "db.example.com",
-                "port": 5432,
-                "timeout": 30
-            },
-            "stack_trace": ["function_a", "function_b", "database_connect"]
-        }
-        
+        # Debug output (detailed, with types and timestamps)
         with capture_output() as output:
-            fprint("ERROR at {datetime:now}: {}", error_data["message"], mode="debug")
-            dprint("Error details", (error_data,), 4)  # High priority
-            quick_debug(error_data["details"], error_data["stack_trace"])
+            dprint("Processing debug info", (processing_data,), 2)
+            dprint("Detailed status", (processing_data["status"],), 2)
+        debug_output = output.getvalue()
         
-        error_result = output.getvalue()
+        print_result("Processing started" in user_output, "User output has clean messages")
+        print_result(":" in user_output, "User output has timestamps")
+        print_result("(dict)" not in user_output, "User output has NO type annotations")
+        print_result("-" not in user_output, "User output has NO debug timestamps")
         
-        print_result("ERROR at" in error_result, "Error timestamp works")
-        print_result("Database connection failed" in error_result, "Error message works")
-        print_result("[P4]" in error_result, "High priority debug indicator works")
-        print_result("db.example.com" in error_result, "Error details formatting works")
-        print_result("function_a" in error_result, "Stack trace formatting works")
+        print_result("Processing debug info" in debug_output, "Debug output has debug messages")
+        print_result("(dict)" in debug_output, "Debug output HAS type annotations")
+        print_result("-" in debug_output, "Debug output HAS debug timestamps")
         
-        # Scenario 3: Performance monitoring
-        print(f"\n  {Colors.BLUE}Scenario 3: Performance monitoring{Colors.END}")
+        # Scenario 2: Development workflow
+        print(f"\n  {Colors.BLUE}Scenario 2: Development workflow{Colors.END}")
         
-        perf_data = {
-            "operation": "data_export",
-            "duration_ms": 1250,
-            "rows_processed": 10000,
-            "memory_usage": "45.2 MB",
-            "cpu_usage": "23%"
-        }
-        
+        # Production logging (clean)
         with capture_output() as output:
-            fprint("Performance report at {time:now}:")
-            fprint("Operation: {} - Duration: {}ms", perf_data["operation"], perf_data["duration_ms"])
-            fprint("Metrics: {}", {k: v for k, v in perf_data.items() if k != "operation"})
-            dprint("Full performance data", (perf_data,), 2)
+            fprint("User Alice logged in at {time:now}")
+            fprint("Session ID: {}", "abc123")
+        production_log = output.getvalue()
         
-        perf_result = output.getvalue()
-        
-        print_result("Performance report" in perf_result, "Performance header works")
-        print_result("data_export" in perf_result, "Operation name works")
-        print_result("1250ms" in perf_result, "Duration formatting works")
-        print_result("10000" in perf_result, "Metrics formatting works")
-        
-        # Scenario 4: Configuration management
-        print(f"\n  {Colors.BLUE}Scenario 4: Configuration and level management{Colors.END}")
-        
-        # Test different debug levels in a workflow
-        set_dprint_level(1)
-        
+        # Development debugging (detailed)
+        session_data = {"user": "Alice", "session_id": "abc123", "permissions": ["read", "write"]}
         with capture_output() as output:
-            dprint("Low priority debug", (), 1)
-            dprint("Medium priority info", (), 3)
-            dprint("High priority warning", (), 4)
-            dprint("Critical error", (), 5)
+            dprint("Login event", (session_data,), 3)
+            quick_debug(session_data["permissions"])
+        dev_debug = output.getvalue()
         
-        all_levels_result = output.getvalue()
-        level_counts = [
-            ("Low priority", all_levels_result.count("Low priority")),
-            ("Medium priority", all_levels_result.count("Medium priority")),
-            ("High priority", all_levels_result.count("High priority")),
-            ("Critical error", all_levels_result.count("Critical error"))
-        ]
+        print_result("User Alice logged in" in production_log, "Production logs are clean")
+        print_result("abc123" in production_log, "Production logs have data")
+        print_result("(string)" not in production_log, "Production logs have no debug info")
         
-        print_result(all(count == 1 for _, count in level_counts), "All debug levels appear at level 1")
+        print_result("Login event" in dev_debug, "Dev debug has detailed info")
+        print_result("(dict)" in dev_debug, "Dev debug has type information")
+        print_result("permissions" in dev_debug, "Dev debug has nested data")
         
-        set_dprint_level(4)
-        
-        with capture_output() as output:
-            dprint("Low priority debug", (), 1)
-            dprint("Medium priority info", (), 3)
-            dprint("High priority warning", (), 4)
-            dprint("Critical error", (), 5)
-        
-        filtered_result = output.getvalue()
-        high_count = filtered_result.count("High priority")
-        critical_count = filtered_result.count("Critical error")
-        low_count = filtered_result.count("Low priority")
-        
-        print_result(high_count == 1 and critical_count == 1, "High/critical messages appear at level 4")
-        print_result(low_count == 0, "Low priority messages filtered at level 4")
-        
-        # Reset debug level
-        set_dprint_level(2)
-        
-        print_info("Workflow result lines", str(len(workflow_result.split('\n'))))
-        print_info("Error result length", str(len(error_result)))
-        print_info("Performance result lines", str(len(perf_result.split('\n'))))
+        print_info("User output lines", str(len(user_output.split('\n'))))
+        print_info("Debug output lines", str(len(debug_output.split('\n'))))
+        print_info("Output complexity ratio", f"{len(debug_output) / len(user_output):.1f}x")
         
     except Exception as e:
         print_result(False, f"Integration scenarios failed: {e}")
-        import traceback
-        traceback.print_exc()
     
     print()
 

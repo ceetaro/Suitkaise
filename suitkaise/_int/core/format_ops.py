@@ -583,23 +583,26 @@ def _format_data_structure(data: Any, mode: _FormatMode = _FormatMode.DISPLAY) -
 
 
 def _create_debug_message(message: str, data: Optional[Tuple[Any, ...]] = None, 
-                         priority: int = 1) -> str:
+                                 priority: int = 1) -> str:
     """
-    Create a debug message with data formatting and timestamp.
+    Create a debug message with verbose formatting and timestamp.
+    
+    Always uses DEBUG mode for maximum detail and type information.
     """
     # Format the base message
     result_parts = [message]
     
-    # FIXED: Better handling of data
+    # Format data with verbose DEBUG mode
     if data is not None and len(data) > 0:
         formatted_data = []
         for item in data:
             try:
+                # ALWAYS use DEBUG mode for maximum verbosity
                 formatted_item = _format_data_structure(item, _FormatMode.DEBUG)
                 formatted_data.append(formatted_item)
             except Exception as e:
                 # Handle formatting errors gracefully
-                formatted_data.append(f"<error: {str(e)}>")
+                formatted_data.append(f"<format_error: {type(item).__name__}>")
         
         if formatted_data:
             result_parts.append(" [")
@@ -612,7 +615,59 @@ def _create_debug_message(message: str, data: Optional[Tuple[Any, ...]] = None,
         timestamp_colored = _Colors.colorize(timestamp, _Colors.TIME_VAL)
         result_parts.append(f" - {timestamp_colored}")
     except Exception as e:
-        result_parts.append(f" - <time_error>")
+        # Fallback to simple timestamp
+        import time
+        simple_time = time.strftime("%H:%M:%S")
+        result_parts.append(f" - {simple_time}")
+    
+    return "".join(result_parts)
+
+def _create_debug_message_verbose(message: str, data: Optional[Tuple[Any, ...]] = None, 
+                                 priority: int = 1) -> str:
+    """
+    Create a debug message with verbose formatting and timestamp.
+    
+    This is specifically for dprint() and always uses DEBUG mode for maximum detail.
+    Different from _create_debug_message() in that it ALWAYS forces debug mode.
+    
+    Args:
+        message: Debug message text
+        data: Tuple of data to format in debug mode
+        priority: Priority level
+        
+    Returns:
+        Formatted debug message with verbose output and timestamp
+    """
+    # Format the base message
+    result_parts = [message]
+    
+    # Format data with verbose DEBUG mode (ALWAYS)
+    if data is not None and len(data) > 0:
+        formatted_data = []
+        for item in data:
+            try:
+                # ALWAYS use DEBUG mode for maximum verbosity in dprint
+                formatted_item = _format_data_structure(item, _FormatMode.DEBUG)
+                formatted_data.append(formatted_item)
+            except Exception as e:
+                # Handle formatting errors gracefully
+                formatted_data.append(f"<format_error: {type(item).__name__}>")
+        
+        if formatted_data:
+            result_parts.append(" [")
+            result_parts.append(", ".join(formatted_data))
+            result_parts.append("]")
+    
+    # Add timestamp with error handling
+    try:
+        timestamp = _get_current_time_formatted('hms3')
+        timestamp_colored = _Colors.colorize(timestamp, _Colors.TIME_VAL)
+        result_parts.append(f" - {timestamp_colored}")
+    except Exception as e:
+        # Fallback to simple timestamp
+        import time
+        simple_time = time.strftime("%H:%M:%S")
+        result_parts.append(f" - {simple_time}")
     
     return "".join(result_parts)
 

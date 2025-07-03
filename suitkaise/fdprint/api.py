@@ -27,6 +27,7 @@ try:
         _format_timestamp,
         _interpolate_string,
         _create_debug_message,
+        _create_debug_message_verbose,
         _set_debug_print_level,
         _get_debug_print_level,
         _should_print_debug,
@@ -35,100 +36,58 @@ try:
         _FormatMode
     )
 except ImportError:
-    # Fallback implementations if internal module unavailable
-    def _format_data_structure(obj, mode="display"):
-        return str(obj)
-    
-    def _format_timestamp(timestamp, format_spec="time"):
-        import time
-        import datetime
-        dt = datetime.datetime.fromtimestamp(timestamp)
-        return dt.strftime("%H:%M:%S.%f")[:-3]
-    
-    def _interpolate_string(template, *args):
-        return template
-    
-    def _create_debug_message(message, data=None, priority=1):
-        import time
-        timestamp = time.strftime("%H:%M:%S")
-        return f"{message} - {timestamp}"
-    
-    def _set_debug_print_level(level):
-        pass
-    
-    def _get_debug_print_level():
-        return 1
-    
-    def _should_print_debug(priority):
-        return True
-    
-    def _get_current_time_formatted(format_spec):
-        import time
-        import datetime
-        dt = datetime.datetime.fromtimestamp(time.time())
-        return dt.strftime("%H:%M:%S.%f")[:-3]
-    
-    class _Colors:
-        RESET = ''
-        @classmethod
-        def enable(cls):
-            pass
-        @classmethod
-        def disable(cls):
-            pass
-    
-    class _FormatMode:
-        DISPLAY = "display"
-        DEBUG = "debug"
+    raise ImportError(
+        "Internal format operations could not be imported. "
+        "Ensure that the internal format operations module is available."
+    )
 
 
 # ============================================================================
 # Core Formatting Functions
 # ============================================================================
 
-def fprint(format_string: str, *values, mode: str = "display", **kwargs) -> None:
+def fprint(format_string: str, *values, **kwargs) -> None:
     """
-    Smart formatted printing with custom interpolation and time specifiers.
+    Smart formatted printing with clean, user-friendly output.
     
-    Supports both standard Python string formatting and custom time specifiers.
-    Automatically formats complex data structures in a readable way.
+    Always uses DISPLAY mode for clean, readable output without type annotations.
+    Perfect for user-facing messages, logs, and general output.
     
     Args:
         format_string: Format string with placeholders and time specifiers
         *values: Values to interpolate into the format string
-        mode: Formatting mode ("display" for clean, "debug" for verbose)
-        **kwargs: Additional formatting options
+        **kwargs: Additional formatting options (reserved for future use)
         
     Examples:
         ```python
-        # Basic formatting with beautiful data structures
-        data = {"key1": "value1", "key2": [1, 2, 3]}
-        fprint("Processing data: {}", data)
+        # Clean, user-friendly output
+        data = {"name": "Alice", "items": [1, 2, 3]}
+        fprint("Processing: {}", data)
+        # Output: Processing: name: Alice
+        #                   items: 1, 2, 3
         
-        # Time specifiers
+        # Time specifiers for timestamps
         fprint("Report generated at {time:now}")
-        fprint("Data from {date:now}")
-        fprint("Precise timing: {hms6:now}")
-        fprint("Timezone aware: {datePST:now}")
+        # Output: Report generated at 14:30:45
         
-        # Mixed formatting
-        results = [1, 2, 3, 4, 5]
-        fprint("Analysis completed at {time:now}: {}", results)
-        
-        # Debug mode for detailed output
-        fprint("Debug data: {}", data, mode="debug")
+        # Mixed data and time
+        fprint("Analysis at {time:now}: {}", results)
         ```
     """
     try:
-        # Convert mode string to internal enum
-        format_mode = _FormatMode.DEBUG if mode == "debug" else _FormatMode.DISPLAY
+        # ALWAYS use DISPLAY mode for clean output
+        format_mode = _FormatMode.DISPLAY
         
-        # Handle time specifiers and basic interpolation
-        processed_format = _interpolate_string(format_string, *values)
+        # Handle time specifiers first
+        processed_format = re.sub(
+            r'\{([^:}]+):now\}', 
+            lambda m: _get_current_time_formatted(m.group(1)), 
+            format_string
+        )
         
-        # If we have values and no placeholders were filled, format them manually
+        # Handle regular {} placeholders with values
         if values and '{}' in processed_format:
-            # Format each value through our data structure formatter
+            # Format each value in clean display mode
             formatted_values = []
             for value in values:
                 formatted_value = _format_data_structure(value, format_mode)
@@ -136,7 +95,9 @@ def fprint(format_string: str, *values, mode: str = "display", **kwargs) -> None
             
             # Replace {} placeholders with formatted values
             try:
-                result = processed_format.format(*formatted_values)
+                placeholder_count = processed_format.count('{}')
+                values_to_use = formatted_values[:placeholder_count]
+                result = processed_format.format(*values_to_use)
             except (IndexError, ValueError):
                 # Fallback if formatting fails
                 result = processed_format + " " + " ".join(formatted_values)
@@ -153,36 +114,30 @@ def fprint(format_string: str, *values, mode: str = "display", **kwargs) -> None
 
 def dprint(message: str, variables: Tuple = (), priority: int = 1, **kwargs) -> None:
     """
-    Debug printing with priority levels and automatic timestamps.
+    Debug printing with verbose, detailed output and automatic timestamps.
     
-    Automatically formats variables in debug mode and adds readable timestamps
-    to every message. Supports priority-based filtering to reduce debug noise.
+    Always uses DEBUG mode for detailed output with type annotations and structure.
+    Perfect for debugging, development, and detailed analysis.
     
     Args:
         message: Debug message to display
-        variables: Tuple of variables to format and display
+        variables: Tuple of variables to format and display in debug mode
         priority: Priority level (1-5, higher = more important)
-        **kwargs: Additional formatting options
+        **kwargs: Additional formatting options (reserved for future use)
         
     Examples:
         ```python
-        # Basic debug message with auto-timestamp
-        dprint("Starting processing")
-        # Output: "Starting processing - 14:23:45.123"
-        
-        # Debug with variables (automatically formatted)
+        # Detailed debug output with timestamps
         user_data = {"name": "Alice", "age": 30}
-        config = ["setting1", "setting2"]
-        dprint("User login", (user_data, config))
-        # Output: "User login [(dict) {...}, (list) [...]] - 14:23:45.123"
+        dprint("User login", (user_data,))
+        # Output: User login [(dict) {
+        #           (string) 'name': (string) 'Alice',
+        #           (string) 'age': (integer) 30
+        #         }] - 14:30:45.123
         
         # Priority-based filtering
         dprint("Minor detail", (), 1)           # Low priority
-        dprint("Important event", (), 3)        # Medium priority  
-        dprint("Critical error", (), 5)         # High priority
-        
-        # Set filter level to hide low priority messages
-        set_dprint_level(3)  # Only show priority 3+ messages
+        dprint("Important event", (), 4)        # High priority with [P4] indicator
         ```
     """
     try:
@@ -190,8 +145,14 @@ def dprint(message: str, variables: Tuple = (), priority: int = 1, **kwargs) -> 
         if not _should_print_debug(priority):
             return
         
-        # Create the debug message with formatted variables and timestamp
-        debug_message = _create_debug_message(message, variables, priority)
+        # FIXED: Handle variables parameter more carefully
+        if variables is None:
+            variables = ()
+        elif not isinstance(variables, (tuple, list)):
+            variables = (variables,)  # Wrap single values in tuple
+        
+        # Create debug message with verbose formatting and timestamp
+        debug_message = _create_debug_message_verbose(message, variables, priority)
         
         # Add priority indicator for high priority messages
         if priority >= 4:
@@ -201,9 +162,16 @@ def dprint(message: str, variables: Tuple = (), priority: int = 1, **kwargs) -> 
         print(debug_message)
         
     except Exception as e:
-        # Graceful fallback
+        # Graceful fallback - but still try to show something useful
+        import time
+        timestamp = time.strftime("%H:%M:%S")
         print(f"dprint error: {e}")
-        print(f"Raw: {message} {variables}")
+        print(f"Raw message: {message} - {timestamp}")
+        if variables:
+            print(f"Raw variables: {variables}")
+        # ADDED: Show the actual error for debugging
+        import traceback
+        traceback.print_exc()
 
 
 # ============================================================================
@@ -326,28 +294,19 @@ def fmt(obj: Any, mode: str = "display") -> str:
     """
     Format any object and return as string (without printing).
     
-    Useful for getting formatted strings to use in other contexts.
-    
     Args:
         obj: Object to format
-        mode: Formatting mode ("display" or "debug")
-        
-    Returns:
-        Formatted string representation
+        mode: Formatting mode ("display" for clean, "debug" for verbose)
         
     Examples:
         ```python
         data = {"key": [1, 2, 3]}
         
-        # Get formatted string for display
-        display_str = fmt(data, "display") 
+        # Clean formatting (like fprint)
+        clean = fmt(data, "display")
         
-        # Get formatted string for debugging
-        debug_str = fmt(data, "debug")
-        
-        # Use in other contexts
-        with open("output.txt", "w") as f:
-            f.write(f"Data: {display_str}\n")
+        # Verbose formatting (like dprint) 
+        verbose = fmt(data, "debug")
         ```
     """
     try:
@@ -362,21 +321,30 @@ def debug_fmt(obj: Any) -> str:
     Format object in debug mode and return as string.
     
     Convenience function equivalent to fmt(obj, "debug").
+    Same verbose formatting as dprint() but returns string instead of printing.
     
     Args:
         obj: Object to format
         
     Returns:
-        Debug-formatted string representation
-        
-    Examples:
-        ```python
-        data = [1, 2, {"nested": "value"}]
-        debug_output = debug_fmt(data)
-        print(f"Debug view: {debug_output}")
-        ```
+        Debug-formatted string representation (verbose with type annotations)
     """
     return fmt(obj, "debug")
+
+def display_fmt(obj: Any) -> str:
+    """
+    Format object in display mode and return as string.
+    
+    Convenience function equivalent to fmt(obj, "display").
+    Same clean formatting as fprint() but returns string instead of printing.
+    
+    Args:
+        obj: Object to format
+        
+    Returns:
+        Display-formatted string representation (clean, user-friendly)
+    """
+    return fmt(obj, "display")
 
 
 def timestamp(format_spec: str = "time") -> str:
@@ -410,69 +378,53 @@ def timestamp(format_spec: str = "time") -> str:
 
 def quick_debug(*objects) -> None:
     """
-    Quickly debug multiple objects with automatic formatting.
+    Quickly debug multiple objects with verbose formatting.
     
-    Convenience function for rapid debugging of multiple variables.
-    
-    Args:
-        *objects: Any number of objects to debug
-        
-    Examples:
-        ```python
-        user = {"name": "Bob"}
-        items = [1, 2, 3]
-        status = True
-        
-        # Debug multiple objects at once
-        quick_debug(user, items, status)
-        # Shows each object with debug formatting and timestamp
-        ```
+    Uses dprint() internally, so output is always in debug mode with type annotations.
     """
     try:
         for i, obj in enumerate(objects):
-            dprint(f"Object {i+1}", (obj,), 3)
+            dprint(f"Object {i+1}", (obj,), 2)  # Priority 2 for filtering
     except Exception as e:
         print(f"Quick debug error: {e}")
 
 
 def trace(*objects, message: str = "Trace") -> None:
     """
-    Trace execution with formatted object output.
+    Trace execution with verbose object output.
     
-    Useful for tracking values at different points in code execution.
-    
-    Args:
-        *objects: Objects to trace
-        message: Trace message prefix
-        
-    Examples:
-        ```python
-        def process_data(data):
-            trace(data, message="Input data")
-            
-            processed = transform(data)
-            trace(processed, message="After transform")
-            
-            result = finalize(processed)
-            trace(result, message="Final result")
-            
-            return result
-        ```
+    Uses dprint() internally, so output is always in debug mode with type annotations.
     """
     try:
-        dprint(message, objects, 3)
+        dprint(message, objects, 2)  # Priority 2 for filtering
     except Exception as e:
         print(f"Trace error: {e}")
 
 
-# ============================================================================
-# Module Exports
-# ============================================================================
+def quick_print(*objects) -> None:
+    """
+    Quickly print multiple objects with clean formatting.
+    
+    Uses fprint() internally, so output is always in display mode (clean).
+    Perfect for quick output without debug verbosity.
+    """
+    try:
+        for i, obj in enumerate(objects):
+            # FIXED: Use simple format string to avoid any placeholder conflicts
+            fprint(f"Item {i + 1}: {{}}", obj)
+    except Exception as e:
+        print(f"Quick print error: {e}")
+
+
+
+# =============================================================================
+# MODULE EXPORTS
+# =============================================================================
 
 __all__ = [
-    # Core functions
-    'fprint',
-    'dprint',
+    # Core functions - now with clear separation
+    'fprint',      # Always display mode (clean)
+    'dprint',      # Always debug mode (verbose)
     
     # Configuration
     'set_dprint_level',
@@ -481,11 +433,13 @@ __all__ = [
     'get_config',
     
     # Convenience functions
-    'fmt',
-    'debug_fmt',
+    'fmt',           # Choose mode explicitly
+    'debug_fmt',     # Force debug mode
+    'display_fmt',   # Force display mode (NEW)
     'timestamp',
     
     # Quick helpers
-    'quick_debug',
-    'trace',
+    'quick_debug',   # Verbose output via dprint
+    'trace',         # Verbose output via dprint  
+    'quick_print',   # Clean output via fprint (NEW)
 ]
