@@ -517,6 +517,7 @@ class _CerialRegistry:
             self._performance_stats[operation] += 1
         self._performance_stats["total_time"] += duration
     
+
     def discover_and_register_handlers(self) -> int:
         """
         Discover and register all available handlers.
@@ -532,13 +533,19 @@ class _CerialRegistry:
         
         registered_count = 0
         
-        # Try to import and register known handlers
         handler_modules = [
             'suitkaise._int.serialization.nso.locks',
-            'suitkaise._int.serialization.nso.sk_objects',
+            'suitkaise._int.serialization.nso.sk_objects', 
             'suitkaise._int.serialization.nso.functions',
             'suitkaise._int.serialization.nso.file_handles',
-            'suitkaise._int.serialization.nso.generators'
+            'suitkaise._int.serialization.nso.generators',
+            'suitkaise._int.serialization.nso.weakrefs',
+            'suitkaise._int.serialization.nso.re_patterns', 
+            'suitkaise._int.serialization.nso.sqlite_conns',
+            'suitkaise._int.serialization.nso.loggers',
+            'suitkaise._int.serialization.nso.context_mgrs',
+            'suitkaise._int.serialization.nso.dynamic_modules',
+            'suitkaise._int.serialization.nso.queues'
         ]
         
         for module_name in handler_modules:
@@ -570,7 +577,6 @@ class _CerialRegistry:
             print(f"Auto-discovered and registered {registered_count} handlers")
         
         return registered_count
-
 
 # Global registry instance
 _registry = _CerialRegistry()
