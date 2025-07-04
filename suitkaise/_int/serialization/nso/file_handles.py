@@ -311,18 +311,22 @@ class FileHandlesHandler(_NSO_Handler):
         if isinstance(obj, io.BytesIO):
             return "bytes_io"
         
-        # Temporary files
-        if isinstance(obj, tempfile._TemporaryFileWrapper):
+        # Temporary files - improved detection
+        obj_type_name = type(obj).__name__
+        
+        # Check for various temporary file types
+        if '_TemporaryFileWrapper' in obj_type_name or 'tempfile' in getattr(type(obj), '__module__', ''):
             return "temporary_file"
-        if hasattr(tempfile, 'TemporaryFile'):
-            try:
-                temp_file = tempfile.TemporaryFile()
-                if type(obj) == type(temp_file):
-                    temp_file.close()
-                    return "temporary_file"
-                temp_file.close()
-            except Exception:
-                pass
+        
+        # Check if it has tempfile-like attributes
+        if hasattr(obj, 'delete') and hasattr(obj, 'name') and hasattr(obj, '_file'):
+            return "temporary_file"
+        
+        # Check for _io.TextIOWrapper that might be temporary
+        if hasattr(obj, 'name') and isinstance(getattr(obj, 'name', None), str):
+            name = obj.name
+            if '/tmp' in name or 'temp' in name.lower() or name.startswith('<'):
+                return "temporary_file"
         
         # Compressed files
         if hasattr(gzip, 'GzipFile') and isinstance(obj, gzip.GzipFile):

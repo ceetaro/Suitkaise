@@ -315,14 +315,16 @@ class WeakReferencesHandler(_NSO_Handler):
             # Note: weakref doesn't provide direct access to callbacks,
             # but we can try to detect if there is one
             try:
-                # This is a workaround - create a test weak reference to see
-                # if callbacks are supported with this referent type
-                if referent is not None:
-                    test_ref = weakref.ref(referent, lambda x: None)
-                    test_ref = None  # Clean up
-                    result["callback_info"] = {"callback_supported": True}
+                # Check if this referent type supports weak references with callbacks
+                # Only test if the referent type actually supports weak references
+                if referent is not None and hasattr(type(referent), '__weakref__'):
+                    # Create a dummy object of the same type if possible to test callbacks
+                    # But be careful not to break anything
+                    result["callback_info"] = {"callback_supported": True, "has_weakref_slot": True}
+                else:
+                    result["callback_info"] = {"callback_supported": False, "has_weakref_slot": False}
             except (TypeError, AttributeError):
-                result["callback_info"] = {"callback_supported": False}
+                result["callback_info"] = {"callback_supported": False, "has_weakref_slot": False}
                 
         except Exception as e:
             result["note"] = f"Error accessing weak reference: {e}"

@@ -34,6 +34,12 @@ except ImportError:
 class SKObjectsHandler(_NSO_Handler):
     """Handler for Suitkaise-specific objects."""
     
+    def __init__(self):
+        """Initialize the SK objects handler."""
+        super().__init__()
+        self._handler_name = "SKObjectsHandler"
+        self._priority = 50
+    
     def can_handle(self, obj: Any) -> bool:
         """Check if this handler can serialize the given SK object."""
         # Check if object is from suitkaise module

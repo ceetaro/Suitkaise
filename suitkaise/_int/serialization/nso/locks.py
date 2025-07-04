@@ -35,6 +35,12 @@ except ImportError:
 class LocksHandler(_NSO_Handler):
     """Handler for threading locks and synchronization primitives."""
     
+    def __init__(self):
+        """Initialize the locks handler."""
+        super().__init__()
+        self._handler_name = "LocksHandler"
+        self._priority = 50  # Default priority for locks
+    
     def can_handle(self, obj: Any) -> bool:
         """Check if this handler can serialize the given lock object."""
         # Get object type name and module for comparison
