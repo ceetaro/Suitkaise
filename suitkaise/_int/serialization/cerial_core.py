@@ -662,6 +662,64 @@ def _contains_nso_objects(obj: Any, max_depth: int = 3, _current_depth: int = 0)
 
 
 
+def _clean_for_pickle(obj: Any) -> Any:
+    """
+    Recursively clean an object to ensure it's pickle-safe.
+    
+    This function removes or replaces any non-pickleable objects
+    like mappingproxy, bound methods, etc.
+    """
+    try:
+        # Test if the object is already pickleable
+        pickle.dumps(obj)
+        return obj
+    except Exception:
+        pass
+    
+    # If not pickleable, try to clean it
+    if isinstance(obj, dict):
+        cleaned = {}
+        for key, value in obj.items():
+            try:
+                cleaned_key = _clean_for_pickle(key)
+                cleaned_value = _clean_for_pickle(value)
+                cleaned[cleaned_key] = cleaned_value
+            except Exception:
+                # Skip items that can't be cleaned
+                pass
+        return cleaned
+    
+    elif isinstance(obj, (list, tuple)):
+        cleaned_items = []
+        for item in obj:
+            try:
+                cleaned_item = _clean_for_pickle(item)
+                cleaned_items.append(cleaned_item)
+            except Exception:
+                # Skip items that can't be cleaned
+                pass
+        return type(obj)(cleaned_items)
+    
+    elif isinstance(obj, set):
+        cleaned_items = set()
+        for item in obj:
+            try:
+                cleaned_item = _clean_for_pickle(item)
+                cleaned_items.add(cleaned_item)
+            except Exception:
+                # Skip items that can't be cleaned
+                pass
+        return cleaned_items
+    
+    else:
+        # For non-container objects that aren't pickleable, 
+        # return a string representation
+        try:
+            return str(obj)
+        except Exception:
+            return f"<non-pickleable {type(obj).__name__}>"
+
+
 def _serialize_container_recursive(obj: Any) -> Any:
     """
     Recursively serialize a container, handling NSOs individually.
@@ -684,6 +742,35 @@ def _serialize_container_recursive(obj: Any) -> Any:
             if handler:
                 try:
                     serialized_data = handler.serialize(obj)
+                    
+                    # CRITICAL FIX: Test if the handler's serialized data is actually pickleable
+                    try:
+                        pickle.dumps(serialized_data)
+                    except Exception as pickle_test_error:
+                        # Handler returned non-pickleable data, try to clean it
+                        if _registry.is_debug_mode():
+                            print(f"Handler {handler._handler_name} returned non-pickleable data for {type(obj).__name__}: {pickle_test_error}")
+                            print(f"Attempting to clean the data...")
+                        
+                        cleaned_data = _clean_for_pickle(serialized_data)
+                        
+                        # Test if cleaned data is now pickleable
+                        try:
+                            pickle.dumps(cleaned_data)
+                            serialized_data = cleaned_data
+                            if _registry.is_debug_mode():
+                                print(f"Successfully cleaned data for {handler._handler_name}")
+                        except Exception as clean_test_error:
+                            # Even cleaning failed, create fallback
+                            if _registry.is_debug_mode():
+                                print(f"Cleaning failed for {handler._handler_name}: {clean_test_error}")
+                            return {
+                                "__cerial_nso__": True,
+                                "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                                "__error__": f"Handler returned non-pickleable data: {pickle_test_error}",
+                                "__fallback__": f"Handler {handler._handler_name} serialization not pickle-safe"
+                            }
+                    
                     return {
                         "__cerial_nso__": True,
                         "__handler_class__": handler._handler_name,
@@ -720,6 +807,26 @@ def _serialize_container_recursive(obj: Any) -> Any:
             return {_serialize_container_recursive(item) for item in obj}
         
         else:
+            # NEW: Check if object has __dict__ (custom objects with attributes)
+            if hasattr(obj, '__dict__'):
+                try:
+                    # Serialize object by converting to dict and recursively processing
+                    obj_dict = {}
+                    obj_dict['__class__'] = f"{obj.__class__.__module__}.{obj.__class__.__name__}"
+                    
+                    # Process all attributes recursively
+                    for attr_name, attr_value in obj.__dict__.items():
+                        obj_dict[attr_name] = _serialize_container_recursive(attr_value)
+                    
+                    return obj_dict
+                except Exception as e:
+                    # If attribute processing fails, create error placeholder
+                    return {
+                        "__cerial_nso__": True,
+                        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                        "__error__": f"Object attribute processing failed: {e}"
+                    }
+            
             # For simple objects that pickle can handle, test if they're actually pickleable
             try:
                 # Quick test to see if object is pickleable
@@ -741,7 +848,104 @@ def _serialize_container_recursive(obj: Any) -> Any:
             "__error__": f"Serialization failed: {e}"
         }
 
-
+def _deserialize_container_recursive(obj: Any) -> Any:
+    """
+    Recursively deserialize a container, handling NSO wrappers individually.
+    
+    Args:
+        obj: Serialized representation to deserialize recursively
+        
+    Returns:
+        Deserialized object with NSOs restored
+        
+    This function walks through nested container structures and
+    recreates NSOs from cerial wrappers, while leaving regular
+    objects unchanged.
+    """
+    try:
+        # Check if this is a cerial NSO wrapper
+        if isinstance(obj, dict) and obj.get("__cerial_nso__") is True:
+            # This is an NSO wrapper - deserialize it
+            handler_class_name = obj.get("__handler_class__")
+            original_type = obj.get("__original_type__", "unknown")
+            error = obj.get("__error__")
+            fallback = obj.get("__fallback__")
+            
+            # If there was an error during serialization, return placeholder
+            if error:
+                return f"<Cerial Error: {error}>"
+            
+            # If this was a fallback, return placeholder
+            if fallback:
+                return f"<Cerial Fallback: {fallback}>"
+            
+            # Find the appropriate handler
+            if handler_class_name:
+                handler = None
+                for registered_handler in _registry._handlers:
+                    if registered_handler._handler_name == handler_class_name:
+                        handler = registered_handler
+                        break
+                
+                if handler:
+                    try:
+                        # Deserialize using the handler
+                        serialized_data = obj.get("__data__")
+                        if serialized_data is not None:
+                            return handler.deserialize(serialized_data)
+                        else:
+                            return f"<Cerial NSO: {original_type} - no data>"
+                    except Exception as e:
+                        return f"<Cerial NSO: {original_type} - error: {e}>"
+                else:
+                    return f"<Cerial NSO: {original_type} - handler {handler_class_name} not found>"
+            else:
+                return f"<Cerial NSO: {original_type} - no handler specified>"
+        
+        # Handle container types recursively
+        elif isinstance(obj, dict):
+            # Check if this is a serialized object with __class__ marker
+            if '__class__' in obj and len(obj) > 1:
+                # This is a serialized object - recreate it
+                class_name = obj['__class__']
+                
+                # Create a simple namespace object to hold the attributes
+                class RecreatedObject:
+                    def __init__(self, class_name):
+                        self._original_class = class_name
+                    
+                    def __repr__(self):
+                        return f"<RecreatedObject {self._original_class}>"
+                
+                recreated = RecreatedObject(class_name)
+                
+                # Recursively deserialize all attributes except __class__
+                for key, value in obj.items():
+                    if key != '__class__':
+                        setattr(recreated, key, _deserialize_container_recursive(value))
+                
+                return recreated
+            else:
+                # Regular dictionary
+                return {key: _deserialize_container_recursive(value) for key, value in obj.items()}
+        
+        elif isinstance(obj, list):
+            return [_deserialize_container_recursive(item) for item in obj]
+        
+        elif isinstance(obj, tuple):
+            return tuple(_deserialize_container_recursive(item) for item in obj)
+        
+        elif isinstance(obj, set):
+            return {_deserialize_container_recursive(item) for item in obj}
+        
+        else:
+            # For simple objects, return as-is
+            return obj
+            
+    except Exception as e:
+        # If anything fails, return a safe placeholder
+        return f"<Cerial Error during container deserialization: {e}>"
+    
 
 def _serialize_enhanced_container(obj: Any) -> bytes:
     """
