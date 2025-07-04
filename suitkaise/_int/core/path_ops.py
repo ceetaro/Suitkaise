@@ -22,6 +22,7 @@ import sys
 import fnmatch
 import inspect
 import hashlib
+import importlib
 from pathlib import Path
 from typing import Dict, List, Set, Optional, Union, Tuple, Any
 
@@ -101,15 +102,55 @@ def _get_non_sk_caller_file_path() -> Optional[Path]:
     finally:
         del frame
 
-# TODO update any inits or other imports that use this newly added function
 def _get_module_file_path(obj: Any) -> Optional[Path]:
-    """Get the file path of the module for an object."""
-    if hasattr(obj, '__module__'):
-        module = inspect.getmodule(obj)
-        if module and hasattr(module, '__file__'):
-            return Path(module.__file__).resolve()
+    """
+    Get the file path of the module for an object or module name.
+    
+    Args:
+        obj: Object to inspect, or module name string, or module object
+        
+    Returns:
+        Path to the module file, or None if not found
+    """
+    try:
+        # Case 1: obj is a string (module name)
+        if isinstance(obj, str):
+            try:
+                # Try to import the module by name
+                import importlib
+                module = importlib.import_module(obj)
+                if hasattr(module, '__file__') and module.__file__:
+                    return Path(module.__file__).resolve()
+            except (ImportError, ModuleNotFoundError):
+                # Module doesn't exist or can't be imported
+                return None
+        
+        # Case 2: obj is a Path object (not a module, return None)
+        elif isinstance(obj, Path):
+            return None
+        
+        # Case 3: obj is already a module object
+        elif hasattr(obj, '__file__'):
+            if obj.__file__:
+                return Path(obj.__file__).resolve()
+        
+        # Case 4: obj is any other object - get its module
+        elif hasattr(obj, '__module__'):
+            module = inspect.getmodule(obj)
+            if module and hasattr(module, '__file__') and module.__file__:
+                return Path(module.__file__).resolve()
+        
+        # Case 5: Try inspect.getmodule directly
+        else:
+            module = inspect.getmodule(obj)
+            if module and hasattr(module, '__file__') and module.__file__:
+                return Path(module.__file__).resolve()
+                
+    except (OSError, ValueError, AttributeError):
+        # Handle any path resolution or module access errors
+        pass
+    
     return None
-
 
 def _is_suitkaise_module(file_path: Path) -> bool:
     """

@@ -190,4 +190,4 @@ def __getattr__(name):
         raise ImportError("skpath module is not available. This module is coming soon!")
     elif name == 'sktime' and not _sktime_available:
         raise ImportError("sktime module is not available. This module is coming soon!")
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

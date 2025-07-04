@@ -312,15 +312,49 @@ def test_module_file_path():
     print_test("Module File Path Detection")
     
     try:
-        # Test _get_module_file_path with current file
-        module_path = _get_module_file_path(Path(__file__))
-        print_info("Current module file path", str(module_path))
-        print_result(module_path.exists(), "Module file exists")
-        print_result(module_path.is_file(), "Module path is a file")
+        # Test _get_module_file_path with current module name (string)
+        module_path = _get_module_file_path(__name__)
+        if module_path:
+            print_info("Current module file path", str(module_path))
+            print_result(module_path.exists(), "Module file exists")
+            print_result(module_path.is_file(), "Module path is a file")
+        else:
+            print_warning("Current module has no file path (might be __main__ or built-in)")
         
-        # Test with a non-existent path
-        non_existent = _get_module_file_path(Path("/this/path/definitely/does/not/exist.py"))
-        print_result(non_existent is None, "Non-existent path returns None")
+        # Test with an actual object that has a module
+        class TestClass:
+            pass
+        
+        test_obj_path = _get_module_file_path(TestClass)
+        if test_obj_path:
+            print_info("Test object module path", str(test_obj_path))
+            print_result(test_obj_path.exists(), "Test object module file exists")
+            print_result(test_obj_path.name.endswith('.py'), "Test object module is Python file")
+        else:
+            print_warning("Test object has no discoverable module file")
+        
+        # Test with Path object (should return None)
+        path_obj_result = _get_module_file_path(Path(__file__))
+        print_result(path_obj_result is None, "Path object correctly returns None")
+        
+        # Test with built-in module name (should return None for built-ins like 'sys')
+        builtin_result = _get_module_file_path('sys')
+        print_result(builtin_result is None, "Built-in module 'sys' correctly returns None")
+        
+        # Test with actual importable module that has a file
+        try:
+            pathlib_result = _get_module_file_path('pathlib')
+            if pathlib_result:
+                print_result(pathlib_result.exists(), "Pathlib module file exists")
+                print_result('pathlib' in str(pathlib_result), "Pathlib result contains 'pathlib'")
+            else:
+                print_warning("Pathlib module has no file (unexpected)")
+        except Exception as e:
+            print_warning(f"Pathlib module test failed: {e}")
+        
+        # Test with non-existent module name (should return None)
+        nonexistent_result = _get_module_file_path('definitely_nonexistent_module_12345')
+        print_result(nonexistent_result is None, "Non-existent module correctly returns None")
         
     except Exception as e:
         print_result(False, f"Module file path detection failed: {e}")

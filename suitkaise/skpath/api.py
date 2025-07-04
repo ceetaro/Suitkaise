@@ -343,32 +343,59 @@ def get_caller_path() -> SKPath:
 
 def get_module_path(obj: Any) -> Optional[SKPath]:
     """
-    Get an object's module file path as an SKPath.
-    This is useful for introspection or debugging to find where an object is defined.
+    Get a module file path as an SKPath.
+    
+    This function can handle:
+    - Objects (finds the module where the object is defined)
+    - Module names as strings (e.g., '__main__', 'sys', 'pathlib')
+    - Module objects directly
+    
+    Useful for introspection, debugging, or finding where objects are defined.
 
     Args:
-        obj: The object to inspect
+        obj: The object to inspect, module name string, or module object
 
     Returns:
         SKPath object for the module file, or None if not found
 
+    Raises:
+        ImportError: If obj is a module name string that cannot be imported
+
     Example:
     ```python
-        from suitkaise.skpath import get_module_file_path
-
-        class MyClass:
-            pass
-
-        module_path = get_module_file_path(MyClass)
-        if module_path:
-            print(module_path.ap)  # Absolute path of the module file
-            print(module_path.np)  # Normalized path relative to project root
-    
+        # Get current module path
+        current_module = get_module_path(__name__)
+        
+        # Get path where a class is defined
+        class_module = get_module_path(MyClass)
+        
+        # Get path of built-in or installed module
+        pathlib_module = get_module_path('pathlib')
+        sys_module = get_module_path('sys')  # Returns None for built-ins
+        
+        # This will raise ImportError
+        invalid_module = get_module_path('non_existent_module')
+    ```
     """
+    # Special handling for module name strings - should raise ImportError if not found
+    if isinstance(obj, str):
+        try:
+            import importlib
+            module = importlib.import_module(obj)
+            if hasattr(module, '__file__') and module.__file__:
+                return SKPath(module.__file__)
+            else:
+                # Module exists but has no file (built-in module)
+                return None
+        except (ImportError, ModuleNotFoundError) as e:
+            raise ImportError(f"No module named '{obj}'") from e
+    
+    # For all other objects, use the internal function and return None if not found
     module_file = _get_module_file_path(obj)
     if module_file is None:
         return None
     return SKPath(module_file)
+
 
 def get_current_dir() -> SKPath:
     """

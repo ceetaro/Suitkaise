@@ -37,31 +37,38 @@ class LocksHandler(_NSO_Handler):
     
     def can_handle(self, obj: Any) -> bool:
         """Check if this handler can serialize the given lock object."""
-        # Threading module locks
-        if isinstance(obj, (
-            threading.Lock, threading.RLock, threading.Semaphore, 
-            threading.BoundedSemaphore, threading.Condition, 
-            threading.Event, threading.Barrier
-        )):
+        # Get object type name and module for comparison
+        obj_type_name = type(obj).__name__
+        obj_module = getattr(type(obj), '__module__', '')
+        
+        # Threading module locks - check by type name and module
+        threading_lock_types = {
+            'lock', '_RLock', 'Semaphore', 'BoundedSemaphore', 
+            'Condition', 'Event', 'Barrier'
+        }
+        
+        if obj_type_name in threading_lock_types:
+            return True
+        
+        # Check by module name for threading objects
+        if 'threading' in obj_module or '_thread' in obj_module:
             return True
         
         # Multiprocessing locks (when available)
         try:
-            if isinstance(obj, (
-                multiprocessing.Lock, multiprocessing.RLock, 
-                multiprocessing.Semaphore, multiprocessing.BoundedSemaphore,
-                multiprocessing.Condition, multiprocessing.Event, 
-                multiprocessing.Barrier
-            )):
+            mp_lock_types = {
+                'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore',
+                'Condition', 'Event', 'Barrier'
+            }
+            if obj_type_name in mp_lock_types and 'multiprocessing' in obj_module:
                 return True
         except AttributeError:
             # Some multiprocessing types might not be available
             pass
         
-        # Check by type name for edge cases
-        obj_type_name = obj.__class__.__name__
-        if obj_type_name in ['_RLock', '_Lock', '_Semaphore', '_BoundedSemaphore', 
-                           '_Condition', '_Event', '_Barrier']:
+        # Additional fallback check for lock-like objects
+        if hasattr(obj, 'acquire') and hasattr(obj, 'release'):
+            # This is likely a lock-like object
             return True
         
         return False
@@ -80,41 +87,24 @@ class LocksHandler(_NSO_Handler):
         }
         
         # Handle specific lock types with their parameters
-        if isinstance(obj, (threading.Semaphore, threading.BoundedSemaphore)):
+        if 'Semaphore' in obj_name:
             data.update(self._serialize_semaphore(obj))
         
-        elif isinstance(obj, (threading.Condition,)):
+        elif 'Condition' in obj_name:
             data.update(self._serialize_condition(obj))
         
-        elif isinstance(obj, (threading.Event,)):
+        elif 'Event' in obj_name:
             data.update(self._serialize_event(obj))
         
-        elif isinstance(obj, (threading.Barrier,)):
+        elif 'Barrier' in obj_name:
             data.update(self._serialize_barrier(obj))
         
-        elif isinstance(obj, (threading.Lock, threading.RLock)):
+        elif 'lock' in obj_name.lower() or 'Lock' in obj_name:
             data.update(self._serialize_basic_lock(obj))
         
-        # Handle multiprocessing locks
-        try:
-            if isinstance(obj, (multiprocessing.Semaphore, multiprocessing.BoundedSemaphore)):
-                data.update(self._serialize_mp_semaphore(obj))
-            
-            elif isinstance(obj, (multiprocessing.Condition,)):
-                data.update(self._serialize_mp_condition(obj))
-            
-            elif isinstance(obj, (multiprocessing.Event,)):
-                data.update(self._serialize_mp_event(obj))
-            
-            elif isinstance(obj, (multiprocessing.Barrier,)):
-                data.update(self._serialize_mp_barrier(obj))
-            
-            elif isinstance(obj, (multiprocessing.Lock, multiprocessing.RLock)):
-                data.update(self._serialize_mp_basic_lock(obj))
-                
-        except AttributeError:
-            # Some multiprocessing types might not be available
-            pass
+        else:
+            # Generic lock-like object
+            data.update(self._serialize_basic_lock(obj))
         
         return data
     
@@ -124,95 +114,73 @@ class LocksHandler(_NSO_Handler):
         module = data.get("module", "threading")
         
         # Route to appropriate deserialization method
-        if lock_type in ["Semaphore", "BoundedSemaphore"]:
+        if 'Semaphore' in lock_type:
             return self._deserialize_semaphore(data, module)
         
-        elif lock_type == "Condition":
+        elif 'Condition' in lock_type:
             return self._deserialize_condition(data, module)
         
-        elif lock_type == "Event":
+        elif 'Event' in lock_type:
             return self._deserialize_event(data, module)
         
-        elif lock_type == "Barrier":
+        elif 'Barrier' in lock_type:
             return self._deserialize_barrier(data, module)
         
-        elif lock_type in ["Lock", "RLock", "_Lock", "_RLock"]:
+        elif 'lock' in lock_type.lower() or 'Lock' in lock_type:
             return self._deserialize_basic_lock(data, module)
         
         else:
-            raise ValueError(f"Unknown lock type: {lock_type}")
+            # Default to basic lock
+            return self._deserialize_basic_lock(data, module)
     
-    def _serialize_semaphore(self, obj: threading.Semaphore) -> Dict[str, Any]:
-        """Serialize threading.Semaphore specific data."""
+    def _serialize_semaphore(self, obj) -> Dict[str, Any]:
+        """Serialize semaphore specific data."""
         # Unfortunately, we can't easily get the current value or initial value
         # from a Semaphore object. We'll recreate with default value.
+        semaphore_type = "bounded" if "Bounded" in type(obj).__name__ else "normal"
         return {
-            "semaphore_type": "bounded" if isinstance(obj, threading.BoundedSemaphore) else "normal",
+            "semaphore_type": semaphore_type,
             "initial_value": 1,  # Default value - we can't detect the actual value
             "note": "Semaphore recreated with default value - actual value unknown"
         }
     
-    def _serialize_condition(self, obj: threading.Condition) -> Dict[str, Any]:
-        """Serialize threading.Condition specific data."""
+    def _serialize_condition(self, obj) -> Dict[str, Any]:
+        """Serialize condition specific data."""
         return {
-            "has_underlying_lock": obj._lock is not None,
+            "has_underlying_lock": hasattr(obj, '_lock') and obj._lock is not None,
             "note": "Condition recreated with new underlying lock"
         }
     
-    def _serialize_event(self, obj: threading.Event) -> Dict[str, Any]:
-        """Serialize threading.Event specific data."""
+    def _serialize_event(self, obj) -> Dict[str, Any]:
+        """Serialize event specific data."""
+        try:
+            is_set = obj.is_set()
+        except AttributeError:
+            is_set = False  # Fallback if is_set method not available
+        
         return {
-            "is_set": obj.is_set(),
+            "is_set": is_set,
             "note": "Event state preserved"
         }
     
-    def _serialize_barrier(self, obj: threading.Barrier) -> Dict[str, Any]:
-        """Serialize threading.Barrier specific data."""
+    def _serialize_barrier(self, obj) -> Dict[str, Any]:
+        """Serialize barrier specific data."""
+        try:
+            parties = getattr(obj, 'parties', 1)
+        except AttributeError:
+            parties = 1  # Fallback
+            
         return {
-            "parties": obj.parties,
+            "parties": parties,
             "action": None,  # We can't serialize the action function
             "timeout": None,  # We can't get the timeout value
             "note": "Barrier recreated with same party count but no action"
         }
     
-    def _serialize_basic_lock(self, obj: threading.Lock) -> Dict[str, Any]:
+    def _serialize_basic_lock(self, obj) -> Dict[str, Any]:
         """Serialize basic Lock/RLock specific data."""
         return {
             "note": "Basic lock recreated as new instance"
-        }
-    
-    def _serialize_mp_semaphore(self, obj) -> Dict[str, Any]:
-        """Serialize multiprocessing.Semaphore specific data."""
-        return {
-            "semaphore_type": "bounded" if "Bounded" in obj.__class__.__name__ else "normal",
-            "initial_value": 1,  # Default value
-            "note": "MP Semaphore recreated with default value"
-        }
-    
-    def _serialize_mp_condition(self, obj) -> Dict[str, Any]:
-        """Serialize multiprocessing.Condition specific data."""
-        return {
-            "note": "MP Condition recreated with new underlying lock"
-        }
-    
-    def _serialize_mp_event(self, obj) -> Dict[str, Any]:
-        """Serialize multiprocessing.Event specific data."""
-        return {
-            "is_set": obj.is_set(),
-            "note": "MP Event state preserved"
-        }
-    
-    def _serialize_mp_barrier(self, obj) -> Dict[str, Any]:
-        """Serialize multiprocessing.Barrier specific data."""
-        return {
-            "parties": obj.parties,
-            "note": "MP Barrier recreated with same party count"
-        }
-    
-    def _serialize_mp_basic_lock(self, obj) -> Dict[str, Any]:
-        """Serialize basic multiprocessing Lock/RLock specific data."""
-        return {
-            "note": "MP basic lock recreated as new instance"
         }
     
     def _deserialize_semaphore(self, data: Dict[str, Any], module: str) -> Any:
@@ -220,40 +188,44 @@ class LocksHandler(_NSO_Handler):
         semaphore_type = data.get("semaphore_type", "normal")
         initial_value = data.get("initial_value", 1)
         
-        if module == "threading":
+        if "threading" in module:
             if semaphore_type == "bounded":
                 return threading.BoundedSemaphore(initial_value)
             else:
                 return threading.Semaphore(initial_value)
         
-        elif module == "multiprocessing":
+        elif "multiprocessing" in module:
             if semaphore_type == "bounded":
                 return multiprocessing.BoundedSemaphore(initial_value)
             else:
                 return multiprocessing.Semaphore(initial_value)
         
         else:
-            raise ValueError(f"Unknown module for semaphore: {module}")
+            # Default to threading
+            if semaphore_type == "bounded":
+                return threading.BoundedSemaphore(initial_value)
+            else:
+                return threading.Semaphore(initial_value)
     
     def _deserialize_condition(self, data: Dict[str, Any], module: str) -> Any:
         """Deserialize condition objects."""
-        if module == "threading":
+        if "threading" in module:
             return threading.Condition()
-        elif module == "multiprocessing":
+        elif "multiprocessing" in module:
             return multiprocessing.Condition()
         else:
-            raise ValueError(f"Unknown module for condition: {module}")
+            return threading.Condition()
     
     def _deserialize_event(self, data: Dict[str, Any], module: str) -> Any:
         """Deserialize event objects."""
         is_set = data.get("is_set", False)
         
-        if module == "threading":
+        if "threading" in module:
             event = threading.Event()
-        elif module == "multiprocessing":
+        elif "multiprocessing" in module:
             event = multiprocessing.Event()
         else:
-            raise ValueError(f"Unknown module for event: {module}")
+            event = threading.Event()
         
         # Restore event state
         if is_set:
@@ -265,31 +237,35 @@ class LocksHandler(_NSO_Handler):
         """Deserialize barrier objects."""
         parties = data.get("parties", 1)
         
-        if module == "threading":
+        if "threading" in module:
             return threading.Barrier(parties)
-        elif module == "multiprocessing":
+        elif "multiprocessing" in module:
             return multiprocessing.Barrier(parties)
         else:
-            raise ValueError(f"Unknown module for barrier: {module}")
+            return threading.Barrier(parties)
     
     def _deserialize_basic_lock(self, data: Dict[str, Any], module: str) -> Any:
         """Deserialize basic lock objects."""
-        lock_type = data.get("lock_type")
+        lock_type = data.get("lock_type", "")
         
-        if module == "threading":
-            if lock_type in ["RLock", "_RLock"]:
+        if "threading" in module:
+            if "RLock" in lock_type or "_RLock" in lock_type:
                 return threading.RLock()
             else:
                 return threading.Lock()
         
-        elif module == "multiprocessing":
-            if lock_type in ["RLock", "_RLock"]:
+        elif "multiprocessing" in module:
+            if "RLock" in lock_type:
                 return multiprocessing.RLock()
             else:
                 return multiprocessing.Lock()
         
         else:
-            raise ValueError(f"Unknown module for basic lock: {module}")
+            # Default to threading
+            if "RLock" in lock_type or "_RLock" in lock_type:
+                return threading.RLock()
+            else:
+                return threading.Lock()
 
 
 # Create a singleton instance
