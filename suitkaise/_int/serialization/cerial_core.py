@@ -659,18 +659,28 @@ def _serialize_container_recursive(obj: Any) -> Any:
             # Create a cerial wrapper for this individual NSO
             handler = _registry.get_handler(obj)
             if handler:
-                return {
-                    "__cerial_nso__": True,
-                    "__handler_class__": handler._handler_name,
-                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-                    "__data__": handler.serialize(obj)
-                }
+                try:
+                    serialized_data = handler.serialize(obj)
+                    return {
+                        "__cerial_nso__": True,
+                        "__handler_class__": handler._handler_name,
+                        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                        "__data__": serialized_data
+                    }
+                except Exception as e:
+                    # If handler fails, create an error placeholder
+                    return {
+                        "__cerial_nso__": True,
+                        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                        "__error__": f"Handler serialization failed: {e}",
+                        "__fallback__": f"Could not serialize {type(obj).__name__}"
+                    }
             else:
                 # Fallback: just store type info
                 return {
                     "__cerial_nso__": True,
                     "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-                    "__fallback__": f"Could not serialize {type(obj).__name__}"
+                    "__fallback__": f"No handler available for {type(obj).__name__}"
                 }
         
         # Handle container types recursively
@@ -687,101 +697,107 @@ def _serialize_container_recursive(obj: Any) -> Any:
             return {_serialize_container_recursive(item) for item in obj}
         
         else:
-            # For simple objects that pickle can handle, return as-is
-            return obj
+            # For simple objects that pickle can handle, test if they're actually pickleable
+            try:
+                # Quick test to see if object is pickleable
+                pickle.dumps(obj)
+                return obj
+            except Exception:
+                # If not pickleable, create a placeholder
+                return {
+                    "__cerial_nso__": True,
+                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                    "__error__": f"Object not pickleable and no handler available"
+                }
             
-    except Exception:
-        # If anything fails, return a placeholder
+    except Exception as e:
+        # If anything fails, return a safe placeholder
         return {
             "__cerial_nso__": True,
-            "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-            "__error__": f"Serialization failed for {type(obj).__name__}"
+            "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}" if hasattr(obj, '__class__') else 'unknown',
+            "__error__": f"Serialization failed: {e}"
         }
+    
 
-
-def _deserialize_container_recursive(obj: Any) -> Any:
+def _serialize_container_recursive(obj: Any) -> Any:
     """
-    Recursively deserialize a container, handling NSOs individually.
+    Recursively serialize a container, handling NSOs individually.
     
     Args:
-        obj: Serialized object to deserialize recursively
+        obj: Object to serialize recursively
         
     Returns:
-        Deserialized object with NSOs restored
+        Serialized representation that can be safely pickled
         
-    This function walks through the serialized container structure
-    and recreates NSOs using their appropriate handlers, while
-    leaving simple objects unchanged.
+    This function walks through nested container structures and
+    creates cerial wrappers for any NSOs it finds, while leaving
+    pickle-compatible objects unchanged.
     """
     try:
-        if _registry.is_debug_mode():
-            print(f"_deserialize_container_recursive called with: {type(obj)}")
-            if isinstance(obj, dict) and len(obj) < 5:  # Only show small dicts
-                print(f"  Object keys: {list(obj.keys()) if isinstance(obj, dict) else 'Not a dict'}")
-        
-        # Check if this is a cerial NSO wrapper
-        if isinstance(obj, dict) and obj.get("__cerial_nso__"):
-            handler_class_name = obj.get("__handler_class__")
-            
-            if _registry.is_debug_mode():
-                print(f"  Found NSO wrapper, handler: {handler_class_name}")
-            
-            # If we have a fallback or error, return a placeholder
-            if "__fallback__" in obj or "__error__" in obj:
-                return f"<Unserialized {obj.get('__original_type__', 'Unknown')}>"
-            
-            # Find and use the appropriate handler
-            if handler_class_name:
-                for registered_handler in _registry._handlers:
-                    if registered_handler._handler_name == handler_class_name:
-                        data = obj.get("__data__")
-                        if data is not None:
-                            result = registered_handler.deserialize(data)
-                            if _registry.is_debug_mode():
-                                print(f"  Deserialized NSO to: {type(result)}")
-                            return result
-                        break
-            
-            # If we can't deserialize, return a placeholder
-            return f"<Unhandled {obj.get('__original_type__', 'Unknown')}>"
+        # If this object needs enhanced serialization, handle it specially
+        if _registry._needs_enhanced_serialization(obj) or _registry.get_handler(obj):
+            # Create a cerial wrapper for this individual NSO
+            handler = _registry.get_handler(obj)
+            if handler:
+                try:
+                    serialized_data = handler.serialize(obj)
+                    return {
+                        "__cerial_nso__": True,
+                        "__handler_class__": handler._handler_name,
+                        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                        "__data__": serialized_data
+                    }
+                except Exception as e:
+                    # If handler fails, create an error placeholder
+                    return {
+                        "__cerial_nso__": True,
+                        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                        "__error__": f"Handler serialization failed: {e}",
+                        "__fallback__": f"Could not serialize {type(obj).__name__}"
+                    }
+            else:
+                # Fallback: just store type info
+                return {
+                    "__cerial_nso__": True,
+                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                    "__fallback__": f"No handler available for {type(obj).__name__}"
+                }
         
         # Handle container types recursively
         elif isinstance(obj, dict):
-            if _registry.is_debug_mode():
-                print(f"  Processing dict with {len(obj)} keys")
-            result = {key: _deserialize_container_recursive(value) for key, value in obj.items()}
-            if _registry.is_debug_mode():
-                print(f"  Dict result has keys: {list(result.keys())}")
-            return result
+            return {key: _serialize_container_recursive(value) for key, value in obj.items()}
         
         elif isinstance(obj, list):
-            if _registry.is_debug_mode():
-                print(f"  Processing list with {len(obj)} items")
-            return [_deserialize_container_recursive(item) for item in obj]
+            return [_serialize_container_recursive(item) for item in obj]
         
         elif isinstance(obj, tuple):
-            if _registry.is_debug_mode():
-                print(f"  Processing tuple with {len(obj)} items")
-            return tuple(_deserialize_container_recursive(item) for item in obj)
+            return tuple(_serialize_container_recursive(item) for item in obj)
         
         elif isinstance(obj, set):
-            if _registry.is_debug_mode():
-                print(f"  Processing set with {len(obj)} items")
-            return {_deserialize_container_recursive(item) for item in obj}
+            return {_serialize_container_recursive(item) for item in obj}
         
         else:
-            # For simple objects, return as-is
-            if _registry.is_debug_mode():
-                print(f"  Returning simple object: {type(obj)}")
-            return obj
+            # For simple objects that pickle can handle, test if they're actually pickleable
+            try:
+                # Quick test to see if object is pickleable
+                pickle.dumps(obj)
+                return obj
+            except Exception:
+                # If not pickleable, create a placeholder
+                return {
+                    "__cerial_nso__": True,
+                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+                    "__error__": f"Object not pickleable and no handler available"
+                }
             
     except Exception as e:
-        if _registry.is_debug_mode():
-            print(f"  Error in _deserialize_container_recursive: {e}")
-        # If anything fails, return the original object or a placeholder
-        if isinstance(obj, dict) and obj.get("__original_type__"):
-            return f"<Failed {obj.get('__original_type__', 'Unknown')}>"
-        return obj
+        # If anything fails, return a safe placeholder
+        return {
+            "__cerial_nso__": True,
+            "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}" if hasattr(obj, '__class__') else 'unknown',
+            "__error__": f"Serialization failed: {e}"
+        }
+
 
 
 def _serialize_enhanced_container(obj: Any) -> bytes:

@@ -120,20 +120,17 @@ class FileHandlesHandler(_NSO_Handler):
             if isinstance(obj, (io.StringIO, io.BytesIO)):
                 return True
             
-            # Temporary files
-            if hasattr(tempfile, 'TemporaryFile') and isinstance(obj, type(tempfile.TemporaryFile())):
+            # Temporary files - improved detection
+            obj_type_name = type(obj).__name__
+            obj_module = getattr(type(obj), '__module__', '')
+            
+            # Check for various temporary file types
+            if '_TemporaryFileWrapper' in obj_type_name or 'tempfile' in obj_module:
                 return True
-            if isinstance(obj, tempfile._TemporaryFileWrapper):
+            
+            # Check if it has tempfile-like attributes
+            if hasattr(obj, 'delete') and hasattr(obj, 'name') and hasattr(obj, '_file'):
                 return True
-            if hasattr(tempfile, 'NamedTemporaryFile'):
-                try:
-                    # NamedTemporaryFile creates different types on different platforms
-                    temp_file = tempfile.NamedTemporaryFile()
-                    temp_file.close()
-                    if type(obj) == type(temp_file):
-                        return True
-                except Exception:
-                    pass
             
             # Standard streams
             if obj in (sys.stdin, sys.stdout, sys.stderr):
@@ -160,7 +157,6 @@ class FileHandlesHandler(_NSO_Handler):
             
             if file_like_methods >= 3:  # At least 3 file-like methods
                 # But exclude common non-file objects that happen to have these methods
-                obj_type_name = type(obj).__name__
                 excluded_types = {
                     'dict', 'list', 'tuple', 'set', 'frozenset', 'str', 'bytes',
                     'int', 'float', 'bool', 'NoneType'
@@ -173,7 +169,8 @@ class FileHandlesHandler(_NSO_Handler):
         except Exception:
             # If type checking fails, assume we can't handle it
             return False
-    
+
+
     def serialize(self, obj: Any) -> Dict[str, Any]:
         """
         Serialize a file handle object to a dictionary representation.

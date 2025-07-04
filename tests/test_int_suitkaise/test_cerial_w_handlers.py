@@ -338,15 +338,27 @@ def test_individual_handlers():
     # 6. Weak References Handler
     print_subsection("Weak Reference Objects (WeakReferencesHandler)")
     
-    # Create objects to reference
-    ref_target = [1, 2, 3]
-    dict_target = {"key": "value"}
+    # Create objects that support weak references
+    class WeakRefTarget:
+        def __init__(self, value):
+            self.value = value
+        def __repr__(self):
+            return f"WeakRefTarget({self.value})"
+        def __hash__(self):
+            return hash(self.value)
+        def __eq__(self, other):
+            return isinstance(other, WeakRefTarget) and self.value == other.value
+    
+    ref_target = WeakRefTarget("test")
+    dict_key_target = WeakRefTarget("key")
+    dict_value_target = WeakRefTarget("value")
+    set_target = WeakRefTarget("set")
     
     weakref_objects = [
         ("Weak Reference", weakref.ref(ref_target)),
-        ("Weak Key Dict", weakref.WeakKeyDictionary({dict_target: "value"})),
-        ("Weak Value Dict", weakref.WeakValueDictionary({"key": dict_target})),
-        ("Weak Set", weakref.WeakSet([dict_target])),
+        ("Weak Key Dict", weakref.WeakKeyDictionary({dict_key_target: "value"})),
+        ("Weak Value Dict", weakref.WeakValueDictionary({"key": dict_value_target})),
+        ("Weak Set", weakref.WeakSet([set_target])),
     ]
     
     for name, obj in weakref_objects:

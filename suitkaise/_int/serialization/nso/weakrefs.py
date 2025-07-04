@@ -356,7 +356,9 @@ class WeakReferencesHandler(_NSO_Handler):
             # Create a dead weak reference
             # This is tricky because we can't create a dead weak reference directly
             # We'll create a reference to a temporary object and let it die
-            temp_obj = object()
+            class TempObject:
+                pass
+            temp_obj = TempObject()
             weak_ref = weakref.ref(temp_obj)
             del temp_obj  # This should make the weak reference dead
             return weak_ref
