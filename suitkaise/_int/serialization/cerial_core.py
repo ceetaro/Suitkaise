@@ -5,15 +5,29 @@ This module provides the core serialization functionality that powers cross-proc
 communication in Suitkaise. Built on standard Python pickle with enhanced handlers
 for non-serializable objects (NSOs) and SK-specific objects.
 
-Key Features:
-- Enhanced serialization for threading locks, lambdas, file handles, generators
-- SK-specific object serialization (SKPath, Timer, Stopwatch, etc.)
-- Graceful fallback to standard pickle for unsupported objects
-- Selective enhancement - only use enhanced serialization when needed
-- Error recovery and detailed logging for debugging
-- Autoregistration system for handlers
-- Batch serialization capabilities
-- Performance monitoring integration
+ARCHITECTURE OVERVIEW:
+======================
+
+1. STRATEGY SYSTEM: Decides how to serialize each object
+   - Standard Pickle: Fast, reliable for most objects
+   - Enhanced Cerial: For complex objects that pickle can't handle
+   - Skip Object: Returns placeholder for unsupported objects
+
+2. HANDLER REGISTRY: Manages specialized serialization handlers
+   - Auto-discovery of available handlers
+   - Priority-based handler selection
+   - Registration/unregistration of custom handlers
+
+3. NSO HANDLERS: Specialized handlers for Non-Serializable Objects
+   - Threading locks, semaphores, events
+   - Lambda functions and complex functions
+   - File handles and I/O streams
+   - Suitkaise-specific objects (SKPath, Timer, etc.)
+
+4. CONTAINER PROCESSING: Handles complex nested structures
+   - Recursively processes containers (dict, list, tuple, set)
+   - Preserves structure while handling embedded NSOs
+   - Creates cerial envelopes for enhanced serialization
 
 Design Philosophy:
 - Start with standard pickle (fast, reliable for most objects)
@@ -36,47 +50,146 @@ from enum import Enum
 
 from suitkaise._int.core.path_ops import _is_suitkaise_module, _get_module_file_path
 
+# ============================================================================
+# EXCEPTION CLASSES
+# ============================================================================
+
 class CerialError(Exception):
-    """Base exception for Cerial serialization errors."""
+    """
+    Base exception for Cerial serialization errors.
+    
+    All cerial-specific exceptions inherit from this base class,
+    making it easy to catch any cerial-related error.
+    """
     pass
 
 
 class CerializationError(CerialError):
-    """Raised when serialization fails."""
+    """
+    Raised when serialization fails.
+    
+    This includes failures in both standard pickle and enhanced
+    cerial serialization methods.
+    """
     pass
 
 
 class DecerializationError(CerialError):
-    """Raised when deserialization fails."""
+    """
+    Raised when deserialization fails.
+    
+    This includes failures in both standard pickle and enhanced
+    cerial deserialization methods.
+    """
     pass
 
 
+# ============================================================================
+# STRATEGY ENUMERATION
+# ============================================================================
+
 class _SerializationStrategy(Enum):
-    """Strategy for handling different object types."""
+    """
+    Strategy enumeration for handling different object types.
+    
+    This enum defines the three possible approaches for serializing objects:
+    - STANDARD_PICKLE: Use regular Python pickle (fastest, most reliable)
+    - ENHANCED_CERIAL: Use our custom enhanced serialization with handlers
+    - SKIP_OBJECT: Skip this object and return a placeholder
+    
+    The strategy is determined by analyzing each object and checking:
+    1. Whether any registered handler can process it
+    2. Whether it's a known NSO type that needs enhancement
+    3. Whether it has explicit strategy override
+    4. Default fallback to standard pickle
+    """
     STANDARD_PICKLE = "standard"      # Use regular pickle
     ENHANCED_CERIAL = "enhanced"      # Use our enhanced serialization
     SKIP_OBJECT = "skip"              # Skip this object (return placeholder)
 
 
+# ============================================================================
+# NSO HANDLER BASE CLASS
+# ============================================================================
+
 class _NSO_Handler:
-    """Base class for Non-Serializable Object handlers."""
+    """
+    Base class for Non-Serializable Object handlers.
+    
+    Each handler is responsible for serializing/deserializing specific
+    types of objects that standard pickle cannot handle. This includes:
+    - Threading primitives (locks, semaphores, events)
+    - Lambda functions and complex function objects
+    - File handles and I/O streams
+    - Suitkaise-specific objects
+    
+    HANDLER LIFECYCLE:
+    1. can_handle(obj): Check if this handler can process the object
+    2. serialize(obj): Convert object to dictionary representation
+    3. deserialize(data): Recreate object from dictionary representation
+    
+    PRIORITY SYSTEM:
+    - Lower priority numbers = higher actual priority
+    - Default priority is 50
+    - Handlers are tried in priority order
+    """
 
     def __init__(self):
-        """Initialize the NSO handler."""
+        """
+        Initialize the NSO handler.
+        
+        Sets up handler metadata including name, priority, and
+        the set of types this handler can process.
+        """
         self._types_handled: Set[Type] = set()
         self._handler_name: str = self.__class__.__name__
         self._priority: int = 50  # Default priority, lower = higher priority
     
     def can_handle(self, obj: Any) -> bool:
-        """Check if this handler can serialize the given object."""
+        """
+        Check if this handler can serialize the given object.
+        
+        Args:
+            obj: The object to check
+            
+        Returns:
+            True if this handler can process the object
+            
+        This method should be implemented by each handler to define
+        which objects it can process. It should be fast since it's
+        called for every object during strategy determination.
+        """
         raise NotImplementedError("Subclasses must implement can_handle()")
     
     def serialize(self, obj: Any) -> Dict[str, Any]:
-        """Serialize the object to a dictionary representation."""
+        """
+        Serialize the object to a dictionary representation.
+        
+        Args:
+            obj: The object to serialize
+            
+        Returns:
+            Dictionary containing all data needed to recreate the object
+            
+        The returned dictionary should contain only pickle-serializable
+        data types (strings, numbers, lists, dicts, etc.). Complex
+        objects should be broken down into their essential components.
+        """
         raise NotImplementedError("Subclasses must implement serialize()")
     
     def deserialize(self, data: Dict[str, Any]) -> Any:
-        """Deserialize the object from dictionary representation."""
+        """
+        Deserialize the object from dictionary representation.
+        
+        Args:
+            data: Dictionary containing serialized object data
+            
+        Returns:
+            Recreated object instance
+            
+        This method recreates the object using the data saved during
+        serialization. It should handle missing or invalid data gracefully.
+        """
         raise NotImplementedError("Subclasses must implement deserialize()")
     
     def get_priority(self) -> int:
@@ -88,7 +201,13 @@ class _NSO_Handler:
         self._priority = priority
     
     def get_handler_info(self) -> Dict[str, Any]:
-        """Get information about this handler."""
+        """
+        Get information about this handler.
+        
+        Returns:
+            Dictionary with handler metadata including name, priority,
+            types handled, and module information.
+        """
         return {
             "name": self._handler_name,
             "priority": self._priority,
@@ -97,11 +216,40 @@ class _NSO_Handler:
         }
 
 
+# ============================================================================
+# CERIAL REGISTRY - THE HEART OF THE SYSTEM
+# ============================================================================
+
 class _CerialRegistry:
-    """Registry for NSO handlers and serialization strategies."""
+    """
+    Registry for NSO handlers and serialization strategies.
+    
+    This is the central coordination point for the entire cerial system.
+    It manages:
+    - Handler registration and discovery
+    - Strategy determination for objects
+    - Performance statistics tracking
+    - Debug mode and configuration
+    
+    HANDLER MANAGEMENT:
+    - Handlers are stored in priority order (lower number = higher priority)
+    - Auto-discovery can find and register handlers automatically
+    - Handlers can be registered/unregistered at runtime
+    
+    STRATEGY DETERMINATION:
+    1. Check if any registered handler can handle the object
+    2. Check if object needs enhanced serialization (NSO detection)
+    3. Check for explicit type strategy overrides
+    4. Default to standard pickle
+    
+    PERFORMANCE TRACKING:
+    - Counts serializations, deserializations, enhanced operations
+    - Tracks timing information
+    - Monitors error rates and fallback usage
+    """
     
     def __init__(self):
-        """Initialize the registry with empty handlers."""
+        """Initialize the registry with empty handlers and default settings."""
         self._handlers: List[_NSO_Handler] = []
         self._type_strategies: Dict[Type, _SerializationStrategy] = {}
         self._debug_mode: bool = False
@@ -116,7 +264,15 @@ class _CerialRegistry:
         }
     
     def register_handler(self, handler: _NSO_Handler) -> None:
-        """Register an NSO handler."""
+        """
+        Register an NSO handler.
+        
+        Args:
+            handler: Handler instance to register
+            
+        The handler is inserted in the correct position based on priority.
+        If a handler with the same name already exists, it's replaced.
+        """
         if not isinstance(handler, _NSO_Handler):
             raise TypeError("Handler must be an instance of _NSO_Handler")
         
@@ -138,7 +294,15 @@ class _CerialRegistry:
             print(f"Registered NSO handler: {handler._handler_name} (priority: {handler.get_priority()})")
     
     def unregister_handler(self, handler_name: str) -> bool:
-        """Unregister a handler by name."""
+        """
+        Unregister a handler by name.
+        
+        Args:
+            handler_name: Name of handler to remove
+            
+        Returns:
+            True if handler was found and removed
+        """
         original_count = len(self._handlers)
         self._handlers = [h for h in self._handlers if h._handler_name != handler_name]
         removed = len(self._handlers) < original_count
@@ -149,7 +313,18 @@ class _CerialRegistry:
         return removed
     
     def get_handler(self, obj: Any) -> Optional[_NSO_Handler]:
-        """Get the appropriate handler for an object."""
+        """
+        Get the appropriate handler for an object.
+        
+        Args:
+            obj: Object to find handler for
+            
+        Returns:
+            Handler that can process the object, or None if no handler available
+            
+        Handlers are tried in priority order until one claims it can
+        handle the object.
+        """
         for handler in self._handlers:
             try:
                 if handler.can_handle(obj):
@@ -162,7 +337,7 @@ class _CerialRegistry:
         return None
     
     def get_all_handlers(self) -> List[_NSO_Handler]:
-        """Get all registered handlers."""
+        """Get all registered handlers (copy to prevent modification)."""
         return self._handlers.copy()
     
     def get_handler_info(self) -> List[Dict[str, Any]]:
@@ -170,11 +345,33 @@ class _CerialRegistry:
         return [handler.get_handler_info() for handler in self._handlers]
     
     def set_type_strategy(self, obj_type: Type, strategy: _SerializationStrategy) -> None:
-        """Set serialization strategy for a specific type."""
+        """
+        Set serialization strategy for a specific type.
+        
+        Args:
+            obj_type: Type to set strategy for
+            strategy: Strategy to use for this type
+            
+        This allows manual override of the automatic strategy determination.
+        """
         self._type_strategies[obj_type] = strategy
     
     def get_type_strategy(self, obj: Any) -> _SerializationStrategy:
-        """Get serialization strategy for an object."""
+        """
+        Get serialization strategy for an object.
+        
+        Args:
+            obj: Object to determine strategy for
+            
+        Returns:
+            Strategy enum indicating how to serialize this object
+            
+        STRATEGY DETERMINATION ORDER:
+        1. Check if any registered handler can handle this object
+        2. Check if object needs enhanced serialization (NSO detection)
+        3. Check for explicit type strategy override
+        4. Default to standard pickle
+        """
         obj_type = type(obj)
         
         # FIRST: Check if any registered handler can handle this object
@@ -194,7 +391,22 @@ class _CerialRegistry:
         return _SerializationStrategy.STANDARD_PICKLE
     
     def _needs_enhanced_serialization(self, obj: Any) -> bool:
-        """Check if object needs enhanced serialization based on type."""
+        """
+        Check if object needs enhanced serialization based on type.
+        
+        Args:
+            obj: Object to check
+            
+        Returns:
+            True if object is a known NSO type that needs enhancement
+            
+        This method detects common NSO types that standard pickle
+        cannot handle, including:
+        - Function types (lambda, function, generator)
+        - Threading objects (locks, semaphores, events)
+        - Suitkaise-specific objects
+        - File handles and I/O objects
+        """
         try:
             # Get the type name for comparison
             obj_type_name = type(obj).__name__
@@ -231,7 +443,7 @@ class _CerialRegistry:
             if '_thread' in obj_module_name:
                 return True
 
-            # SK-specific objects
+            # SK-specific objects - check if from suitkaise module
             if hasattr(obj, '__module__'):
                 try:
                     obj_module_file = _get_module_file_path(obj)
@@ -277,11 +489,11 @@ class _CerialRegistry:
             print("Cerial auto-discovery disabled.")
     
     def get_performance_stats(self) -> Dict[str, Any]:
-        """Get performance statistics."""
+        """Get performance statistics (copy to prevent modification)."""
         return self._performance_stats.copy()
     
     def reset_performance_stats(self) -> None:
-        """Reset performance statistics."""
+        """Reset performance statistics to zero."""
         self._performance_stats = {
             "serializations": 0,
             "deserializations": 0,
@@ -294,13 +506,27 @@ class _CerialRegistry:
             print("Cerial performance stats reset.")
     
     def _record_operation(self, operation: str, duration: float = 0.0) -> None:
-        """Record performance statistics."""
+        """
+        Record performance statistics.
+        
+        Args:
+            operation: Type of operation performed
+            duration: Time taken for the operation
+        """
         if operation in self._performance_stats:
             self._performance_stats[operation] += 1
         self._performance_stats["total_time"] += duration
     
     def discover_and_register_handlers(self) -> int:
-        """Discover and register all available handlers."""
+        """
+        Discover and register all available handlers.
+        
+        Returns:
+            Number of handlers discovered and registered
+            
+        This method tries to import known handler modules and
+        automatically register any handler instances found.
+        """
         if not self._auto_discovery_enabled:
             return 0
         
@@ -351,77 +577,7 @@ _registry = _CerialRegistry()
 
 
 # ============================================================================
-# Autoregistration Decorators and Functions
-# ============================================================================
-
-def register_handler(priority: int = 50):
-    """
-    Decorator to automatically register an NSO handler.
-    
-    Args:
-        priority: Handler priority (lower = higher priority)
-        
-    Example:
-        @register_handler(priority=10)
-        class MyCustomHandler(_NSO_Handler):
-            def can_handle(self, obj):
-                return isinstance(obj, MyCustomType)
-            # ... rest of implementation
-    """
-    def decorator(handler_class: Type[_NSO_Handler]):
-        # Create instance and set priority
-        handler_instance = handler_class()
-        handler_instance.set_priority(priority)
-        
-        # Register immediately
-        _registry.register_handler(handler_instance)
-        
-        # Return the class unchanged
-        return handler_class
-    
-    return decorator
-
-
-def register_nso_handler(handler: _NSO_Handler) -> None:
-    """
-    Register a new NSO handler globally.
-    
-    Args:
-        handler: NSO handler instance
-    """
-    _registry.register_handler(handler)
-
-
-def unregister_handler(handler_name: str) -> bool:
-    """
-    Unregister a handler by name.
-    
-    Args:
-        handler_name: Name of handler to remove
-        
-    Returns:
-        True if handler was found and removed
-    """
-    return _registry.unregister_handler(handler_name)
-
-
-def get_registered_handlers() -> List[Dict[str, Any]]:
-    """Get information about all registered handlers."""
-    return _registry.get_handler_info()
-
-
-def discover_handlers() -> int:
-    """
-    Discover and register all available handlers.
-    
-    Returns:
-        Number of handlers discovered and registered
-    """
-    return _registry.discover_and_register_handlers()
-
-
-# ============================================================================
-# Internal Helper Functions (defined before main functions)
+# CONTAINER PROCESSING FUNCTIONS
 # ============================================================================
 
 def _contains_nso_objects(obj: Any, max_depth: int = 3, _current_depth: int = 0) -> bool:
@@ -435,6 +591,10 @@ def _contains_nso_objects(obj: Any, max_depth: int = 3, _current_depth: int = 0)
         
     Returns:
         True if any nested object needs enhanced serialization
+        
+    This function recursively searches through container objects
+    (dict, list, tuple, set) to find any embedded NSOs that would
+    require enhanced serialization.
     """
     if _current_depth >= max_depth:
         return False
@@ -473,32 +633,6 @@ def _contains_nso_objects(obj: Any, max_depth: int = 3, _current_depth: int = 0)
         return False
 
 
-def _serialize_enhanced_container(obj: Any) -> bytes:
-    """
-    Enhanced serialization for containers that hold NSO objects.
-    
-    Args:
-        obj: Container object to serialize
-        
-    Returns:
-        Serialized bytes with cerial header
-    """
-    # Recursively serialize the container, handling NSOs individually
-    serialized_container = _serialize_container_recursive(obj)
-    
-    # Create a special container envelope
-    cerial_envelope = {
-        "__cerial_data__": True,
-        "__cerial_version__": "0.1.0",
-        "__handler_class__": "ContainerHandler", 
-        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-        "__data__": serialized_container
-    }
-    
-    # Use standard pickle for the envelope
-    return pickle.dumps(cerial_envelope)
-
-
 def _serialize_container_recursive(obj: Any) -> Any:
     """
     Recursively serialize a container, handling NSOs individually.
@@ -508,6 +642,10 @@ def _serialize_container_recursive(obj: Any) -> Any:
         
     Returns:
         Serialized representation that can be safely pickled
+        
+    This function walks through nested container structures and
+    creates cerial wrappers for any NSOs it finds, while leaving
+    pickle-compatible objects unchanged.
     """
     try:
         # If this object needs enhanced serialization, handle it specially
@@ -564,6 +702,10 @@ def _deserialize_container_recursive(obj: Any) -> Any:
         
     Returns:
         Deserialized object with NSOs restored
+        
+    This function walks through the serialized container structure
+    and recreates NSOs using their appropriate handlers, while
+    leaving simple objects unchanged.
     """
     try:
         if _registry.is_debug_mode():
@@ -636,6 +778,40 @@ def _deserialize_container_recursive(obj: Any) -> Any:
         return obj
 
 
+def _serialize_enhanced_container(obj: Any) -> bytes:
+    """
+    Enhanced serialization for containers that hold NSO objects.
+    
+    Args:
+        obj: Container object to serialize
+        
+    Returns:
+        Serialized bytes with cerial header
+        
+    This function handles containers (dict, list, etc.) that contain
+    NSOs mixed with regular objects. It creates a special container
+    envelope and recursively processes the contents.
+    """
+    # Recursively serialize the container, handling NSOs individually
+    serialized_container = _serialize_container_recursive(obj)
+    
+    # Create a special container envelope
+    cerial_envelope = {
+        "__cerial_data__": True,
+        "__cerial_version__": "0.1.0",
+        "__handler_class__": "ContainerHandler", 
+        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
+        "__data__": serialized_container
+    }
+    
+    # Use standard pickle for the envelope
+    return pickle.dumps(cerial_envelope)
+
+
+# ============================================================================
+# ENHANCED SERIALIZATION FUNCTIONS
+# ============================================================================
+
 def _is_enhanced_cerial_data(data: bytes) -> bool:
     """
     Check if data was serialized using enhanced cerial.
@@ -645,6 +821,10 @@ def _is_enhanced_cerial_data(data: bytes) -> bool:
         
     Returns:
         True if data contains cerial envelope
+        
+    This function quickly checks if the given bytes represent
+    enhanced cerial data by trying to load the envelope and
+    checking for the cerial marker.
     """
     try:
         # Try to load as pickle and check for cerial envelope
@@ -663,6 +843,9 @@ def _serialize_enhanced(obj: Any) -> bytes:
         
     Returns:
         Serialized bytes with cerial header
+        
+    This function handles individual NSOs by finding the appropriate
+    handler and creating a cerial envelope with the serialized data.
     """
     # Get appropriate handler
     handler = _registry.get_handler(obj)
@@ -695,6 +878,14 @@ def _deserialize_enhanced(data: bytes) -> Any:
         
     Returns:
         Deserialized object
+        
+    This function handles cerial envelopes by extracting the handler
+    information and data, then using the appropriate handler to
+    recreate the object.
+    
+    CRITICAL FIX: This function now properly handles ContainerHandler
+    by calling _deserialize_container_recursive instead of trying to
+    find a handler named "ContainerHandler".
     """
     # Load the cerial envelope
     try:
@@ -716,9 +907,10 @@ def _deserialize_enhanced(data: bytes) -> Any:
         serialized_data = envelope.get("__data__")
         if serialized_data is None:
             raise DecerializationError("Missing data in container envelope")
+        # THIS IS THE KEY FIX: Properly deserialize container data
         return _deserialize_container_recursive(serialized_data)
     
-    # Find handler by class name
+    # Find handler by class name for individual NSOs
     handler = None
     for registered_handler in _registry._handlers:
         if registered_handler._handler_name == handler_class_name:
@@ -737,7 +929,7 @@ def _deserialize_enhanced(data: bytes) -> Any:
 
 
 # ============================================================================
-# Core Serialization Functions
+# CORE SERIALIZATION FUNCTIONS
 # ============================================================================
 
 def serialize(obj: Any, fallback_to_pickle: bool = True) -> bytes:
@@ -753,6 +945,13 @@ def serialize(obj: Any, fallback_to_pickle: bool = True) -> bytes:
         
     Raises:
         CerializationError: If serialization fails and fallback is disabled
+        
+    SERIALIZATION FLOW:
+    1. Determine strategy (standard pickle vs enhanced cerial)
+    2. Try primary strategy
+    3. If primary fails and fallback enabled, try alternative
+    4. If container contains NSOs, use enhanced container serialization
+    5. Record performance statistics
     """
     start_time = time.time()
     
@@ -842,6 +1041,12 @@ def deserialize(data: bytes, fallback_to_pickle: bool = True) -> Any:
         
     Raises:
         DecerializationError: If deserialization fails and fallback is disabled
+        
+    DESERIALIZATION FLOW:
+    1. Check if data is enhanced cerial format
+    2. Use appropriate deserialization method
+    3. If enhanced fails and fallback enabled, try standard pickle
+    4. Record performance statistics
     """
     start_time = time.time()
     
@@ -876,7 +1081,7 @@ def deserialize(data: bytes, fallback_to_pickle: bool = True) -> Any:
 
 
 # ============================================================================
-# Batch Serialization Convenience Methods
+# BATCH SERIALIZATION CONVENIENCE METHODS
 # ============================================================================
 
 def serialize_batch(objects: List[Any], fallback_to_pickle: bool = True) -> List[bytes]:
@@ -994,7 +1199,77 @@ def deserialize_dict(data_dict: Dict[str, bytes], fallback_to_pickle: bool = Tru
 
 
 # ============================================================================
-# Configuration and Control Functions  
+# HANDLER REGISTRATION AND MANAGEMENT
+# ============================================================================
+
+def register_handler(priority: int = 50):
+    """
+    Decorator to automatically register an NSO handler.
+    
+    Args:
+        priority: Handler priority (lower = higher priority)
+        
+    Example:
+        @register_handler(priority=10)
+        class MyCustomHandler(_NSO_Handler):
+            def can_handle(self, obj):
+                return isinstance(obj, MyCustomType)
+            # ... rest of implementation
+    """
+    def decorator(handler_class: Type[_NSO_Handler]):
+        # Create instance and set priority
+        handler_instance = handler_class()
+        handler_instance.set_priority(priority)
+        
+        # Register immediately
+        _registry.register_handler(handler_instance)
+        
+        # Return the class unchanged
+        return handler_class
+    
+    return decorator
+
+
+def register_nso_handler(handler: _NSO_Handler) -> None:
+    """
+    Register a new NSO handler globally.
+    
+    Args:
+        handler: NSO handler instance
+    """
+    _registry.register_handler(handler)
+
+
+def unregister_handler(handler_name: str) -> bool:
+    """
+    Unregister a handler by name.
+    
+    Args:
+        handler_name: Name of handler to remove
+        
+    Returns:
+        True if handler was found and removed
+    """
+    return _registry.unregister_handler(handler_name)
+
+
+def get_registered_handlers() -> List[Dict[str, Any]]:
+    """Get information about all registered handlers."""
+    return _registry.get_handler_info()
+
+
+def discover_handlers() -> int:
+    """
+    Discover and register all available handlers.
+    
+    Returns:
+        Number of handlers discovered and registered
+    """
+    return _registry.discover_and_register_handlers()
+
+
+# ============================================================================
+# CONFIGURATION AND CONTROL FUNCTIONS  
 # ============================================================================
 
 def enable_debug_mode() -> None:
@@ -1033,232 +1308,7 @@ def reset_performance_stats() -> None:
 
 
 # ============================================================================
-# Internal Enhanced Serialization Functions
-# ============================================================================
-
-def _serialize_enhanced(obj: Any) -> bytes:
-    """
-    Enhanced serialization for NSOs and SK objects.
-    
-    Args:
-        obj: Object to serialize
-        
-    Returns:
-        Serialized bytes with cerial header
-    """
-    # Get appropriate handler
-    handler = _registry.get_handler(obj)
-    
-    if handler is None:
-        raise CerializationError(f"No handler found for object type: {type(obj)}")
-    
-    # Serialize using handler
-    serialized_data = handler.serialize(obj)
-    
-    # Add cerial metadata
-    cerial_envelope = {
-        "__cerial_data__": True,
-        "__cerial_version__": "0.1.0",
-        "__handler_class__": handler._handler_name,
-        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-        "__data__": serialized_data
-    }
-    
-    # Use standard pickle for the envelope
-    return pickle.dumps(cerial_envelope)
-
-
-def _deserialize_enhanced(data: bytes) -> Any:
-    """
-    Enhanced deserialization for NSOs and SK objects.
-    
-    Args:
-        data: Serialized bytes with cerial header
-        
-    Returns:
-        Deserialized object
-    """
-    # Load the cerial envelope
-    try:
-        envelope = pickle.loads(data)
-    except Exception as e:
-        raise DecerializationError(f"Failed to load cerial envelope: {e}")
-    
-    # Validate envelope structure
-    if not isinstance(envelope, dict) or not envelope.get("__cerial_data__"):
-        raise DecerializationError("Invalid cerial envelope format")
-    
-    # Get handler class name and find matching handler
-    handler_class_name = envelope.get("__handler_class__")
-    if not handler_class_name:
-        raise DecerializationError("Missing handler class name in envelope")
-    
-    # Find handler by class name
-    handler = None
-    for registered_handler in _registry._handlers:
-        if registered_handler._handler_name == handler_class_name:
-            handler = registered_handler
-            break
-    
-    if handler is None:
-        raise DecerializationError(f"Handler not found: {handler_class_name}")
-    
-    # Deserialize using handler
-    serialized_data = envelope.get("__data__")
-    if serialized_data is None:
-        raise DecerializationError("Missing data in cerial envelope")
-    
-    return handler.deserialize(serialized_data)
-
-
-def _contains_nso_objects(obj: Any, max_depth: int = 3, _current_depth: int = 0) -> bool:
-    """
-    Check if an object contains any NSOs in its nested structure.
-    
-    Args:
-        obj: Object to check
-        max_depth: Maximum depth to search (prevents infinite recursion)
-        _current_depth: Current recursion depth (internal use)
-        
-    Returns:
-        True if any nested object needs enhanced serialization
-    """
-    if _current_depth >= max_depth:
-        return False
-    
-    try:
-        # Check if this object itself needs enhanced serialization
-        if _registry._needs_enhanced_serialization(obj):
-            return True
-        
-        # Check if any handler can handle this object
-        if _registry.get_handler(obj) is not None:
-            return True
-        
-        # Recursively check common container types
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                if _contains_nso_objects(key, max_depth, _current_depth + 1):
-                    return True
-                if _contains_nso_objects(value, max_depth, _current_depth + 1):
-                    return True
-        
-        elif isinstance(obj, (list, tuple)):
-            for item in obj:
-                if _contains_nso_objects(item, max_depth, _current_depth + 1):
-                    return True
-        
-        elif isinstance(obj, set):
-            for item in obj:
-                if _contains_nso_objects(item, max_depth, _current_depth + 1):
-                    return True
-        
-        return False
-        
-    except Exception:
-        # If any error occurs during checking, assume no NSOs to be safe
-        return False
-
-
-def _serialize_enhanced_container(obj: Any) -> bytes:
-    """
-    Enhanced serialization for containers that hold NSO objects.
-    
-    Args:
-        obj: Container object to serialize
-        
-    Returns:
-        Serialized bytes with cerial header
-    """
-    # Recursively serialize the container, handling NSOs individually
-    serialized_container = _serialize_container_recursive(obj)
-    
-    # Create a special container envelope
-    cerial_envelope = {
-        "__cerial_data__": True,
-        "__cerial_version__": "0.1.0",
-        "__handler_class__": "ContainerHandler", 
-        "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-        "__data__": serialized_container
-    }
-    
-    # Use standard pickle for the envelope
-    return pickle.dumps(cerial_envelope)
-
-
-def _serialize_container_recursive(obj: Any) -> Any:
-    """
-    Recursively serialize a container, handling NSOs individually.
-    
-    Args:
-        obj: Object to serialize recursively
-        
-    Returns:
-        Serialized representation that can be safely pickled
-    """
-    try:
-        # If this object needs enhanced serialization, handle it specially
-        if _registry._needs_enhanced_serialization(obj) or _registry.get_handler(obj):
-            # Create a cerial wrapper for this individual NSO
-            handler = _registry.get_handler(obj)
-            if handler:
-                return {
-                    "__cerial_nso__": True,
-                    "__handler_class__": handler._handler_name,
-                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-                    "__data__": handler.serialize(obj)
-                }
-            else:
-                # Fallback: just store type info
-                return {
-                    "__cerial_nso__": True,
-                    "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-                    "__fallback__": f"Could not serialize {type(obj).__name__}"
-                }
-        
-        # Handle container types recursively
-        elif isinstance(obj, dict):
-            return {key: _serialize_container_recursive(value) for key, value in obj.items()}
-        
-        elif isinstance(obj, list):
-            return [_serialize_container_recursive(item) for item in obj]
-        
-        elif isinstance(obj, tuple):
-            return tuple(_serialize_container_recursive(item) for item in obj)
-        
-        elif isinstance(obj, set):
-            return {_serialize_container_recursive(item) for item in obj}
-        
-        else:
-            # For simple objects that pickle can handle, return as-is
-            return obj
-            
-    except Exception:
-        # If anything fails, return a placeholder
-        return {
-            "__cerial_nso__": True,
-            "__original_type__": f"{obj.__class__.__module__}.{obj.__class__.__name__}",
-            "__error__": f"Serialization failed for {type(obj).__name__}"
-        }
-    """
-    Check if data was serialized using enhanced cerial.
-    
-    Args:
-        data: Serialized bytes
-        
-    Returns:
-        True if data contains cerial envelope
-    """
-    try:
-        # Try to load as pickle and check for cerial envelope
-        obj = pickle.loads(data)
-        return isinstance(obj, dict) and obj.get("__cerial_data__") is True
-    except Exception:
-        return False
-
-
-# ============================================================================
-# Testing and Analysis Functions
+# TESTING AND ANALYSIS FUNCTIONS
 # ============================================================================
 
 def get_serialization_info(obj: Any) -> Dict[str, Any]:
@@ -1401,7 +1451,10 @@ def benchmark_serialization(obj: Any, iterations: int = 100) -> Dict[str, Any]:
     return results
 
 
-# Initialize with some basic type strategies
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
 def _initialize_default_strategies():
     """Initialize default serialization strategies for common types."""
     # These types should always use standard pickle
