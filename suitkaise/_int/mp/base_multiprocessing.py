@@ -43,6 +43,11 @@ from .processes import (
     _FunctionProcess
 )
 
+from .managers import (
+    CrossProcessing,
+    SubProcessing
+)
+
 from .runner import _ProcessRunner
 
 from .pdata import (
@@ -107,5 +112,5 @@ def _create_default_quick_config():
 
 
 # Version info for debugging
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 __engine__ = "Suitkaise internal cross-processing engine"
