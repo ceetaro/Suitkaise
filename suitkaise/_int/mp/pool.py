@@ -13,12 +13,13 @@ from typing import Dict, List, Optional, Any, Type, Callable, Union
 from dataclasses import dataclass
 from enum import Enum
 
-from .process import _Process, _FunctionProcess, PStatus
-from .config import _PConfig, _QPConfig
+from .processes import _Process, _FunctionProcess, PStatus
+from .configs import _PConfig, _QPConfig
 from .pdata import _PData, ProcessResultError
 from .runner import _ProcessRunner
 from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
 from suitkaise._int.core.format_ops import _create_debug_message
+from suitkaise._int.serialization.cerial_core import _serialize, _deserialize
 
 
 class PoolMode(Enum):
@@ -51,7 +52,6 @@ class PoolTaskError(Exception):
         self.message = message
         super().__init__(message)
 
-
 @dataclass
 class _PTask:
     """
@@ -63,14 +63,11 @@ class _PTask:
     key: str                        # Unique task identifier
     process_class: Type[_Process]   # Process class to instantiate
     config: _PConfig = None        # Process configuration (defaults to _PConfig())
-    process_name: str = None       # Name for process instance (defaults to class name)
     
     def __post_init__(self):
         """Set defaults for config and process name if not provided."""
         if self.config is None:
             self.config = _PConfig()
-        if self.process_name is None:
-            self.process_name = self.process_class.__name__
 
 
 @dataclass 
@@ -81,7 +78,7 @@ class _PTaskResult:
     Contains all information about a completed task including results,
     worker information, and execution metadata.
     """
-    key: str                    # Task key
+    key: str                   # Task key
     pclass_name: str           # Process class name  
     worker_pid: int            # Worker process PID
     worker_number: int         # Worker number (1-N)
@@ -229,43 +226,28 @@ class ProcessPool:
             else:  # PARALLEL
                 self._parallel_batch.append(ptask)
                 print(_create_debug_message(f"Added task to parallel batch: {ptask.key}"))
+
                 
     def submit_function(self, key: str, func: Callable, args: tuple = None, 
-                       kwargs: dict = None, config: _QPConfig = None):
-        """
-        Submit a function to be executed as a task.
-        
-        Args:
-            key: Unique task identifier
-            func: Function to execute
-            args: Function arguments
-            kwargs: Function keyword arguments  
-            config: Quick process configuration
-        """
+                    kwargs: dict = None, config: _QPConfig = None):
+        """Submit a function to be executed as a task."""
         if config is None:
             config = _QPConfig()
             
-        # Convert to full PConfig
         process_config = config.to_process_config()
         
-        # Create a dynamic process class for the function
-        class FunctionProcessWrapper(_Process):
-            def __init__(self, process_name: str):
-                super().__init__(process_name, num_loops=1)
-                self._func = func
-                self._args = args or ()
-                self._kwargs = kwargs or {}
-                self._function_result = None
-                
-            def __loop__(self):
-                self._function_result = self._func(*self._args, **self._kwargs)
-                
-            def __result__(self):
-                return self._function_result
-                
-        # Submit as regular task
-        function_name = getattr(func, '__name__', 'anonymous_function')
-        self.submit(key, FunctionProcessWrapper, process_config, function_name)
+        # Create a wrapper that returns a _FunctionProcess instance
+        def create_function_process():
+            return _FunctionProcess(func, args, kwargs)
+        
+        task = _PTask(
+            key=key,
+            process_class=create_function_process,
+            config=process_config
+        )
+        
+        self.submit(task)
+
         
     def submit_multiple(self, tasks: List[_PTask]):
         """
@@ -502,15 +484,24 @@ class ProcessPool:
                 
         # Wait for all tasks in batch to complete before next batch
         batch_keys = [task.key for task in current_batch]
+        max_wait_time = 30.0  # Maximum wait time for batch
+        wait_start = time.time()
+
         while not all(key in self._results for key in batch_keys):
             if self._shutdown_event.is_set():
                 break
+            if time.time() - wait_start > max_wait_time:
+                print(f"Warning: Parallel batch timed out waiting for completion")
+                break
             time.sleep(0.1)
+            self._cleanup_completed_workers()  # Force cleanup check
             
     def _process_async_tasks(self):
         """Process tasks asynchronously as workers become available."""
         while self._task_queue and self._available_workers:
             task = self._task_queue.pop(0)
+            if task is None:  # Safety check
+                continue
             worker_number = self._available_workers.pop(0)
             self._assign_task_to_worker(worker_number, task)
             
@@ -535,13 +526,14 @@ class ProcessPool:
         
         print(_create_debug_message(f"Created worker {worker_number}"))
         return worker_number
+    
         
     def _assign_task_to_worker(self, worker_number: int, task: _PTask):
         """Assign a task to a specific worker."""
         worker_info = self._workers[worker_number]
         
         # Create process instance
-        process_instance = task.process_class(task.process_name or task.process_class.__name__)
+        process_instance = task.process_class()
         process_instance._set_process_key(task.key)
         
         # Create PData instance
@@ -563,7 +555,7 @@ class ProcessPool:
         # Create runner
         runner = _ProcessRunner(process_instance, task.config, result_queue)
         
-        # Create multiprocessing.Process
+        # Create multiprocessing.Process using standard approach
         mp_process = multiprocessing.Process(
             target=runner.run,
             name=f"PoolWorker-{worker_number}-{task.key}"
@@ -590,7 +582,8 @@ class ProcessPool:
         
         for worker_number, worker_info in self._workers.items():
             mp_process = worker_info.get('mp_process')
-            if mp_process and not mp_process.is_alive():
+            current_task = worker_info.get('current_task')
+            if mp_process and not mp_process.is_alive() and current_task is not None:
                 completed_workers.append(worker_number)
                 
         for worker_number in completed_workers:
@@ -608,6 +601,10 @@ class ProcessPool:
         result_data = None
         error_msg = None
         
+        # Check if process exited with error code
+        if mp_process.exitcode != 0:
+            error_msg = f"Process exited with code {mp_process.exitcode}"
+        
         try:
             result_data = result_queue.get_nowait()
             
@@ -617,8 +614,8 @@ class ProcessPool:
                 if status == 'success':
                     if data is not None:
                         try:
-                            from suitkaise._int.serialization.cerial_core import deserialize
-                            result = deserialize(data)
+                            from suitkaise._int.serialization.cerial_core import _deserialize
+                            result = _deserialize(data)
                             pdata_instance._set_result(result)
                         except Exception as e:
                             error_msg = f"Deserialization error: {e}"
@@ -633,8 +630,13 @@ class ProcessPool:
                 pdata_instance._set_result(result_data)
                 
         except Exception as e:
-            error_msg = f"Failed to get result: {e}"
+            if not error_msg:  # Only set if we don't already have an error
+                error_msg = f"Failed to get result: {e}"
             pdata_instance._set_error(error_msg)
+            
+        # Check if PData indicates an error (from process status updates)
+        if pdata_instance.has_error and not error_msg:
+            error_msg = pdata_instance.error
             
         # Create task result
         task_result = _PTaskResult(

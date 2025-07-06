@@ -1101,7 +1101,7 @@ def _deserialize_enhanced(data: bytes) -> Any:
 # CORE SERIALIZATION FUNCTIONS
 # ============================================================================
 
-def serialize(obj: Any, fallback_to_pickle: bool = True) -> bytes:
+def _serialize(obj: Any, fallback_to_pickle: bool = True) -> bytes:
     """
     Serialize an object using appropriate strategy.
     
@@ -1197,7 +1197,7 @@ def serialize(obj: Any, fallback_to_pickle: bool = True) -> bytes:
         raise
 
 
-def deserialize(data: bytes, fallback_to_pickle: bool = True) -> Any:
+def _deserialize(data: bytes, fallback_to_pickle: bool = True) -> Any:
     """
     Deserialize an object from bytes.
     
@@ -1253,7 +1253,7 @@ def deserialize(data: bytes, fallback_to_pickle: bool = True) -> Any:
 # BATCH SERIALIZATION CONVENIENCE METHODS
 # ============================================================================
 
-def serialize_batch(objects: List[Any], fallback_to_pickle: bool = True) -> List[bytes]:
+def _serialize_batch(objects: List[Any], fallback_to_pickle: bool = True) -> List[bytes]:
     """
     Serialize a batch of objects efficiently.
     
@@ -1272,7 +1272,7 @@ def serialize_batch(objects: List[Any], fallback_to_pickle: bool = True) -> List
     
     for i, obj in enumerate(objects):
         try:
-            serialized = serialize(obj, fallback_to_pickle)
+            serialized = _serialize(obj, fallback_to_pickle)
             results.append(serialized)
         except Exception as e:
             errors.append(f"Object {i}: {e}")
@@ -1284,7 +1284,7 @@ def serialize_batch(objects: List[Any], fallback_to_pickle: bool = True) -> List
     return results
 
 
-def deserialize_batch(data_list: List[bytes], fallback_to_pickle: bool = True) -> List[Any]:
+def _deserialize_batch(data_list: List[bytes], fallback_to_pickle: bool = True) -> List[Any]:
     """
     Deserialize a batch of serialized objects efficiently.
     
@@ -1303,7 +1303,7 @@ def deserialize_batch(data_list: List[bytes], fallback_to_pickle: bool = True) -
     
     for i, data in enumerate(data_list):
         try:
-            deserialized = deserialize(data, fallback_to_pickle)
+            deserialized = _deserialize(data, fallback_to_pickle)
             results.append(deserialized)
         except Exception as e:
             errors.append(f"Data {i}: {e}")
@@ -1315,7 +1315,7 @@ def deserialize_batch(data_list: List[bytes], fallback_to_pickle: bool = True) -
     return results
 
 
-def serialize_dict(obj_dict: Dict[str, Any], fallback_to_pickle: bool = True) -> Dict[str, bytes]:
+def _serialize_dict(obj_dict: Dict[str, Any], fallback_to_pickle: bool = True) -> Dict[str, bytes]:
     """
     Serialize a dictionary of objects, preserving keys.
     
@@ -1331,7 +1331,7 @@ def serialize_dict(obj_dict: Dict[str, Any], fallback_to_pickle: bool = True) ->
     
     for key, obj in obj_dict.items():
         try:
-            result[key] = serialize(obj, fallback_to_pickle)
+            result[key] = _serialize(obj, fallback_to_pickle)
         except Exception as e:
             errors.append(f"Key '{key}': {e}")
     
@@ -1341,7 +1341,7 @@ def serialize_dict(obj_dict: Dict[str, Any], fallback_to_pickle: bool = True) ->
     return result
 
 
-def deserialize_dict(data_dict: Dict[str, bytes], fallback_to_pickle: bool = True) -> Dict[str, Any]:
+def _deserialize_dict(data_dict: Dict[str, bytes], fallback_to_pickle: bool = True) -> Dict[str, Any]:
     """
     Deserialize a dictionary of serialized objects, preserving keys.
     
@@ -1357,7 +1357,7 @@ def deserialize_dict(data_dict: Dict[str, bytes], fallback_to_pickle: bool = Tru
     
     for key, data in data_dict.items():
         try:
-            result[key] = deserialize(data, fallback_to_pickle)
+            result[key] = _deserialize(data, fallback_to_pickle)
         except Exception as e:
             errors.append(f"Key '{key}': {e}")
     
@@ -1371,7 +1371,7 @@ def deserialize_dict(data_dict: Dict[str, bytes], fallback_to_pickle: bool = Tru
 # HANDLER REGISTRATION AND MANAGEMENT
 # ============================================================================
 
-def register_handler(priority: int = 50):
+def _register_handler(priority: int = 50):
     """
     Decorator to automatically register an NSO handler.
     
@@ -1399,7 +1399,7 @@ def register_handler(priority: int = 50):
     return decorator
 
 
-def register_nso_handler(handler: _NSO_Handler) -> None:
+def _register_nso_handler(handler: _NSO_Handler) -> None:
     """
     Register a new NSO handler globally.
     
@@ -1409,7 +1409,7 @@ def register_nso_handler(handler: _NSO_Handler) -> None:
     _registry.register_handler(handler)
 
 
-def unregister_handler(handler_name: str) -> bool:
+def _unregister_handler(handler_name: str) -> bool:
     """
     Unregister a handler by name.
     
@@ -1422,12 +1422,12 @@ def unregister_handler(handler_name: str) -> bool:
     return _registry.unregister_handler(handler_name)
 
 
-def get_registered_handlers() -> List[Dict[str, Any]]:
+def _get_registered_handlers() -> List[Dict[str, Any]]:
     """Get information about all registered handlers."""
     return _registry.get_handler_info()
 
 
-def discover_handlers() -> int:
+def _discover_handlers() -> int:
     """
     Discover and register all available handlers.
     
@@ -1441,37 +1441,37 @@ def discover_handlers() -> int:
 # CONFIGURATION AND CONTROL FUNCTIONS  
 # ============================================================================
 
-def enable_debug_mode() -> None:
+def _enable_debug_mode() -> None:
     """Enable debug mode for detailed serialization logging."""
     _registry.enable_debug_mode()
 
 
-def disable_debug_mode() -> None:
+def _disable_debug_mode() -> None:
     """Disable debug mode."""
     _registry.disable_debug_mode()
 
 
-def is_debug_mode() -> bool:
+def _is_debug_mode() -> bool:
     """Check if debug mode is enabled."""
     return _registry.is_debug_mode()
 
 
-def enable_auto_discovery() -> None:
+def _enable_auto_discovery() -> None:
     """Enable automatic handler discovery."""
     _registry.enable_auto_discovery()
 
 
-def disable_auto_discovery() -> None:
+def _disable_auto_discovery() -> None:
     """Disable automatic handler discovery."""
     _registry.disable_auto_discovery()
 
 
-def get_performance_stats() -> Dict[str, Any]:
+def _get_performance_stats() -> Dict[str, Any]:
     """Get performance statistics for cerial operations."""
     return _registry.get_performance_stats()
 
 
-def reset_performance_stats() -> None:
+def _reset_performance_stats() -> None:
     """Reset performance statistics."""
     _registry.reset_performance_stats()
 
@@ -1480,7 +1480,7 @@ def reset_performance_stats() -> None:
 # TESTING AND ANALYSIS FUNCTIONS
 # ============================================================================
 
-def get_serialization_info(obj: Any) -> Dict[str, Any]:
+def _get_serialization_info(obj: Any) -> Dict[str, Any]:
     """
     Get information about how an object would be serialized.
     
@@ -1504,7 +1504,7 @@ def get_serialization_info(obj: Any) -> Dict[str, Any]:
     }
 
 
-def test_serialization(obj: Any, include_roundtrip: bool = True) -> Dict[str, Any]:
+def _test_serialization(obj: Any, include_roundtrip: bool = True) -> Dict[str, Any]:
     """
     Test serialization of an object without permanently serializing it.
     
@@ -1576,7 +1576,7 @@ def test_serialization(obj: Any, include_roundtrip: bool = True) -> Dict[str, An
     return results
 
 
-def benchmark_serialization(obj: Any, iterations: int = 100) -> Dict[str, Any]:
+def _benchmark_serialization(obj: Any, iterations: int = 100) -> Dict[str, Any]:
     """
     Benchmark serialization performance for an object.
     
@@ -1603,8 +1603,8 @@ def benchmark_serialization(obj: Any, iterations: int = 100) -> Dict[str, Any]:
     for _ in range(iterations):
         try:
             start = time.time()
-            serialized = serialize(obj, fallback_to_pickle=True)
-            deserialized = deserialize(serialized, fallback_to_pickle=True)
+            serialized = _serialize(obj, fallback_to_pickle=True)
+            deserialized = _deserialize(serialized, fallback_to_pickle=True)
             duration = time.time() - start
             results["pickle_times"].append(duration)
         except Exception as e:

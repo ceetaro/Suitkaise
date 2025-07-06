@@ -72,7 +72,7 @@ class _ProcessRunner:
                     
                 config_str = f" ({', '.join(config_info)})" if config_info else ""
                 print(_create_debug_message(
-                    f"Process {self.process_setup.pname} started (PID: {self.process_setup.pid}){config_str}"
+                    f"Process {self.process_setup.pkey} started (PID: {self.process_setup.pid}){config_str}"
                 ))
             
             # Main execution loop
@@ -101,40 +101,37 @@ class _ProcessRunner:
                     # These are our custom lifecycle errors with detailed information
                     self.process_setup.stats.record_error(e, self.process_setup.current_loop)
                     
+                    # Update status to CRASHED
+                    self.process_setup._status = PStatus.CRASHED
+                    
+                    # Update PData instance if available
+                    if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
+                        self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
+                    
                     # Log the specific error type and section
                     error_type = type(e).__name__
                     section = error_type.replace("Error", "").replace("Timeout", "").lower()
                     
                     error_msg = _create_debug_message(
-                        f"{error_type} in process {self.process_setup.pname}: {e}"
+                        f"{error_type} in process {self.process_setup.pkey}: {e}"
                     )
                     print(error_msg)
+                
+                    # always crash to enable restart logic
+                    raise e
                     
-                    # For now, break on any lifecycle error. Later we can add retry logic
-                    self.process_setup._status = PStatus.CRASHED
-                    break
-                    
-                except Exception as e:
-                    # Record error in statistics
-                    self.process_setup.stats.record_error(e, self.process_setup.current_loop)
-                    
-                    # Handle error based on configuration
-                    error_msg = _create_debug_message(
-                        f"Unexpected error in process {self.process_setup.pname} loop {self.process_setup.current_loop}: {e}",
-                        (traceback.format_exc(),)
-                    )
-                    print(error_msg)
-                    
-                    # For now, break on any error. Later we can add retry logic
-                    self.process_setup._status = PStatus.CRASHED
-                    break
                     
         except Exception as e:
             # Fatal error in process runner itself
             self.process_setup._status = PStatus.CRASHED
+            
+            # Update PData instance if available 
+            if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
+                self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
+            
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
             print(_create_debug_message(
-                f"Fatal error in process {self.process_setup.pname}: {e}",
+                f"Fatal error in process {self.process_setup.pkey}: {e}",
                 (traceback.format_exc(),)
             ))
             
@@ -146,7 +143,7 @@ class _ProcessRunner:
                     self.process_setup.__onfinish__()
                 except Exception as e:
                     print(_create_debug_message(
-                        f"Error in __onfinish__ for process {self.process_setup.pname}: {e}"
+                        f"Error in __onfinish__ for process {self.process_setup.pkey}: {e}"
                     ))
                     
             # NEW: Always call __result__ if it exists and serialize with Cerial
@@ -159,16 +156,16 @@ class _ProcessRunner:
                         
                         # Serialize result using Cerial for complex object support
                         try:
-                            from suitkaise._int.serialization.cerial_core import serialize
-                            serialized_result = serialize(result)
+                            from suitkaise._int.serialization.cerial_core import _serialize
+                            serialized_result = _serialize(result)
                             self.result_queue.put(('success', serialized_result))
                             if self.config.log_loops:
                                 print(_create_debug_message(
-                                    f"Process {self.process_setup.pname} returned and serialized result"
+                                    f"Process {self.process_setup.pkey} returned and serialized result"
                                 ))
                         except Exception as serialize_error:
                             print(_create_debug_message(
-                                f"Failed to serialize result from process {self.process_setup.pname}: {serialize_error}"
+                                f"Failed to serialize result from process {self.process_setup.pkey}: {serialize_error}"
                             ))
                             # Store error info instead
                             self.result_queue.put(('serialize_error', str(serialize_error)))
@@ -177,7 +174,7 @@ class _ProcessRunner:
                         self.result_queue.put(('success', None))
                 except Exception as e:
                     print(_create_debug_message(
-                        f"Error in __result__ for process {self.process_setup.pname}: {e}"
+                        f"Error in __result__ for process {self.process_setup.pkey}: {e}"
                     ))
                     # Put error info in queue
                     self.result_queue.put(('result_error', str(e)))
@@ -191,7 +188,7 @@ class _ProcessRunner:
             if self.config.log_loops:
                 stats = self.process_setup.stats.get_summary()
                 print(_create_debug_message(
-                    f"Process {self.process_setup.pname} finished",
+                    f"Process {self.process_setup.pkey} finished",
                     (stats,)
                 ))
                 
@@ -261,7 +258,7 @@ class _ProcessRunner:
             
         except Exception as e:
             # Unexpected error - wrap it appropriately
-            error_msg = f"Unexpected error in process {self.process_setup.pname} loop {self.process_setup.current_loop}: {e}"
+            error_msg = f"Unexpected error in process {self.process_setup.pkey} loop {self.process_setup.current_loop}: {e}"
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
             print(_create_debug_message(error_msg, (traceback.format_exc(),)))
             return False
@@ -327,7 +324,7 @@ class _ProcessRunner:
             # Timeout occurred - thread is still running
             timeout_error = timeout_error_class(
                 timeout_duration, 
-                self.process_setup.pname, 
+                self.process_setup.pkey, 
                 self.process_setup.current_loop
             )
             
@@ -342,7 +339,7 @@ class _ProcessRunner:
         if exception[0]:
             # Wrap regular errors in section-specific error class
             section_error = regular_error_class(
-                exception[0], self.process_setup.pname, self.process_setup.current_loop
+                exception[0], self.process_setup.pkey, self.process_setup.current_loop
             )
             raise section_error
         
@@ -358,7 +355,7 @@ class _ProcessRunner:
         except Exception as e:
             # Wrap in section-specific error class
             section_error = regular_error_class(
-                e, self.process_setup.pname, self.process_setup.current_loop
+                e, self.process_setup.pkey, self.process_setup.current_loop
             )
             raise section_error
             
@@ -393,7 +390,7 @@ class _ProcessRunner:
         timing_info += f" ({', '.join(all_info)})"
             
         print(_create_debug_message(
-            f"Process {self.process_setup.pname} completed loop {self.process_setup.current_loop}: {timing_info}"
+            f"Process {self.process_setup.pkey} completed loop {self.process_setup.current_loop}: {timing_info}"
         ))
                 
     def _start_timer(self):

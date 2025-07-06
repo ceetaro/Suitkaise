@@ -16,12 +16,10 @@ from typing import Dict, Optional, Any, Callable
 from .processes import _Process, _FunctionProcess, PStatus
 from .configs import _PConfig, _QPConfig
 from .runner import _ProcessRunner
-from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
 from .pdata import _PData
-
-
+from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
 from suitkaise._int.core.format_ops import _create_debug_message
-
+from suitkaise._int.serialization.cerial_core import _serialize, _deserialize
 
 class CrossProcessing:
     """
@@ -144,8 +142,10 @@ class CrossProcessing:
             process_setup = info['process_setup']
             pdata_instance = info['pdata_instance']
             
-            # Update status
-            pdata_instance._update_status(process_setup._status)
+            # Update status - prioritize process_setup status
+            current_status = process_setup._status
+            if current_status != pdata_instance.status:
+                pdata_instance._update_status(current_status)
             
             # Update PID if changed
             if process_setup.pid != pdata_instance.pid:
@@ -159,6 +159,7 @@ class CrossProcessing:
             # Don't let PData update errors crash the monitor
             print(_create_debug_message(f"Error updating PData for {key}: {e}"))
         
+
     def create_process(self, key: str, process_setup: _Process, config: Optional[_PConfig] = None) -> _PData:
         """
         Create and start a new process with key-based tracking.
@@ -209,10 +210,10 @@ class CrossProcessing:
             # Create the process runner
             runner = _ProcessRunner(process_setup, config, result_queue)
             
-            # Create and start the multiprocessing.Process
+            # Create and start the multiprocessing.Process using standard approach
             mp_process = multiprocessing.Process(
                 target=runner.run,
-                name=f"XProcess-{key}"  # Use key instead of pname
+                name=f"XProcess-{key}"
             )
             
             # Store process information using key as the dict key
@@ -236,7 +237,7 @@ class CrossProcessing:
             print(_create_debug_message(f"Started process: {key} (class: {process_setup.pclass})"))
             
             return pdata_instance  # Return PData instead of key
-        
+
     def get_pdata(self, key: str) -> Optional[_PData]:
         """Get the PData instance for a process by key."""
         with self._processes_lock:
@@ -255,7 +256,14 @@ class CrossProcessing:
         """Get the current status of a process."""
         with self._processes_lock:
             if key in self._processes:
-                return self._processes[key]['process_setup']._status
+                process_setup = self._processes[key]['process_setup']
+                pdata_instance = self._processes[key]['pdata_instance']
+                
+                # Sync status before returning
+                if process_setup._status != pdata_instance.status:
+                    pdata_instance._update_status(process_setup._status)
+                
+                return process_setup._status
         return None
         
     def get_process_stats(self, key: str) -> Optional[Dict[str, Any]]:
@@ -304,8 +312,8 @@ class CrossProcessing:
                         else:
                             # Deserialize using Cerial
                             try:
-                                from suitkaise._int.serialization.cerial_core import deserialize
-                                result = deserialize(data)
+                                from suitkaise._int.serialization.cerial_core import _deserialize
+                                result = _deserialize(data)
                                 pdata_instance._set_result(result)
                                 return result
                             except Exception as deserialize_error:
@@ -692,8 +700,8 @@ class SubProcessing:
                         else:
                             # Deserialize using Cerial
                             try:
-                                from suitkaise._int.serialization.cerial_core import deserialize
-                                return deserialize(data)
+                                from suitkaise._int.serialization.cerial_core import _deserialize
+                                return _deserialize(data)
                             except Exception as deserialize_error:
                                 print(_create_debug_message(
                                     f"Failed to deserialize result from subprocess {key}: {deserialize_error}"

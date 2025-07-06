@@ -37,7 +37,7 @@ class _Process:
     - __onfinish__(): Called when process is terminating
     """
     
-    def __init__(self, process_name: str, num_loops: Optional[int] = None):
+    def __init__(self, num_loops: Optional[int] = None):
         """
         Initialize a new process.
         
@@ -45,7 +45,7 @@ class _Process:
             process_name: Name/identifier for this process class
             num_loops: Maximum number of loops to execute (None = infinite)
         """
-        self.pclass = process_name  # Process class name/identifier
+        self.pclass = self.__class__.__name__  # Actual class name
         self.pkey = None  # Will be set by manager when process is created
         self.pid = None   # Set when actually started
         self.num_loops = num_loops
@@ -53,11 +53,11 @@ class _Process:
         
         # Process data - will be converted to _PData by manager
         self.pdata = {
-            'pclass': process_name,  # Process class name
+            'pclass': self.__class__.__name__,  # Process class name
             'pkey': None,  # Will be set by manager
             'pid': None,
             'num_loops': num_loops,
-            'completed_loops': 0,
+            'completed_loops': 0
             # 'result': None # Will be handled by _PData system
         }
         
@@ -68,7 +68,7 @@ class _Process:
         self._should_continue = None      # Will be multiprocessing.Value
         self._control_signal = None       # Will be multiprocessing.Value
         self._status = PStatus.CREATED
-        self._last_loop_time = 0.0  # FIXED: Removed trailing comma
+        self._last_loop_time = 0.0
         
         # Timing configuration
         self._timer_start_point = "before_loop"  # Default: start before __loop__()
@@ -286,7 +286,7 @@ class _FunctionProcess(_Process):
     Process lifecycle system. It always runs exactly once (num_loops=1).
     """
     
-    def __init__(self, process_name: str, func: Callable, args: tuple = None, kwargs: dict = None):
+    def __init__(self, func: Callable, args: tuple = None, kwargs: dict = None):
         """
         Initialize a function process.
         
@@ -296,7 +296,7 @@ class _FunctionProcess(_Process):
             args: Positional arguments for the function
             kwargs: Keyword arguments for the function
         """
-        super().__init__(process_name, num_loops=1)  # Always exactly 1 loop
+        super().__init__(num_loops=1)  # Always exactly 1 loop
         self.func = func
         self.args = args or ()
         self.kwargs = kwargs or {}

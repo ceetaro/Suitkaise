@@ -43,16 +43,16 @@ from typing import Any, Dict, List
 # Add the suitkaise path for testing
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+# Import all cerial core functions with leading underscores (internal API)
 try:
-    # Import all cerial core functions
     from suitkaise._int.serialization.cerial_core import (
-        serialize, deserialize,
-        serialize_batch, deserialize_batch,
-        serialize_dict, deserialize_dict,
-        get_serialization_info, test_serialization,
-        enable_debug_mode, disable_debug_mode,
-        get_performance_stats, reset_performance_stats,
-        get_registered_handlers, discover_handlers
+        _serialize, _deserialize,
+        _serialize_batch, _deserialize_batch,
+        _serialize_dict, _deserialize_dict,
+        _get_serialization_info, _test_serialization,
+        _enable_debug_mode, _disable_debug_mode,
+        _get_performance_stats, _reset_performance_stats,
+        _get_registered_handlers, _discover_handlers
     )
     CERIAL_IMPORTS_SUCCESSFUL = True
 except ImportError as e:
@@ -250,8 +250,8 @@ def test_individual_handlers():
     
     for name, obj in threading_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -274,8 +274,8 @@ def test_individual_handlers():
     
     for name, obj in db_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -300,8 +300,8 @@ def test_individual_handlers():
     
     for name, obj in function_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -318,8 +318,8 @@ def test_individual_handlers():
     
     for name, obj in file_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -347,8 +347,8 @@ def test_individual_handlers():
     
     for name, obj in generator_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -372,8 +372,8 @@ def test_individual_handlers():
     
     for name, obj in weakref_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -390,8 +390,8 @@ def test_individual_handlers():
     
     for name, obj in regex_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -415,8 +415,8 @@ def test_individual_handlers():
     
     for name, obj in logging_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -433,8 +433,8 @@ def test_individual_handlers():
     
     for name, obj in context_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -450,8 +450,8 @@ def test_individual_handlers():
     
     for name, obj in module_objects:
         try:
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_result(True, f"{name}", len(serialized))
         except Exception as e:
             print_result(False, f"{name}: {e}")
@@ -468,8 +468,8 @@ def test_individual_handlers():
         
         for name, obj in queue_objects:
             try:
-                serialized = serialize(obj)
-                deserialized = deserialize(serialized)
+                serialized = _serialize(obj)
+                deserialized = _deserialize(serialized)
                 print_result(True, f"{name}", len(serialized))
             except Exception as e:
                 print_result(False, f"{name}: {e}")
@@ -500,12 +500,11 @@ def test_complex_class_serialization():
         print_subsection("Testing Class Serialization")
         
         # Enable debug mode temporarily to see what's happening
-        from suitkaise._int.serialization.cerial_core import enable_debug_mode, disable_debug_mode
-        enable_debug_mode()
+        _enable_debug_mode()
         
         # Test serialization
         start_time = time.time()
-        serialized = serialize(complex_obj)
+        serialized = _serialize(complex_obj)
         serialize_time = time.time() - start_time
         
         print_result(True, f"Complex class serialized", len(serialized))
@@ -513,11 +512,11 @@ def test_complex_class_serialization():
         
         # Test deserialization
         start_time = time.time()
-        deserialized = deserialize(serialized)
+        deserialized = _deserialize(serialized)
         deserialize_time = time.time() - start_time
         
         # Disable debug mode
-        disable_debug_mode()
+        _disable_debug_mode()
         
         print_result(True, f"Complex class deserialized")
         print_info(f"Deserialization time: {deserialize_time:.4f}s")
@@ -603,7 +602,7 @@ def test_batch_operations():
         io.StringIO("test"),
         sqlite3.connect(":memory:"),
         lambda x: x,
-                    weakref.ref(weak_target),  # Use compatible object instead of list
+        weakref.ref(weak_target),  # Use compatible object instead of list
         logging.getLogger("batch_test"),
         {"regular": "data", "number": 42},
         [1, 2, 3, "mixed", "list"],
@@ -614,7 +613,7 @@ def test_batch_operations():
         print_subsection("Batch List Serialization")
         
         start_time = time.time()
-        serialized_batch = serialize_batch(batch_objects)
+        serialized_batch = _serialize_batch(batch_objects)
         batch_time = time.time() - start_time
         
         print_result(True, f"Batch of {len(batch_objects)} objects serialized")
@@ -622,7 +621,7 @@ def test_batch_operations():
         
         # Test batch deserialization
         start_time = time.time()
-        deserialized_batch = deserialize_batch(serialized_batch)
+        deserialized_batch = _deserialize_batch(serialized_batch)
         debatch_time = time.time() - start_time
         
         print_result(True, f"Batch of {len(deserialized_batch)} objects deserialized")
@@ -644,8 +643,8 @@ def test_batch_operations():
             "data": [1, 2, 3]
         }
         
-        serialized_dict = serialize_dict(batch_dict)
-        deserialized_dict = deserialize_dict(serialized_dict)
+        serialized_dict = _serialize_dict(batch_dict)
+        deserialized_dict = _deserialize_dict(serialized_dict)
         
         print_result(len(deserialized_dict) == len(batch_dict), 
                     f"Dictionary batch: {len(deserialized_dict)}/{len(batch_dict)} items")
@@ -665,7 +664,7 @@ def test_performance_and_stats():
     
     try:
         # Reset stats for clean testing
-        reset_performance_stats()
+        _reset_performance_stats()
         
         # Perform various operations
         test_objects = [
@@ -676,12 +675,12 @@ def test_performance_and_stats():
         ]
         
         for i, obj in enumerate(test_objects):
-            serialized = serialize(obj)
-            deserialized = deserialize(serialized)
+            serialized = _serialize(obj)
+            deserialized = _deserialize(serialized)
             print_info(f"Operation {i+1}: {len(serialized)} bytes")
         
         # Get performance stats
-        stats = get_performance_stats()
+        stats = _get_performance_stats()
         
         print_subsection("Performance Statistics")
         print_info(f"Total serializations: {stats['serializations']}")
@@ -703,7 +702,7 @@ def test_handler_discovery():
     
     try:
         # Get registered handlers
-        handlers = get_registered_handlers()
+        handlers = _get_registered_handlers()
         
         print_info(f"Discovered {len(handlers)} handlers:")
         for handler_info in handlers:
