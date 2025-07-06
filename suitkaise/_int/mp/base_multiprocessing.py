@@ -1,9 +1,11 @@
 """
-XProcess Core - Internal Process Management System for Suitkaise
+Xprocess Internal Cross-processing Engine - Internal Process Management System for Suitkaise
 
 This module provides the core process management functionality that powers 
 cross-process execution in Suitkaise. Built on multiprocessing with enhanced 
 lifecycle management and automatic error handling.
+
+This is an INTERNAL module. Front-facing APIs are provided in separate modules.
 
 Key Features:
 - Declarative process lifecycle management
@@ -11,11 +13,14 @@ Key Features:
 - Loop timing and performance tracking
 - Process status monitoring and crash recovery
 - Clean separation between user code and process management
+- Function-based quick process execution (internal implementation)
+- Class-based advanced process management
 
 Architecture:
 - CrossProcessing: Main process manager and registry
 - Process: User-defined process class with lifecycle hooks
 - _ProcessRunner: Internal execution engine that runs in subprocess
+- _FunctionProcess: Internal wrapper for function-based execution
 """
 
 import multiprocessing
@@ -191,6 +196,88 @@ class ProcessConfig:
         return new_config
 
 
+@dataclass
+class QuickProcessConfig:
+    """Simplified configuration for quick one-shot function processes."""
+    join_in: Optional[float] = 30.0      # Default 30s timeout (shorter than ProcessConfig)
+    crash_restart: bool = False          # Keep restart capability
+    max_restarts: int = 1               # Lower default for quick processes
+    heartbeat_interval: float = 5.0     # Heartbeat check interval
+    resource_monitoring: bool = False   # Enable resource monitoring
+    
+    # Function-specific timeout (applies to the single function execution)
+    function_timeout: float = 25.0      # Timeout for the function execution (5s buffer from join_in)
+    
+    def to_process_config(self) -> ProcessConfig:
+        """Convert to full ProcessConfig for internal use."""
+        return ProcessConfig(
+            join_in=self.join_in,
+            join_after=1,  # Always exactly 1 loop for functions
+            crash_restart=self.crash_restart,
+            max_restarts=self.max_restarts,
+            log_loops=False,  # No loop logging for quick processes
+            loop_timeout=self.function_timeout,
+            preloop_timeout=1.0,   # Minimal preloop timeout
+            postloop_timeout=1.0,  # Minimal postloop timeout
+            startup_timeout=5.0,   # Quick startup
+            shutdown_timeout=5.0,  # Quick shutdown
+            heartbeat_interval=self.heartbeat_interval,
+            resource_monitoring=self.resource_monitoring
+        )
+    join_in: Optional[float] = None      # Auto-join after N seconds
+    join_after: Optional[int] = None     # Auto-join after N loops (separate from num_loops)
+    crash_restart: bool = False          # Auto-restart on crash
+    max_restarts: int = 3               # Maximum restart attempts
+    log_loops: bool = False             # Log each loop iteration
+    loop_timeout: float = 300.0         # Timeout for individual __loop__() calls (5 minutes default)
+    preloop_timeout: float = 30.0       # Timeout for individual __preloop__() calls (30 seconds default)
+    postloop_timeout: float = 60.0      # Timeout for individual __postloop__() calls (1 minute default)
+    startup_timeout: float = 60.0       # Timeout for process startup (increased)
+    shutdown_timeout: float = 20.0      # Timeout for graceful shutdown (increased)
+    heartbeat_interval: float = 5.0     # Heartbeat check interval (foundation for monitoring)
+    resource_monitoring: bool = False   # Enable resource monitoring (foundation for SKPerf)
+    
+    def disable_timeouts(self):
+        """
+        Disable all lifecycle timeouts (set to None).
+        
+        WARNING: This removes timeout protection and processes could hang indefinitely.
+        Only use this if you're absolutely sure your process logic is robust.
+        """
+        self.preloop_timeout = None
+        self.loop_timeout = None  
+        self.postloop_timeout = None
+        
+    def set_quick_timeouts(self):
+        """
+        Set aggressive timeouts for fast processes.
+        
+        Useful for processes that should complete each section quickly.
+        """
+        self.preloop_timeout = 5.0   # 5 seconds for setup
+        self.loop_timeout = 30.0     # 30 seconds for main work
+        self.postloop_timeout = 10.0 # 10 seconds for cleanup
+        
+    def set_long_timeouts(self):
+        """
+        Set generous timeouts for slow processes.
+        
+        Useful for processes doing heavy computation, I/O, or network operations.
+        """
+        self.preloop_timeout = 120.0  # 2 minutes for setup
+        self.loop_timeout = 1800.0    # 30 minutes for main work
+        self.postloop_timeout = 300.0 # 5 minutes for cleanup
+        
+    def copy_with_overrides(self, **overrides) -> 'ProcessConfig':
+        """Create a copy of this config with specific overrides."""
+        import copy
+        new_config = copy.deepcopy(self)
+        for key, value in overrides.items():
+            if hasattr(new_config, key):
+                setattr(new_config, key, value)
+        return new_config
+
+
 class ProcessStats:
     """Statistics tracking for a process."""
     
@@ -276,33 +363,33 @@ class Process:
     - __onfinish__(): Called when process is terminating
     """
     
-    def __init__(self, name: str, num_loops: Optional[int] = None):
+    def __init__(self, pname: str, num_loops: Optional[int] = None):
         """
         Initialize a new process.
         
         Args:
-            name: Unique name for this process
+            pname: Unique name for this process
             num_loops: Maximum number of loops to execute (None = infinite)
         """
-        self.pname = name
+        self.pname = pname
         self.pid = None  # Set when actually started
         self.num_loops = num_loops
         self.current_loop = 0
         
-        # Metadata for future data syncing integration
+        # Process data for future data syncing integration (auto-removed on join)
         self.pdata = {
-            'name': name,
+            'pname': pname,
             'pid': None,
             'num_loops': num_loops,
             'completed_loops': 0,
-            'remove_on_process_join': True,
+            # 'result': None # NEW: to add when implementing new result handling
         }
         
         # Internal control flags (shared across processes)
         self._should_continue = None      # Will be multiprocessing.Value
         self._control_signal = None       # Will be multiprocessing.Value
         self._status = ProcessStatus.CREATED
-        self._last_loop_time = 0.0
+        self._last_loop_time = 0.0,
         
         # Timing configuration
         self._timer_start_point = "before_loop"  # Default: start before __loop__()
@@ -316,6 +403,9 @@ class Process:
         
         # Statistics tracking
         self.stats = ProcessStats()
+        
+        # Return value support (will be set by CrossProcessing)
+        self._result_queue = None
         
     # =============================================================================
     # LIFECYCLE HOOKS - Users override these methods
@@ -343,6 +433,18 @@ class Process:
     def __onfinish__(self):
         """Called automatically when process needs to join."""
         pass
+        
+    def __result__(self):
+        """
+        Return value method - OPTIONAL.
+        
+        Users can implement this method to return a value from the process.
+        This method is called automatically when the process finishes.
+        
+        Returns:
+            Any serializable value to return from the process
+        """
+        return None
         
     # =============================================================================
     # TIMING CONFIGURATION - Users can call these in __init__() to customize timing
@@ -414,15 +516,16 @@ class Process:
     # INTERNAL METHODS - Used by process management system
     # =============================================================================
     
-    def _initialize_shared_state(self, manager):
+    def _initialize_shared_state(self, manager, result_queue):
         """Initialize shared state objects for cross-process communication."""
         self._should_continue = manager.Value('i', 1)  # 1 = continue, 0 = stop
         self._control_signal = manager.Value('i', 0)   # 0 = none, 1 = rejoin, 2 = skip, 3 = kill
+        self._result_queue = result_queue
         
     def _start_process(self):
         """Called when process starts - internal initialization."""
         self.pid = os.getpid()
-        self.metadata['pid'] = self.pid
+        self.pdata['pid'] = self.pid
         self._status = ProcessStatus.RUNNING
         self.stats.start_time = _get_current_time()
         self._process_start_time = self.stats.start_time  # For timing-based termination
@@ -477,6 +580,43 @@ class Process:
         return self.current_loop >= (self.num_loops - 1)
 
 
+class _FunctionProcess(Process):
+    """
+    Internal process wrapper for function-based execution.
+    
+    This class wraps a regular function to make it compatible with the
+    Process lifecycle system. It always runs exactly once (num_loops=1).
+    """
+    
+    def __init__(self, pname: str, func: Callable, args: tuple = None, kwargs: dict = None):
+        """
+        Initialize a function process.
+        
+        Args:
+            pname: Unique name for this process
+            func: Function to execute
+            args: Positional arguments for the function
+            kwargs: Keyword arguments for the function
+        """
+        super().__init__(pname, num_loops=1)  # Always exactly 1 loop
+        self.func = func
+        self.args = args or ()
+        self.kwargs = kwargs or {}
+        self._function_result = None
+        
+        # Update pdata to indicate this is a function process
+        self.pdata['process_type'] = 'function'
+        self.pdata['function_name'] = getattr(func, '__name__', 'anonymous')
+        
+    def __loop__(self):
+        """Execute the function once and store result."""
+        self._function_result = self.func(*self.args, **self.kwargs)
+        
+    def __result__(self):
+        """Return the function result."""
+        return self._function_result
+
+
 class _ProcessRunner:
     """
     Internal process runner that executes in the subprocess.
@@ -485,16 +625,18 @@ class _ProcessRunner:
     and lifecycle management for a user-defined Process instance.
     """
     
-    def __init__(self, process_setup: Process, config: ProcessConfig):
+    def __init__(self, process_setup: Process, config: ProcessConfig, result_queue):
         """
         Initialize the process runner.
         
         Args:
             process_setup: User's Process instance
             config: Process configuration
+            result_queue: Queue for returning process results
         """
         self.process_setup = process_setup
         self.config = config
+        self.result_queue = result_queue
         self._timer_start_time = None
         
         # Store config reference in process for termination checks
@@ -528,7 +670,7 @@ class _ProcessRunner:
                     
                 config_str = f" ({', '.join(config_info)})" if config_info else ""
                 print(_create_debug_message(
-                    f"Process {self.process_setup.name} started (PID: {self.process_setup.pid}){config_str}"
+                    f"Process {self.process_setup.pname} started (PID: {self.process_setup.pid}){config_str}"
                 ))
             
             # Main execution loop
@@ -562,7 +704,7 @@ class _ProcessRunner:
                     section = error_type.replace("Error", "").replace("Timeout", "").lower()
                     
                     error_msg = _create_debug_message(
-                        f"{error_type} in process {self.process_setup.name}: {e}"
+                        f"{error_type} in process {self.process_setup.pname}: {e}"
                     )
                     print(error_msg)
                     
@@ -576,7 +718,7 @@ class _ProcessRunner:
                     
                     # Handle error based on configuration
                     error_msg = _create_debug_message(
-                        f"Unexpected error in process {self.process_setup.name} loop {self.process_setup.current_loop}: {e}",
+                        f"Unexpected error in process {self.process_setup.pname} loop {self.process_setup.current_loop}: {e}",
                         (traceback.format_exc(),)
                     )
                     print(error_msg)
@@ -590,7 +732,7 @@ class _ProcessRunner:
             self.process_setup._status = ProcessStatus.CRASHED
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
             print(_create_debug_message(
-                f"Fatal error in process {self.process_setup.name}: {e}",
+                f"Fatal error in process {self.process_setup.pname}: {e}",
                 (traceback.format_exc(),)
             ))
             
@@ -602,8 +744,44 @@ class _ProcessRunner:
                     self.process_setup.__onfinish__()
                 except Exception as e:
                     print(_create_debug_message(
-                        f"Error in __onfinish__ for process {self.process_setup.name}: {e}"
+                        f"Error in __onfinish__ for process {self.process_setup.pname}: {e}"
                     ))
+                    
+            # NEW: Always call __result__ if it exists and serialize with Cerial
+            if hasattr(self.process_setup, '__result__'):
+                try:
+                    # Check if __result__ is implemented (not just the default return None)
+                    result_method = getattr(self.process_setup, '__result__')
+                    if result_method.__func__ is not Process.__result__:
+                        result = self.process_setup.__result__()
+                        
+                        # Serialize result using Cerial for complex object support
+                        try:
+                            from suitkaise._int.serialization.cerial_core import serialize
+                            serialized_result = serialize(result)
+                            self.result_queue.put(('success', serialized_result))
+                            if self.config.log_loops:
+                                print(_create_debug_message(
+                                    f"Process {self.process_setup.pname} returned and serialized result"
+                                ))
+                        except Exception as serialize_error:
+                            print(_create_debug_message(
+                                f"Failed to serialize result from process {self.process_setup.pname}: {serialize_error}"
+                            ))
+                            # Store error info instead
+                            self.result_queue.put(('serialize_error', str(serialize_error)))
+                    else:
+                        # Default implementation, put None
+                        self.result_queue.put(('success', None))
+                except Exception as e:
+                    print(_create_debug_message(
+                        f"Error in __result__ for process {self.process_setup.pname}: {e}"
+                    ))
+                    # Put error info in queue
+                    self.result_queue.put(('result_error', str(e)))
+            else:
+                # No __result__ method, put None
+                self.result_queue.put(('success', None))
                     
             # Final cleanup
             self.process_setup._join_process()
@@ -611,7 +789,7 @@ class _ProcessRunner:
             if self.config.log_loops:
                 stats = self.process_setup.stats.get_summary()
                 print(_create_debug_message(
-                    f"Process {self.process_setup.name} finished",
+                    f"Process {self.process_setup.pname} finished",
                     (stats,)
                 ))
                 
@@ -624,7 +802,7 @@ class _ProcessRunner:
         """
         # Increment loop counter
         self.process_setup.current_loop += 1
-        self.process_setup.metadata['completed_loops'] = self.process_setup.current_loop
+        self.process_setup.pdata['completed_loops'] = self.process_setup.current_loop
         
         # Execute with timeout protection for each section
         return self._execute_with_granular_timeouts()
@@ -681,7 +859,7 @@ class _ProcessRunner:
             
         except Exception as e:
             # Unexpected error - wrap it appropriately
-            error_msg = f"Unexpected error in process {self.process_setup.name} loop {self.process_setup.current_loop}: {e}"
+            error_msg = f"Unexpected error in process {self.process_setup.pname} loop {self.process_setup.current_loop}: {e}"
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
             print(_create_debug_message(error_msg, (traceback.format_exc(),)))
             return False
@@ -748,7 +926,7 @@ class _ProcessRunner:
             # Create specific timeout error
             timeout_error = timeout_error_class(
                 timeout_duration, 
-                self.process_setup.name, 
+                self.process_setup.pname, 
                 self.process_setup.current_loop
             )
             
@@ -763,7 +941,7 @@ class _ProcessRunner:
         except Exception as e:
             # Wrap regular errors in section-specific error class
             section_error = regular_error_class(
-                e, self.process_setup.name, self.process_setup.current_loop
+                e, self.process_setup.pname, self.process_setup.current_loop
             )
             raise section_error
             
@@ -781,7 +959,7 @@ class _ProcessRunner:
         except Exception as e:
             # Wrap in section-specific error class
             section_error = regular_error_class(
-                e, self.process_setup.name, self.process_setup.current_loop
+                e, self.process_setup.pname, self.process_setup.current_loop
             )
             raise section_error
             
@@ -816,7 +994,7 @@ class _ProcessRunner:
         timing_info += f" ({', '.join(all_info)})"
             
         print(_create_debug_message(
-            f"Process {self.process_setup.name} completed loop {self.process_setup.current_loop}: {timing_info}"
+            f"Process {self.process_setup.pname} completed loop {self.process_setup.current_loop}: {timing_info}"
         ))
                 
     def _start_timer(self):
@@ -832,254 +1010,6 @@ class _ProcessRunner:
         self._timer_start_time = None
         return duration
 
-
-class SubProcessing:
-    """
-    Subprocess manager for creating and managing SubProcess instances.
-    
-    This manager provides the same interface as CrossProcessing but is designed
-    for use within existing processes to create lightweight subprocesses.
-    
-    Features:
-    - Automatic nesting depth protection (max depth 2)
-    - Signal-based cascading shutdown
-    - Full lifecycle management for subprocesses
-    - Compatible with Process lifecycle hooks
-    """
-    
-    def __init__(self):
-        """Initialize the subprocess manager with nesting depth protection."""
-        # Check current nesting depth to prevent infinite nesting
-        current_depth = int(os.environ.get('XPROCESS_DEPTH', '0'))
-        if current_depth >= 2:
-            raise RuntimeError(
-                f"Maximum subprocess nesting depth (2) exceeded. Current depth: {current_depth}. "
-                f"SubProcesses cannot create their own subprocesses if they are already at depth 2."
-            )
-            
-        self._subprocesses: Dict[str, Dict[str, Any]] = {}
-        self._active = True
-        self._nesting_depth = current_depth + 1
-        
-        # Set environment variable for subprocess depth tracking
-        os.environ['XPROCESS_DEPTH'] = str(self._nesting_depth)
-        
-        print(_create_debug_message(
-            f"SubProcessing manager initialized at depth {self._nesting_depth}"
-        ))
-        
-    def create_process(self, subprocess_setup: SubProcess, config: Optional[ProcessConfig] = None) -> str:
-        """
-        Create and start a new subprocess.
-        
-        Args:
-            subprocess_setup: SubProcess instance with lifecycle hooks
-            config: Process configuration (uses defaults if None)
-            
-        Returns:
-            Process ID string for tracking
-            
-        Raises:
-            ValueError: If subprocess with same name already exists
-            RuntimeError: If manager is not active or depth limit exceeded
-        """
-        if not self._active:
-            raise RuntimeError("SubProcessing manager is not active")
-            
-        if subprocess_setup.name in self._subprocesses:
-            raise ValueError(f"SubProcess with name '{subprocess_setup.name}' already exists")
-            
-        # Use default config if none provided
-        if config is None:
-            config = ProcessConfig()
-            
-        # Store config reference in subprocess for termination checks
-        subprocess_setup._config = config
-        
-        # Create the process runner (same as regular processes)
-        runner = _ProcessRunner(subprocess_setup, config)
-        
-        # Create and start the multiprocessing.Process
-        mp_process = multiprocessing.Process(
-            target=runner.run,
-            name=f"XSubProcess-{subprocess_setup.name}-depth{self._nesting_depth}"
-        )
-        
-        # Store subprocess information
-        subprocess_info = {
-            'subprocess_setup': subprocess_setup,
-            'config': config,
-            'mp_process': mp_process,
-            'runner': runner,
-            'created_at': _get_current_time(),
-            'nesting_depth': self._nesting_depth
-        }
-        
-        self._subprocesses[subprocess_setup.name] = subprocess_info
-        
-        # Start the subprocess
-        mp_process.start()
-        subprocess_setup._status = ProcessStatus.STARTING
-        
-        print(_create_debug_message(
-            f"Started subprocess: {subprocess_setup.name} (depth {self._nesting_depth})"
-        ))
-        
-        return subprocess_setup.name
-        
-    def get_subprocess(self, name: str) -> Optional[SubProcess]:
-        """Get a subprocess by name."""
-        if name in self._subprocesses:
-            return self._subprocesses[name]['subprocess_setup']
-        return None
-        
-    def get_subprocess_status(self, name: str) -> Optional[ProcessStatus]:
-        """Get the current status of a subprocess."""
-        if name in self._subprocesses:
-            return self._subprocesses[name]['subprocess_setup']._status
-        return None
-        
-    def list_subprocesses(self) -> Dict[str, Dict[str, Any]]:
-        """Get information about all managed subprocesses."""
-        result = {}
-        for name, info in self._subprocesses.items():
-            subprocess_setup = info['subprocess_setup']
-            mp_process = info['mp_process']
-            config = info['config']
-            
-            result[name] = {
-                'status': subprocess_setup._status.value,
-                'pid': subprocess_setup.pid,
-                'current_loop': subprocess_setup.current_loop,
-                'is_alive': mp_process.is_alive(),
-                'created_at': info['created_at'],
-                'nesting_depth': info['nesting_depth'],
-                'parent_pid': subprocess_setup._parent_pid
-            }
-            
-        return result
-        
-    def join_subprocess(self, name: str, timeout: Optional[float] = None) -> bool:
-        """
-        Wait for a subprocess to complete.
-        
-        Args:
-            name: Name of subprocess to join
-            timeout: Maximum time to wait (None = wait forever)
-            
-        Returns:
-            True if subprocess completed, False if timeout
-        """
-        if name not in self._subprocesses:
-            return False
-            
-        mp_process = self._subprocesses[name]['mp_process']
-        mp_process.join(timeout)
-        
-        return not mp_process.is_alive()
-        
-    def join_all(self, timeout: Optional[float] = None) -> bool:
-        """
-        Wait for all subprocesses to complete.
-        
-        Args:
-            timeout: Maximum time to wait for all subprocesses
-            
-        Returns:
-            True if all subprocesses completed, False if timeout
-        """
-        start_time = _get_current_time()
-        
-        for name in list(self._subprocesses.keys()):
-            if timeout is not None:
-                elapsed = _elapsed_time(start_time)
-                remaining = timeout - elapsed
-                if remaining <= 0:
-                    return False
-            else:
-                remaining = None
-                
-            if not self.join_subprocess(name, remaining):
-                return False
-                
-        return True
-        
-    def terminate_subprocess(self, name: str, force: bool = False):
-        """
-        Terminate a specific subprocess using signals.
-        
-        Args:
-            name: Name of subprocess to terminate
-            force: If True, use force signal. If False, use graceful signal.
-        """
-        if name not in self._subprocesses:
-            return
-            
-        subprocess_info = self._subprocesses[name]
-        mp_process = subprocess_info['mp_process']
-        
-        if mp_process.is_alive():
-            try:
-                if force:
-                    # Send force shutdown signal
-                    os.kill(mp_process.pid, signal.SIGUSR2)
-                else:
-                    # Send graceful shutdown signal
-                    os.kill(mp_process.pid, signal.SIGUSR1)
-                    
-                print(_create_debug_message(
-                    f"Sent {'force' if force else 'graceful'} shutdown signal to subprocess {name} (PID: {mp_process.pid})"
-                ))
-                
-            except ProcessLookupError:
-                # Process already dead
-                pass
-            except OSError as e:
-                print(_create_debug_message(f"Error sending signal to subprocess {name}: {e}"))
-                
-    def shutdown(self, timeout: float = 10.0, force_after_timeout: bool = True):
-        """
-        Shutdown the subprocess manager and all subprocesses using signal-based coordination.
-        
-        Args:
-            timeout: Time to wait for graceful shutdown
-            force_after_timeout: Whether to force-kill subprocesses after timeout
-        """
-        if not self._active:
-            return
-            
-        print(_create_debug_message(f"Shutting down {len(self._subprocesses)} subprocesses..."))
-        
-        # Phase 1: Signal all subprocesses to terminate gracefully
-        for name in self._subprocesses:
-            self.terminate_subprocess(name, force=False)
-            
-        # Phase 2: Wait for graceful shutdown
-        graceful_timeout = timeout * 0.7  # Give 70% of time for graceful shutdown
-        if not self.join_all(graceful_timeout):
-            if force_after_timeout:
-                print(_create_debug_message("Graceful timeout reached, sending force signals"))
-                
-                # Phase 3: Force termination for remaining subprocesses
-                for name in list(self._subprocesses.keys()):
-                    subprocess_info = self._subprocesses[name]
-                    if subprocess_info['mp_process'].is_alive():
-                        self.terminate_subprocess(name, force=True)
-                        
-                # Wait a bit more for force termination
-                remaining_timeout = timeout - graceful_timeout
-                self.join_all(remaining_timeout)
-                        
-        self._active = False
-        print(_create_debug_message("SubProcessing shutdown complete"))
-        
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit with automatic shutdown."""
-        self.shutdown()
 
 
 class CrossProcessing:
@@ -1161,15 +1091,18 @@ class CrossProcessing:
             # Reset process state for restart
             process_setup._status = ProcessStatus.STARTING
             process_setup.current_loop = 0
-            process_setup.metadata['completed_loops'] = 0
+            process_setup.pdata['completed_loops'] = 0
             process_setup.pid = None
-            process_setup.metadata['pid'] = None
+            process_setup.pdata['pid'] = None
+            
+            # Create new result queue for restart
+            new_result_queue = multiprocessing.Queue()
             
             # Re-initialize shared state
-            process_setup._initialize_shared_state(self._manager)
+            process_setup._initialize_shared_state(self._manager, new_result_queue)
             
             # Create new process runner and multiprocessing.Process
-            runner = _ProcessRunner(process_setup, config)
+            runner = _ProcessRunner(process_setup, config, new_result_queue)
             new_mp_process = multiprocessing.Process(
                 target=runner.run,
                 name=f"XProcess-{name}-restart{process_setup._restart_count}"
@@ -1178,6 +1111,7 @@ class CrossProcessing:
             # Update process info
             info['mp_process'] = new_mp_process
             info['runner'] = runner
+            info['result_queue'] = new_result_queue
             info['restarted_at'] = _get_current_time()
             
             # Start the new process
@@ -1204,23 +1138,26 @@ class CrossProcessing:
         if not self._active:
             raise RuntimeError("CrossProcessing manager is not active")
             
-        if process_setup.name in self._processes:
-            raise ValueError(f"Process with name '{process_setup.name}' already exists")
+        if process_setup.pname in self._processes:
+            raise ValueError(f"Process with name '{process_setup.pname}' already exists")
             
         # Use default config if none provided
         if config is None:
             config = ProcessConfig()
             
+        # Create result queue for this process
+        result_queue = multiprocessing.Queue()
+        
         # Initialize shared state for the process
-        process_setup._initialize_shared_state(self._manager)
+        process_setup._initialize_shared_state(self._manager, result_queue)
         
         # Create the process runner
-        runner = _ProcessRunner(process_setup, config)
+        runner = _ProcessRunner(process_setup, config, result_queue)
         
         # Create and start the multiprocessing.Process
         mp_process = multiprocessing.Process(
             target=runner.run,
-            name=f"XProcess-{process_setup.name}"
+            name=f"XProcess-{process_setup.pname}"
         )
         
         # Store process information
@@ -1229,18 +1166,19 @@ class CrossProcessing:
             'config': config,
             'mp_process': mp_process,
             'runner': runner,
+            'result_queue': result_queue,
             'created_at': _get_current_time()
         }
         
-        self._processes[process_setup.name] = process_info
+        self._processes[process_setup.pname] = process_info
         
         # Start the process
         mp_process.start()
         process_setup._status = ProcessStatus.STARTING
         
-        print(_create_debug_message(f"Started process: {process_setup.name}"))
+        print(_create_debug_message(f"Started process: {process_setup.pname}"))
         
-        return process_setup.name
+        return process_setup.pname
         
     def get_process(self, name: str) -> Optional[Process]:
         """Get a process by name."""
@@ -1259,6 +1197,91 @@ class CrossProcessing:
         if name in self._processes:
             return self._processes[name]['process_setup'].stats.get_summary()
         return None
+        
+    def get_process_result(self, name: str, timeout: Optional[float] = None):
+        """
+        Get the result from a completed process with Cerial deserialization support.
+        
+        Args:
+            name: Name of process to get result from
+            timeout: Maximum time to wait for result
+            
+        Returns:
+            Result value from process, or None if no result/timeout/error
+        """
+        if name not in self._processes:
+            return None
+            
+        process_info = self._processes[name]
+        mp_process = process_info['mp_process']
+        result_queue = process_info['result_queue']
+        
+        # Wait for process to complete first
+        mp_process.join(timeout)
+        
+        if not mp_process.is_alive():
+            try:
+                # Get result from queue (non-blocking since process is done)
+                result_data = result_queue.get_nowait()
+                
+                # Handle new tuple format: (status, data)
+                if isinstance(result_data, tuple) and len(result_data) == 2:
+                    status, data = result_data
+                    
+                    if status == 'success':
+                        if data is None:
+                            return None
+                        else:
+                            # Deserialize using Cerial
+                            try:
+                                from suitkaise._int.serialization.cerial_core import deserialize
+                                return deserialize(data)
+                            except Exception as deserialize_error:
+                                print(_create_debug_message(
+                                    f"Failed to deserialize result from process {name}: {deserialize_error}"
+                                ))
+                                return None
+                    
+                    elif status == 'serialize_error':
+                        print(_create_debug_message(f"Process {name} had serialization error: {data}"))
+                        return None
+                    
+                    elif status == 'result_error':
+                        print(_create_debug_message(f"Process {name} had __result__ error: {data}"))
+                        return None
+                    
+                    else:
+                        print(_create_debug_message(f"Process {name} returned unknown status: {status}"))
+                        return None
+                        
+                else:
+                    # Legacy format or direct value - treat as success
+                    return result_data
+                    
+            except:
+                return None
+        else:
+            return None
+    
+    def join_and_get_result(self, name: str, timeout: Optional[float] = None):
+        """
+        Convenience method to join a process and get its result in one call.
+        
+        Args:
+            name: Name of process to join and get result from
+            timeout: Maximum time to wait for process completion
+            
+        Returns:
+            Tuple of (success: bool, result: Any)
+            - success: True if process completed successfully
+            - result: The process result, or None if no result/error
+        """
+        success = self.join_process(name, timeout)
+        if success:
+            result = self.get_process_result(name)
+            return True, result
+        else:
+            return False, None
         
     def list_processes(self) -> Dict[str, Dict[str, Any]]:
         """Get information about all managed processes."""
@@ -1385,6 +1408,385 @@ class CrossProcessing:
                         
         self._active = False
         print(_create_debug_message("CrossProcessing shutdown complete"))
+        
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with automatic shutdown."""
+        self.shutdown()
+
+
+
+class SubProcessing:
+    """
+    Subprocess manager for creating and managing SubProcess instances.
+    
+    This manager provides the same interface as CrossProcessing but is designed
+    for use within existing processes to create lightweight subprocesses.
+    
+    Features:
+    - Automatic nesting depth protection (max depth 2)
+    - Signal-based cascading shutdown
+    - Full lifecycle management for subprocesses
+    - Compatible with Process lifecycle hooks
+    """
+    
+    def __init__(self):
+        """Initialize the subprocess manager with nesting depth protection."""
+        # Check current nesting depth to prevent infinite nesting
+        current_depth = int(os.environ.get('XPROCESS_DEPTH', '0'))
+        if current_depth >= 2:
+            raise RuntimeError(
+                f"Maximum subprocess nesting depth (2) exceeded. Current depth: {current_depth}. "
+                f"SubProcesses cannot create their own subprocesses if they are already at depth 2."
+            )
+            
+        self._subprocesses: Dict[str, Dict[str, Any]] = {}
+        self._active = True
+        self._nesting_depth = current_depth + 1
+        
+        # Set environment variable for subprocess depth tracking
+        os.environ['XPROCESS_DEPTH'] = str(self._nesting_depth)
+        
+        print(_create_debug_message(
+            f"SubProcessing manager initialized at depth {self._nesting_depth}"
+        ))
+        
+    def create_process(self, subprocess_setup: Process, config: Optional[ProcessConfig] = None) -> str:
+        """
+        Create and start a new subprocess.
+        
+        Args:
+            subprocess_setup: Process instance with lifecycle hooks
+            config: Process configuration (uses defaults if None)
+            
+        Returns:
+            Process ID string for tracking
+            
+        Raises:
+            ValueError: If subprocess with same name already exists
+            RuntimeError: If manager is not active or depth limit exceeded
+        """
+        if not self._active:
+            raise RuntimeError("SubProcessing manager is not active")
+            
+        if subprocess_setup.pname in self._subprocesses:
+            raise ValueError(f"SubProcess with name '{subprocess_setup.pname}' already exists")
+            
+        # Use default config if none provided
+        if config is None:
+            config = ProcessConfig()
+            
+        # Create result queue for this subprocess
+        result_queue = multiprocessing.Queue()
+        
+        # Initialize shared state for the subprocess
+        subprocess_setup._initialize_shared_state(multiprocessing.Manager(), result_queue)
+        
+        # Store config reference in subprocess for termination checks
+        subprocess_setup._config = config
+        
+        # Create the process runner (same as regular processes)
+        runner = _ProcessRunner(subprocess_setup, config, result_queue)
+        
+        # Create and start the multiprocessing.Process
+        mp_process = multiprocessing.Process(
+            target=runner.run,
+            name=f"XSubProcess-{subprocess_setup.pname}-depth{self._nesting_depth}"
+        )
+        
+        # Store subprocess information
+        subprocess_info = {
+            'subprocess_setup': subprocess_setup,
+            'config': config,
+            'mp_process': mp_process,
+            'runner': runner,
+            'result_queue': result_queue,
+            'created_at': _get_current_time(),
+            'nesting_depth': self._nesting_depth
+        }
+        
+        self._subprocesses[subprocess_setup.pname] = subprocess_info
+        
+        # Start the subprocess
+        mp_process.start()
+        subprocess_setup._status = ProcessStatus.STARTING
+        
+        print(_create_debug_message(
+            f"Started subprocess: {subprocess_setup.pname} (depth {self._nesting_depth})"
+        ))
+        
+        return subprocess_setup.pname
+        
+    def get_subprocess(self, name: str) -> Optional[Process]:
+        """Get a subprocess by name."""
+        if name in self._subprocesses:
+            return self._subprocesses[name]['subprocess_setup']
+        return None
+        
+    def get_subprocess_status(self, name: str) -> Optional[ProcessStatus]:
+        """Get the current status of a subprocess."""
+        if name in self._subprocesses:
+            return self._subprocesses[name]['subprocess_setup']._status
+        return None
+        
+    def get_subprocess_result(self, name: str, timeout: Optional[float] = None):
+        """
+        Get the result from a completed subprocess with Cerial deserialization support.
+        
+        Args:
+            name: Name of subprocess to get result from
+            timeout: Maximum time to wait for result
+            
+        Returns:
+            Result value from subprocess, or None if no result/timeout/error
+        """
+        if name not in self._subprocesses:
+            return None
+            
+        subprocess_info = self._subprocesses[name]
+        mp_process = subprocess_info['mp_process']
+        result_queue = subprocess_info['result_queue']
+        
+        # Wait for process to complete first
+        mp_process.join(timeout)
+        
+        if not mp_process.is_alive():
+            try:
+                # Get result from queue (non-blocking since process is done)
+                result_data = result_queue.get_nowait()
+                
+                # Handle new tuple format: (status, data)
+                if isinstance(result_data, tuple) and len(result_data) == 2:
+                    status, data = result_data
+                    
+                    if status == 'success':
+                        if data is None:
+                            return None
+                        else:
+                            # Deserialize using Cerial
+                            try:
+                                from suitkaise._int.serialization.cerial_core import deserialize
+                                return deserialize(data)
+                            except Exception as deserialize_error:
+                                print(_create_debug_message(
+                                    f"Failed to deserialize result from subprocess {name}: {deserialize_error}"
+                                ))
+                                return None
+                    
+                    elif status == 'serialize_error':
+                        print(_create_debug_message(f"Subprocess {name} had serialization error: {data}"))
+                        return None
+                    
+                    elif status == 'result_error':
+                        print(_create_debug_message(f"Subprocess {name} had __result__ error: {data}"))
+                        return None
+                    
+                    else:
+                        print(_create_debug_message(f"Subprocess {name} returned unknown status: {status}"))
+                        return None
+                        
+                else:
+                    # Legacy format or direct value - treat as success
+                    return result_data
+                    
+            except:
+                return None
+        else:
+            return None
+    
+    def join_and_get_result(self, name: str, timeout: Optional[float] = None):
+        """
+        Convenience method to join a subprocess and get its result in one call.
+        
+        Args:
+            name: Name of subprocess to join and get result from
+            timeout: Maximum time to wait for subprocess completion
+            
+        Returns:
+            Tuple of (success: bool, result: Any)
+            - success: True if subprocess completed successfully
+            - result: The subprocess result, or None if no result/error
+        """
+        success = self.join_subprocess(name, timeout)
+        if success:
+            result = self.get_subprocess_result(name)
+            return True, result
+        else:
+            return False, None
+        
+    def list_subprocesses(self) -> Dict[str, Dict[str, Any]]:
+        """Get information about all managed subprocesses."""
+        result = {}
+        for name, info in self._subprocesses.items():
+            subprocess_setup = info['subprocess_setup']
+            mp_process = info['mp_process']
+            config = info['config']
+            
+            result[name] = {
+                'status': subprocess_setup._status.value,
+                'pid': subprocess_setup.pid,
+                'current_loop': subprocess_setup.current_loop,
+                'is_alive': mp_process.is_alive(),
+                'created_at': info['created_at'],
+                'nesting_depth': info['nesting_depth'],
+            }
+            
+        return result
+        
+    def join_subprocess(self, name: str, timeout: Optional[float] = None) -> bool:
+        """
+        Wait for a subprocess to complete.
+        
+        Args:
+            name: Name of subprocess to join
+            timeout: Maximum time to wait (None = wait forever)
+            
+        Returns:
+            True if subprocess completed, False if timeout
+        """
+        if name not in self._subprocesses:
+            return False
+            
+        mp_process = self._subprocesses[name]['mp_process']
+        mp_process.join(timeout)
+        
+        return not mp_process.is_alive()
+        
+    def join_all(self, timeout: Optional[float] = None) -> bool:
+        """
+        Wait for all subprocesses to complete.
+        
+        Args:
+            timeout: Maximum time to wait for all subprocesses
+            
+        Returns:
+            True if all subprocesses completed, False if timeout
+        """
+        start_time = _get_current_time()
+        
+        for name in list(self._subprocesses.keys()):
+            if timeout is not None:
+                elapsed = _elapsed_time(start_time)
+                remaining = timeout - elapsed
+                if remaining <= 0:
+                    return False
+            else:
+                remaining = None
+                
+            if not self.join_subprocess(name, remaining):
+                return False
+                
+        return True
+        
+    def terminate_subprocess(self, name: str, force: bool = False):
+        """
+        Terminate a specific subprocess using signals.
+        
+        Args:
+            name: Name of subprocess to terminate
+            force: If True, use force signal. If False, use graceful signal.
+        """
+        if name not in self._subprocesses:
+            return
+            
+        subprocess_info = self._subprocesses[name]
+        mp_process = subprocess_info['mp_process']
+        
+        if mp_process.is_alive():
+            try:
+                if force:
+                    # Send force shutdown signal
+                    os.kill(mp_process.pid, signal.SIGUSR2)
+                else:
+                    # Send graceful shutdown signal
+                    os.kill(mp_process.pid, signal.SIGUSR1)
+                    
+                print(_create_debug_message(
+                    f"Sent {'force' if force else 'graceful'} shutdown signal to subprocess {name} (PID: {mp_process.pid})"
+                ))
+                
+            except ProcessLookupError:
+                # Process already dead
+                pass
+            except OSError as e:
+                print(_create_debug_message(f"Error sending signal to subprocess {name}: {e}"))
+                
+    def _quick_process_internal(self, name: str, func: Callable, args: tuple = None, 
+                               kwargs: dict = None, config: Optional[QuickProcessConfig] = None) -> Any:
+        """
+        Internal implementation for quick function process execution.
+        
+        Args:
+            name: Unique name for the process
+            func: Function to execute
+            args: Positional arguments for the function
+            kwargs: Keyword arguments for the function
+            config: Optional configuration (uses defaults if None)
+            
+        Returns:
+            Result from the function execution
+            
+        Raises:
+            RuntimeError: If process fails to complete within timeout
+        """
+        if config is None:
+            config = QuickProcessConfig()
+        
+        # Create function process wrapper
+        function_process = _FunctionProcess(name, func, args, kwargs)
+        
+        # Convert to full ProcessConfig
+        process_config = config.to_process_config()
+        
+        # Create and start the process
+        process_id = self.create_process(function_process, process_config)
+        
+        # Wait for completion and get result
+        success, result = self.join_and_get_result(process_id, config.join_in)
+        
+        if not success:
+            raise RuntimeError(f"Quick process '{name}' failed to complete within {config.join_in}s timeout")
+        
+        return result
+        
+    def shutdown(self, timeout: float = 10.0, force_after_timeout: bool = True):
+        """
+        Shutdown the subprocess manager and all subprocesses using signal-based coordination.
+        
+        Args:
+            timeout: Time to wait for graceful shutdown
+            force_after_timeout: Whether to force-kill subprocesses after timeout
+        """
+        if not self._active:
+            return
+            
+        print(_create_debug_message(f"Shutting down {len(self._subprocesses)} subprocesses..."))
+        
+        # Phase 1: Signal all subprocesses to terminate gracefully
+        for name in self._subprocesses:
+            self.terminate_subprocess(name, force=False)
+            
+        # Phase 2: Wait for graceful shutdown
+        graceful_timeout = timeout * 0.7  # Give 70% of time for graceful shutdown
+        if not self.join_all(graceful_timeout):
+            if force_after_timeout:
+                print(_create_debug_message("Graceful timeout reached, sending force signals"))
+                
+                # Phase 3: Force termination for remaining subprocesses
+                for name in list(self._subprocesses.keys()):
+                    subprocess_info = self._subprocesses[name]
+                    if subprocess_info['mp_process'].is_alive():
+                        self.terminate_subprocess(name, force=True)
+                        
+                # Wait a bit more for force termination
+                remaining_timeout = timeout - graceful_timeout
+                self.join_all(remaining_timeout)
+                        
+        self._active = False
+        print(_create_debug_message("SubProcessing shutdown complete"))
         
     def __enter__(self):
         """Context manager entry."""

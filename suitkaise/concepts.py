@@ -1,168 +1,256 @@
-# lets focus just on the process management for now, and data syncing later
+# process pool concept
 
-class CrossProcessing:
-    def __init__(self):
-        self._processes = {}  # Process registry
-        self._active = True
+# --------
 
-class Process:
-    def __init__(self, name, num_loops=None):
-        self.name = name
-        self.pid = None  # Set when actually started
-        self.num_loops = num_loops
-        self.current_loop = 0
-        self.metadata = {
-            'name': name,
-            'pid': None,
-            'num_loops': num_loops,
-            'completed_loops': 0
-            # for future use when we add data syncing and global variables
-            'remove_on_process_join': True,
-        }
+# NOTE: we are changing ProcessConfig to PConfig
+# NOTE: we are changing QuickProcessConfig to QPConfig
 
-        self._should_continue = True
-        
-    # Lifecycle hooks (user overrides these)
+# to support upcoming concepts, 
+# we need to accept a key during xprocess.create_process().
 
-    # called automatically before every loop iteration
-    def __preloop__(self): pass
+# from...
+xprocess.create_process(Process, PConfig)
 
-    # NEW! HAVE to use this for main loop logic
-    def __loop__(self): pass
+# to...
+xprocess.create_process(key="a_key", Process, PConfig)
 
-    # called automatically after every loop iteration
-    def __postloop__(self): pass  
+# and the way we handle results will change as well.
 
-    # called automatically when process needs to join and last __postloop__ is done
-    def __onfinish__(self): pass
+# before, we just returned the result on its own, but now:
+# we return pdata class, with result as an entry
+class pdata:
 
-    
-    # Control methods
+    def __init__(self, pname, pid, num_loops, completed_loops):
 
-    # finishes current loop (before, loop, after) and then calls __onfinish__
-    def rejoin(self): 
-        """Graceful shutdown after current loop"""
-        
-    # does not finish current loop, immediately calls __onfinish__
-    # use with caution!
-    def skip_and_rejoin(self): 
-        """Immediate shutdown"""
+        self._pname = pname
+        self._pid = pid
+        self._num_loops = num_loops
+        self._completed_loops = None
+        self._result = None # eventually result from __result__ or error
 
-    # immediately stops process, no hooks called
-    # use with extreme caution!
-    def instakill(self):
-        """Kill process immediately, no hooks called"""
+    # as well as methods for updating metadata and to_dict
+
+# and access result like this:
+with CrossProcessing() as xp:
+
+    # returns pdata now!
+    process1 = xprocess.create_process(key="a_key", Process, PConfig)
+
+# raises error if process1.result is an error
+result1 = process1.result
 
 
-class _ProcessRunner:
-    def __init__(self, process_setup, config, *args, **kwargs):
-        self.process_setup = process_setup  # User's Process instance
-        self.config = config
-        
-    def run(self):
-        # Initialize process
-        self.process_setup._start_process()
-        
-        try:
-            # Main execution loop
-            # the position of counters and loop timers is subject to change
-            while self._should_continue():
-                self.process_setup.current_loop += 1
-                self.process_setup.__preloop__()
-                self._start_loop_timer()
-                self.process_setup.__loop__()
-                self.end_loop_timer()
-                self.process_setup.__postloop__()
-                # check if we should continue
+# ~~we should also add a property method to get depth level of current process!~~
+# --------
 
-                
-        except Exception as e:
-            # our custom error handling
+#  adding a standardized PTask type (key, Process classes, and PConfigs)
+tasks: list[PTask]
+
+results = {}
+errors = {}
+
+# pool processes cannot loop
+with ProcessPool(size=8) as pool:
+
+    for task in tasks:
+        # submit() takes a key, Process class and PConfig just like create_process()
+        # can also take the PTask class
+        pool.submit(task)
 
 
-        finally:
-            self.process_setup.__onfinish__()
-            self.process_setup._join_process()
+# accessing data returned using __result__:
+try:
+    result = pool.get_result("key" or task_num)
+    # returns a class PTaskResult with the data in pdata's result
+    # {
+    #   "key": key
+    #   "pclass_name": Process class name
+    #   "worker_pid": worker process's pid
+    #   "worker_number": 1-8
+    #   "task_num": if second task SUBMITTED, would be 2
+    #   "result": the result or error being returned (error gets raised as PoolTaskError)
+    # }
+
+    results.append(result) # or results.append(result.result) if you want raw result data
+
+
+except PoolTaskError as e:
+    # pool task error will also inform you of what failed:
+    # Process class name
+    # task number
+    # failing worker process number and id
+    # error(s) that was/were caught during task to raise that PoolTaskError
+    # and then the message that user adds to error.
+    errors.append(result)
+
+
+# or... all at once!
+task_results = ProcessPool.submit_all(List[PTask]=tasks, size=4, parallel=False)
+# returns all results in a list of PoolTaskResults
+# if there are multiple errors, they are all collected into one PoolTaskError and raised at once
+
+# expected behavior:
+try:
+    task_results = ProcessPool.submit_all(a Plist of tasks=tasks, size=4)
+
+except PoolTaskError as e:
+    for result in task_results:
+        if result.error:
+            # do something with each error specifically if you want
+
+
+# !!! context manager gives control, but we still have that easy one liner! !!!
+
+# the only difference is that we keep the worker processes active until all tasks are complete.
+
+# once all tasks are finished, all the processes rejoin gracefully just like usual.
+
+# subprocesses at depth 2 (deepest possible layer) CANNOT create process pools, as this 
+# would go over the maximum XPROCESS_DEPTH.
+
+# process pool can support parallelism! if there are 8+ tasks and we have 8 workers,
+# then all 8 should be active, but wait until all are empty until starting next batch.
+# however, if we are creating a pool with the one liner:
+task_results = ProcessPool.submit_all(only 5 tasks) # default workers (size) is 8
+
+# then we will only create 5 processes!
+
+# additionally, empty worker processes will be rejoined fully if there are no more tasks
+# left to do.
+
+# parallelism in process pools:
+# base ProcessPool assumes asynchronous behavior, but can be changed within manager.
+
+with ProcessPool(size=8) as pool: # starts in async mode
+
+
+# EXAMPLE 1
+    # can still manipulate order asynchronously
+    sent_back = []
+    for task in tasks:
+        if isinstance(task.pclass, LongerExpensiveOperation) and task not in sent_back:
+
+            # send to back of list
+            tasks.remove(task)
+            tasks.append(task)
+            sent_back.append(task)
+            break
+
+        elif not isinstance(task.pclass, LongerExpensiveOperation):
+            pool.submit(task)
+
+        # we now only have LongExpensiveOperations left
+        else:
+            pool.submit_multiple(tasks)
+
+# EXAMPLE 2
+    sent_back = []
+    for task in tasks:
+        if isinstance(task.pclass, ParallelOperation) and task not in sent_back:
+
+            # send to back of list
+            tasks.remove(task)
+            tasks.append(task)
+            sent_back.append(task)
+            break
+
+        # catch for when all that is left is ParallelOperation
+        elif isinstance(task.pclass, ParallelOperation) and task in sent_back:
+            break
+
+        else:
+            pool.submit(task)
+
+    pool.set_parallel()
+    # remaining are all ParallelOperation and get completed in parallel
+    # submit them all at once if you want
+    pool.submit_multiple(tasks)
+
+    # these will start and finish 8 at a time!
+
+    # or...
+    pool.set_parallel(size=2)
+    # remaining are all ParallelOperation and get completed in parallel
+    # but, we want them completing only 2 at a time
+    pool.submit_multiple(tasks)
+
+    # these will start and finish ONLY 2 at a time!      
+
+    # to revert to async behavior:
+    pool.set_async()
+
+    # additionally, 8 processes remain open even if parallel size is 2
+    # because our pool size is 8 
+
+
+# we also have some explicit classes where behavior cant change:
+
+# if the second process finishes before all others, it can take the next task immediately
+with AsyncProcessPool(size=6) as pool:
+
+    for task in tasks:
+        pool.submit(task)
+
+    # block will still wait to exit until all workers are in shutdown ready state
 
 
 
-self.process_setup.current_loop += 1
-self._start_loop_timer()
-self.process_setup.__preloop__()
-self.process_setup.__loop__()
-self.end_loop_timer()
-self.process_setup.__postloop__()
+# if the second process finishes before all others, it has to wait for them to finish.
+with ParallelProcessPool(size=4) as pool:
 
-# check if we should continue
+    for task in tasks:
+        pool.submit(task)
 
-# DEFUALT BEHAVIOR
+    # fills first four tasks before starting next 4
 
-def __preloop__(self): pass
+# -----------------
+# set_parallel and set_async will exist in CrossProcess and SubProcess as well, 
+# not ONLY ProcessPool!
 
-# timer starts here
-def __loop__(self): pass
-# timer ends here
+# question: how exactly should we control parallelism or process execution in general in the 
+# main process creation managers, CrossProcessing and SubProcessing? what exactly is parallelism
+# outside the context of a processing pool?
 
-def __postloop__(self): pass  
+# how do we control processes that depend on other processes? just conditionals and
+# set_parallel and set_async?
 
+# we could add things like: 
 
-def __onfinish__(self): pass
+xp.wait(seconds)
+xp.wait_for("a_key" or list["of_keys"]) # wait until one or more processes rejoin
 
+# for dependency tracking/control,
+# but both of these could just be handled with conditional logic and might complicate things
+# i want to see how powerful this system is without extra control other than set+parallel/async,
+# just using clean, strong base logic
 
-# CUSTOM BEHAVIOR
-
-# functions to use in init
-def __init__(self, ...):
-    # in __init__...
-
-    # start timer before preloop
-    start_timer_before_preloop()
-
-    # these two are functionally the same
-    start_timer_after_preloop()
-    start_timer_before_loop()
-
-    # these two are functionally the same
-    end_timer_after_loop()
-    end_timer_before_postloop()
-    
-    # end timer after postloop
-    end_timer_after_postloop()
-
-# in the case of end_timer_after_postloop, last timing result would
-#  have to be processed in next preloop, so not as intuitive
+# do you think we should create xp.wait and wait_for? (and their internal counterparts)
 
 
-# question: what if a process is running and realizes it needs to dynamically 
-# create another process? 
-# should we handle this or just stick to users declaring processes in that one context manager?
-# reason i bring this up is becuase this is logic that might not be in the main script under the context manager.
+# question: is parallelism just processes running at the same time, or is it processes starting
+# and ending in a group together?
 
-def main():
-    with CrossProcessing() as xp:
-        # Set up data processing workers
-        processor1 = DataProcessor("processor-1", "database")
-        processor2 = DataProcessor("processor-2", "files")
-        
-        # Set up monitoring
-        api_monitor = APIMonitor("api-monitor", "https://api.example.com")
-        
-        # Create and start all processes
-        xp.create_process(processor1, get_data_processor_config())
-        xp.create_process(processor2, get_data_processor_config())
+# Implementation
 
-        # **for some reason this process wants to make another process
-        xp.create_process(api_monitor, get_monitor_config())
-        
-        # Let them run
-        xp.join_all()
-    # Automatic cleanup
+# Phase 1: Core Changes
 
-if __name__ == "__main__":
-    main()
+# Add key parameter to create_process()
+# Implement pdata class (should it be PData or pdata?)
+# Rename configs (ProcessConfig → PConfig, QuickProcessConfig → QPConfig or QConfig)
+# Update result handling to return PData
 
+# Phase 2: Process Pool
 
-# **
-# 1. is this just a subprocess? is that a thing?
-# 2. how do we currently handle this?
-# is our current handling of this following intuitive coding principles?
+# Implement PTask and PTaskResult classes
+# Create ProcessPool with async/parallel modes
+# Add submit(), submit_multiple() and submit_all() methods
+# submit_all() is only for the one line ProcessPool creation
+# Implement PoolTaskError handling
+
+# Phase 3: Parallelism Control
+
+# Add set_parallel()/set_async() to CrossProcessing
+# Implement group coordination logic
+# Add specialized pool classes (AsyncProcessPool, ParallelProcessPool)
+
+# we are NOT adding wait() and wait_for() right now.
