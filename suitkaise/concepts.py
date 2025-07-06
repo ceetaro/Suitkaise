@@ -20,7 +20,7 @@ xprocess.create_process(key="a_key", Process, PConfig)
 # we return pdata class, with result as an entry
 class pdata:
 
-    def __init__(self, pname, pid, num_loops, completed_loops):
+    def __init__(self, pname, pid, num_loops):
 
         self._pname = pname
         self._pid = pid
