@@ -13,60 +13,51 @@ def test_display_mode():
     print("DISPLAY MODE TESTING (fprint - clean formatting)")
     print("=" * 60)
     
-    # None type - looks good
+    # None type
     none_obj = None
     fprint("My None: {}", none_obj)
     
-    # Strings - looks good
+    # Strings
     string_obj = "hello world"
     fprint("My string: {}", string_obj)
     
-    # String with special characters - looks good
+    # String with special characters
     special_string = "hello\nworld\ttab"
     fprint("My special string: {}", special_string)
     
-    # Empty string - looks good
+    # Empty string
     empty_string = ""
     fprint("My empty string: {}", empty_string)
     
-    # Integers - looks good
+    # Integers
     int_obj = 42
     fprint("My integer: {}", int_obj)
     
     # Large integer
-    # Current output: 12345678900
-    # Desired output if greater than 9.999,999,999: 1.23456789 e+n with space between number and e
     large_int = 12345678900
     fprint("My large integer: {}", large_int)
     
-    # Negative integer - looks good
+    # Negative integer
     negative_int = -123
     fprint("My negative integer: {}", negative_int)
     
-    # Float - looks good
+    # Float
     float_obj = 3.14159
     fprint("My float: {}", float_obj)
     
     # Very small float
-    # Current output: 1e-06
-    # Desired output: 1.0 e-6 (keep at least one decimal place, even if it's zero)
-    # right n
     small_float = 0.000001
     fprint("My small float: {}", small_float)
     
-    # Complex number - looks good
+    # Complex number
     complex_obj = 3 + 4j
     fprint("My complex: {}", complex_obj)
     
     # Boolean True
-    # Current output: same color as integer
-    # Desired output: bold text, standard green color like 🟩
     bool_true = True
     fprint("My boolean True: {}", bool_true)
     
     # Boolean False
-    # Current output: same color as integer
-    # Desired output: bold text, standard lighter red color like a watermelon red
     bool_false = False
     fprint("My boolean False: {}", bool_false)
     
@@ -74,39 +65,31 @@ def test_display_mode():
     empty_list = []
     fprint("My empty list: {}", empty_list)
     
-    # Simple list - looks good, integers are correctly colored
+    # Simple list
     simple_list = [1, 2, 3]
     fprint("My simple list: {}", simple_list)
     
-    # Mixed list - looks good, mixed types are handled with correct colors
+    # Mixed list
     mixed_list = [1, "hello", True, None]
     fprint("My mixed list: {}", mixed_list)
     
-    # Nested list - looks good, nested lists are handled with correct colors
+    # Nested list
     nested_list = [1, [2, 3], [4, [5, 6]]]
     fprint("My nested list: {}", nested_list)
     
     # Empty tuple
-    # Current output: ()
-    # Desired output: () with soft yellow color
     empty_tuple = ()
     fprint("My empty tuple: {}", empty_tuple)
     
     # Single item tuple
-    # Current output: (42,)
-    # Desired output: (42, ) with parentheses in soft yellow color
     single_tuple = (42,)
     fprint("My single tuple: {}", single_tuple)
     
     # Simple tuple
-    # Current output: (1, 2, 3)
-    # Desired output: (1, 2, 3) with parentheses in soft yellow color
     simple_tuple = (1, 2, 3)
     fprint("My simple tuple: {}", simple_tuple)
     
     # Mixed tuple
-    # Current output: (1, 'hello', True, None)
-    # Desired output: (1, 'hello', True, None) with parentheses in soft yellow color
     mixed_tuple = (1, "hello", True, None)
     fprint("My mixed tuple: {}", mixed_tuple)
     
@@ -115,113 +98,69 @@ def test_display_mode():
     fprint("My empty dict: {}", empty_dict)
     
     # Simple dictionary
-    # Current output: key1: value1
-    # key2: value2
-    # Desired output: key1: value1, key2: value2 -- with:
-    # - 60 characters max width, and values must be on the same line as the keys
-    # - "My simple dict: " counts towards the 60 characters for the first line
-    # - if more than one line needed, once whole dict is printed, new line should be added
-    # - key value pairs should be separated by commas
-    # - keys should be a slightly lighter green than string color so that they differentiate from string values
     simple_dict = {"key1": "value1", "key2": "value2"}
     fprint("My simple dict: {}", simple_dict)
     
     # Mixed dictionary
-    # Current output: name: Alice
-    # age: 30
-    # active: True
-    # data: None
-    # Desired output: same concept as simple_dict, but with the mixed types
     mixed_dict = {"name": "Alice", "age": 30, "active": True, "data": None}
     fprint("My mixed dict: {}", mixed_dict)
     
     # Nested dictionary
-    # Current output: My nested dict: user: name: Bob
-    # details: age: 25
-    # city: NYC
-    # Desired output: user: name: Bob, details: age: 25, city: NYC -- with:
-    # - 60 characters max width, and values must be on the same line as the keys
-    # - "My nested dict: " counts towards the 60 characters for the first line
-    # - if more than one line needed, once whole dict is printed, new line should be added
-    # - key value pairs should be separated by commas
-    # - keys should be a slightly lighter green than string color so that they differentiate from string values
-    # - in this case, "user" and "details" should be bold, as they are the top-level keys
-    # - if there are than 2 layers of nesting, make the key color the next color of the rainbow for each layer
     nested_dict = {"user": {"name": "Bob", "details": {"age": 25, "city": "NYC"}}}
     fprint("My nested dict: {}", nested_dict)
     
     # Dictionary with list values
-    # My dict with lists: numbers: 1, 2, 3
-    # words: hello, world
-    # Desired output: numbers: 1, 2, 3, words: hello, world -- with:
-    # same concept as simple_dict, but with the list values. if the list is too long,
-    # it should be truncated to 5 items and then "..." added at the end with how many more items there are.
     dict_with_lists = {"numbers": [1, 2, 3, 4, 5], "words": ["hello", "world"]}
     fprint("My dict with lists: {}", dict_with_lists)
 
-    # currently, this prints all 500 items in the list, which is too long
+    # Very large list
     list = [1, 2, 3, 4, 5]
     big_list = []
     for i in range(100):
         big_list.append(list)
     fprint("My big list: {}", big_list)
     
-    # Empty set - looks good
+    # Empty set
     empty_set = set()
     fprint("My empty set: {}", empty_set)
     
-    # Simple set - looks good
+    # Simple set
     simple_set = {1, 2, 3}
     fprint("My simple set: {}", simple_set)
     
     # Mixed set
-    # Current output: 1, hello
-    # Desired output: 1, hello, True
     mixed_set = {1, "hello", True}  # Note: True and 1 might be deduplicated
     fprint("My mixed set: {}", mixed_set)
     
-    # String set - looks good
+    # String set
     string_set = {"apple", "banana", "cherry"}
     fprint("My string set: {}", string_set)
     
-    # Frozenset - looks good
+    # Frozenset
     frozen_set = frozenset([1, 2, 3])
     fprint("My frozenset: {}", frozen_set)
     
-    # Range object - looks good
+    # Range object
     range_obj = range(5)
     fprint("My range: {}", range_obj)
     
     # Range with step
-    # Current output: 0, 10
-    # Desired output: 0, 10 (+2) -- with "(+2)" in a dim gray similar to None color but a little darker
     range_step = range(0, 10, 2)
     fprint("My range with step: {}", range_step)
     
-    # Bytes - looks good
+    # Bytes
     bytes_obj = b"hello"
     fprint("My bytes: {}", bytes_obj)
     
     # Bytes with non-UTF8
-    # Current output: no visible output at all
-    # Desired output: 00, 01, 02, 03 (binary) -- with "binary" in a dim gray similar to None color but a little darker
-    # This should print the bytes in a readable format, and truncate if too long (more than 5 bytes)
     binary_bytes = b"\x00\x01\x02\x03"
     fprint("My binary bytes: {}", binary_bytes)
     
-    # Bytearray - looks good
+    # Bytearray
     bytearray_obj = bytearray(b"hello")
     fprint("My bytearray: {}", bytearray_obj)
     
     # Complex nested structure
-    # if we recognize this as a complex structure, we should print it in a readable format like this:
-    # My complex structure: 
-    #   users: 
-    #       name: Alice, scores: 95, 87, 92
-    #       name: Bob, scores: 88, 91, 85
-    #   metadata:
-    #       total_users: 2, active: True, tags: important, test, demo
-    # \n
     complex_structure = {
         "users": [
             {"name": "Alice", "scores": [95, 87, 92]},
@@ -235,6 +174,9 @@ def test_display_mode():
     }
     fprint("My complex structure: {}", complex_structure)
 
+
+
+# NOTE: not finished with this yet, focus on testing display mode first
 
 def test_debug_mode():
     """Test all data types using dprint() - Debug Mode (verbose formatting)"""
