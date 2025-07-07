@@ -255,17 +255,38 @@ class CrossProcessing:
     def get_process_status(self, key: str) -> Optional[PStatus]:
         """Get the current status of a process."""
         with self._processes_lock:
-            if key in self._processes:
-                process_setup = self._processes[key]['process_setup']
-                pdata_instance = self._processes[key]['pdata_instance']
+            if key not in self._processes:
+                return None
                 
-                # Sync status before returning
-                if process_setup._status != pdata_instance.status:
-                    pdata_instance._update_status(process_setup._status)
+            process_setup = self._processes[key]['process_setup']
+            mp_process = self._processes[key]['mp_process']
+            pdata_instance = self._processes[key]['pdata_instance']
+            
+            # ENHANCED: Check if process is dead and infer status
+            if not mp_process.is_alive():
+                exit_code = mp_process.exitcode
                 
-                return process_setup._status
-        return None
-        
+                # If process exited with error code, it crashed
+                if exit_code != 0:
+                    # Update both process_setup and pdata status to CRASHED
+                    if process_setup._status not in [PStatus.CRASHED, PStatus.KILLED]:
+                        process_setup._status = PStatus.CRASHED
+                        pdata_instance._update_status(PStatus.CRASHED)
+                        if exit_code == 1:
+                            pdata_instance._set_error("Process crashed with error")
+                else:
+                    # Process exited normally - check if it was finished or killed
+                    if process_setup._status not in [PStatus.FINISHED, PStatus.KILLED, PStatus.CRASHED]:
+                        process_setup._status = PStatus.FINISHED
+                        pdata_instance._update_status(PStatus.FINISHED)
+            
+            # Sync status between process_setup and pdata before returning
+            if process_setup._status != pdata_instance.status:
+                pdata_instance._update_status(process_setup._status)
+            
+            return process_setup._status
+    
+
     def get_process_stats(self, key: str) -> Optional[Dict[str, Any]]:
         """Get statistics for a process."""
         with self._processes_lock:

@@ -64,10 +64,24 @@ class _PTask:
     process_class: Type[_Process]   # Process class to instantiate
     config: _PConfig = None        # Process configuration (defaults to _PConfig())
     
+    # Function support
+    func: Callable = None          # Function to execute (for function tasks)
+    args: tuple = None             # Function args
+    kwargs: dict = None            # Function kwargs
+    
     def __post_init__(self):
         """Set defaults for config and process name if not provided."""
         if self.config is None:
             self.config = _PConfig()
+        if self.args is None:
+            self.args = ()
+        if self.kwargs is None:
+            self.kwargs = {}
+    
+    @property
+    def is_function_task(self) -> bool:
+        """Check if this is a function task."""
+        return self.func is not None
 
 
 @dataclass 
@@ -236,14 +250,13 @@ class ProcessPool:
             
         process_config = config.to_process_config()
         
-        # Create a wrapper that returns a _FunctionProcess instance
-        def create_function_process():
-            return _FunctionProcess(func, args, kwargs)
-        
         task = _PTask(
             key=key,
-            process_class=create_function_process,
-            config=process_config
+            process_class=_FunctionProcess,  # Will be ignored since func is set
+            config=process_config,
+            func=func,
+            args=args,
+            kwargs=kwargs
         )
         
         self.submit(task)
@@ -532,8 +545,12 @@ class ProcessPool:
         """Assign a task to a specific worker."""
         worker_info = self._workers[worker_number]
         
-        # Create process instance
-        process_instance = task.process_class()
+        # Create process instance based on task type
+        if task.is_function_task:
+            process_instance = _FunctionProcess(task.func, task.args, task.kwargs)
+        else:
+            process_instance = task.process_class()
+        
         process_instance._set_process_key(task.key)
         
         # Create PData instance
@@ -576,6 +593,7 @@ class ProcessPool:
         
         print(_create_debug_message(f"Assigned task {task.key} to worker {worker_number}"))
         
+
     def _cleanup_completed_workers(self):
         """Check for completed workers and collect results."""
         completed_workers = []
@@ -587,8 +605,11 @@ class ProcessPool:
                 completed_workers.append(worker_number)
                 
         for worker_number in completed_workers:
+            # Small delay to ensure status synchronization
+            time.sleep(0.01)  # 10ms delay
             self._collect_worker_result(worker_number)
-            
+
+
     def _collect_worker_result(self, worker_number: int):
         """Collect result from a completed worker."""
         worker_info = self._workers[worker_number]
@@ -597,55 +618,80 @@ class ProcessPool:
         mp_process = worker_info['mp_process']
         pdata_instance = worker_info['pdata_instance']
         
-        # Get result from queue
+        # Initialize result tracking
         result_data = None
         error_msg = None
+        has_queue_data = False
         
-        # Check if process exited with error code
-        if mp_process.exitcode != 0:
-            error_msg = f"Process exited with code {mp_process.exitcode}"
+        # STEP 1: Check process exit code FIRST (most reliable indicator)
+        exit_code = mp_process.exitcode
+        if exit_code != 0:
+            if exit_code == 1:
+                error_msg = "Process crashed with error"
+            elif exit_code == -9:  # SIGKILL
+                error_msg = "Process was killed (SIGKILL)"
+            elif exit_code < 0:  # Other signals
+                error_msg = f"Process terminated by signal {-exit_code}"
+            else:
+                error_msg = f"Process exited with code {exit_code}"
+            
+            print(_create_debug_message(f"Task {task.key} exit code: {exit_code} -> {error_msg}"))
         
+        # STEP 2: Try to get data from queue (may contain error details)
         try:
             result_data = result_queue.get_nowait()
+            has_queue_data = True
             
             if isinstance(result_data, tuple) and len(result_data) == 2:
                 status, data = result_data
                 
                 if status == 'success':
-                    if data is not None:
-                        try:
-                            from suitkaise._int.serialization.cerial_core import _deserialize
-                            result = _deserialize(data)
-                            pdata_instance._set_result(result)
-                        except Exception as e:
-                            error_msg = f"Deserialization error: {e}"
-                            pdata_instance._set_error(error_msg)
+                    if exit_code == 0:  # Only trust success if exit code is also 0
+                        if data is not None:
+                            try:
+                                from suitkaise._int.serialization.cerial_core import _deserialize
+                                result = _deserialize(data)
+                                pdata_instance._set_result(result)
+                            except Exception as e:
+                                error_msg = f"Deserialization error: {e}"
+                                pdata_instance._set_error(error_msg)
+                        else:
+                            pdata_instance._set_result(None)
                     else:
-                        pdata_instance._set_result(None)
+                        # Exit code indicates error, but queue says success -> treat as error
+                        error_msg = error_msg or "Process indicated error despite success message"
                 else:
-                    error_msg = f"{status}: {data}"
-                    pdata_instance._set_error(error_msg)
+                    # Queue explicitly contains error
+                    queue_error = f"{status}: {data}"
+                    error_msg = error_msg or queue_error  # Use queue error if no exit code error
+                    
             else:
-                # Legacy format
-                pdata_instance._set_result(result_data)
+                # Legacy format or unexpected format
+                if exit_code == 0:
+                    pdata_instance._set_result(result_data)
+                # If exit_code != 0, error_msg is already set above
                 
-        except Exception as e:
-            if not error_msg:  # Only set if we don't already have an error
-                error_msg = f"Failed to get result: {e}"
+        except Exception as queue_error:
+            # Couldn't get anything from queue
+            if exit_code == 0:
+                # No exit error and no queue data -> assume success with None result
+                pdata_instance._set_result(None)
+            # If exit_code != 0, error_msg is already set above
+            
+            print(_create_debug_message(f"Task {task.key} queue error: {queue_error}"))
+        
+        # STEP 3: Final error determination
+        if error_msg:
             pdata_instance._set_error(error_msg)
-            
-        # Check if PData indicates an error (from process status updates)
-        if pdata_instance.has_error and not error_msg:
-            error_msg = pdata_instance.error
-            
-        # Create task result
+        
+        # STEP 4: Create task result
         task_result = _PTaskResult(
             key=task.key,
-            pclass_name=task.process_class.__name__,
+            pclass_name=task.process_class.__name__ if not task.is_function_task else f"Function({task.func.__name__})",
             worker_pid=mp_process.pid,
             worker_number=worker_number,
             task_num=self._tasks_submitted - len(self._task_queue) - len(self._parallel_batch),
-            result=pdata_instance.result if not pdata_instance.has_error else None,
+            result=pdata_instance.result if not error_msg else None,
             error=error_msg,
             pdata=pdata_instance
         )
@@ -661,6 +707,8 @@ class ProcessPool:
         # Make worker available again
         if worker_number not in self._available_workers:
             self._available_workers.append(worker_number)
-            
+        
+        # Enhanced status logging
         status_msg = "completed" if error_msg is None else f"failed ({error_msg})"
-        print(_create_debug_message(f"Task {task.key} {status_msg} on worker {worker_number}"))
+        debug_info = f"exit_code={exit_code}, has_queue_data={has_queue_data}"
+        print(_create_debug_message(f"Task {task.key} {status_msg} on worker {worker_number} ({debug_info})"))

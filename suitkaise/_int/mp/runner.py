@@ -77,57 +77,33 @@ class _ProcessRunner:
             
             # Main execution loop
             while self.process_setup._should_continue_loop():
-                try:
-                    # Check for immediate termination signals
-                    if (self.process_setup._control_signal is not None and 
-                        self.process_setup._control_signal.value == 3):  # instakill
-                        break
-                        
-                    # Check for skip signal
-                    if (self.process_setup._control_signal is not None and 
-                        self.process_setup._control_signal.value == 2):  # skip and rejoin
-                        break
+                # Check for immediate termination signals
+                if (self.process_setup._control_signal is not None and 
+                    self.process_setup._control_signal.value == 3):  # instakill
+                    break
                     
-                    # Execute single loop iteration with granular timeout handling
-                    if not self._execute_loop_iteration():
-                        break  # Timeout or error occurred
-                        
-                    # Check for graceful termination signal
-                    if (self.process_setup._control_signal is not None and 
-                        self.process_setup._control_signal.value == 1):  # rejoin
-                        break
-                        
-                except (PreloopError, MainLoopError, PostLoopError) as e:
-                    # These are our custom lifecycle errors with detailed information
-                    self.process_setup.stats.record_error(e, self.process_setup.current_loop)
-                    
-                    # Update status to CRASHED
-                    self.process_setup._status = PStatus.CRASHED
-                    
-                    # Update PData instance if available
-                    if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
-                        self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
-                    
-                    # Log the specific error type and section
-                    error_type = type(e).__name__
-                    section = error_type.replace("Error", "").replace("Timeout", "").lower()
-                    
-                    error_msg = _create_debug_message(
-                        f"{error_type} in process {self.process_setup.pkey}: {e}"
-                    )
-                    print(error_msg)
+                # Check for skip signal
+                if (self.process_setup._control_signal is not None and 
+                    self.process_setup._control_signal.value == 2):  # skip and rejoin
+                    break
                 
-                    # always crash to enable restart logic
-                    raise e
+                # Execute single loop iteration with granular timeout handling
+                if not self._execute_loop_iteration():
+                    break  # Timeout or error occurred (status already set in _execute_loop_iteration)
                     
+                # Check for graceful termination signal
+                if (self.process_setup._control_signal is not None and 
+                    self.process_setup._control_signal.value == 1):  # rejoin
+                    break
                     
         except Exception as e:
-            # Fatal error in process runner itself
+            # Fatal error in process runner itself (not lifecycle errors)
             self.process_setup._status = PStatus.CRASHED
             
             # Update PData instance if available 
             if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
                 self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
+                self.process_setup._pdata_instance._set_error(str(e))
             
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
             print(_create_debug_message(
@@ -146,7 +122,7 @@ class _ProcessRunner:
                         f"Error in __onfinish__ for process {self.process_setup.pkey}: {e}"
                     ))
                     
-            # NEW: Always call __result__ if it exists and serialize with Cerial
+            # Always call __result__ if it exists and serialize with Cerial
             if hasattr(self.process_setup, '__result__'):
                 try:
                     # Check if __result__ is implemented (not just the default return None)
@@ -181,17 +157,28 @@ class _ProcessRunner:
             else:
                 # No __result__ method, put None
                 self.result_queue.put(('success', None))
-                    
-            # Final cleanup
-            self.process_setup._join_process()
-            
-            if self.config.log_loops:
-                stats = self.process_setup.stats.get_summary()
-                print(_create_debug_message(
-                    f"Process {self.process_setup.pkey} finished",
-                    (stats,)
-                ))
                 
+            # CRITICAL: Only call _join_process if status is not CRASHED
+            if self.process_setup._status != PStatus.CRASHED:
+                self.process_setup._join_process()
+            # If status is CRASHED, leave it as CRASHED for restart detection
+            
+            # CRITICAL: Ensure process exits with proper code for crash detection
+            if self.process_setup._status == PStatus.CRASHED:
+                if self.config.log_loops:
+                    print(_create_debug_message(
+                        f"Process {self.process_setup.pkey} exiting with error code 1 (CRASHED)"
+                    ))
+                import sys
+                sys.exit(1)  # Force non-zero exit code for crash detection
+            else:
+                if self.config.log_loops:
+                    print(_create_debug_message(
+                        f"Process {self.process_setup.pkey} exiting with code 0 (SUCCESS)"
+                    ))
+                # Normal successful exit (status will be FINISHED from _join_process)
+                
+
     def _execute_loop_iteration(self) -> bool:
         """
         Execute a single loop iteration with granular timeout handling.
@@ -205,7 +192,11 @@ class _ProcessRunner:
         
         # Execute with timeout protection for each section
         return self._execute_with_granular_timeouts()
-            
+        
+        # NOTE: All error handling is now done in _execute_with_granular_timeouts()
+        # This method just returns True/False for loop continuation
+
+
     def _execute_with_granular_timeouts(self) -> bool:
         """Execute loop iteration with individual section timeout protection."""
         try:
@@ -251,18 +242,54 @@ class _ProcessRunner:
             return True
             
         except (PreloopError, MainLoopError, PostLoopError) as e:
-            # These are already properly formatted errors
+            # CRITICAL: Lifecycle errors - handle restart logic here
             self.process_setup.stats.record_error(e, self.process_setup.current_loop)
-            print(_create_debug_message(str(e)))
-            return False
+            
+            # IMMEDIATELY set status to CRASHED
+            self.process_setup._status = PStatus.CRASHED
+            
+            # Update PData instance and ensure it's synchronized
+            if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
+                self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
+                self.process_setup._pdata_instance._set_error(str(e))
+            
+            # Log the error
+            error_type = type(e).__name__
+            print(_create_debug_message(f"{error_type} in process {self.process_setup.pkey}: {e}"))
+            
+            # DECISION: Restart or crash?
+            restart_enabled = self.config.crash_restart
+            restarts_remaining = (self.process_setup._restart_count < self.config.max_restarts)
+            
+            if restart_enabled and restarts_remaining:
+                # Return False to exit loop cleanly, allowing restart
+                print(_create_debug_message(
+                    f"Process {self.process_setup.pkey} will allow restart "
+                    f"(attempt {self.process_setup._restart_count + 1}/{self.config.max_restarts})"
+                ))
+                return False  # This will break the main loop and exit normally for restart
+            else:
+                # CRASH the process immediately - don't return False
+                if not restart_enabled:
+                    print(_create_debug_message(f"Process {self.process_setup.pkey} crashing (restart disabled)"))
+                else:
+                    print(_create_debug_message(f"Process {self.process_setup.pkey} crashing (max restarts exceeded)"))
+                
+                # Force the process to crash by re-raising the error
+                raise e
             
         except Exception as e:
-            # Unexpected error - wrap it appropriately
-            error_msg = f"Unexpected error in process {self.process_setup.pkey} loop {self.process_setup.current_loop}: {e}"
-            self.process_setup.stats.record_error(e, self.process_setup.current_loop)
-            print(_create_debug_message(error_msg, (traceback.format_exc(),)))
-            return False
+            # Unexpected error - always crash
+            self.process_setup._status = PStatus.CRASHED
+            if hasattr(self.process_setup, '_pdata_instance') and self.process_setup._pdata_instance:
+                self.process_setup._pdata_instance._update_status(PStatus.CRASHED)
+                self.process_setup._pdata_instance._set_error(str(e))
             
+            self.process_setup.stats.record_error(e, self.process_setup.current_loop)
+            print(_create_debug_message(f"Unexpected error in process {self.process_setup.pkey}: {e}"))
+            raise e
+
+
     def _execute_preloop_with_timeout(self) -> bool:
         """Execute __preloop__() with timeout protection (always enabled with defaults)."""
         return self._execute_section_with_timeout(

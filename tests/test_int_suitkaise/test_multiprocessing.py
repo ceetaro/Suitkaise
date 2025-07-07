@@ -563,6 +563,7 @@ def test_process_managers():
             
             # Wait longer to allow for restart attempts
             success = cp.join_process("restart_test", timeout=20.0)
+            time.sleep(3)
             
             # Check if restart was attempted
             process_info = cp.get_process("restart_test")

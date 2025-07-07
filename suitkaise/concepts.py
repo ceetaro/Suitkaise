@@ -254,3 +254,26 @@ xp.wait_for("a_key" or list["of_keys"]) # wait until one or more processes rejoi
 # Add specialized pool classes (AsyncProcessPool, ParallelProcessPool)
 
 # we are NOT adding wait() and wait_for() right now.
+
+
+
+
+# CURRENT basic concepts (fdprint, sktime, skpath)
+
+
+
+# FINALIZED basic processing concepts, before adding data syncing with Manager
+#   or creating the api
+
+
+
+
+
+
+
+
+
+
+
+
+# expanded SKGlobal and SKTree concepts

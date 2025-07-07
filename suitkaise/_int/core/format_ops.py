@@ -12,6 +12,9 @@ Key Features:
 - Color-coded output with visual hierarchy
 - Priority-based debug filtering
 - String interpolation with format specifiers
+- Terminal-aware smart wrapping for dictionaries
+- Value-over-key truncation with 40-character minimum width
+- 2-space indentation per nesting level
 
 The internal operations handle all the complex formatting logic and visual styling.
 """
@@ -20,6 +23,7 @@ import time
 import datetime
 import re
 import sys
+import shutil
 from typing import Any, Dict, List, Set, Tuple, Union, Optional, Callable
 from collections.abc import Mapping, Sequence
 from enum import Enum
@@ -39,7 +43,7 @@ class _Colors:
     YELLOW = '\033[93m'
     BLUE = '\033[94m'
     MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
+    CYAN = '\033[38;5;117m'
     WHITE = '\033[97m'
     GRAY = '\033[90m'
     
@@ -50,13 +54,36 @@ class _Colors:
     RESET = '\033[0m'
     
     # Data type colors
-    TYPE_LABEL = '\033[36m'      # Cyan for type labels
-    STRING_VAL = '\033[92m'      # Green for strings
-    NUMBER_VAL = '\033[94m'      # Blue for numbers
-    BOOL_VAL = '\033[95m'        # Magenta for booleans
-    NONE_VAL = '\033[90m'        # Gray for None
-    COLLECTION = '\033[93m'      # Yellow for collections
-    TIME_VAL = '\033[96m'        # Cyan for timestamps
+    TYPE_LABEL = '\033[38;5;117m'  # Soft blue-cyan for type labels
+    STRING_VAL = '\033[92m'        # Green for strings
+    NUMBER_VAL = '\033[94m'        # Blue for numbers
+    BOOL_VAL = '\033[95m'          # Magenta for booleans (legacy)
+    NONE_VAL = '\033[90m'          # Gray for None
+    COLLECTION = '\033[93m'        # Yellow for collections
+    TIME_VAL = '\033[38;5;117m'    # Soft blue-cyan for timestamps
+    
+    # Enhanced boolean colors
+    BOOL_TRUE = '\033[1;32m'         # Bold green for True
+    BOOL_FALSE = '\033[1;91m'        # Bold light red for False
+    
+    # Tuple and dictionary colors
+    TUPLE_BRACKET = '\033[97m'       # White for tuple parentheses in display mode
+    
+    # Rainbow cycle colors for nested dictionary keys (all light/pastel)
+    DICT_KEY_COLORS = [
+        '\033[38;5;120m',  # Pastel green (#80ef80 equivalent)
+        '\033[38;5;159m',  # Light cyan
+        '\033[38;5;183m',  # Light magenta
+        '\033[38;5;217m',  # Light red/pink
+        '\033[38;5;223m',  # Light orange/peach
+        '\033[38;5;228m',  # Light yellow
+        '\033[38;5;147m',  # Light blue
+    ]
+    
+    # Special formatting colors
+    RANGE_STEP = '\033[2;37m'        # Dim gray for range step info
+    BINARY_LABEL = '\033[2;37m'      # Dim gray for binary labels
+    TRUNCATION_LABEL = '\033[38;5;207m'  # Neon pink for truncation indicators
     
     _enabled = True
     
@@ -149,6 +176,29 @@ _TIME_FORMATS = {
 }
 
 
+def _get_terminal_width() -> int:
+    """Get current terminal width with fallback and minimum width enforcement."""
+    try:
+        width = shutil.get_terminal_size().columns
+        return max(width, 40)  # Minimum width of 40
+    except:
+        return 80  # Fallback to 80 columns
+
+
+def _truncate_string(text: str, max_length: int) -> str:
+    """Truncate string to max_length with ellipsis."""
+    if len(text) <= max_length:
+        return text
+    if max_length <= 3:
+        return "..."
+    return text[:max_length-3] + "..."
+
+
+def _clean_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text for length calculation."""
+    return re.sub(r'\033\[[0-9;]*m', '', text)
+
+
 def _format_timestamp(timestamp: float, format_spec: str) -> str:
     """
     Format a timestamp according to the given format specification.
@@ -207,9 +257,16 @@ def _format_timestamp(timestamp: float, format_spec: str) -> str:
         return dt.strftime(base_format) + ' UTC'
     
     else:
-        # Standard strftime formatting
+        # Standard strftime formatting with 12-hour format cleanup
         dt = datetime.datetime.fromtimestamp(timestamp)
-        return dt.strftime(format_string)
+        result = dt.strftime(format_string)
+        
+        # Clean up 12-hour formats - remove leading zeros from hours
+        if format_spec in ['hms12', 'hm12', 'time12']:
+            # Replace leading zero in hour (e.g., "04:30 AM" -> "4:30 AM")
+            result = re.sub(r'^0(\d)', r'\1', result)
+        
+        return result
 
 
 def _format_relative_time(timestamp: float) -> str:
@@ -307,9 +364,25 @@ def _format_string_value(value: str, mode: _FormatMode) -> str:
         # In display mode, show clean string without quotes
         return _Colors.colorize(value, _Colors.STRING_VAL)
 
+
 def _format_number_value(value: Union[int, float, complex], mode: _FormatMode) -> str:
-    """Format numeric values."""
-    if isinstance(value, complex):
+    """Format numeric values with scientific notation for very large numbers."""
+    if isinstance(value, int):
+        # Format very large integers in scientific notation
+        if abs(value) > 9_999_999_999:
+            formatted = f"{value:.8g}"  # Use g format for automatic scientific notation
+        else:
+            formatted = str(value)
+    elif isinstance(value, float):
+        # Keep at least one decimal place for small floats
+        if abs(value) < 0.01 and value != 0:
+            # Format as scientific notation but ensure readable format with single space
+            formatted = f"{value:.1e}".replace('e-0', ' e-').replace('e+0', ' e+').replace('e-', ' e-').replace('e+', ' e+')
+            # Fix double spaces that might occur
+            formatted = re.sub(r'  +', ' ', formatted)
+        else:
+            formatted = str(value)
+    elif isinstance(value, complex):
         # Special handling for complex numbers - preserve integer formatting
         real_part = int(value.real) if value.real.is_integer() else value.real
         imag_part = int(value.imag) if value.imag.is_integer() else value.imag
@@ -325,8 +398,11 @@ def _format_number_value(value: Union[int, float, complex], mode: _FormatMode) -
 
 
 def _format_boolean_value(value: bool, mode: _FormatMode) -> str:
-    """Format boolean values."""
-    return _Colors.colorize(str(value), _Colors.BOOL_VAL)
+    """Format boolean values with bold text and appropriate colors."""
+    if value:
+        return _Colors.colorize(str(value), _Colors.BOOL_TRUE)
+    else:
+        return _Colors.colorize(str(value), _Colors.BOOL_FALSE)
 
 
 def _format_none_value(mode: _FormatMode) -> str:
@@ -335,7 +411,7 @@ def _format_none_value(mode: _FormatMode) -> str:
 
 
 def _format_bytes_value(value: Union[bytes, bytearray], mode: _FormatMode) -> str:
-    """Format bytes/bytearray values."""
+    """Format bytes/bytearray values with better binary handling."""
     try:
         # Try to decode as UTF-8 for display
         decoded = value.decode('utf-8')
@@ -344,34 +420,87 @@ def _format_bytes_value(value: Union[bytes, bytearray], mode: _FormatMode) -> st
         else:
             return _Colors.colorize(decoded, _Colors.STRING_VAL)
     except UnicodeDecodeError:
-        # If can't decode, show as hex
-        hex_repr = value.hex()
-        if mode == _FormatMode.DEBUG:
-            return _Colors.colorize(f"b'\\x{hex_repr}'", _Colors.STRING_VAL)
-        else:
-            return _Colors.colorize(f"<{len(value)} bytes>", _Colors.STRING_VAL)
+        # If can't decode, show as hex with truncation
+        if len(value) == 0:
+            return _Colors.colorize("<empty bytes>", _Colors.STRING_VAL)
+        
+        # Show first 5 bytes as hex
+        hex_parts = []
+        show_count = min(5, len(value))
+        for i in range(show_count):
+            hex_parts.append(f"{value[i]:02x}")
+        
+        hex_display = ", ".join(hex_parts)
+        
+        # Add truncation indicator if needed
+        if len(value) > 5:
+            hex_display += f", ... (+{len(value) - 5} more)"
+        
+        # Add binary label
+        binary_label = _Colors.colorize(" (binary)", _Colors.BINARY_LABEL)
+        return _Colors.colorize(hex_display, _Colors.STRING_VAL) + binary_label
 
 
 def _format_range_value(value: range, mode: _FormatMode) -> str:
-    """Format range objects."""
+    """Format range objects with step information."""
     if mode == _FormatMode.DEBUG:
         return _Colors.colorize(f"range({value.start}, {value.stop}, {value.step})", _Colors.COLLECTION)
     else:
         # Show as start, stop for display mode
-        return _Colors.colorize(f"{value.start}, {value.stop}", _Colors.COLLECTION)
+        base = _Colors.colorize(f"{value.start}, {value.stop}", _Colors.COLLECTION)
+        if value.step != 1:
+            step_info = _Colors.colorize(f" (+{value.step})", _Colors.RANGE_STEP)
+            return base + step_info
+        return base
 
 
-def _format_list_display(items: List[Any], indent: int = 0) -> str:
-    """Format list for display mode (comma-separated)."""
+def _format_list_display(items: List[Any], indent: int = 0, available_width: int = None, nesting_level: int = 0, use_rainbow: bool = False) -> str:
+    """Format list for display mode with optional rainbow coloring for sub-items."""
     if not items:
         return ""
     
+    # Truncate long lists to 5 items
+    if len(items) > 5:
+        display_items = items[:5]
+        truncated = True
+        remaining_count = len(items) - 5
+    else:
+        display_items = items
+        truncated = False
+        remaining_count = 0
+    
     formatted_items = []
-    for item in items:
-        formatted_item = _format_single_value(item, _FormatMode.DISPLAY, indent)
+    for i, item in enumerate(display_items):
+        if use_rainbow and isinstance(item, (list, tuple)):
+            # Use rainbow colors for sub-lists/tuples - each gets a different color
+            rainbow_color = _get_dict_key_color(i)
+            if isinstance(item, list):
+                # Format sub-list items with the rainbow color
+                sub_items = []
+                for sub_item in item:
+                    sub_formatted = _format_single_value(sub_item, _FormatMode.DISPLAY, indent + 1, nesting_level)
+                    # Apply rainbow color to the entire sub-item
+                    sub_items.append(_Colors.colorize(str(sub_item), rainbow_color))
+                formatted_item = ", ".join(sub_items)
+            elif isinstance(item, tuple):
+                # Format tuple items with the rainbow color
+                sub_items = []
+                for sub_item in item:
+                    sub_items.append(_Colors.colorize(str(sub_item), rainbow_color))
+                formatted_item = _Colors.colorize("(", _Colors.TUPLE_BRACKET) + ", ".join(sub_items) + _Colors.colorize(")", _Colors.TUPLE_BRACKET)
+            else:
+                formatted_item = _format_single_value(item, _FormatMode.DISPLAY, indent, nesting_level)
+        else:
+            formatted_item = _format_single_value(item, _FormatMode.DISPLAY, indent, nesting_level)
         formatted_items.append(formatted_item)
     
-    return ", ".join(formatted_items)
+    result = ", ".join(formatted_items)
+    
+    if truncated:
+        truncation_text = _Colors.colorize(f" ...({remaining_count} more)", _Colors.TRUNCATION_LABEL)
+        result += truncation_text
+    
+    return result
 
 
 def _format_list_debug(items: List[Any], indent: int = 0) -> str:
@@ -379,8 +508,8 @@ def _format_list_debug(items: List[Any], indent: int = 0) -> str:
     if not items:
         return "[]"
     
-    indent_str = "    " * indent
-    next_indent_str = "    " * (indent + 1)
+    indent_str = "  " * indent  # 2 spaces per level
+    next_indent_str = "  " * (indent + 1)
     
     # Format items with proper indentation
     formatted_items = []
@@ -392,20 +521,144 @@ def _format_list_debug(items: List[Any], indent: int = 0) -> str:
     return _Colors.colorize(result, _Colors.COLLECTION)
 
 
-def _format_dict_display(items: Dict[Any, Any], indent: int = 0) -> str:
-    """Format dictionary for display mode."""
+def _format_tuple_display(items: Tuple[Any, ...], indent: int = 0, available_width: int = None) -> str:
+    """Format tuple for display mode with colored parentheses."""
+    if not items:
+        return _Colors.colorize("()", _Colors.TUPLE_BRACKET)
+    
+    # Format the contents
+    formatted_items = []
+    for item in items:
+        formatted_item = _format_single_value(item, _FormatMode.DISPLAY, indent)
+        formatted_items.append(formatted_item)
+    
+    content = ", ".join(formatted_items)
+    
+    # Handle single item tuple
+    if len(items) == 1:
+        content += ","
+    
+    # Add colored parentheses
+    open_paren = _Colors.colorize("(", _Colors.TUPLE_BRACKET)
+    close_paren = _Colors.colorize(")", _Colors.TUPLE_BRACKET)
+    
+    return f"{open_paren}{content}{close_paren}"
+
+
+def _get_dict_key_color(nesting_level: int) -> str:
+    """Get the appropriate color for dictionary keys based on nesting level."""
+    return _Colors.DICT_KEY_COLORS[nesting_level % len(_Colors.DICT_KEY_COLORS)]
+
+
+def _format_dict_display(items: Dict[Any, Any], indent: int = 0, prefix_length: int = 0, nesting_level: int = 0) -> str:
+    """Format dictionary with smart terminal-width wrapping, 2-space indentation, and rainbow key colors."""
     if not items:
         return ""
     
-    formatted_pairs = []
-    for key, value in items.items():
-        # Format key and value in display mode (no type annotations)
-        key_str = _format_single_value(key, _FormatMode.DISPLAY, indent)
-        value_str = _format_single_value(value, _FormatMode.DISPLAY, indent)
-        formatted_pairs.append(f"{key_str}: {value_str}")
+    # Get terminal width and calculate available space
+    terminal_width = _get_terminal_width()
+    # Subtract 2 spaces per indentation level
+    indent_space = indent * 2
+    available_width = terminal_width - prefix_length - indent_space
     
-    # Join with newlines for readable output
-    return "\n".join(formatted_pairs)
+    # Minimum usable width of 40
+    if available_width < 40:
+        available_width = 40
+    
+    formatted_pairs = []
+    
+    # Get the key color for this nesting level
+    key_color = _get_dict_key_color(nesting_level)
+    
+    for key, value in items.items():
+        # Format key with current level color (and color the colon too)
+        key_str = _Colors.colorize(str(key), key_color)
+        colon_str = _Colors.colorize(":", key_color)
+        
+        # Format value with potential truncation
+        if isinstance(value, dict):
+            # Handle nested dictionaries with increased nesting level
+            nested_pairs = []
+            next_nesting_level = nesting_level + 1
+            for nested_key, nested_value in value.items():
+                nested_key_color = _get_dict_key_color(next_nesting_level)
+                nested_key_str = _Colors.colorize(str(nested_key), nested_key_color)
+                nested_colon_str = _Colors.colorize(":", nested_key_color)
+                nested_value_str = _format_single_value(nested_value, _FormatMode.DISPLAY, indent + 1, next_nesting_level)
+                nested_pairs.append(f"{nested_key_str}{nested_colon_str} {nested_value_str}")
+            value_str = ", ".join(nested_pairs)
+        elif isinstance(value, list):
+            # Check if this is a list of lists (like the big list case)
+            if value and isinstance(value[0], (list, tuple)):
+                # Use rainbow coloring for sub-lists
+                value_str = _format_list_display(value, indent + 1, available_width, nesting_level, use_rainbow=True)
+            else:
+                # Regular list formatting
+                value_str = _format_list_display(value, indent + 1, available_width, nesting_level)
+        elif isinstance(value, tuple):
+            value_str = _format_tuple_display(value, indent + 1, available_width, nesting_level)
+        elif isinstance(value, set):
+            value_str = _format_set_display(value, indent + 1, nesting_level)
+        else:
+            # Handle simple values
+            value_str = _format_single_value(value, _FormatMode.DISPLAY, indent + 1, nesting_level)
+        
+        # Create the key-value pair with colored colon
+        pair = f"{key_str}{colon_str} {value_str}"
+        
+        # Check if this pair fits in available width
+        clean_pair = _clean_ansi(pair)
+        
+        if len(clean_pair) > available_width:
+            # Truncate the value part (prioritize key over value)
+            key_part = f"{key_str}{colon_str} "
+            clean_key_part = _clean_ansi(key_part)
+            value_space = available_width - len(clean_key_part) - 3  # 3 for "..."
+            
+            if value_space > 5:  # Only truncate if we have reasonable space
+                # Truncate the clean value and reapply basic formatting
+                clean_value = _clean_ansi(value_str)
+                truncated_value = _truncate_string(clean_value, value_space)
+                # Note: We lose the original coloring, but that's acceptable for truncated values
+                pair = f"{key_str}{colon_str} {truncated_value}"
+        
+        formatted_pairs.append(pair)
+    
+    # Join pairs with commas and check for line wrapping
+    result = ", ".join(formatted_pairs)
+    
+    # If the entire result is too long, format it with line breaks
+    clean_result = _clean_ansi(result)
+    if len(clean_result) > available_width:
+        # Format with line breaks for better readability
+        lines = []
+        current_line = ""
+        indent_str = "  " * (indent + 1)  # 2 spaces per level
+        
+        for i, pair in enumerate(formatted_pairs):
+            clean_pair = _clean_ansi(pair)
+            
+            # Check if adding this pair would exceed the width
+            if current_line and len(_clean_ansi(current_line + ", " + pair)) > available_width:
+                # Add current line and start a new one
+                lines.append(current_line)
+                current_line = f"{indent_str}{pair}"
+            elif current_line:
+                current_line += f", {pair}"
+            else:
+                if i == 0:
+                    # First item doesn't need indentation
+                    current_line = pair
+                else:
+                    current_line = f"{indent_str}{pair}"
+        
+        # Add the last line
+        if current_line:
+            lines.append(current_line)
+        
+        result = "\n".join(lines)
+    
+    return result
 
 
 def _format_dict_debug(items: Dict[Any, Any], indent: int = 0) -> str:
@@ -413,8 +666,8 @@ def _format_dict_debug(items: Dict[Any, Any], indent: int = 0) -> str:
     if not items:
         return "{}"
     
-    indent_str = "    " * indent
-    next_indent_str = "    " * (indent + 1)
+    indent_str = "  " * indent  # 2 spaces per level
+    next_indent_str = "  " * (indent + 1)
     
     formatted_pairs = []
     for key, value in items.items():
@@ -428,6 +681,7 @@ def _format_dict_debug(items: Dict[Any, Any], indent: int = 0) -> str:
     result = "{\n" + ",\n".join(formatted_pairs) + f"\n{indent_str}}}"
     
     return _Colors.colorize(result, _Colors.COLLECTION)
+
 
 def _format_set_display(items: Set[Any], indent: int = 0) -> str:
     """Format set for display mode."""
@@ -447,8 +701,8 @@ def _format_set_debug(items: Set[Any], indent: int = 0) -> str:
     if not items:
         return "set()"
     
-    indent_str = "    " * indent
-    next_indent_str = "    " * (indent + 1)
+    indent_str = "  " * indent  # 2 spaces per level
+    next_indent_str = "  " * (indent + 1)
     
     formatted_items = []
     for item in sorted(items, key=str):  # Sort for consistent output
@@ -459,14 +713,15 @@ def _format_set_debug(items: Set[Any], indent: int = 0) -> str:
     return _Colors.colorize(result, _Colors.COLLECTION)
 
 
-def _format_single_value(value: Any, mode: _FormatMode, indent: int = 0) -> str:
+def _format_single_value(value: Any, mode: _FormatMode, indent: int = 0, nesting_level: int = 0) -> str:
     """
     Format a single value according to the specified mode.
     
     Args:
         value: Value to format
         mode: Formatting mode (DISPLAY or DEBUG)
-        indent: Current indentation level
+        indent: Current indentation level (used for nested structures)
+        nesting_level: Current dictionary nesting level for rainbow colors
         
     Returns:
         Formatted string representation
@@ -497,32 +752,37 @@ def _format_single_value(value: Any, mode: _FormatMode, indent: int = 0) -> str:
     elif isinstance(value, range):
         formatted = _format_range_value(value, mode)
     
-    # Handle lists and tuples
-    elif isinstance(value, (list, tuple)):
+    # Handle lists
+    elif isinstance(value, list):
         if mode == _FormatMode.DISPLAY:
-            content = _format_list_display(value, indent)
-            if isinstance(value, tuple):
-                formatted = f"({content})" if len(value) != 1 else f"({content},)"
-            else:
-                formatted = content
+            # Check if this is a list of lists for rainbow coloring
+            use_rainbow = value and isinstance(value[0], (list, tuple))
+            formatted = _format_list_display(value, indent, None, nesting_level, use_rainbow)
         else:
-            content = _format_list_debug(value, indent)
-            if isinstance(value, tuple):
-                formatted = f"({content[1:-1]})" if content != "[]" else "()"
+            formatted = _format_list_debug(value, indent)
+    
+    # Handle tuples
+    elif isinstance(value, tuple):
+        if mode == _FormatMode.DISPLAY:
+            formatted = _format_tuple_display(value, indent, None, nesting_level)
+        else:
+            content = _format_list_debug(list(value), indent)
+            if content != "[]":
+                formatted = f"({content[1:-1]})" if len(value) != 1 else f"({content[1:-1]},)"
             else:
-                formatted = content
+                formatted = "()"
     
     # Handle dictionaries
     elif isinstance(value, dict):
         if mode == _FormatMode.DISPLAY:
-            formatted = _format_dict_display(value, indent)
+            formatted = _format_dict_display(value, indent, 0, nesting_level)
         else:
             formatted = _format_dict_debug(value, indent)
     
     # Handle sets and frozensets
     elif isinstance(value, (set, frozenset)):
         if mode == _FormatMode.DISPLAY:
-            formatted = _format_set_display(value, indent)
+            formatted = _format_set_display(value, indent, nesting_level)
         else:
             formatted = _format_set_debug(value, indent)
     
@@ -538,6 +798,7 @@ def _format_single_value(value: Any, mode: _FormatMode, indent: int = 0) -> str:
             formatted = f"{type_label} {formatted}"
     
     return formatted
+
 
 def _interpolate_string(template: str, *args) -> str:
     """
@@ -568,18 +829,24 @@ def _interpolate_string(template: str, *args) -> str:
     return result
 
 
-def _format_data_structure(data: Any, mode: _FormatMode = _FormatMode.DISPLAY) -> str:
+def _format_data_structure(data: Any, mode: _FormatMode = _FormatMode.DISPLAY, prefix_length: int = 0) -> str:
     """
     Format any data structure according to the specified mode.
     
     Args:
         data: Data to format
         mode: Formatting mode
+        prefix_length: Length of prefix text for width calculation
         
     Returns:
         Formatted string
     """
-    return _format_single_value(data, mode, 0)
+    if isinstance(data, dict) and mode == _FormatMode.DISPLAY:
+        # For dictionaries in display mode, use the full formatting with width awareness
+        return _format_dict_display(data, 0, prefix_length, 0)
+    else:
+        # For other types or debug mode, use the regular formatting
+        return _format_single_value(data, mode, 0, 0)
 
 
 def _create_debug_message(message: str, data: Optional[Tuple[Any, ...]] = None, 
@@ -621,6 +888,7 @@ def _create_debug_message(message: str, data: Optional[Tuple[Any, ...]] = None,
         result_parts.append(f" - {simple_time}")
     
     return "".join(result_parts)
+
 
 def _create_debug_message_verbose(message: str, data: Optional[Tuple[Any, ...]] = None, 
                                  priority: int = 1) -> str:
