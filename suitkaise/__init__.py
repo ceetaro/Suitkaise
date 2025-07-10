@@ -8,37 +8,15 @@ Philosophy: "Grand ideas, little coding experience" - enabling anyone with
 great ideas to build complex, production-ready applications.
 
 Core Modules:
-- fdprint: Smart formatting and debug printing with beautiful output
 - skpath: Smart path operations with dual-path architecture (coming soon)
 - sktime: Smart timing operations with statistical analysis (coming soon)
-- (Future modules: xprocess, sktree, skfunction, report, etc.)
 
-Usage Examples:
+Import Usage Examples:
     ```python
-    # Most common usage patterns
-    from suitkaise import fprint, dprint
-    
-    # Clean output for users
-    fprint("Processing complete at {time:now}")
-    
-    # Debug output for developers
-    data = {"status": "success", "count": 42}
-    dprint("Process result", (data,), 3)
-    
-    # Module-specific imports
-    from suitkaise.fdprint import fmt, timestamp
     ```
 """
 
 # Import core modules for direct access
-try:
-    from . import fdprint
-    _fdprint_available = True
-except ImportError:
-    # Graceful degradation if fdprint module unavailable
-    fdprint = None
-    _fdprint_available = False
-
 try:
     from . import skpath
     _skpath_available = True
@@ -56,7 +34,7 @@ except ImportError:
     _sktime_available = False
 
 # Package metadata
-__version__ = "0.1.0"
+__version__ = "0.0.0"
 __author__ = "Suitkaise Development Team"
 __description__ = "Democratizing complex application development for Python"
 __url__ = "https://github.com/suitkaise/suitkaise"  # Update when you have a repo
@@ -65,8 +43,6 @@ __url__ = "https://github.com/suitkaise/suitkaise"  # Update when you have a rep
 __all__ = []
 
 # Add available modules to __all__
-if _fdprint_available:
-    __all__.append('fdprint')
 if _skpath_available:
     __all__.append('skpath')
 if _sktime_available:
@@ -75,14 +51,6 @@ if _sktime_available:
 # =============================================================================
 # Convenience Imports - Most Common Functions
 # =============================================================================
-
-# FDPrint convenience imports (most commonly used)
-if _fdprint_available:
-    try:
-        from .fdprint import fprint, dprint, fmt, set_dprint_level, timestamp
-        __all__.extend(['fprint', 'dprint', 'fmt', 'set_dprint_level', 'timestamp'])
-    except ImportError:
-        pass  # Graceful degradation
 
 # SKPath convenience imports (when available)
 if _skpath_available:
@@ -112,18 +80,6 @@ def get_available_modules():
         dict: Module availability status and versions
     """
     modules = {}
-    
-    if _fdprint_available:
-        try:
-            modules['fdprint'] = {
-                'available': True,
-                'version': fdprint.__version__ if hasattr(fdprint, '__version__') else __version__,
-                'description': 'Smart formatting and debug printing'
-            }
-        except:
-            modules['fdprint'] = {'available': True, 'version': 'unknown', 'description': 'Smart formatting and debug printing'}
-    else:
-        modules['fdprint'] = {'available': False, 'description': 'Smart formatting and debug printing'}
     
     if _skpath_available:
         try:

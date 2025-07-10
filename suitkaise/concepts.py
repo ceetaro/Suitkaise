@@ -258,7 +258,8 @@ xp.wait_for("a_key" or list["of_keys"]) # wait until one or more processes rejoi
 
 
 
-# CURRENT basic concepts (fdprint, sktime, skpath)
+# CURRENT basic concepts (fdl, sktime, skpath)
+
 
 
 
