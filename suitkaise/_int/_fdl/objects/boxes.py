@@ -1,0 +1,1 @@
+# box (what rich calls Panel) object logic

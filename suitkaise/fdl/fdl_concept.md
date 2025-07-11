@@ -1,6 +1,7 @@
 fdl - Formatting, Debugging, and Logging for suitkaise
 
-
+NOTE: f strings are not supported by fdl print. use <> instead!
+all commands are prefaced by a / as well.
 
 Setting up logging
 ```python
@@ -24,14 +25,12 @@ rptr.info("Module initialized successfully.")
 # this removes the "lq" reporter from memory and looks and feels more intuitive
 except exception as e:
     with fdl.log.Quickly("a/different/file/path") as lq:
-        lq.error(
-            "{value1} was set to None so {value2} was not initialized. {e}",
-            (value1, value2, e)
-            )
+        lq.error("<value1> was set to None so <value2> was not initialized. <e>")
 
+value1 = # some value
+value2 = # some value
 # log same message using multiple reporters
-msg = "{value1} was set to None so {value2} was not initialized."
-values = (value1, value2)
+msg = "<value1> was set to None so <value2> was not initialized."
 
 rptr.warning(msg, values)
 central_rptr.warning(msg, values)
@@ -86,7 +85,7 @@ config = {
     'decimal_places_after_seconds': 6
 }
 time_fmt = TimeFormat(config)
-fmt = '{fdl.time} - {fdl.name} - {fdl.msgtype} - {fdl.message}'
+fmt = '<fdl.time> - <fdl.name> - <fdl.msgtype> - <fdl.message>'
 
 # log format, fdl configs
 lsetup.set_format(fmt, (time_fmt))
@@ -130,7 +129,7 @@ config = {
     'decimal_places_after_seconds': 2
 }
 rptr_time_fmt = TimeFormat(config)
-rptr_fmt = '{fdl.time} - {fdl.name} - {fdl.msgtype} - {fdl.message}'
+rptr_fmt = '<fdl.time> - <fdl.name> - <fdl.msgtype> - <fdl.message>'
 rptr.set_format(rptr_fmt, (rptr_time_fmt))
 ```
 
@@ -141,7 +140,7 @@ from suitkaise import fdl
 rptr = fdl.log.from_current_file()
 
 # standard logging
-rptr.info("value1: {value1}, value2: {value2}", (value1, value2))
+rptr.info("value1: <value1>, value2: <value2>", (value1, value2))
 rptr.debug()
 rptr.warning()
 rptr.error()
@@ -173,7 +172,7 @@ rptr.leftQueueEarly()
 
 # custom message type
 rptr.custom(
-    "value1: {value1}, value2: {value2}", 
+    "value1: <value1>, value2: <value2>", 
     (value1, value2),
     "custom message type"
 )
@@ -194,55 +193,53 @@ fdl.get_default_color_names()
 fdl.get_default_text_formatting()
 
 # adding color and text formatting to messages
-# NOTE: using the f"string" pattern is not required, but most IDEs 
-#       display bracketed text differently when f is at the start
 
 # adding text formatting
-fdl.print(f"{/bold}This is bold text{/end bold}")
+fdl.print("</bold>This is bold text</end bold>")
 
 # adding text color
-fdl.print(f"{/red}This is red text{/end red}")
-fdl.print(f"{/ #FFFFFF}This is white text{/end #FFFFFF}")
-fdl.print(f"{/rgb(0, 0, 0)}This is black text{/end rgb(0, 0, 0)}")
+fdl.print("</red>This is red text</end red>")
+fdl.print("</ #FFFFFF>This is white text</end #FFFFFF>")
+fdl.print("</rgb(0, 0, 0)>This is black text</end rgb(0, 0, 0)>")
 
 # adding background color
-fdl.print(f"{/red, bkg blue}This is red text on a blue background{/end red, bkg blue}")
+fdl.print("</red, bkg blue>This is red text on a blue background</end red, bkg blue>")
 
 # putting all 3 together
 fdl.print(
-    f"{/italic, green, bkg rgb(165, 165, 165)}"
+    "</italic, green, bkg rgb(165, 165, 165)>"
     "This is italicized green text on a light gray background"
-    f"{/end italic, green, bkg rgb(165, 165, 165)}"
+    "</end italic, green, bkg rgb(165, 165, 165)>"
     )
 
 # can add multiple text formats at once
-fdl.print(f"{/bold, underline}This is bolded and underlined text{/end bold, underline}")
+fdl.print("</bold, underline>This is bolded and underlined text</end bold, underline>")
 
 # order doesn't matter, unlike rich
 # but must be separated by commas
 fdl.print(
-    f"{/italic, bkg green, black, bold}"
+    "</italic, bkg green, black, bold>"
     "This is bolded, italicized, black text on a green background."
-    f"{/end bkg green, bold, italic, black}"
+    "</end bkg green, bold, italic, black>"
     )
 
 # can remove some but not all
 fdl.print(
     # add your color and text formatting
-    f"{/italic, bkg green, black, bold}"
+    "</italic, bkg green, black, bold>"
 
     "This is bolded, italicized, black text on a green background.\n"
 
     # end some of it
-    f"{/end black, italic}"
+    "</end black, italic>"
 
     "This is now bold default color text, still on a green background.\n"
 
     # you don't have to explicitly end colors, you can just change them
-    f"{/blue, strikethrough, bkg yellow}"
+    "</blue, strikethrough, bkg yellow>"
 
     # but you have to explicitly end text formatting, as they wont override each other!   
-    f"{/end bold}"
+    "</end bold>"
 
     "This is now blue strikethough text on a yellow background"
 
@@ -275,12 +272,12 @@ fdl.reset_to_default()
 fdl.set_var_format("pink")
 
 # values appear pink
-fdl.print("{value1} was set to None so {value2} was not initialized.", (value1, value2))
+fdl.print("<value1> was set to None so <value2> was not initialized.", (value1, value2))
 
 # string variables appear bold black with green background
 fdl.set_str_format(("bkg green", "bold", "black"))
 
-# higlight certain words that aren't {values}
+# higlight certain words that aren't <values>
 # "None" appears bold white, with red background
 fdl.highlight("None", ("bkg red", "bold", "white"))
 
@@ -292,8 +289,8 @@ fdl.highlight("None", ("bkg red", "bold", "white"))
 
 # loggers support the same formatting options!
 rptr.error(
-    f"{/bold, orange}"
-    "{value1} was set to None so {value2} was not initialized."
+    "</bold, orange>"
+    "<value1> was set to None so <value2> was not initialized."
     # remember, no need to /end if the whole sentence uses the formatting!
     )
 
@@ -316,25 +313,25 @@ from_64_sec_ago = time.time() - 64
 elapsed = now - from_64_sec_ago
 
 # print current time in default timestamp format (hh:mm:ss.123456)
-fdl.print("{time:}")
+fdl.print("<time:>")
 # print a given timestamp in default timestamp format
-fdl.print("{time:from_64_sec_ago}", from_64_sec_ago)
+fdl.print("<time:from_64_sec_ago>", from_64_sec_ago)
 
 # print current time in default date form (dd/mm/yy hh:mm:ss)
-fdl.print("{date:}")
+fdl.print("<date:>")
 # print a given timestamp in date form
-fdl.print("{date:from_64_sec_ago}", from_64_sec_ago)
+fdl.print("<date:from_64_sec_ago>", from_64_sec_ago)
 
 # print a given timestamp in a different format
 # July 4, 2025
-fdl.print("{datelong:}")
+fdl.print("<datelong:>")
 
 # using a command
 # 16:30 -> 4:30 PM (accounts for daylight savings)
-fdl.print(f"{/12hr, time:}")
+fdl.print("</12hr, time:>")
 
 # timezones account for daylight savings
-fdl.print(f"{/tz pst, time:from_64_sec_ago}", from_64_sec_ago)
+fdl.print("</tz pst, time:from_64_sec_ago>", from_64_sec_ago)
 
 # print a given elapsed time value in a smart format
 # single digit hours only show one digit
@@ -343,15 +340,15 @@ fdl.print(f"{/tz pst, time:from_64_sec_ago}", from_64_sec_ago)
 # ex. 82000 -> 22:46:40
 time_ago = 8274.743462
 # result: 2:17:54.743462 hours ago
-fdl.print("{elapsed:time_ago} {timeprefix:time_ago} ago", time_ago)
+fdl.print("<elapsed:time_ago> <timeprefix:time_ago> ago", time_ago)
 
 time_until = 82000
 # use a different elapsed format to display in __h __m __.______s
 # result: 22h 46m 40.000000s until next meeting
-fdl.print("{elapsed2:time_until} until next meeting", time_until)
+fdl.print("<elapsed2:time_until> until next meeting", time_until)
 
-# use a command to get rid of seconds (f"" is for IDE display, not required)
-fdl.print(f"{/no sec, elapsed2:time_until} until next meeting", time_until)
+# use a command to get rid of seconds
+fdl.print("</no sec, elapsed2:time_until> until next meeting", time_until)
 
 
 # printing time and values
@@ -359,12 +356,12 @@ import os
 pid = os.pid()
 value1 = True
 fdl.print(
-    "Process {pid} ({time:from_64_sec_ago}): value1 set to {value1}.",
+    "Process <pid> (<time:from_64_sec_ago>): value1 set to <value1>.",
     (pid, from_64_sec_ago, value1)
     )
 # or... without an explicit time value
 fdl.print(
-    "Process {pid} ({time:}): value1 set to {value1}.",
+    "Process <pid> (<time:>): value1 set to <value1>.",
     (pid, value1)
     )
 ```
@@ -373,14 +370,14 @@ Creating Format objects
 ```python
 from suitkaise import fdl
 
-# create a format (f"" not required, only for IDE visualization)
+# create a format
 greentext_bluebkg = fdl.Format(
     name="greentext_bluebkg", 
-    format=f"{/green, bkg blue}"
+    format="</green, bkg blue>"
 )
 # use a format
 fdl.print(
-    f"{/fmt greentext_bluebkg}"
+    "</fmt greentext_bluebkg>"
     "This is green text with a blue background"
 )
 
@@ -388,12 +385,12 @@ fdl.print(
 # (cannot override previously set formatting (text color, bkg color))
 format2 = fdl.Format(
     name="format2",
-    format=f"{/fmt greentext_bluebkg, bold, italic}
+    format="</fmt greentext_bluebkg, bold, italic>
 )
 fdl.print(
-    f"{/fmt format2, underline}"
+    "</fmt format2, underline>"
     "This is green, bolded, italicized, underlined text on a blue background."
-    f"{/end format2}"
+    "</end format2>"
     "This is now just underlined text."
 )
 ```
@@ -413,14 +410,14 @@ fdl.set_debug_mode(True)
 value1 = 32
 
 # use direct function
-fdl.dprint("value1 was set to {value1}.", value1)
+fdl.dprint("value1 was set to <value1>.", value1)
 
 # use formatting
-fdl.print(f"{/debug}value1 was set to {value1}.", value1)
+fdl.print("</debug>value1 was set to <value1>.", value1)
 # result: see "debug_mode.png"
 
 # get type annotation individually
-fdl.print("value1 was set to {type:value1}.", value1)
+fdl.print("value1 was set to <type:value1>.", value1)
 ```
 
 
@@ -517,16 +514,16 @@ Using decorators to set formats for functions
 ```python
 from suitkaise import fdl
 
-@fdl.autoformat(f"{/bkg dark gray}")
+@fdl.autoformat("</bkg dark gray>")
 def fibonacci(n):
     """Calculate fibonacci number"""
     if n <= 1:
         pass
     else: n = fibonacci(n-1) + fibonacci(n-2)
     # auto applies format
-    fdl.print("Result: {n}", n)
+    fdl.print("Result: <n>", n)
     # disable autoformat
-    fdl.print(f"{/end autofmt}Result: {n}", n)
+    fdl.print("</end autofmt>Result: <n>", n)
     return n
 
 # ❌ does not auto apply format to return value ❌
@@ -544,9 +541,9 @@ def fibonacci(n):
         pass
     else: n = fibonacci(n-1) + fibonacci(n-2)
     # auto applies debug mode
-    fdl.print("Result: {n}", n)
+    fdl.print("Result: <n>", n)
     # disable autodebug
-    fdl.print(f"{/end autodebug}Result: {n}", n)
+    fdl.print("</end autodebug>Result: <n>", n)
     return n
 ```
 
@@ -572,12 +569,12 @@ Creating spinners and boxes (rich's Panels)
 from suitkaise import fdl
 
 # supported spinners: dots (only first one), arrow3 (fallback: dqpb)
-fdl.print("{spinner:arrows}a message") # arrow3
-fdl.print("{spinner:dots}a message") # dots
-fdl.print("{spinner:letters}a message") # dqpb
+fdl.print("<spinner:arrows>a message") # arrow3
+fdl.print("<spinner:dots>a message") # dots
+fdl.print("<spinner:letters>a message") # dqpb
 
 # or use a command:
-fdl.print(f"{/spinner arrows}a message")
+fdl.print("</spinner arrows>a message")
 
 # adding color and background to a spinner is exactly the same as text!
 # does not support text formatiing like bold, italic, etc.
@@ -593,30 +590,30 @@ fdl.stop_spinner()
 # (fallback: ascii)
 
 # print a whole message in one box
-fdl.print(f"{/box rounded}a message")
+fdl.print("</box rounded>a message")
 
 # or some in a box and some out
 fdl.print(
-    f"{/box double}
+    "</box double>
     "a message in a box"
-    f"{/end box}"
+    "</end box>"
     "\na message outside the box"
 )
 
 # adding a title to the box
-fdl.print(f"{/box rounded, title Important}a message")
+fdl.print("</box rounded, title Important>a message")
 
 # adding a color to the box (if no color, takes current text color)
-fdl.print(f"{/box rounded, title Important, green}a message")
+fdl.print("</box rounded, title Important, green>a message")
 ```
 
 Justifying text
 ```python
 from suitkaise import fdl
 
-fdl.print(f"{/justify left}a message justified left")
-fdl.print(f"{/justify right}a message justified right")
-fdl.print(f"{/justify center}a message justified centered")
+fdl.print("</justify left>a message justified left")
+fdl.print("</justify right>a message justified right")
+fdl.print("</justify center>a message justified centered")
 
 # default is left. changing justification or ending justification creates a new line unless justify is already left
 ```
@@ -646,7 +643,7 @@ table1.set_row_format(format=fdl.Format)
 table1.set_column_format(format=fdl.Format)
 
 # printing table
-fdl.print("{table1}", table1)
+fdl.print("<table1>", table1)
 # or...
 table1.display_table()
 ```
@@ -657,12 +654,6 @@ Is there anything I am missing? Is there anything that you think could be simple
 
 We will start by creating private equivalents to all of these methods so that any printing or logging from suitkaise itself will match user default! Then, we will wrap the internal logic with public counterparts. ex. format_ops._print -> fdl.print.
 
-Can you help me by listing all of the commands and {objtype:obj} patterns (ex. {time:a_time}) out together?
+Can you help me by listing all of the commands and <objtype:obj> patterns (ex. <time:a_time>) out together?
 
 Do you think this is a good concept?
-
-
-
-
-
-
