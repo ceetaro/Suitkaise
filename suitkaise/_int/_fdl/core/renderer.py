@@ -1,1 +1,1 @@
-# final rendering to console/file
+# final rendering for output to console/file

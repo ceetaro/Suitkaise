@@ -16,6 +16,8 @@ import warnings
 from typing import List, Tuple, Dict, Any, Optional, Union
 from dataclasses import dataclass
 
+warnings.simplefilter("always")
+
 @dataclass
 class _ParsedElement:
     """
@@ -422,6 +424,11 @@ class _fdlParser:
             'time ago',       # Add "ago" suffix
             'time until',     # Add "until" suffix  
             'no sec',         # Remove seconds
+            'no min',         # Remove minutes
+            'no hr',          # Remove hours
+            'round sec',      # Round to nearest second
+            'smart units 1',  # Smart formatting
+            'smart units 2',  # Smart formatting
         ]
         
         # Check exact matches

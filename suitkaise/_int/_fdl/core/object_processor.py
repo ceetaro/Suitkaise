@@ -32,6 +32,7 @@ except ImportError:
     import pytz
     ZoneInfo = None
 
+warnings.simplefilter("always")  # Show all warnings, even duplicates
 
 class ObjectProcessorError(Exception):
     """Raised when object processing fails."""
@@ -58,17 +59,33 @@ class _ObjectCommands:
         timezone (Optional[str]): Timezone to convert to (e.g., 'pst', 'utc')
         time_suffix (Optional[str]): 'ago' or 'until' suffix
         hide_seconds (bool): Remove seconds from time display
+        smart_units (Optional[int]): Show only N highest units (1 or 2)
+        hide_hours (bool): Hide hours, minutes, seconds (show only days)
+        hide_minutes (bool): Hide minutes and seconds (show days+hours only)
+        round_seconds (bool): Round seconds to whole numbers, no decimals
     """
     use_12hr: bool = False
     timezone: Optional[str] = None
     time_suffix: Optional[str] = None
     hide_seconds: bool = False
+    smart_units: Optional[int] = None
+    hide_hours: bool = False
+    hide_minutes: bool = False
+    round_seconds: bool = False
     
     def validate(self) -> None:
         """Validate command combination for conflicts."""
         # Can't have both time ago and time until
         if self.time_suffix not in [None, 'ago', 'until']:
             raise InvalidObjectError(f"Invalid time suffix: {self.time_suffix}")
+        
+        # Smart units must be 1 or 2
+        if self.smart_units is not None and self.smart_units not in [1, 2]:
+            raise InvalidObjectError(f"Smart units must be 1 or 2, got: {self.smart_units}")
+        
+        # Can't combine hide_hours with hide_minutes (hide_hours is more restrictive)
+        if self.hide_hours and self.hide_minutes:
+            warnings.warn("'no hr' already includes 'no min' - 'no min' command ignored", UserWarning)
 
 
 class _TimeZoneHandler:
@@ -374,6 +391,20 @@ class _ObjectProcessor:
                 if parsed.time_suffix == 'ago':
                     raise InvalidObjectError("Cannot have both 'time ago' and 'time until'")
                 parsed.time_suffix = 'until'
+            elif command == 'smart units 1':
+                if parsed.smart_units is not None:
+                    raise InvalidObjectError("Cannot specify multiple smart units commands")
+                parsed.smart_units = 1
+            elif command == 'smart units 2':
+                if parsed.smart_units is not None:
+                    raise InvalidObjectError("Cannot specify multiple smart units commands")
+                parsed.smart_units = 2
+            elif command == 'no hr':
+                parsed.hide_hours = True
+            elif command == 'no min':
+                parsed.hide_minutes = True
+            elif command == 'round sec':
+                parsed.round_seconds = True
             elif command.startswith('tz '):
                 if parsed.timezone is not None:
                     raise InvalidObjectError("Cannot specify multiple timezones")
@@ -421,21 +452,16 @@ class _ObjectProcessor:
     def _process_time_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
         Process time object: <time:> or <time:timestamp>
+        
+        Time objects show absolute time only. time ago/until commands are invalid and ignored.
         """
         # Get timestamp (current time if None)
         if timestamp is None:
             timestamp = time.time()
         
-        # Handle time ago/until - calculate elapsed time instead of showing absolute time
+        # Warn about invalid time ago/until commands for time objects
         if commands.time_suffix:
-            current_time = time.time()
-            if commands.time_suffix == 'ago':
-                duration = current_time - timestamp
-            else:  # time until
-                duration = timestamp - current_time
-            
-            # Use elapsed formatting for relative time
-            return self._format_duration_as_elapsed(duration, commands.time_suffix)
+            warnings.warn(f"'{commands.time_suffix}' command only works with elapsed objects, not time objects", UserWarning)
         
         # Apply timezone conversion if specified
         if commands.timezone:
@@ -446,7 +472,7 @@ class _ObjectProcessor:
         # Convert to time components using time.gmtime() (avoids local timezone issues)
         time_struct = time.gmtime(adjusted_timestamp)
         
-        # Format time
+        # Format time (never add suffixes - time objects show absolute time only)
         if commands.use_12hr:
             time_str = self._format_12hr_time(time_struct, commands.hide_seconds)
         else:
@@ -460,48 +486,6 @@ class _ObjectProcessor:
         
         return time_str
     
-    def _format_duration_as_elapsed(self, duration: float, suffix: str) -> str:
-        """
-        Format a duration as elapsed time with suffix.
-        
-        Args:
-            duration: Duration in seconds
-            suffix: "ago" or "until"
-            
-        Returns:
-            str: Formatted elapsed time (e.g., "2 hours ago")
-        """
-        abs_duration = abs(duration)
-        
-        # Calculate time units
-        days = int(abs_duration // 86400)
-        remaining = abs_duration % 86400
-        hours = int(remaining // 3600)
-        minutes = int((remaining % 3600) // 60)
-        seconds = int(remaining % 60)
-        
-        # Choose the most significant unit
-        if days > 0:
-            if days == 1:
-                return f"1 day {suffix}"
-            else:
-                return f"{days} days {suffix}"
-        elif hours > 0:
-            if hours == 1:
-                return f"1 hour {suffix}"
-            else:
-                return f"{hours} hours {suffix}"
-        elif minutes > 0:
-            if minutes == 1:
-                return f"1 minute {suffix}"
-            else:
-                return f"{minutes} minutes {suffix}"
-        else:
-            if seconds == 1:
-                return f"1 second {suffix}"
-            else:
-                return f"{seconds} seconds {suffix}"
-    
     def _process_date_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
         Process date object: <date:> or <date:timestamp>
@@ -509,6 +493,10 @@ class _ObjectProcessor:
         # Get timestamp (current time if None)
         if timestamp is None:
             timestamp = time.time()
+        
+        # Warn about invalid time ago/until commands for date objects
+        if commands.time_suffix:
+            warnings.warn(f"'{commands.time_suffix}' command only works with elapsed objects, not date objects", UserWarning)
         
         # Apply timezone conversion if specified
         if commands.timezone:
@@ -519,7 +507,7 @@ class _ObjectProcessor:
         # Convert to time components using time.gmtime()
         time_struct = time.gmtime(adjusted_timestamp)
         
-        # Format as date with time
+        # Format as date with time (never add suffixes - date objects show absolute date/time only)
         if commands.use_12hr:
             if commands.hide_seconds:
                 date_str = time.strftime('%d/%m/%y ', time_struct) + self._format_12hr_time(time_struct, True)
@@ -531,10 +519,6 @@ class _ObjectProcessor:
             else:
                 date_str = time.strftime('%d/%m/%y %H:%M:%S', time_struct)
         
-        # Add suffix if specified
-        if commands.time_suffix:
-            date_str += f" {commands.time_suffix}"
-        
         return date_str
     
     def _process_datelong_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
@@ -545,6 +529,10 @@ class _ObjectProcessor:
         if timestamp is None:
             timestamp = time.time()
         
+        # Warn about invalid time ago/until commands for datelong objects
+        if commands.time_suffix:
+            warnings.warn(f"'{commands.time_suffix}' command only works with elapsed objects, not datelong objects", UserWarning)
+        
         # Apply timezone conversion if specified
         if commands.timezone:
             adjusted_timestamp = self.timezone_handler.convert_timestamp(timestamp, commands.timezone)
@@ -554,12 +542,8 @@ class _ObjectProcessor:
         # Convert to time components using time.gmtime()
         time_struct = time.gmtime(adjusted_timestamp)
         
-        # Format as long date
+        # Format as long date (never add suffixes - datelong objects show absolute date only)
         date_str = time.strftime('%B %d, %Y', time_struct)
-        
-        # Add suffix if specified (though unusual for long dates)
-        if commands.time_suffix:
-            date_str += f" {commands.time_suffix}"
         
         return date_str
     
@@ -569,6 +553,9 @@ class _ObjectProcessor:
         
         Takes a timestamp and calculates elapsed time from then to now.
         Format: "3d 2h 15m 30s" (only shows non-zero units)
+        
+        For "time until" commands, uses absolute value to handle future timestamps correctly.
+        New smart formatting options control which units are displayed.
         """
         # Get timestamp (current time if None, which results in 0 elapsed)
         if timestamp is None:
@@ -577,7 +564,12 @@ class _ObjectProcessor:
         # Calculate elapsed time from timestamp to now
         current_time = time.time()
         duration = current_time - timestamp
-        abs_duration = abs(duration)
+        
+        # For "time until", use absolute value to handle future timestamps
+        if commands.time_suffix == 'until':
+            abs_duration = abs(duration)
+        else:
+            abs_duration = abs(duration)  # Always use abs for display
         
         # Calculate days, hours, minutes, seconds
         days = int(abs_duration // 86400)
@@ -586,7 +578,91 @@ class _ObjectProcessor:
         minutes = int((remaining % 3600) // 60)
         seconds = remaining % 60
         
-        # Build parts list (only include non-zero units)
+        # Apply rounding to seconds if requested
+        if commands.round_seconds:
+            seconds = round(seconds)
+        
+        # Build parts list based on command precedence
+        parts = self._build_elapsed_parts(days, hours, minutes, seconds, commands)
+        
+        # Ensure we have at least something to display
+        if not parts:
+            if commands.hide_seconds or commands.round_seconds:
+                parts = ["0m"]
+            else:
+                parts = ["0.000000s"]
+        
+        elapsed_str = " ".join(parts)
+        
+        # Add suffix if specified
+        if commands.time_suffix:
+            elapsed_str += f" {commands.time_suffix}"
+        
+        return elapsed_str
+    
+    def _build_elapsed_parts(self, days: int, hours: int, minutes: int, seconds: float, 
+                           commands: _ObjectCommands) -> List[str]:
+        """
+        Build the parts list for elapsed display based on commands.
+        
+        Args:
+            days, hours, minutes, seconds: Calculated time units
+            commands: Parsed commands controlling display
+            
+        Returns:
+            List[str]: Parts to join for final display
+        """
+        # Handle restrictive display modes first
+        if commands.hide_hours:
+            # Only show days
+            if days > 0:
+                return [f"{days}d"]
+            else:
+                return []  # Will be handled by caller
+        
+        if commands.hide_minutes:
+            # Show days and hours only
+            parts = []
+            if days > 0:
+                parts.append(f"{days}d")
+            if hours > 0:
+                parts.append(f"{hours}h")
+            return parts
+        
+        # Handle smart units (show only N highest non-zero units)
+        if commands.smart_units is not None:
+            return self._build_smart_units_parts(days, hours, minutes, seconds, 
+                                               commands.smart_units, commands)
+        
+        # Normal display logic
+        return self._build_normal_parts(days, hours, minutes, seconds, commands)
+    
+    def _build_smart_units_parts(self, days: int, hours: int, minutes: int, seconds: float,
+                                num_units: int, commands: _ObjectCommands) -> List[str]:
+        """Build parts for smart units display (show only N highest units)."""
+        # Create list of all non-zero units in descending order
+        all_units = []
+        
+        if days > 0:
+            all_units.append(f"{days}d")
+        if hours > 0:
+            all_units.append(f"{hours}h")
+        if minutes > 0:
+            all_units.append(f"{minutes}m")
+        
+        # Handle seconds based on commands
+        if not commands.hide_seconds and seconds > 0:
+            if commands.round_seconds:
+                all_units.append(f"{int(seconds)}s")
+            else:
+                all_units.append(f"{seconds:.6f}s")
+        
+        # Return only the requested number of highest units
+        return all_units[:num_units]
+    
+    def _build_normal_parts(self, days: int, hours: int, minutes: int, seconds: float,
+                           commands: _ObjectCommands) -> List[str]:
+        """Build parts for normal display (show all non-zero units)."""
         parts = []
         
         if days > 0:
@@ -596,20 +672,17 @@ class _ObjectProcessor:
         if minutes > 0:
             parts.append(f"{minutes}m")
         
+        # Handle seconds
         if not commands.hide_seconds and (seconds > 0 or len(parts) == 0):
-            # Always show seconds if nothing else, or if seconds > 0
-            parts.append(f"{seconds:.6f}s")
+            if commands.round_seconds:
+                parts.append(f"{int(seconds)}s")
+            else:
+                parts.append(f"{seconds:.6f}s")
         elif commands.hide_seconds and len(parts) == 0:
             # If hiding seconds but no other units, show 0m
             parts.append("0m")
         
-        elapsed_str = " ".join(parts)
-        
-        # Add suffix if specified
-        if commands.time_suffix:
-            elapsed_str += f" {commands.time_suffix}"
-        
-        return elapsed_str
+        return parts
     
     def get_performance_stats(self) -> Dict[str, int]:
         """Get performance statistics."""
@@ -641,6 +714,9 @@ def set_auto_dst(enabled: bool) -> None:
 
 # Test script for Object Processor
 if __name__ == "__main__":
+
+    warnings.simplefilter("always")  # Show all warnings, even duplicates
+
     def test_object_processor():
         """Comprehensive test suite for the object processor."""
         
@@ -760,25 +836,25 @@ if __name__ == "__main__":
             print(f"✓ Elapsed objects with timestamps: recent='{result}'")
             return True
         
-        # Test 6: Time suffixes
+        # Test 6: Time suffixes (should warn and ignore for time objects)
         def test_time_suffixes(proc):
             timestamp = 1640995200.0
             
-            # Time ago - should calculate elapsed time from then to now
+            # Time ago with time object - should warn and ignore suffix
             result, _ = proc.process_object("time:ts", ["time ago"], (timestamp,), 0)
-            if not result.endswith(" ago"):
-                print(f"❌ Time ago suffix missing: '{result}'")
+            if result.endswith(" ago"):
+                print(f"❌ Time ago should be ignored for time objects: '{result}'")
                 return False
             
-            # Should show some elapsed time format
-            if not any(unit in result for unit in ["second", "minute", "hour", "day"]):
-                print(f"❌ Time ago should show elapsed time: '{result}'")
+            # Should show just the absolute time
+            if "00:00:00" not in result:
+                print(f"❌ Should show absolute time: '{result}'")
                 return False
             
-            print(f"✓ Time suffixes work: '{result}'")
+            print(f"✓ Time suffixes correctly ignored for time objects: '{result}'")
             return True
         
-        # Test 7: Complex combinations (time ago should show elapsed, not absolute time)
+        # Test 7a: Complex combinations (with time object)
         def test_complex_combinations(proc):
             # Use a timestamp that's exactly 4 hours ago for predictable testing
             four_hours_ago = time.time() - (4 * 3600)  # 4 hours ago
@@ -787,8 +863,24 @@ if __name__ == "__main__":
             result, _ = proc.process_object("time:ts", commands, (four_hours_ago,), 0)
             
             # Should show "4 hours ago" (not absolute time)
-            if "hours ago" not in result:
-                print(f"❌ Should show 'hours ago': '{result}'")
+            if "hours ago" in result:
+                print(f"❌ Should not show 'hours ago' because not an <elapsed:obj> object: '{result}'")
+                return False
+            
+            print(f"✓ Complex combination: '{result}'")
+            return True
+        
+        # Test 7b: Complex combinations (with elapsed object)
+        def test_complex_combinations2(proc):
+            # Use a timestamp that's exactly 4 hours ago for predictable testing
+            four_hours_ago = time.time() - (4 * 3600)  # 4 hours ago
+            commands = ["12hr", "tz pst", "time ago", "no sec"]
+            
+            result, _ = proc.process_object("elapsed:ts", commands, (four_hours_ago,), 0)
+            
+            # Should show "4 hours ago" (not absolute time)
+            if "h ago" not in result:
+                print(f"❌ Should show 'hours ago' because this is an <elapsed:obj> object: '{result}'")
                 return False
             
             print(f"✓ Complex combination: '{result}'")
@@ -823,6 +915,47 @@ if __name__ == "__main__":
             print("✓ Error handling works")
             return True
         
+        # Test 9: New smart formatting commands
+        def test_smart_formatting(proc):
+            # Test duration: 2 days, 3 hours, 15 minutes, 30 seconds
+            duration = (2 * 86400) + (3 * 3600) + (15 * 60) + 30
+            test_timestamp = time.time() - duration
+            
+            # Test smart units 1 (only highest unit)
+            result, _ = proc.process_object("elapsed:ts", ["smart units 1"], (test_timestamp,), 0)
+            if "d" not in result or "h" in result or "m" in result:
+                print(f"❌ Smart units 1 failed: '{result}' (should only show days)")
+                return False
+            
+            # Test smart units 2 (2 highest units)
+            result, _ = proc.process_object("elapsed:ts", ["smart units 2"], (test_timestamp,), 0)
+            if "d" not in result or "h" not in result or "m" in result:
+                print(f"❌ Smart units 2 failed: '{result}' (should show days and hours)")
+                return False
+            
+            # Test no hr (only days)
+            result, _ = proc.process_object("elapsed:ts", ["no hr"], (test_timestamp,), 0)
+            if "d" not in result or "h" in result:
+                print(f"❌ No hr failed: '{result}' (should only show days)")
+                return False
+            
+            # Test no min (days and hours only)
+            result, _ = proc.process_object("elapsed:ts", ["no min"], (test_timestamp,), 0)
+            if "d" not in result or "h" not in result or "m" in result:
+                print(f"❌ No min failed: '{result}' (should show days and hours only)")
+                return False
+            
+            # Test round sec (no decimals)
+            short_duration = 65.789  # 1 minute, 5.789 seconds
+            short_timestamp = time.time() - short_duration
+            result, _ = proc.process_object("elapsed:ts", ["round sec"], (short_timestamp,), 0)
+            if "." in result:
+                print(f"❌ Round sec failed: '{result}' (should have no decimals)")
+                return False
+            
+            print(f"✓ Smart formatting commands work")
+            return True
+        
         # Run all tests
         run_test("Basic time objects", test_basic_time)
         run_test("12-hour time format", test_12hr_time)
@@ -831,7 +964,10 @@ if __name__ == "__main__":
         run_test("Elapsed objects with timestamps", test_elapsed_objects)
         run_test("Time suffixes", test_time_suffixes)
         run_test("Complex command combinations", test_complex_combinations)
+        run_test("Complex command combinations 2", test_complex_combinations2)
         run_test("Error handling", test_error_handling)
+        run_test("Smart formatting commands", test_smart_formatting)
+        run_test("Smart formatting commands", test_smart_formatting)
         
         print("\n" + "=" * 60)
         print(f"TEST RESULTS: {passed_count}/{test_count} tests passed")

@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple, Set, Union
 from dataclasses import dataclass, field
 import warnings
 
+warnings.simplefilter("always")
 
 class CommandError(Exception):
     """Raised when command processing fails."""
@@ -623,6 +624,11 @@ class _CommandProcessor:
             'time ago',       # Add "ago" suffix
             'time until',     # Add "until" suffix  
             'no sec',         # Remove seconds
+            'no min',         # Remove minutes
+            'no hr',          # Remove hours
+            'round sec',      # Round to nearest second
+            'smart units 1',  # Smart formatting
+            'smart units 2',  # Smart formatting
         ]
         
         # Check exact matches
