@@ -783,13 +783,15 @@ We will start by creating private equivalents to all of these methods so that an
 **Special Logging:**
 - `<fdl.time>`, `<fdl.name>`, `<fdl.msgtype>`, `<fdl.message>` (logging format variables)
 
+**Misc**
+- `</end all>`, `</reset>` (ends all special formatting, even defaults)
+
 
 ## Implementation Plan
 
 ### Basic fdl printing 
 1. Parser - DONE FOR NOW
-2. fdl Format class
-3. Command processor and reconstructor
+2. Command processor and reconstructor
 - converts simple commands (`</red>`, `</bold>`) directly to ANSI
 - caches all simple command ANSI equivalents on launch
 
@@ -804,6 +806,7 @@ We will start by creating private equivalents to all of these methods so that an
 
 - for complex combinations like `</fmt base, rgb(255,0,0)>`, attempts lookups first for each entry and then combines ANSI. If a newly encountered color needs to be converted and cached for the first time, does that first and then combines.
 
+3. fdl Format class
 4. Renderer - Combine everything into final output
 5. Internal `_print()` functions that tie basic execution together
 

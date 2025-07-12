@@ -157,6 +157,12 @@ class _fdlParser:
                 for element in parsed_elements:
                     elements.append(element)
                     
+                    # Check for parse errors from mixed content
+                    if hasattr(element, '_has_parse_errors') and element._has_parse_errors:
+                        has_errors = True
+                        if hasattr(element, '_parse_error_messages'):
+                            error_messages.extend(element._parse_error_messages)
+                    
                     # Add to appropriate category list
                     if element.element_type == 'command':
                         commands.append(element)
@@ -236,8 +242,6 @@ class _fdlParser:
             error_messages=error_messages
         )
 
-
-    
     def _parse_bracket_content(self, raw_content: str, inner_content: str, 
                              position: int, start_idx: int, end_idx: int) -> List[_ParsedElement]:
         """
@@ -253,8 +257,13 @@ class _fdlParser:
         Returns:
             List[ParsedElement]: List of parsed elements (multiple for comma-separated commands)
         """
+        # Check for mixed content: commands + objects in same brackets
+        # Example: </12hr, tz pst, time:timestamp>
+        if inner_content.startswith('/') and ':' in inner_content:
+            return self._parse_mixed_content(raw_content, inner_content[1:], position, start_idx, end_idx)
+        
         # Check if it's a command (starts with /)
-        if inner_content.startswith('/'):
+        elif inner_content.startswith('/'):
             return self._parse_command(raw_content, inner_content[1:], position, start_idx, end_idx)
         
         # Check if it's an object pattern (contains :)
@@ -275,6 +284,155 @@ class _fdlParser:
         
         # Could not determine type
         return []
+
+    def _parse_mixed_content(self, raw_content: str, command_content: str, 
+                           position: int, start_idx: int, end_idx: int) -> List[_ParsedElement]:
+        """
+        Parse mixed content with commands and objects in same brackets.
+        
+        Example: </12hr, tz pst, time:timestamp>
+        
+        Args:
+            raw_content (str): Full content including < >
+            command_content (str): Content without < / >
+            position (int): Logical position in sequence
+            start_idx (int): Start character index
+            end_idx (int): End character index
+            
+        Returns:
+            List[_ParsedElement]: List of commands and object at same position
+        """
+        elements = []
+        error_messages = []
+        has_errors = False
+        
+        # Split on commas to find commands and object
+        parts = [part.strip() for part in command_content.split(',')]
+        
+        object_parts = []
+        command_parts = []
+        
+        # Separate commands from object patterns
+        for part in parts:
+            if ':' in part and not part.startswith('tz '):  # Object pattern (but not timezone)
+                object_parts.append(part)
+            else:
+                command_parts.append(part)
+        
+        # Validate: should have exactly one object
+        if len(object_parts) != 1:
+            if len(object_parts) == 0:
+                error_msg = f"Mixed content without object pattern: {raw_content}"
+                error_messages.append(error_msg)
+                warnings.warn(error_msg, UserWarning)
+                has_errors = True
+            else:
+                error_msg = f"Multiple object patterns in same brackets: {raw_content}"
+                error_messages.append(error_msg)
+                warnings.warn(error_msg, UserWarning)
+                has_errors = True
+            return []
+        
+        object_pattern = object_parts[0]
+        
+        # Validate object pattern
+        if not self._is_valid_object_pattern(object_pattern):
+            error_msg = f"Invalid object pattern: {object_pattern}"
+            error_messages.append(error_msg)
+            warnings.warn(error_msg, UserWarning)
+            has_errors = True
+            return []
+        
+        # Validate commands are object-specific
+        valid_commands = []
+        for cmd in command_parts:
+            if self._is_object_specific_command(cmd):
+                valid_commands.append(cmd)
+            else:
+                error_msg = f"Non-object command '{cmd}' ignored in object context: {raw_content}"
+                error_messages.append(error_msg)
+                warnings.warn(error_msg, UserWarning)
+                has_errors = True
+        
+        # Store errors in the element for later propagation
+        # We'll handle this by returning a special marker or propagating differently
+        
+        # Create command elements at same position
+        for cmd in valid_commands:
+            elements.append(_ParsedElement(
+                content=cmd,
+                position=position,
+                element_type='command',
+                raw_match=raw_content,
+                start_index=start_idx,
+                end_index=end_idx
+            ))
+        
+        # Create object element at same position
+        elements.append(_ParsedElement(
+            content=object_pattern,
+            position=position,
+            element_type='object',
+            raw_match=raw_content,
+            start_index=start_idx,
+            end_index=end_idx
+        ))
+        
+        # We need to propagate the error state back to the main parse method
+        # Let's add error info to elements or handle this differently
+        if has_errors:
+            # Add a special marker to indicate this parsing had errors
+            for elem in elements:
+                elem._has_parse_errors = True
+                elem._parse_error_messages = error_messages
+        
+        return elements
+    
+    def _is_valid_object_pattern(self, pattern: str) -> bool:
+        """Check if a string is a valid object pattern."""
+        if ':' not in pattern:
+            return False
+        
+        parts = pattern.split(':', 1)
+        if len(parts) != 2:
+            return False
+        
+        obj_type, obj_var = parts
+        obj_type = obj_type.strip()
+        obj_var = obj_var.strip()
+        
+        # Valid object types
+        valid_types = ['time', 'date', 'datelong', 'elapsed', 'elapsed2', 'timeprefix']
+        if obj_type not in valid_types:
+            return False
+        
+        # Object variable can be empty (for current time) or valid identifier
+        if obj_var and not self._is_valid_variable_name(obj_var):
+            return False
+        
+        return True
+    
+    def _is_object_specific_command(self, command: str) -> bool:
+        """Check if a command is object-specific (not formatting)."""
+        command = command.strip()
+        
+        # Object-specific commands
+        object_commands = [
+            '12hr',           # 12-hour format
+            'time ago',       # Add "ago" suffix
+            'time until',     # Add "until" suffix  
+            'no sec',         # Remove seconds
+        ]
+        
+        # Check exact matches
+        if command in object_commands:
+            return True
+        
+        # Check timezone commands: "tz pst", "tz utc", etc.
+        if command.startswith('tz ') and len(command) > 3:
+            return True
+        
+        return False
     
     def _parse_command(self, raw_content: str, command_content: str, 
                       position: int, start_idx: int, end_idx: int) -> List[_ParsedElement]:
@@ -346,7 +504,6 @@ class _fdlParser:
         
         return elements
 
-
     def _parse_object(self, raw_content: str, object_content: str,
                      position: int, start_idx: int, end_idx: int) -> Optional[_ParsedElement]:
         """
@@ -416,6 +573,22 @@ class _fdlParser:
             List[_ParsedElement]: All commands at that position
         """
         return [cmd for cmd in parse_result.commands if cmd.position == position]
+    
+    def get_elements_at_position(self, parse_result: _ParseResult, position: int) -> List[_ParsedElement]:
+        """
+        Get all elements (commands, objects, etc.) that occur at a specific position.
+        
+        This handles mixed content like </12hr, tz pst, time:timestamp> where
+        commands and objects share the same position.
+        
+        Args:
+            parse_result (_ParseResult): Result from parse()
+            position (int): Position to check
+            
+        Returns:
+            List[_ParsedElement]: All elements at that position
+        """
+        return [elem for elem in parse_result.elements if elem.position == position]
     
 def _parse_fdl_string(format_string: str, values: Optional[Tuple] = None) -> _ParseResult:
     """
@@ -573,11 +746,11 @@ if __name__ == "__main__":
         # Test 7: Single variable
         run_test(
             "Single variable",
-            "Hello <name>!",
+            "Hello <n>!",
             ("Alice",),
             expected_elements=[
                 ("Hello ", 0, "text"),
-                ("name", 1, "variable"),
+                ("n", 1, "variable"),
                 ("!", 2, "text")
             ]
         )
@@ -724,12 +897,12 @@ if __name__ == "__main__":
         # Test 20: Your exact examples from specification
         run_test(
             "Your example 1",
-            "User </bold><name></end bold> logged in at <time:login_time>",
+            "User </bold><n></end bold> logged in at <time:login_time>",
             ("Alice", 1234567890),
             expected_elements=[
                 ("User ", 0, "text"),
                 ("bold", 1, "command"),
-                ("name", 2, "variable"),
+                ("n", 2, "variable"),
                 ("end bold", 3, "command"),
                 (" logged in at ", 4, "text"),
                 ("time:login_time", 5, "object")
@@ -739,17 +912,80 @@ if __name__ == "__main__":
         # Test 21: Your example 2
         run_test(
             "Your example 2",
-            "User </bold, italic><name></end bold, italic> logged in at <time:login_time>",
+            "User </bold, italic><n></end bold, italic> logged in at <time:login_time>",
             ("Alice", 1234567890),
             expected_elements=[
                 ("User ", 0, "text"),
                 ("bold", 1, "command"),
                 ("italic", 1, "command"),
-                ("name", 2, "variable"),
+                ("n", 2, "variable"),
                 ("end bold", 3, "command"),
                 ("end italic", 3, "command"),
                 (" logged in at ", 4, "text"),
                 ("time:login_time", 5, "object")
+            ]
+        )
+        
+        # Test 22: Mixed content - object with commands
+        run_test(
+            "Mixed content - object with commands",
+            "Current time: </12hr, tz pst, time:>",
+            expected_elements=[
+                ("Current time: ", 0, "text"),
+                ("12hr", 1, "command"),
+                ("tz pst", 1, "command"),
+                ("time:", 1, "object")
+            ]
+        )
+        
+        # Test 23: Mixed content with variable
+        run_test(
+            "Mixed content with variable",
+            "Login at </time ago, time:login_time>",
+            (1234567890,),
+            expected_elements=[
+                ("Login at ", 0, "text"),
+                ("time ago", 1, "command"),
+                ("time:login_time", 1, "object")
+            ]
+        )
+        
+        # Test 24: Invalid mixed content - formatting command with object
+        run_test(
+            "Invalid mixed content - formatting command with object",
+            "Time: </bold, time:>",
+            should_have_errors=True  # Should warn about bold being invalid with time object
+        )
+        
+        # Test 25: Complex time formatting
+        run_test(
+            "Complex time formatting",
+            "Meeting </12hr, no sec, time until, elapsed:duration> from now",
+            (3600,),
+            expected_elements=[
+                ("Meeting ", 0, "text"),
+                ("12hr", 1, "command"),
+                ("no sec", 1, "command"),
+                ("time until", 1, "command"),
+                ("elapsed:duration", 1, "object"),
+                (" from now", 2, "text")
+            ]
+        )
+        
+        # Test 26: Multiple object types
+        import time
+        run_test(
+            "Multiple object types",
+            "Current: <time:> | Elapsed: <elapsed:start> | Date: </tz utc, datelong:>",
+            (time.time() - 3600,),
+            expected_elements=[
+                ("Current: ", 0, "text"),
+                ("time:", 1, "object"),
+                (" | Elapsed: ", 2, "text"),
+                ("elapsed:start", 3, "object"),
+                (" | Date: ", 4, "text"),
+                ("tz utc", 5, "command"),
+                ("datelong:", 5, "object")
             ]
         )
         
@@ -765,4 +1001,3 @@ if __name__ == "__main__":
     
     # Run the tests
     test_parser()
-
