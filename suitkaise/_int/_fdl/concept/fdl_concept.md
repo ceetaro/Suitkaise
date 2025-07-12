@@ -319,7 +319,7 @@ if rptr.using_color and rptr.italicizing:
 
 ## Explicit time and date printing
 
-### We have 3 time and date display commands: time, date, and elapsed.
+### We have 4 time and date display commands: time, date, datelong, and elapsed.
 ```python
 from suitkaise import fdl
 import time
@@ -347,29 +347,23 @@ fdl.print("</12hr, time:>")
 # timezones account for daylight savings
 fdl.print("</tz pst, time:from_64_sec_ago>", (from_64_sec_ago,))
 
-# print a given elapsed time value in a smart format
-# single digit hours only show one digit
-# ex. 8274 -> 2:17:54
-# ex. 2492 -> 0:41:32
-# ex. 82000 -> 22:46:40
-time_ago = 8274.743462
-# result: 2:17:54.743462 hours ago
-fdl.print("<elapsed:time_ago> <timeprefix:time_ago> ago", (time_ago,))
+# print elapsed time from a timestamp to now in smart format
+# automatically shows appropriate units: days, hours, minutes, seconds
+# only shows non-zero units for clean output
+# ex. timestamp from 2 hours 17 minutes ago -> "2h 17m 54.123456s"
+# ex. timestamp from 1 day 5 hours ago -> "1d 5h 23m 12.654321s"  
+# ex. timestamp from 30 seconds ago -> "30.123456s"
+timestamp_2h_ago = time.time() - 8274.743462
+fdl.print("Login was <elapsed:timestamp_2h_ago> ago", (timestamp_2h_ago,))
 
-time_until = 82000
-# use a different elapsed format to display in __h __m __.______s
-# result: 22h 46m 40.000000s until next meeting
-fdl.print("<elapsed2:time_until> until next meeting", (time_until,))
+# use commands to modify elapsed display
+fdl.print("</no sec, elapsed:timestamp_2h_ago> ago", (timestamp_2h_ago,))
 
-# use a command to get rid of seconds
-fdl.print("</no sec, elapsed:time_until> until next meeting", (time_until,))
+# you can also add time suffixes directly
+fdl.print("Login was </time ago, elapsed:timestamp_2h_ago>", (timestamp_2h_ago,))
 
-# you can also do this!
-# result: 2:17:54.743462 hours ago
-fdl.print("</time ago, elapsed:time_ago>", (time_ago,))
-
-fdl.print("</time until, no sec, elapsed:time_until> next meeting", (time_until,))
-
+# elapsed with current time shows minimal elapsed (nearly 0)
+fdl.print("Current moment: <elapsed:>")
 
 # printing time and values
 import os
@@ -385,6 +379,54 @@ fdl.print(
     (pid, value1)
 )
 ```
+### Key Object Types:
+
+#### Time Objects:
+- `<time:>` - Current time in hh:mm:ss.microseconds format
+- `<time:timestamp>` - Specific timestamp in same format
+- `<date:timestamp>` - Date and time in dd/mm/yy hh:mm:ss format
+- `<datelong:timestamp>` - Long date format like "January 01, 2022"
+
+#### Elapsed Objects:
+- `<elapsed:>` - Elapsed time from current moment (essentially 0)
+- `<elapsed:timestamp>` - Elapsed time from timestamp to now
+- Format: Shows only non-zero units in "3d 2h 15m 30.123456s" style
+- Automatically chooses appropriate units (days, hours, minutes, seconds)
+
+#### Time Commands:
+
+- `</12hr>` - Use 12-hour format with AM/PM (removes leading zeros: "4:00 PM" not "04:00 PM")
+- `</tz pst>` - Convert to timezone (supports daylight savings)
+- `</time ago>` - Add "ago" suffix to time displays
+- `</time until>` - Add "until" suffix to time displays
+- `</no sec>` - Hide seconds from time display
+
+#### Usage Examples:
+```python
+# Absolute time formatting
+login_time = time.time() - 3600  # 1 hour ago
+fdl.print("User logged in at </12hr, tz est, time:login_time>", (login_time,))
+# Result: "User logged in at 3:30:45 PM"
+
+# Relative time formatting  
+fdl.print("User logged in <elapsed:login_time> ago", (login_time,))
+# Result: "User logged in 1h 23m 45.123456s ago"
+
+# Combined formatting
+fdl.print("Login at </12hr, time ago, time:login_time> (<elapsed:login_time>)", (login_time,))
+# Result: "Login at 3:30:45 PM ago (1h 23m 45.123456s)"
+
+# Clean elapsed without seconds
+fdl.print("Session active for </no sec, elapsed:login_time>", (login_time,))  
+# Result: "Session active for 1h 23m"
+```
+#### Design Philosophy:
+
+- Time objects show absolute timestamps (when something happened)
+- Elapsed objects show relative durations (how long ago/until)
+- Smart formatting automatically chooses the most readable units
+- Timezone aware with automatic daylight savings handling
+- Flexible commands allow customization without complex formatting strings
 
 ## Creating Format objects
 ```python

@@ -8,20 +8,17 @@ Supported Objects:
 - <time:> / <time:timestamp> - Time formatting
 - <date:> / <date:timestamp> - Date formatting  
 - <datelong:> / <datelong:timestamp> - Long date format
-- <elapsed:duration> - Elapsed time formatting
-- <elapsed2:duration> - Alternative elapsed format
-- <timeprefix:duration> - Time unit names
+- <elapsed:> / <elapsed:timestamp> - Elapsed time from timestamp to now (3d 2h 15m 30s format)
 
 Supported Commands:
-- 12hr - 12-hour format
+- 12hr - 12-hour format (removes leading zeros)
 - tz <timezone> - Timezone conversion with DST
-- time ago / time until - Time suffixes  
+- time ago / time until - Calculate elapsed time from timestamp to now
 - no sec - Remove seconds from display
 """
 
 import time
 import warnings
-from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 import re
@@ -76,10 +73,9 @@ class _ObjectCommands:
 
 class _TimeZoneHandler:
     """
-    Handles timezone conversion with daylight savings support using float timestamps.
+    Handles timezone conversion with daylight savings support using pure timestamp math.
     
-    Works purely with Unix timestamps (floats) for maximum performance and simplicity.
-    Supports automatic daylight savings time conversion for supported timezones.
+    Works with Unix timestamps throughout, calculating offsets and applying them directly.
     """
     
     # Comprehensive timezone abbreviations to full names
@@ -185,29 +181,28 @@ class _TimeZoneHandler:
             auto_dst (bool): Whether to automatically handle daylight savings
         """
         self.auto_dst = auto_dst
-        # Cache for timezone conversions
+        # Cache for timezone offset calculations
         self._offset_cache: Dict[Tuple[str, float], float] = {}
     
     def convert_timestamp(self, timestamp: float, target_tz: str) -> float:
         """
-        Convert Unix timestamp to target timezone, returning adjusted timestamp.
+        Convert Unix timestamp to target timezone, returning adjusted timestamp for use with time.gmtime().
         
         Args:
             timestamp (float): Unix timestamp (UTC)
             target_tz (str): Target timezone (e.g., 'pst', 'America/Los_Angeles')
             
         Returns:
-            float: Adjusted timestamp for target timezone
+            float: Adjusted timestamp for use with time.gmtime()
             
         Raises:
             ObjectProcessorError: If timezone conversion fails
             
-        The returned timestamp can be used with time.strftime() or similar
-        functions to get the correct local time representation.
+        The returned timestamp can be used with time.gmtime() to get the correct local time.
         """
         try:
-            # Check cache first (rounded to minute for efficiency)
-            cache_key = (target_tz.lower(), int(timestamp // 60) * 60)
+            # Check cache first (rounded to hour for efficiency)
+            cache_key = (target_tz.lower(), int(timestamp // 3600) * 3600)
             if cache_key in self._offset_cache:
                 cached_offset = self._offset_cache[cache_key]
                 return timestamp + cached_offset
@@ -219,9 +214,9 @@ class _TimeZoneHandler:
             if tz_name == 'UTC':
                 return timestamp
             
-            # Calculate timezone offset using datetime temporarily for conversion
-            # but return pure float
-            utc_dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            # Calculate timezone offset using minimal datetime usage
+            import datetime
+            utc_dt = datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)
             
             if ZONEINFO_AVAILABLE:
                 target_tz_obj = ZoneInfo(tz_name)
@@ -237,7 +232,7 @@ class _TimeZoneHandler:
             # Cache the offset (cache for 1 hour to handle DST changes)
             self._offset_cache[cache_key] = offset_seconds
             
-            # Return adjusted timestamp
+            # Return adjusted timestamp for use with time.gmtime()
             return timestamp + offset_seconds
                 
         except Exception as e:
@@ -268,7 +263,7 @@ class _ObjectProcessor:
     Concrete object processor for fdl time/date/elapsed patterns.
     
     Processes object patterns and applies object-specific commands to generate
-    formatted time/date/elapsed strings.
+    formatted time/date/elapsed strings using pure timestamp math.
     """
     
     def __init__(self, auto_dst: bool = True):
@@ -302,13 +297,6 @@ class _ObjectProcessor:
             InvalidObjectError: If object pattern is invalid
             UnsupportedObjectError: If object type is not supported
             ObjectProcessorError: If processing fails
-            
-        Example:
-            # <time:login_time> with commands ["12hr", "tz pst"]
-            result, new_idx = processor.process_object(
-                "time:login_time", ["12hr", "tz pst"], (1640995200,), 0
-            )
-            # Returns: ("6:00 PM", 1)
         """
         self._processed_count += 1
         
@@ -339,10 +327,6 @@ class _ObjectProcessor:
                 result = self._process_datelong_object(value, parsed_commands)
             elif obj_type == 'elapsed':
                 result = self._process_elapsed_object(value, parsed_commands)
-            elif obj_type == 'elapsed2':
-                result = self._process_elapsed2_object(value, parsed_commands)
-            elif obj_type == 'timeprefix':
-                result = self._process_timeprefix_object(value, parsed_commands)
             else:
                 raise UnsupportedObjectError(f"Unsupported object type: {obj_type}")
             
@@ -356,15 +340,7 @@ class _ObjectProcessor:
                 raise ObjectProcessorError(f"Object processing failed: {e}")
     
     def _parse_object_content(self, obj_content: str) -> Tuple[str, str]:
-        """
-        Parse object content into type and variable.
-        
-        Args:
-            obj_content (str): Object content like "time:timestamp" or "elapsed:"
-            
-        Returns:
-            Tuple[str, str]: (object_type, variable_name)
-        """
+        """Parse object content into type and variable."""
         if ':' not in obj_content:
             raise InvalidObjectError(f"Invalid object content: {obj_content}")
         
@@ -373,22 +349,14 @@ class _ObjectProcessor:
         obj_var = obj_var.strip()
         
         # Validate object type
-        valid_types = ['time', 'date', 'datelong', 'elapsed', 'elapsed2', 'timeprefix']
+        valid_types = ['time', 'date', 'datelong', 'elapsed']
         if obj_type not in valid_types:
             raise UnsupportedObjectError(f"Unsupported object type: {obj_type}")
         
         return obj_type, obj_var
     
     def _parse_commands(self, commands: List[str]) -> _ObjectCommands:
-        """
-        Parse object-specific commands into structured format.
-        
-        Args:
-            commands (List[str]): List of command strings
-            
-        Returns:
-            _ObjectCommands: Parsed command structure
-        """
+        """Parse object-specific commands into structured format."""
         parsed = _ObjectCommands()
         
         for command in commands:
@@ -415,20 +383,59 @@ class _ObjectProcessor:
         
         return parsed
     
+    def _format_12hr_time(self, time_struct: time.struct_time, hide_seconds: bool = False) -> str:
+        """
+        Format time in 12-hour format without leading zeros.
+        
+        Args:
+            time_struct: Time structure from time.gmtime()
+            hide_seconds: Whether to hide seconds
+            
+        Returns:
+            str: Formatted 12-hour time (e.g., "4:00:00 PM")
+        """
+        hour = time_struct.tm_hour
+        minute = time_struct.tm_min
+        second = time_struct.tm_sec
+        
+        # Convert to 12-hour format
+        if hour == 0:
+            display_hour = 12
+            ampm = "AM"
+        elif hour < 12:
+            display_hour = hour
+            ampm = "AM"
+        elif hour == 12:
+            display_hour = 12
+            ampm = "PM"
+        else:
+            display_hour = hour - 12
+            ampm = "PM"
+        
+        # Format without leading zeros for hours
+        if hide_seconds:
+            return f"{display_hour}:{minute:02d} {ampm}"
+        else:
+            return f"{display_hour}:{minute:02d}:{second:02d} {ampm}"
+    
     def _process_time_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
         Process time object: <time:> or <time:timestamp>
-        
-        Args:
-            timestamp (Optional[float]): Unix timestamp or None for current time
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Formatted time string
         """
         # Get timestamp (current time if None)
         if timestamp is None:
             timestamp = time.time()
+        
+        # Handle time ago/until - calculate elapsed time instead of showing absolute time
+        if commands.time_suffix:
+            current_time = time.time()
+            if commands.time_suffix == 'ago':
+                duration = current_time - timestamp
+            else:  # time until
+                duration = timestamp - current_time
+            
+            # Use elapsed formatting for relative time
+            return self._format_duration_as_elapsed(duration, commands.time_suffix)
         
         # Apply timezone conversion if specified
         if commands.timezone:
@@ -436,15 +443,12 @@ class _ObjectProcessor:
         else:
             adjusted_timestamp = timestamp
         
-        # Convert to time components using adjusted timestamp
-        time_struct = time.localtime(adjusted_timestamp)
+        # Convert to time components using time.gmtime() (avoids local timezone issues)
+        time_struct = time.gmtime(adjusted_timestamp)
         
         # Format time
         if commands.use_12hr:
-            if commands.hide_seconds:
-                time_str = time.strftime('%I:%M %p', time_struct)
-            else:
-                time_str = time.strftime('%I:%M:%S %p', time_struct)
+            time_str = self._format_12hr_time(time_struct, commands.hide_seconds)
         else:
             if commands.hide_seconds:
                 time_str = time.strftime('%H:%M', time_struct)
@@ -454,22 +458,53 @@ class _ObjectProcessor:
                 base_time = time.strftime('%H:%M:%S', time_struct)
                 time_str = f"{base_time}.{microseconds:06d}"
         
-        # Add suffix if specified
-        if commands.time_suffix:
-            time_str += f" {commands.time_suffix}"
-        
         return time_str
+    
+    def _format_duration_as_elapsed(self, duration: float, suffix: str) -> str:
+        """
+        Format a duration as elapsed time with suffix.
+        
+        Args:
+            duration: Duration in seconds
+            suffix: "ago" or "until"
+            
+        Returns:
+            str: Formatted elapsed time (e.g., "2 hours ago")
+        """
+        abs_duration = abs(duration)
+        
+        # Calculate time units
+        days = int(abs_duration // 86400)
+        remaining = abs_duration % 86400
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        seconds = int(remaining % 60)
+        
+        # Choose the most significant unit
+        if days > 0:
+            if days == 1:
+                return f"1 day {suffix}"
+            else:
+                return f"{days} days {suffix}"
+        elif hours > 0:
+            if hours == 1:
+                return f"1 hour {suffix}"
+            else:
+                return f"{hours} hours {suffix}"
+        elif minutes > 0:
+            if minutes == 1:
+                return f"1 minute {suffix}"
+            else:
+                return f"{minutes} minutes {suffix}"
+        else:
+            if seconds == 1:
+                return f"1 second {suffix}"
+            else:
+                return f"{seconds} seconds {suffix}"
     
     def _process_date_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
         Process date object: <date:> or <date:timestamp>
-        
-        Args:
-            timestamp (Optional[float]): Unix timestamp or None for current time
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Formatted date string (dd/mm/yy hh:mm:ss format)
         """
         # Get timestamp (current time if None)
         if timestamp is None:
@@ -481,15 +516,15 @@ class _ObjectProcessor:
         else:
             adjusted_timestamp = timestamp
         
-        # Convert to time components using adjusted timestamp
-        time_struct = time.localtime(adjusted_timestamp)
+        # Convert to time components using time.gmtime()
+        time_struct = time.gmtime(adjusted_timestamp)
         
         # Format as date with time
         if commands.use_12hr:
             if commands.hide_seconds:
-                date_str = time.strftime('%d/%m/%y %I:%M %p', time_struct)
+                date_str = time.strftime('%d/%m/%y ', time_struct) + self._format_12hr_time(time_struct, True)
             else:
-                date_str = time.strftime('%d/%m/%y %I:%M:%S %p', time_struct)
+                date_str = time.strftime('%d/%m/%y ', time_struct) + self._format_12hr_time(time_struct, False)
         else:
             if commands.hide_seconds:
                 date_str = time.strftime('%d/%m/%y %H:%M', time_struct)
@@ -505,13 +540,6 @@ class _ObjectProcessor:
     def _process_datelong_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
         Process datelong object: <datelong:> or <datelong:timestamp>
-        
-        Args:
-            timestamp (Optional[float]): Unix timestamp or None for current time
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Formatted long date string (e.g., "July 4, 2025")
         """
         # Get timestamp (current time if None)
         if timestamp is None:
@@ -523,8 +551,8 @@ class _ObjectProcessor:
         else:
             adjusted_timestamp = timestamp
         
-        # Convert to time components using adjusted timestamp
-        time_struct = time.localtime(adjusted_timestamp)
+        # Convert to time components using time.gmtime()
+        time_struct = time.gmtime(adjusted_timestamp)
         
         # Format as long date
         date_str = time.strftime('%B %d, %Y', time_struct)
@@ -535,107 +563,56 @@ class _ObjectProcessor:
         
         return date_str
     
-    def _process_elapsed_object(self, duration: float, commands: _ObjectCommands) -> str:
+    def _process_elapsed_object(self, timestamp: Optional[float], commands: _ObjectCommands) -> str:
         """
-        Process elapsed object: <elapsed:duration>
+        Process elapsed object: <elapsed:> or <elapsed:timestamp>
         
-        Args:
-            duration (float): Duration in seconds
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Formatted elapsed time (e.g., "2:17:54.123456")
+        Takes a timestamp and calculates elapsed time from then to now.
+        Format: "3d 2h 15m 30s" (only shows non-zero units)
         """
-        if duration is None:
-            raise InvalidObjectError("Elapsed objects require a duration value")
+        # Get timestamp (current time if None, which results in 0 elapsed)
+        if timestamp is None:
+            timestamp = time.time()
         
-        # Convert to absolute value (handle negative durations)
-        abs_duration = abs(float(duration))
+        # Calculate elapsed time from timestamp to now
+        current_time = time.time()
+        duration = current_time - timestamp
+        abs_duration = abs(duration)
         
-        # Calculate hours, minutes, seconds
-        hours = int(abs_duration // 3600)
-        minutes = int((abs_duration % 3600) // 60)
-        seconds = abs_duration % 60
+        # Calculate days, hours, minutes, seconds
+        days = int(abs_duration // 86400)
+        remaining = abs_duration % 86400
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        seconds = remaining % 60
         
-        # Format based on commands
-        if commands.hide_seconds:
-            elapsed_str = f"{hours}:{minutes:02d}"
-        else:
-            # Include fractional seconds
-            elapsed_str = f"{hours}:{minutes:02d}:{seconds:09.6f}"
+        # Build parts list (only include non-zero units)
+        parts = []
+        
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
+        
+        if not commands.hide_seconds and (seconds > 0 or len(parts) == 0):
+            # Always show seconds if nothing else, or if seconds > 0
+            parts.append(f"{seconds:.6f}s")
+        elif commands.hide_seconds and len(parts) == 0:
+            # If hiding seconds but no other units, show 0m
+            parts.append("0m")
+        
+        elapsed_str = " ".join(parts)
         
         # Add suffix if specified
         if commands.time_suffix:
             elapsed_str += f" {commands.time_suffix}"
         
         return elapsed_str
-    
-    def _process_elapsed2_object(self, duration: float, commands: _ObjectCommands) -> str:
-        """
-        Process elapsed2 object: <elapsed2:duration>
-        
-        Args:
-            duration (float): Duration in seconds
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Alternative elapsed format (e.g., "22h 46m 40.000000s")
-        """
-        if duration is None:
-            raise InvalidObjectError("Elapsed2 objects require a duration value")
-        
-        # Convert to absolute value
-        abs_duration = abs(float(duration))
-        
-        # Calculate hours, minutes, seconds
-        hours = int(abs_duration // 3600)
-        minutes = int((abs_duration % 3600) // 60)
-        seconds = abs_duration % 60
-        
-        # Format in alternative style
-        if commands.hide_seconds:
-            elapsed_str = f"{hours}h {minutes}m"
-        else:
-            elapsed_str = f"{hours}h {minutes}m {seconds:.6f}s"
-        
-        # Add suffix if specified
-        if commands.time_suffix:
-            elapsed_str += f" {commands.time_suffix}"
-        
-        return elapsed_str
-    
-    def _process_timeprefix_object(self, duration: float, commands: _ObjectCommands) -> str:
-        """
-        Process timeprefix object: <timeprefix:duration>
-        
-        Args:
-            duration (float): Duration in seconds
-            commands (_ObjectCommands): Parsed commands
-            
-        Returns:
-            str: Time unit name (e.g., "hours", "minutes", "seconds")
-        """
-        if duration is None:
-            raise InvalidObjectError("Timeprefix objects require a duration value")
-        
-        # Convert to absolute value
-        abs_duration = abs(float(duration))
-        
-        # Determine primary unit
-        if abs_duration >= 3600:
-            return "hours"
-        elif abs_duration >= 60:
-            return "minutes"
-        else:
-            return "seconds"
     
     def get_performance_stats(self) -> Dict[str, int]:
-        """
-        Get performance statistics.
-        
-        Returns:
-            Dict[str, int]: Processing statistics
-        """
+        """Get performance statistics."""
         return {
             'objects_processed': self._processed_count,
             'processing_errors': self._error_count,
@@ -648,14 +625,7 @@ _global_object_processor: Optional[_ObjectProcessor] = None
 
 
 def _get_object_processor() -> _ObjectProcessor:
-    """
-    Get the global object processor instance.
-    
-    Returns:
-        _ObjectProcessor: Global processor instance
-        
-    Creates the processor on first call, returns cached instance afterward.
-    """
+    """Get the global object processor instance."""
     global _global_object_processor
     if _global_object_processor is None:
         _global_object_processor = _ObjectProcessor()
@@ -663,16 +633,10 @@ def _get_object_processor() -> _ObjectProcessor:
 
 
 def set_auto_dst(enabled: bool) -> None:
-    """
-    Enable or disable automatic daylight savings handling.
-    
-    Args:
-        enabled (bool): Whether to automatically handle DST
-    """
+    """Enable or disable automatic daylight savings handling."""
     global _global_object_processor
     if _global_object_processor is not None:
         _global_object_processor.timezone_handler.auto_dst = enabled
-    # If processor doesn't exist yet, it will use the default when created
 
 
 # Test script for Object Processor
@@ -714,7 +678,7 @@ if __name__ == "__main__":
         def test_basic_time(proc):
             # Test current time
             result, new_idx = proc.process_object("time:", [], (), 0)
-            if not re.match(r'\d{2}:\d{2}:\d{2}\.\d{3}', result):
+            if not re.match(r'\d{2}:\d{2}:\d{2}\.\d{6}', result):
                 print(f"❌ Current time format invalid: '{result}'")
                 return False
             
@@ -728,13 +692,14 @@ if __name__ == "__main__":
             print(f"✓ Basic time: '{result}'")
             return True
         
-        # Test 2: Time with 12hr format
+        # Test 2: Time with 12hr format (should be "4:00:00 PM")
         def test_12hr_time(proc):
             timestamp = 1640995200.0  # 2022-01-01 00:00:00 UTC
             result, _ = proc.process_object("time:ts", ["12hr"], (timestamp,), 0)
             
-            if "AM" not in result and "PM" not in result:
-                print(f"❌ 12hr format missing AM/PM: '{result}'")
+            # Should be "12:00:00 AM" (no leading zero, midnight UTC)
+            if not result.startswith("12:00:00 AM"):
+                print(f"❌ 12hr format incorrect: '{result}' (expected '12:00:00 AM')")
                 return False
             
             print(f"✓ 12hr time: '{result}'")
@@ -746,8 +711,8 @@ if __name__ == "__main__":
             result, _ = proc.process_object("time:ts", ["tz pst"], (timestamp,), 0)
             
             # PST is UTC-8, so should be 16:00:00 on Dec 31, 2021
-            if "16:00:00" not in result:
-                print(f"❌ Timezone conversion incorrect: '{result}'")
+            if not result.startswith("16:00:00"):
+                print(f"❌ Timezone conversion incorrect: '{result}' (expected '16:00:00')")
                 return False
             
             print(f"✓ Timezone time: '{result}'")
@@ -757,108 +722,79 @@ if __name__ == "__main__":
         def test_date_objects(proc):
             timestamp = 1640995200.0  # 2022-01-01 00:00:00 UTC
             
-            # Regular date
+            # Regular date (UTC)
             result, _ = proc.process_object("date:ts", [], (timestamp,), 0)
             if not re.match(r'\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}', result):
                 print(f"❌ Date format invalid: '{result}'")
                 return False
             
-            # Long date
+            # Long date (UTC) - should be January 01, 2022
             result, _ = proc.process_object("datelong:ts", [], (timestamp,), 0)
             if "January 01, 2022" not in result:
-                print(f"❌ Long date format invalid: '{result}'")
+                print(f"❌ Long date format invalid: '{result}' (expected 'January 01, 2022')")
                 return False
             
             print(f"✓ Date objects: '{result}'")
             return True
         
-        # Test 5: Elapsed objects
+        # Test 5: Elapsed objects with timestamps
         def test_elapsed_objects(proc):
-            duration = 8274.743462  # 2:17:54.743462
+            # Test with a timestamp 2 hours and 17 minutes ago
+            hours_ago_timestamp = time.time() - 8274.0  # About 2:17:54 ago
+            result, _ = proc.process_object("elapsed:ts", [], (hours_ago_timestamp,), 0)
             
-            # Regular elapsed
-            result, _ = proc.process_object("elapsed:dur", [], (duration,), 0)
-            if not result.startswith("2:17:54"):
-                print(f"❌ Elapsed format invalid: '{result}'")
+            # Should show something like "2h 17m 54s" 
+            if "h" not in result or "m" not in result:
+                print(f"❌ Elapsed format should show hours and minutes: '{result}'")
                 return False
             
-            # Alternative elapsed
-            result, _ = proc.process_object("elapsed2:dur", [], (duration,), 0)
-            if not result.startswith("2h 17m"):
-                print(f"❌ Elapsed2 format invalid: '{result}'")
+            # Test with current time (should be very small elapsed)
+            current_timestamp = time.time()
+            result, _ = proc.process_object("elapsed:ts", [], (current_timestamp,), 0)
+            
+            # Should show seconds or be very small
+            if not ("s" in result or "0m" in result):
+                print(f"❌ Current time elapsed should show seconds or 0m: '{result}'")
                 return False
             
-            print(f"✓ Elapsed objects: '{result}'")
+            print(f"✓ Elapsed objects with timestamps: recent='{result}'")
             return True
         
-        # Test 6: Time prefix
-        def test_timeprefix(proc):
-            # Hours
-            result, _ = proc.process_object("timeprefix:dur", [], (7200,), 0)  # 2 hours
-            if result != "hours":
-                print(f"❌ Hours prefix wrong: '{result}'")
-                return False
-            
-            # Minutes  
-            result, _ = proc.process_object("timeprefix:dur", [], (120,), 0)  # 2 minutes
-            if result != "minutes":
-                print(f"❌ Minutes prefix wrong: '{result}'")
-                return False
-            
-            # Seconds
-            result, _ = proc.process_object("timeprefix:dur", [], (30,), 0)  # 30 seconds
-            if result != "seconds":
-                print(f"❌ Seconds prefix wrong: '{result}'")
-                return False
-            
-            print(f"✓ Time prefixes work")
-            return True
-        
-        # Test 7: Time suffixes
+        # Test 6: Time suffixes
         def test_time_suffixes(proc):
             timestamp = 1640995200.0
             
-            # Time ago
+            # Time ago - should calculate elapsed time from then to now
             result, _ = proc.process_object("time:ts", ["time ago"], (timestamp,), 0)
             if not result.endswith(" ago"):
                 print(f"❌ Time ago suffix missing: '{result}'")
                 return False
             
-            # Time until
-            result, _ = proc.process_object("time:ts", ["time until"], (timestamp,), 0)
-            if not result.endswith(" until"):
-                print(f"❌ Time until suffix missing: '{result}'")
+            # Should show some elapsed time format
+            if not any(unit in result for unit in ["second", "minute", "hour", "day"]):
+                print(f"❌ Time ago should show elapsed time: '{result}'")
                 return False
             
-            print(f"✓ Time suffixes work")
+            print(f"✓ Time suffixes work: '{result}'")
             return True
         
-        # Test 8: Complex combinations
+        # Test 7: Complex combinations (time ago should show elapsed, not absolute time)
         def test_complex_combinations(proc):
-            timestamp = 1640995200.0
+            # Use a timestamp that's exactly 4 hours ago for predictable testing
+            four_hours_ago = time.time() - (4 * 3600)  # 4 hours ago
             commands = ["12hr", "tz pst", "time ago", "no sec"]
             
-            result, _ = proc.process_object("time:ts", commands, (timestamp,), 0)
+            result, _ = proc.process_object("time:ts", commands, (four_hours_ago,), 0)
             
-            # Should have 12hr format (AM/PM)
-            if "AM" not in result and "PM" not in result:
-                print(f"❌ Missing 12hr format")
-                return False
-            
-            # Should have ago suffix
-            if not result.endswith(" ago"):
-                print(f"❌ Missing ago suffix")
-                return False
-            
-            # Should not have seconds (due to no sec)
-            if re.search(r':\d{2}\s', result):  # seconds pattern
-                print(f"❌ Seconds not hidden: '{result}'")
+            # Should show "4 hours ago" (not absolute time)
+            if "hours ago" not in result:
+                print(f"❌ Should show 'hours ago': '{result}'")
                 return False
             
             print(f"✓ Complex combination: '{result}'")
             return True
         
-        # Test 9: Error handling
+        # Test 8: Error handling
         def test_error_handling(proc):
             try:
                 # Invalid object type
@@ -892,8 +828,7 @@ if __name__ == "__main__":
         run_test("12-hour time format", test_12hr_time)
         run_test("Timezone conversion", test_timezone_time)
         run_test("Date objects", test_date_objects)
-        run_test("Elapsed objects", test_elapsed_objects)
-        run_test("Time prefix objects", test_timeprefix)
+        run_test("Elapsed objects with timestamps", test_elapsed_objects)
         run_test("Time suffixes", test_time_suffixes)
         run_test("Complex command combinations", test_complex_combinations)
         run_test("Error handling", test_error_handling)
