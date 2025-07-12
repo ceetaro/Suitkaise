@@ -705,7 +705,7 @@ def _get_object_processor() -> _ObjectProcessor:
     return _global_object_processor
 
 
-def set_auto_dst(enabled: bool) -> None:
+def _set_auto_dst(enabled: bool) -> None:
     """Enable or disable automatic daylight savings handling."""
     global _global_object_processor
     if _global_object_processor is not None:
