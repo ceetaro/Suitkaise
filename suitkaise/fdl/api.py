@@ -7,7 +7,7 @@ from typing import Set, List, Optional
 # Import internal components with multiple fallback strategies
 try:
     # Try relative import first (standard package structure)
-    from ..._int._fdl.core.format_class import (
+    from .._int._fdl.core.format_class import (
         # Exceptions
         FormatError,
         InvalidFormatError, 

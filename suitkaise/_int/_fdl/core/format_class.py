@@ -200,8 +200,14 @@ def _compile_format_string(name: str, format_string: str) -> _CompiledFormat:
     
     # Validate referenced formats exist
     registry = _get_format_registry()
+
+    # Check for self-reference (circular reference) 
+    if name in referenced_formats:
+        raise CircularReferenceError(f"Format '{name}' cannot reference itself")
+
+    # Validate non-self referenced formats exist
     for ref_name in referenced_formats:
-        if not registry._exists(ref_name):
+        if ref_name != name and not registry._exists(ref_name):
             raise FormatNotFoundError(f"Referenced format '{ref_name}' not found")
     
     # Compile to target state

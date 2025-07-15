@@ -475,8 +475,8 @@ fdl.print(
 TRACEBACK (red and bold)
 ═════════════════════════════════════════════════════════════════════
 
-╭─────────────────────────── Stack Frame ───────────────────────────╮
-│ src/myproject/main.py, line 45 at level_1                         │
+╭──────────────────────────── Frame 1 ──────────────────────────────╮
+│ src/myproject/main.py, line 45                                    │
 │                                                                   │
 │   42 │ def level_1():                                             │
 │   43 │     session_id = "abc123"                                  │
@@ -489,8 +489,8 @@ TRACEBACK (red and bold)
 │   timestamp (int) = 1641234567                                    │
 ╰───────────────────────────────────────────────────────────────────╯
 
-╭─────────────────────────── Stack Frame ───────────────────────────╮
-│ src/myproject/utils.py, line 12 at level_3                        │
+╭──────────────────────── Frame 2 (current) ────────────────────────╮
+│ src/myproject/utils.py, line 12                                   │
 │                                                                   │
 │   10 │     data = [1, 2, 3]                                       │
 │   11 │     config = {"debug": True}                               │

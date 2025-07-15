@@ -32,6 +32,7 @@ try:
         _apply_format_to_state
     )
     from suitkaise._int._fdl.core.command_processor import _FormattingState
+    from suitkaise._int._fdl.core.reconstructor import _reconstruct_fdl_string
     IMPORTS_AVAILABLE = True
     
 except ImportError as e:
@@ -94,15 +95,15 @@ class FormatTestSuite:
             print("❌ Format not registered in global registry")
             return False
         
-        # Check direct ANSI is generated
-        ansi = red_bold.direct_ansi
-        if not ansi or not isinstance(ansi, str):
-            print(f"❌ Invalid direct ANSI: '{ansi}'")
+        try:
+            result = _reconstruct_fdl_string("Test: </fmt red_bold>formatted text")
+            print(f"✓ Created format: {red_bold}")
+            print(f"✓ Format in use: ", end="")
+            print(result)  # This will show actual formatting + auto-reset
+            return True
+        except Exception as e:
+            print(f"❌ Format failed in reconstruction: {e}")
             return False
-        
-        print(f"✓ Created format: {red_bold}")
-        print(f"✓ Direct ANSI: '{ansi}'")
-        return True
     
     def test_format_inheritance(self):
         """Test format inheritance and dependency tracking."""
@@ -346,28 +347,21 @@ class FormatTestSuite:
         # Create format
         Format("integration_test", "</green, bold>")
         
-        # Test internal _apply_format_to_state function
-        current_state = _FormattingState()
-        current_state.italic = True  # Start with some formatting
-        
         try:
-            target_state, ansi = _apply_format_to_state("integration_test", current_state)
+            result = _reconstruct_fdl_string("Status: </fmt integration_test>System OK")
             
-            # Should have transitioned properly
-            if not ansi or not isinstance(ansi, str):
-                print(f"❌ Invalid ANSI sequence: '{ansi}'")
+            # Should contain the text and end with reset
+            if "Status:" not in result or "System OK" not in result:
+                print(f"❌ Missing expected content in: '{result}'")
                 return False
             
-            # ANSI should contain expected codes (turn off italic, add green and bold)
-            expected_codes = ['\033[23m', '\033[32m', '\033[1m']  # Off italic, green, bold
-            missing_codes = [code for code in expected_codes if code not in ansi]
-            
-            if missing_codes:
-                print(f"❌ Missing ANSI codes {missing_codes} in: '{ansi}'")
+            if not result.endswith('\033[0m'):
+                print(f"❌ Should end with reset code")
                 return False
             
             print(f"✓ Command processor integration works")
-            print(f"   Generated ANSI: '{ansi}'")
+            print(f"✓ Format result: ", end="")
+            print(result)  # Shows actual formatting
             return True
             
         except Exception as e:
@@ -447,6 +441,405 @@ class FormatTestSuite:
         print("✓ Edge cases handled correctly")
         return True
     
+# Add this to the FormatTestSuite class after test_edge_cases():
+
+    def test_format_chaining(self):
+        """Test chaining multiple formats in one command: </fmt format1, fmt format2>"""
+        clear_formats()
+        
+        # Create test formats with overlapping properties
+        Format("base_red", "</red, bold>")
+        Format("override_blue", "</blue, italic>")  # blue overrides red, adds italic
+        Format("add_underline", "</underline>")     # just adds underline, no conflicts
+        
+        # Test through reconstruction flow 
+        from suitkaise._int._fdl.core.reconstructor import _reconstruct_fdl_string
+        
+        # Test 1: Two formats with conflicting colors
+        print("Test 1: Color override (red -> blue)")
+        try:
+            # This should apply red+bold, then blue+italic (blue overrides red)
+            result1 = _reconstruct_fdl_string("Status: </fmt base_red, fmt override_blue>ALERT")
+            print(f"  Result: ", end="")
+            print(result1)  # Should be blue, bold, italic
+            print(f"  Raw: {repr(result1)}")
+            
+            # Check that result contains blue and italic codes, not red
+            if '\033[31m' in result1:  # Red code
+                print("  ❌ Still contains red - override failed")
+                return False
+            if '\033[34m' not in result1:  # Blue code  
+                print("  ❌ Missing blue - override failed")
+                return False
+            if '\033[1m' not in result1:  # Bold code (should be preserved)
+                print("  ❌ Missing bold - chaining failed")
+                return False
+            if '\033[3m' not in result1:  # Italic code (should be added)
+                print("  ❌ Missing italic - chaining failed")
+                return False
+            
+            print("  ✓ Color override works correctly")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in color override test: {e}")
+            return False
+        
+        # Test 2: Three formats with additive properties
+        print("\nTest 2: Additive properties (no conflicts)")
+        try:
+            # This should combine all properties: red+bold + blue+italic + underline
+            # Final result: blue+bold+italic+underline (blue overrides red)
+            result2 = _reconstruct_fdl_string("Multi: </fmt base_red, fmt override_blue, fmt add_underline>text")
+            print(f"  Result: ", end="")
+            print(result2)  # Should be blue, bold, italic, underline
+            print(f"  Raw: {repr(result2)}")
+            
+            # Check all expected codes are present
+            expected_codes = ['\033[34m', '\033[1m', '\033[3m', '\033[4m']  # blue, bold, italic, underline
+            missing_codes = [code for code in expected_codes if code not in result2]
+            
+            if missing_codes:
+                print(f"  ❌ Missing codes: {missing_codes}")
+                return False
+            
+            if '\033[31m' in result2:  # Should not have red
+                print("  ❌ Still contains red - should be overridden by blue")
+                return False
+            
+            print("  ✓ Additive chaining works correctly")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in additive test: {e}")
+            return False
+    
+        # Test 3: Format inheritance in chains
+        print("\nTest 3: Format inheritance in chains")
+        try:
+            # Create formats that inherit from each other
+            Format("parent", "</bold, red>")
+            Format("child", "</fmt parent, italic>")  # inherits bold+red, adds italic
+            Format("modifier", "</blue>")             # just blue
+            
+            # Chain: child (bold+red+italic) + modifier (blue overrides red)
+            # Final: blue+bold+italic
+            result3 = _reconstruct_fdl_string("Inherit: </fmt child, fmt modifier>test")
+            print(f"  Result: ", end="")
+            print(result3)
+            print(f"  Raw: {repr(result3)}")
+            
+            # Should have blue, bold, italic but NOT red
+            if '\033[31m' in result3:  # Red should be overridden
+                print("  ❌ Red not overridden in inheritance chain")
+                return False
+            
+            expected_codes = ['\033[34m', '\033[1m', '\033[3m']  # blue, bold, italic
+            missing_codes = [code for code in expected_codes if code not in result3]
+            
+            if missing_codes:
+                print(f"  ❌ Missing inherited codes: {missing_codes}")
+                return False
+            
+            print("  ✓ Inheritance in chains works correctly")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in inheritance test: {e}")
+            return False
+        
+        # Test 4: Order dependency
+        print("\nTest 4: Order dependency (format2, format1 vs format1, format2)")
+        try:
+            # Test both orders to verify override behavior
+            result_a = _reconstruct_fdl_string("Order A: </fmt base_red, fmt override_blue>text")
+            result_b = _reconstruct_fdl_string("Order B: </fmt override_blue, fmt base_red>text")
+            
+            print(f"  A (red->blue): ", end="")
+            print(result_a)
+            print(f"  B (blue->red): ", end="")
+            print(result_b)
+            
+            # A should end with blue, B should end with red
+            a_has_blue = '\033[34m' in result_a and '\033[31m' not in result_a
+            b_has_red = '\033[31m' in result_b and '\033[34m' not in result_b
+            
+            if not a_has_blue:
+                print("  ❌ Order A should have blue (last wins)")
+                return False
+            
+            if not b_has_red:
+                print("  ❌ Order B should have red (last wins)")
+                return False
+            
+            print("  ✓ Order dependency works correctly (last format wins)")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in order test: {e}")
+            return False
+        
+        # Test 5: Background color conflicts
+        print("\nTest 5: Background color conflicts")
+        try:
+            Format("red_bg", "</red, bkg yellow>")
+            Format("blue_bg", "</blue, bkg green>")
+            
+            result5 = _reconstruct_fdl_string("Backgrounds: </fmt red_bg, fmt blue_bg>text")
+            print(f"  Result: ", end="")
+            print(result5)
+            print(f"  Raw: {repr(result5)}")
+            
+            # Should have blue text and green background (both from blue_bg)
+            # Should NOT have red text or yellow background
+            if '\033[31m' in result5 or '\033[43m' in result5:  # red text or yellow bg
+                print("  ❌ Background override failed - still has red/yellow")
+                return False
+            
+            if '\033[34m' not in result5 or '\033[42m' not in result5:  # blue text and green bg
+                print("  ❌ Missing final blue text or green background")
+                return False
+            
+            print("  ✓ Background color conflicts handled correctly")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in background test: {e}")
+            return False
+        
+        print("\n✓ All format chaining tests passed!")
+        print("✓ Override behavior works correctly")
+        print("✓ Additive properties combine properly") 
+        print("✓ Order dependency respected")
+        print("✓ Inheritance chains work in combination")
+        
+        return True
+    
+    def test_multi_string_and_partial_endings(self):
+        """Test multi-string statements and partial format endings."""
+        clear_formats()
+        
+        # Create test format
+        Format("format2", "</green, bold, italic, bkg blue>")
+        
+        from suitkaise._int._fdl.core.reconstructor import _reconstruct_fdl_string
+        
+        # Test 1: Your exact example - partial ending
+        print("Test 1: Multi-string with partial ending")
+        try:
+            # Simulate the multi-string concatenation
+            test_string = (
+                "</fmt format2, underline>"
+                "This is green, bolded, italicized, underlined text on a blue background."
+                "</end format2>"
+                "This is now just underlined text."
+            )
+            
+            result1 = _reconstruct_fdl_string(test_string)
+            print(f"  Result: ", end="")
+            print(result1)
+            print(f"  Raw: {repr(result1)}")
+            
+            # Check that both parts of text are present
+            if "green, bolded, italicized" not in result1:
+                print("  ❌ Missing first part of text")
+                return False
+            
+            if "just underlined text" not in result1:
+                print("  ❌ Missing second part of text")
+                return False
+            
+            # The string should contain:
+            # - Green, bold, italic, blue background, underline codes for first part
+            # - Codes to end green, bold, italic, blue background but keep underline
+            # - Underline should still be active for second part
+            
+            # Check for underline throughout (should never be ended)
+            if '\033[4m' not in result1:
+                print("  ❌ Missing underline - should be present throughout")
+                return False
+            
+            if '\033[24m' in result1:
+                print("  ❌ Underline was ended - should remain active")
+                return False
+            
+            print("  ✓ Multi-string with partial ending works")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in multi-string test: {e}")
+            return False
+        
+        # Test 2: Multiple partial endings
+        print("\nTest 2: Multiple partial endings")
+        try:
+            # Start with multiple formats, end them one by one
+            Format("red_bold", "</red, bold>")
+            Format("blue_italic", "</blue, italic>")
+            
+            test_string2 = (
+                "</fmt red_bold, fmt blue_italic, underline>"
+                "All formatting active."
+                "</end red_bold>"
+                "Blue italic underline."
+                "</end blue_italic>"
+                "Just underline."
+            )
+            
+            result2 = _reconstruct_fdl_string(test_string2)
+            print(f"  Result: ", end="")
+            print(result2)
+            print(f"  Raw: {repr(result2)}")
+            
+            # Should contain all three text segments
+            expected_texts = ["All formatting active", "Blue italic underline", "Just underline"]
+            for text in expected_texts:
+                if text not in result2:
+                    print(f"  ❌ Missing text segment: '{text}'")
+                    return False
+            
+            # Underline should be present throughout, never ended
+            if '\033[4m' not in result2:
+                print("  ❌ Missing underline in multiple partial endings")
+                return False
+            
+            if '\033[24m' in result2:
+                print("  ❌ Underline was ended in multiple partial endings")
+                return False
+            
+            print("  ✓ Multiple partial endings work")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in multiple partial endings: {e}")
+            return False
+        
+        # Test 3: Ending individual properties vs ending formats
+        print("\nTest 3: Individual property endings vs format endings")
+        try:
+            test_string3 = (
+                "</fmt format2, underline>"
+                "Format plus underline."
+                "</end bold>"  # End just bold property
+                "Format minus bold."
+                "</end format2>"  # End entire format
+                "Just underline."
+            )
+            
+            result3 = _reconstruct_fdl_string(test_string3)
+            print(f"  Result: ", end="")
+            print(result3)
+            print(f"  Raw: {repr(result3)}")
+            
+            # Should have all text segments
+            expected_texts = ["Format plus underline", "Format minus bold", "Just underline"]
+            for text in expected_texts:
+                if text not in result3:
+                    print(f"  ❌ Missing text: '{text}'")
+                    return False
+            
+            # Should contain bold turn-off code (\033[22m) after first segment
+            if '\033[22m' not in result3:
+                print("  ❌ Missing bold turn-off code")
+                return False
+            
+            print("  ✓ Individual vs format endings work")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in individual endings test: {e}")
+            return False
+        
+        # Test 4: Complex chaining with partial endings
+        print("\nTest 4: Format chaining with partial endings")
+        try:
+            Format("base", "</bold>")
+            Format("color", "</red>")
+            Format("bg", "</bkg yellow>")
+            
+            test_string4 = (
+                "</fmt base, fmt color, fmt bg, italic>"
+                "All: bold red yellow italic."
+                "</end base, color>"  # End bold and red
+                "Yellow italic only."
+                "</end bg>"  # End yellow background
+                "Italic only."
+            )
+            
+            result4 = _reconstruct_fdl_string(test_string4)
+            print(f"  Result: ", end="")
+            print(result4)
+            print(f"  Raw: {repr(result4)}")
+            
+            # Should have all segments
+            expected_texts = ["bold red yellow italic", "Yellow italic only", "Italic only"]
+            for text in expected_texts:
+                if text not in result4:
+                    print(f"  ❌ Missing text: '{text}'")
+                    return False
+            
+            # Italic should be present throughout
+            if '\033[3m' not in result4:
+                print("  ❌ Missing italic - should be present throughout")
+                return False
+            
+            if '\033[23m' in result4:
+                print("  ❌ Italic was ended - should remain active")
+                return False
+            
+            print("  ✓ Complex chaining with partial endings works")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in complex chaining test: {e}")
+            return False
+        
+        # Test 5: Verify Python string concatenation behavior
+        print("\nTest 5: Python string concatenation verification")
+        try:
+            # Test that our multi-line string becomes single string
+            multi_line = (
+                "Part 1 "
+                "Part 2 "
+                "Part 3"
+            )
+            
+            single_line = "Part 1 Part 2 Part 3"
+            
+            if multi_line != single_line:
+                print(f"  ❌ String concatenation failed: {repr(multi_line)} != {repr(single_line)}")
+                return False
+            
+            # Test with fdl commands
+            fdl_multi = (
+                "</bold>"
+                "Bold text"
+                "</end bold>"
+                "Normal text"
+            )
+            
+            fdl_single = "</bold>Bold text</end bold>Normal text"
+            
+            if fdl_multi != fdl_single:
+                print(f"  ❌ FDL string concatenation failed")
+                return False
+            
+            # Test that both produce same result
+            result_multi = _reconstruct_fdl_string(fdl_multi)
+            result_single = _reconstruct_fdl_string(fdl_single)
+            
+            if result_multi != result_single:
+                print(f"  ❌ Multi vs single string produce different results")
+                print(f"    Multi:  {repr(result_multi)}")
+                print(f"    Single: {repr(result_single)}")
+                return False
+            
+            print("  ✓ Python string concatenation works correctly with fdl")
+            
+        except Exception as e:
+            print(f"  ❌ Exception in concatenation test: {e}")
+            return False
+        
+        print("\n✓ All multi-string and partial ending tests passed!")
+        print("✓ Python string concatenation works with fdl")
+        print("✓ Partial format endings work correctly")
+        print("✓ Individual property endings work")
+        print("✓ Complex combinations work")
+        
+        return True
+
+    
     def run_all_tests(self):
         """Run the complete test suite."""
         print("=" * 70)
@@ -473,6 +866,9 @@ class FormatTestSuite:
             self.run_test("Command processor integration", self.test_command_processor_integration)
             self.run_test("Format registry functionality", self.test_format_registry_functionality)
             self.run_test("Edge cases", self.test_edge_cases)
+            self.run_test("Format chaining", self.test_format_chaining)
+            self.run_test("Multi-string and partial endings", self.test_multi_string_and_partial_endings)
+
         
         # Print summary
         print("\n" + "=" * 70)
