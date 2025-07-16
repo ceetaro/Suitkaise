@@ -50,6 +50,7 @@ class _FormattingState:
         italic (bool): Italic text formatting active  
         underline (bool): Underline text formatting active
         strikethrough (bool): Strikethrough text formatting active
+        justify (Optional[str]): Text justification type (left, right, center)
         active_formats (Set[str]): Set of active named formats
     """
     text_color: Optional[str] = None
@@ -58,6 +59,7 @@ class _FormattingState:
     italic: bool = False
     underline: bool = False
     strikethrough: bool = False
+    justify: Optional[str] = None
     active_formats: Set[str] = field(default_factory=set)
 
     def copy(self) -> '_FormattingState':
@@ -69,6 +71,7 @@ class _FormattingState:
             italic=self.italic,
             underline=self.underline,
             strikethrough=self.strikethrough,
+            justify=self.justify,
             active_formats=self.active_formats.copy()
         )
     
@@ -80,6 +83,7 @@ class _FormattingState:
         self.italic = False
         self.underline = False
         self.strikethrough = False
+        self.justify = None
         self.active_formats.clear()
 
     def apply_defaults_from(self, default_state: '_FormattingState') -> None:
@@ -90,6 +94,7 @@ class _FormattingState:
         self.italic = default_state.italic
         self.underline = default_state.underline
         self.strikethrough = default_state.strikethrough
+        self.justify = default_state.justify
         self.active_formats = default_state.active_formats.copy()
 
     def __eq__(self, other) -> bool:
@@ -103,6 +108,7 @@ class _FormattingState:
             self.italic == other.italic and
             self.underline == other.underline and
             self.strikethrough == other.strikethrough and
+            self.justify == other.justify and
             self.active_formats == other.active_formats
         )
     
@@ -115,6 +121,7 @@ class _FormattingState:
             self.italic,
             self.underline,
             self.strikethrough,
+            self.justify,
             tuple(sorted(self.active_formats))
         ))
     
@@ -590,6 +597,13 @@ class _CommandProcessor:
             bg_color = command[4:].strip()
             state.background_color = bg_color
             return
+        
+        # Add after the background color handling:
+        if command.startswith('justify '):
+            justify_type = command[8:].strip()
+            if justify_type in ['left', 'right', 'center']:
+                state.justify = justify_type
+                return
         
         # Handle format references - IMPLEMENTED!
         if command.startswith('fmt '):

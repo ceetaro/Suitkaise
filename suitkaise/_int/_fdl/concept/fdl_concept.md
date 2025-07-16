@@ -734,15 +734,59 @@ table1.add_columns(["Parser Process", "Event Hub Process"])
 table1.add_row("Memory Usage")
 table1.add_rows(["Num Threads", "Time Created", "Time Ended"])
 
-# populate cells using int coords
+# populate cells using int coords (1-based)
 table1.populate(1, 1, "str or str(value)")
 # populate cells using row and column names (order doesn't matter as long as rows and columns have unique names)
 table1.populate("Parser Process", "Memory Usage", "str or str(value)")
+
+# or a mix of both:
+table1.populate("Event Hub Process", 3, "str or str(value)")
 
 # set formatting for rows, columns, or cells
 table1.set_cell_format(format=fdl.Format)
 table1.set_row_format(format=fdl.Format)
 table1.set_column_format(format=fdl.Format)
+
+# column only table
+table2 = fdl.ColumnTable()
+# can only add columns, and a max of 10 rows down are available
+table2.add_column("Component")
+# or...
+table2.add_columns("Component", "Status")
+
+# populate cells by adding them to columns
+# add a value to column 1 (adds to lowest y coordinate empty cell)
+table2.populate_first_column(1, "CPU") # add to column 1, "row" 1 (1, 1)
+# then, if you were to...
+table2.populate_first_column(1, "GPU") # added to 1, 2 automatically
+
+# adding to other columns requires you to add via (column 1 value, other column name)
+table2.populate("CPU", "Status", "Very Busy")
+# or...
+table2.populate("CPU", 2, "Very Busy")
+
+# row only table
+table2 = fdl.RowTable()
+# can only add rows, and a max of 3 columns over are available
+table2.add_row("Component")
+# or...
+table2.add_rows("Component", "Status")
+
+# populate cells by adding them to rows
+# add a value to row 1 (adds to lowest x coordinate empty cell)
+table2.populate_first_row(1, "CPU") # add to row 1, "column" 1 (1, 1)
+# then, if you were to...
+table2.populate_first_row(1, "GPU") # added to 2, 1 automatically
+
+# adding to other rows requires you to add via (row 1 value, other row name)
+table2.populate("CPU", "Status", "Very Busy")
+# or...
+table2.populate("CPU", 2, "Very Busy")
+
+# depopulating and repopulating cells (does not update in real time)
+table.depopulate(1, 3)
+# cells CANNOT be overridden unless repopulate is used
+table.repopulate(2, "Status", "Not Busy")
 
 # printing table
 fdl.print("<table1>", (table1,))
@@ -848,13 +892,13 @@ We will start by creating private equivalents to all of these methods so that an
 
 - for complex combinations like `</fmt base, rgb(255,0,0)>`, attempts lookups first for each entry and then combines ANSI. If a newly encountered color needs to be converted and cached for the first time, does that first and then combines.
 
-3. fdl Format class
+3. fdl Format class DONE
 4. Renderer - Combine everything into final output
 - also handle output to other destinations (files, MarkDown and HTML)
 5. Internal `_print()` functions that tie basic execution together
 
 ### Advanced objects
-6. Time objects - `<time:>`, `<elapsed:duration>` handling
+6. Time objects - `<time:>`, `<elapsed:duration>` handling DONE
 7. Custom progress bar - using cached terminal width and batched updates with smooth animation
 8. Custom spinners - global state, simple animation
 9. Custom tables - pre-calculated layout, row/column limits

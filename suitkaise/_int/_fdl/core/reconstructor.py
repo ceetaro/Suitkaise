@@ -116,6 +116,9 @@ def _reconstruct_fdl_string(format_string: str, values: Optional[Tuple] = None,
 
     final_string += command_proc.generate_reset_ansi()
 
+    if current_state.justify:
+        final_string = _apply_justification(final_string, current_state.justify)
+
     return final_string
 
 def _validate_variables(parse_result: _ParseResult, values: Optional[Tuple], 
@@ -509,3 +512,45 @@ def _remove_format_from_state(format_name: str, current_state: _FormattingState)
         
     except Exception as e:
         warnings.warn(f"Failed to remove format '{format_name}': {e}")
+
+def _apply_justification(text: str, justify: str) -> str:
+    """Apply justification to final output text."""
+    if not justify or justify == "left":
+        return text  # Default - no change
+    
+    # Import here to avoid circular imports
+    from ..setup.terminal import _terminal
+    terminal_width = _terminal.width
+    
+    lines = text.split('\n')
+    justified_lines = []
+    
+    for line in lines:
+        if not line.strip():  # Skip empty lines
+            justified_lines.append(line)
+            continue
+            
+        # Calculate visible length (strip ANSI codes for measurement)
+        visible_line = _strip_ansi_for_measurement(line)
+        visible_length = len(visible_line)
+        available_space = terminal_width - visible_length
+        
+        if justify == "right":
+            padding = max(0, available_space)
+            justified_line = ' ' * padding + line
+        elif justify == "center":
+            padding = max(0, available_space // 2)
+            justified_line = ' ' * padding + line
+        else:
+            justified_line = line
+            
+        justified_lines.append(justified_line)
+    
+    return '\n'.join(justified_lines)
+
+def _strip_ansi_for_measurement(text: str) -> str:
+    """Strip ANSI codes to measure visible text length."""
+    import re
+    # Remove ANSI escape sequences
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)

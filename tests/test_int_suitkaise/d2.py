@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import your modules with actual project paths
 try:
-    from suitkaise._int.formatting.terminal import _terminal, TerminalWidthError
-    from suitkaise._int.formatting.unicode import (
+    from suitkaise._int._fdl.setup.terminal import _terminal, TerminalWidthError
+    from suitkaise._int._fdl.setup.unicode import (
         _get_unicode_support, 
         _supports_box_drawing, 
         _supports_unicode_spinners, 
