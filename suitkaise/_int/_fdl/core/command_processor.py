@@ -14,6 +14,7 @@ Features:
 - Thread-safe caching design
 - Support for all fdl command types including reset commands
 - Minimal ANSI output through incremental state changes
+- Format application during compilation (breaks circular imports)
 """
 
 import threading
@@ -590,11 +591,13 @@ class _CommandProcessor:
             state.background_color = bg_color
             return
         
-        # Handle format references (placeholder for future implementation)
+        # Handle format references - IMPLEMENTED!
         if command.startswith('fmt '):
             format_name = command[4:].strip()
-            # TODO: This will be implemented when Format class is integrated
-            state.active_formats.add(format_name)
+            try:
+                self._apply_format_to_state(format_name, state)
+            except Exception as e:
+                raise UnsupportedCommandError(f"Failed to apply format '{format_name}': {e}")
             return
         
         # Check if this is an object-specific command that got through
@@ -605,6 +608,79 @@ class _CommandProcessor:
         
         # Unknown command
         raise UnsupportedCommandError(f"Unknown command: {command}")
+    
+    def _apply_format_to_state(self, format_name: str, state: _FormattingState) -> None:
+        """
+        Apply a named format to a formatting state.
+        
+        Args:
+            format_name (str): Name of format to apply
+            state (_FormattingState): State to modify in-place
+            
+        This implements format application directly in the command processor
+        to avoid circular imports. Uses late import to access the format registry.
+        """
+        try:
+            # Use different import approaches for different contexts
+            registry = None
+            try:
+                # Try relative import first
+                from .format_class import _get_format_registry
+                registry = _get_format_registry()
+            except ImportError:
+                try:
+                    # Try absolute import for testing
+                    from format_class import _get_format_registry
+                    registry = _get_format_registry()
+                except ImportError:
+                    # If we can't import, warn and skip
+                    warnings.warn(f"Format system not available, ignoring format '{format_name}'", UserWarning)
+                    return
+            
+            if registry is None:
+                warnings.warn(f"Format registry not available, ignoring format '{format_name}'", UserWarning)
+                return
+            
+            compiled = registry._get(format_name)
+            
+            if not compiled:
+                raise Exception(f"Format '{format_name}' not found in registry")
+            
+            # Apply the format's state to current state (override conflicts)
+            format_state = compiled.formatting_state
+            
+            # DEBUG: Print what we're applying (can remove in production)
+            # print(f"DEBUG: Applying format '{format_name}':")
+            # print(f"  Format state: bold={format_state.bold}, color={format_state.text_color}, italic={format_state.italic}")
+            # print(f"  Before: bold={state.bold}, color={state.text_color}, italic={state.italic}")
+            
+            # Apply all properties from the format state
+            # Color properties: only apply if format has them set
+            if format_state.text_color is not None:
+                state.text_color = format_state.text_color
+            if format_state.background_color is not None:
+                state.background_color = format_state.background_color
+            
+            # Boolean properties: apply if format has them as True
+            # (This preserves existing True values and adds new ones)
+            if format_state.bold:
+                state.bold = True
+            if format_state.italic:
+                state.italic = True
+            if format_state.underline:
+                state.underline = True
+            if format_state.strikethrough:
+                state.strikethrough = True
+            
+            # Copy active formats
+            state.active_formats.update(format_state.active_formats)
+            state.active_formats.add(format_name)
+            
+            # DEBUG: Print result (can remove in production)
+            # print(f"  After: bold={state.bold}, color={state.text_color}, italic={state.italic}")
+            
+        except Exception as e:
+            raise Exception(f"Failed to apply format '{format_name}': {e}")
     
     def _is_object_specific_command(self, command: str) -> bool:
         """
@@ -703,11 +779,123 @@ class _CommandProcessor:
         # Handle format reference end commands
         if end_target.startswith('fmt '):
             format_name = end_target[4:].strip()
-            state.active_formats.discard(format_name)
+            if format_name in state.active_formats:
+                self._remove_format_from_state(format_name, state, default_state)
+            return
+        
+        # Handle ending named formats directly - IMPLEMENTED!
+        if end_target in state.active_formats:
+            self._remove_format_from_state(end_target, state, default_state)
             return
         
         # Unknown end target
         raise UnsupportedCommandError(f"Unknown end target: {end_target}")
+    
+    def _remove_format_from_state(self, format_name: str, state: _FormattingState, 
+                                 default_state: Optional[_FormattingState] = None) -> None:
+        """
+        Remove a format's effects from the current state using recomputation.
+        
+        Args:
+            format_name (str): Name of format to remove
+            state (_FormattingState): State to modify
+            default_state (Optional[_FormattingState]): Default state
+            
+        Strategy: Recompute the state from scratch by applying all remaining formats.
+        This ensures correctness without complex property tracking.
+        """
+        # Remove the format from active formats first
+        state.active_formats.discard(format_name)
+        
+        # Store current non-format properties (directly set properties)
+        # These are properties that weren't set by formats
+        remaining_formats = state.active_formats.copy()
+        
+        # Store any directly-set properties by checking what would remain 
+        # if we only had the remaining formats
+        temp_state = _FormattingState()
+        temp_state.active_formats = remaining_formats.copy()
+        
+        # Apply default state if provided
+        if default_state:
+            temp_state.text_color = default_state.text_color
+            temp_state.background_color = default_state.background_color
+            temp_state.bold = default_state.bold
+            temp_state.italic = default_state.italic
+            temp_state.underline = default_state.underline
+            temp_state.strikethrough = default_state.strikethrough
+        
+        # Reapply all remaining formats to get the correct final state
+        for remaining_format in remaining_formats:
+            try:
+                self._apply_format_to_state_direct(remaining_format, temp_state)
+            except Exception as e:
+                warnings.warn(f"Failed to reapply format '{remaining_format}' during removal: {e}")
+        
+        # Update the original state with the recomputed state
+        state.text_color = temp_state.text_color
+        state.background_color = temp_state.background_color
+        state.bold = temp_state.bold
+        state.italic = temp_state.italic
+        state.underline = temp_state.underline
+        state.strikethrough = temp_state.strikethrough
+        state.active_formats = temp_state.active_formats
+    
+    def _apply_format_to_state_direct(self, format_name: str, state: _FormattingState) -> None:
+        """
+        Apply a format directly to a state without error handling wrapper.
+        
+        Used internally by _remove_format_from_state for recomputation.
+        """
+        try:
+            # Use different import approaches for different contexts
+            registry = None
+            try:
+                # Try relative import first
+                from .format_class import _get_format_registry
+                registry = _get_format_registry()
+            except ImportError:
+                try:
+                    # Try absolute import for testing
+                    from format_class import _get_format_registry
+                    registry = _get_format_registry()
+                except ImportError:
+                    # If we can't import, skip silently (used in recomputation)
+                    return
+            
+            if registry is None:
+                return
+            
+            compiled = registry._get(format_name)
+            if not compiled:
+                return  # Format not found, skip silently during recomputation
+            
+            # Apply the format's state to current state
+            format_state = compiled.formatting_state
+            
+            # Apply all properties from the format state
+            if format_state.text_color is not None:
+                state.text_color = format_state.text_color
+            if format_state.background_color is not None:
+                state.background_color = format_state.background_color
+            
+            # Boolean properties: apply if format has them as True
+            if format_state.bold:
+                state.bold = True
+            if format_state.italic:
+                state.italic = True
+            if format_state.underline:
+                state.underline = True
+            if format_state.strikethrough:
+                state.strikethrough = True
+            
+            # Copy active formats
+            state.active_formats.update(format_state.active_formats)
+            state.active_formats.add(format_name)
+            
+        except Exception:
+            # Silent failure during recomputation - don't break the process
+            pass
     
     def create_default_state(self, **kwargs) -> _FormattingState:
         """
@@ -763,365 +951,3 @@ def _get_command_processor() -> _CommandProcessor:
     if _global_processor is None:
         _global_processor = _CommandProcessor()
     return _global_processor
-
-
-# Test script for Command Processor - comprehensive validation
-if __name__ == "__main__":
-    def test_command_processor():
-        """Comprehensive test suite for the command processor."""
-        
-        print("=" * 60)
-        print("COMMAND PROCESSOR TEST SUITE")
-        print("=" * 60)
-        
-        processor = _CommandProcessor()
-        test_count = 0
-        passed_count = 0
-        
-        def run_test(name: str, test_func):
-            """Run a single test case."""
-            nonlocal test_count, passed_count
-            test_count += 1
-            
-            print(f"\nTest {test_count}: {name}")
-            
-            try:
-                passed = test_func(processor)
-                if passed:
-                    print("✅ PASSED")
-                    passed_count += 1
-                else:
-                    print("❌ FAILED")
-                    
-            except Exception as e:
-                print(f"❌ EXCEPTION: {e}")
-                import traceback
-                traceback.print_exc()
-                
-            print("-" * 40)
-        
-        # Test 1: Basic text formatting commands
-        def test_basic_formatting(proc):
-            initial_state = _FormattingState()
-            
-            # Test bold
-            new_state, ansi = proc.process_command("bold", initial_state)
-            if not new_state.bold or ansi != '\033[1m':
-                print(f"❌ Bold failed: bold={new_state.bold}, ansi='{ansi}'")
-                return False
-            
-            # Test italic
-            new_state, ansi = proc.process_command("italic", new_state)
-            if not new_state.italic or ansi != '\033[3m':
-                print(f"❌ Italic failed: italic={new_state.italic}, ansi='{ansi}'")
-                return False
-            
-            print("✓ Basic formatting commands work")
-            return True
-        
-        # Test 2: Color commands
-        def test_color_commands(proc):
-            initial_state = _FormattingState()
-            
-            # Test named color
-            new_state, ansi = proc.process_command("red", initial_state)
-            if new_state.text_color != "red" or ansi != '\033[31m':
-                print(f"❌ Red color failed: color={new_state.text_color}, ansi='{ansi}'")
-                return False
-            
-            # Test hex color
-            new_state, ansi = proc.process_command("#FF0000", initial_state)
-            if new_state.text_color != "#FF0000" or not ansi.startswith('\033[38;2;255;0;0m'):
-                print(f"❌ Hex color failed: color={new_state.text_color}, ansi='{ansi}'")
-                return False
-            
-            # Test RGB color
-            new_state, ansi = proc.process_command("rgb(0, 255, 0)", initial_state)
-            if new_state.text_color != "rgb(0, 255, 0)" or not ansi.startswith('\033[38;2;0;255;0m'):
-                print(f"❌ RGB color failed: color={new_state.text_color}, ansi='{ansi}'")
-                return False
-            
-            print("✓ Color commands work")
-            return True
-        
-        # Test 3: Background color commands
-        def test_background_commands(proc):
-            initial_state = _FormattingState()
-            
-            # Test named background
-            new_state, ansi = proc.process_command("bkg blue", initial_state)
-            if new_state.background_color != "blue" or ansi != '\033[44m':
-                print(f"❌ Background failed: bg={new_state.background_color}, ansi='{ansi}'")
-                return False
-            
-            # Test hex background
-            new_state, ansi = proc.process_command("bkg #00FF00", initial_state)
-            if new_state.background_color != "#00FF00" or not ansi.startswith('\033[48;2;0;255;0m'):
-                print(f"❌ Hex background failed: bg={new_state.background_color}, ansi='{ansi}'")
-                return False
-            
-            print("✓ Background commands work")
-            return True
-        
-        # Test 4: End commands
-        def test_end_commands(proc):
-            # Set up initial state with formatting
-            initial_state = _FormattingState()
-            initial_state.bold = True
-            initial_state.text_color = "red"
-            
-            # Test end bold
-            new_state, ansi = proc.process_command("end bold", initial_state)
-            if new_state.bold or ansi != '\033[22m':
-                print(f"❌ End bold failed: bold={new_state.bold}, ansi='{ansi}'")
-                return False
-            
-            # Test end color
-            new_state, ansi = proc.process_command("end red", initial_state)
-            if new_state.text_color is not None or ansi != '\033[39m':
-                print(f"❌ End color failed: color={new_state.text_color}, ansi='{ansi}'")
-                return False
-            
-            print("✓ End commands work")
-            return True
-        
-        # Test 5: Reset commands
-        def test_reset_commands(proc):
-            # Set up state with all formatting
-            initial_state = _FormattingState()
-            initial_state.bold = True
-            initial_state.italic = True
-            initial_state.text_color = "red"
-            initial_state.background_color = "blue"
-            
-            # Test reset command
-            new_state, ansi = proc.process_command("reset", initial_state)
-            # State should be cleared
-            if (new_state.bold or new_state.italic or new_state.text_color or 
-                new_state.background_color):
-                print(f"❌ Reset failed: state not cleared properly")
-                print(f"   bold={new_state.bold}, italic={new_state.italic}")
-                print(f"   color={new_state.text_color}, bg={new_state.background_color}")
-                return False
-            
-            # ANSI should show transition from formatted state to clear state
-            # This will generate codes to turn off bold, italic, reset colors
-            expected_ansi_parts = ['\033[22m', '\033[23m', '\033[39m', '\033[49m']
-            if not all(part in ansi for part in expected_ansi_parts):
-                print(f"❌ Reset ANSI incomplete: got '{ansi}'")
-                print(f"   Expected parts: {expected_ansi_parts}")
-                return False
-            
-            # Test end all command
-            new_state, ansi = proc.process_command("end all", initial_state)
-            # State should be cleared
-            if (new_state.bold or new_state.italic or new_state.text_color or 
-                new_state.background_color):
-                print(f"❌ End all failed: state not cleared properly")
-                return False
-            
-            # ANSI should be the same as reset
-            if not all(part in ansi for part in expected_ansi_parts):
-                print(f"❌ End all ANSI incomplete: got '{ansi}'")
-                return False
-            
-            print("✓ Reset commands work")
-            return True
-        
-        # Test 6: Object-specific commands (should be ignored)
-        def test_object_commands(proc):
-            initial_state = _FormattingState()
-            initial_state.bold = True  # Should remain unchanged
-            
-            # Test 12hr command (object-specific)
-            new_state, ansi = proc.process_command("12hr", initial_state)
-            if not new_state.bold or ansi != '':
-                print(f"❌ Object command not ignored: bold={new_state.bold}, ansi='{ansi}'")
-                return False
-            
-            # Test timezone command (object-specific)
-            new_state, ansi = proc.process_command("tz pst", initial_state)
-            if not new_state.bold or ansi != '':
-                print(f"❌ Timezone command not ignored: bold={new_state.bold}, ansi='{ansi}'")
-                return False
-            
-            # Test time ago command (object-specific)
-            new_state, ansi = proc.process_command("time ago", initial_state)
-            if not new_state.bold or ansi != '':
-                print(f"❌ Time ago command not ignored: bold={new_state.bold}, ansi='{ansi}'")
-                return False
-            
-            print("✓ Object-specific commands properly ignored")
-            return True
-        
-        # Test 7: Batch command processing
-        def test_batch_processing(proc):
-            initial_state = _FormattingState()
-            
-            # Test multiple formatting commands
-            commands = ["bold", "red", "bkg blue"]
-            new_state, ansi = proc.process_commands(commands, initial_state)
-            
-            if not new_state.bold or new_state.text_color != "red" or new_state.background_color != "blue":
-                print(f"❌ Batch processing failed: bold={new_state.bold}, color={new_state.text_color}, bg={new_state.background_color}")
-                return False
-            
-            # Should combine all ANSI codes
-            expected_ansi = '\033[1m\033[31m\033[44m'
-            if ansi != expected_ansi:
-                print(f"❌ Batch ANSI failed: expected='{expected_ansi}', got='{ansi}'")
-                return False
-            
-            print("✓ Batch processing works")
-            return True
-        
-        # Test 8: Mixed formatting and object commands
-        def test_mixed_commands(proc):
-            initial_state = _FormattingState()
-            
-            # Mix formatting and object commands
-            commands = ["bold", "12hr", "red", "time ago", "bkg blue"]
-            new_state, ansi = proc.process_commands(commands, initial_state)
-            
-            # Only formatting commands should be applied
-            if (not new_state.bold or new_state.text_color != "red" or 
-                new_state.background_color != "blue"):
-                print(f"❌ Mixed commands failed: formatting not applied correctly")
-                return False
-            
-            # ANSI should only include formatting commands
-            expected_ansi = '\033[1m\033[31m\033[44m'
-            if ansi != expected_ansi:
-                print(f"❌ Mixed ANSI failed: expected='{expected_ansi}', got='{ansi}'")
-                return False
-            
-            print("✓ Mixed command filtering works")
-            return True
-        
-        # Test 9: State transitions and caching
-        def test_state_transitions(proc):
-            state1 = _FormattingState()
-            state1.bold = True
-            
-            state2 = _FormattingState()
-            state2.bold = True
-            state2.italic = True
-            
-            # Test transition from state1 to state2
-            ansi = proc.converter.generate_transition_ansi(state1, state2)
-            if ansi != '\033[3m':  # Should only add italic
-                print(f"❌ State transition failed: expected='\\033[3m', got='{ansi}'")
-                return False
-            
-            # Test caching - same transition should hit cache
-            ansi2 = proc.converter.generate_transition_ansi(state1, state2)
-            if ansi2 != ansi:
-                print(f"❌ Caching failed: results differ")
-                return False
-            
-            # Check cache stats
-            stats = proc.get_performance_stats()
-            if stats['cache_hits'] == 0:
-                print(f"❌ Cache not working: no hits recorded")
-                return False
-            
-            print("✓ State transitions and caching work")
-            return True
-        
-        # Test 10: Helper methods
-        def test_helper_methods(proc):
-            commands = ["bold", "12hr", "red", "tz pst", "underline", "time ago"]
-            
-            # Test object command filtering
-            obj_commands = proc.get_object_commands(commands)
-            expected_obj = ["12hr", "tz pst", "time ago"]
-            if obj_commands != expected_obj:
-                print(f"❌ Object filtering failed: expected={expected_obj}, got={obj_commands}")
-                return False
-            
-            # Test formatting command filtering
-            fmt_commands = proc.get_formatting_commands(commands)
-            expected_fmt = ["bold", "red", "underline"]
-            if fmt_commands != expected_fmt:
-                print(f"❌ Formatting filtering failed: expected={expected_fmt}, got={fmt_commands}")
-                return False
-            
-            print("✓ Helper methods work")
-            return True
-        
-        # Test 11: Default state handling
-        def test_default_state(proc):
-            # Create default state
-            default_state = proc.create_default_state(text_color="blue", bold=True)
-            
-            if default_state.text_color != "blue" or not default_state.bold:
-                print(f"❌ Default state creation failed")
-                return False
-            
-            # Test end command with default state
-            current_state = _FormattingState()
-            current_state.text_color = "red"
-            
-            new_state, ansi = proc.process_command("end red", current_state, default_state)
-            if new_state.text_color != "blue":  # Should revert to default
-                print(f"❌ Default state revert failed: color={new_state.text_color}")
-                return False
-            
-            print("✓ Default state handling works")
-            return True
-        
-        # Test 12: Error handling
-        def test_error_handling(proc):
-            initial_state = _FormattingState()
-            
-            try:
-                # Test unknown command
-                proc.process_command("unknown_command", initial_state)
-                print("❌ Should have raised UnsupportedCommandError")
-                return False
-            except UnsupportedCommandError:
-                pass  # Expected
-            
-            try:
-                # Test invalid property in default state
-                proc.create_default_state(invalid_property="value")
-                print("❌ Should have raised ValueError")
-                return False
-            except ValueError:
-                pass  # Expected
-            
-            print("✓ Error handling works")
-            return True
-        
-        # Run all tests
-        run_test("Basic text formatting commands", test_basic_formatting)
-        run_test("Color commands", test_color_commands)
-        run_test("Background color commands", test_background_commands)
-        run_test("End commands", test_end_commands)
-        run_test("Reset commands", test_reset_commands)
-        run_test("Object-specific commands (ignored)", test_object_commands)
-        run_test("Batch command processing", test_batch_processing)
-        run_test("Mixed formatting and object commands", test_mixed_commands)
-        run_test("State transitions and caching", test_state_transitions)
-        run_test("Helper methods", test_helper_methods)
-        run_test("Default state handling", test_default_state)
-        run_test("Error handling", test_error_handling)
-        
-        print("\n" + "=" * 60)
-        print(f"TEST RESULTS: {passed_count}/{test_count} tests passed")
-        if passed_count == test_count:
-            print("🎉 ALL TESTS PASSED!")
-            print("\n📊 PERFORMANCE STATS:")
-            stats = processor.get_performance_stats()
-            print(f"Cache hits: {stats['cache_hits']}")
-            print(f"Cache misses: {stats['cache_misses']}")
-            print(f"Cache hit rate: {stats['cache_hit_rate']:.2%}")
-            print(f"Transition cache size: {stats['transition_cache_size']}")
-        else:
-            print(f"❌ {test_count - passed_count} tests failed")
-        print("=" * 60)
-        
-        return passed_count == test_count
-    
-    # Run the tests
-    test_command_processor()

@@ -8,21 +8,21 @@ Internal components:
 - _CompiledFormat: Internal representation of compiled formats
 - _FormatRegistry: Global registry with thread-safe access
 - _compile_format_string: Internal compilation function
-- _apply_format_to_state: Internal function for command processor integration
+
+CIRCULAR IMPORT FIXED: Removed dependency on command_processor during module import.
+Command processor now handles format application directly to avoid circular imports.
 """
 
 import threading
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple, Set, Any
 from dataclasses import dataclass
 
 try:
     # Try relative imports first (when used as module)
     from .parser import _fdlParser
-    from .command_processor import _get_command_processor, _FormattingState
 except ImportError:
     # Fall back to direct imports (when run as script)
     from parser import _fdlParser
-    from command_processor import _get_command_processor, _FormattingState
 
 
 # Exception classes - these will be re-exported by public API
@@ -54,11 +54,22 @@ class _CompiledFormat:
     This is purely internal - users never see this directly.
     """
     name: str
-    formatting_state: _FormattingState
+    formatting_state: Any  # _FormattingState - using Any to avoid circular imports
     direct_ansi: str
     referenced_formats: Set[str]
     original_string: str
     compilation_order: int
+
+
+# Import FormattingState late to avoid circular imports
+def _get_formatting_state_class():
+    """Late import of FormattingState to avoid circular imports."""
+    try:
+        from .command_processor import _FormattingState
+        return _FormattingState
+    except ImportError:
+        from command_processor import _FormattingState
+        return _FormattingState
 
 
 class _FormatRegistry:
@@ -155,6 +166,9 @@ def _compile_format_string(name: str, format_string: str) -> _CompiledFormat:
     INTERNAL: Compile a format string into internal representation.
     
     Called by public Format class constructor.
+    
+    UPDATED: Uses late imports to avoid circular dependency issues.
+    Format application is now handled by the command processor directly.
     """
     # Parse the format string
     parser = _fdlParser()
@@ -181,6 +195,12 @@ def _compile_format_string(name: str, format_string: str) -> _CompiledFormat:
     command_elements = parsed.commands
     if not command_elements:
         raise InvalidFormatError("Format string must contain at least one command")
+    
+    # Late import to avoid circular dependencies
+    try:
+        from .command_processor import _get_command_processor
+    except ImportError:
+        from command_processor import _get_command_processor
     
     command_proc = _get_command_processor()
     referenced_formats = set()
@@ -210,9 +230,14 @@ def _compile_format_string(name: str, format_string: str) -> _CompiledFormat:
         if ref_name != name and not registry._exists(ref_name):
             raise FormatNotFoundError(f"Referenced format '{ref_name}' not found")
     
-    # Compile to target state
+    # Compile to target state using command processor
     try:
-        blank_state = _FormattingState()
+        # Get FormattingState class with late import
+        FormattingState = _get_formatting_state_class()
+        blank_state = FormattingState()
+        
+        # Process commands to get target state
+        # The command processor now handles fmt commands properly!
         target_state, _ = command_proc.process_commands(formatting_commands, blank_state)
     except Exception as e:
         raise InvalidFormatError(f"Failed to process commands: {e}")
@@ -241,26 +266,6 @@ def _register_compiled_format(compiled_format: _CompiledFormat) -> None:
 def _get_compiled_format(name: str) -> Optional[_CompiledFormat]:
     """INTERNAL: Get a compiled format by name."""
     return _get_format_registry()._get(name)
-
-
-def _apply_format_to_state(format_name: str, current_state: _FormattingState) -> Tuple[_FormattingState, str]:
-    """
-    INTERNAL: Apply a named format to a formatting state.
-    
-    Used by command processor when handling 'fmt formatname' commands.
-    """
-    registry = _get_format_registry()
-    compiled = registry._get(format_name)
-    
-    if not compiled:
-        raise FormatNotFoundError(f"Format '{format_name}' not found")
-    
-    command_proc = _get_command_processor()
-    ansi_sequence = command_proc.converter.generate_transition_ansi(
-        current_state, compiled.formatting_state
-    )
-    
-    return compiled.formatting_state.copy(), ansi_sequence
 
 
 # Additional internal functions for public API

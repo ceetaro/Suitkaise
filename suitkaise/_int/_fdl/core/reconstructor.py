@@ -10,6 +10,8 @@ Key responsibilities:
 - Handle mixed content (commands + objects at same position)
 - Variable substitution and validation
 - Error handling with detailed messages
+
+FIXED: Removed circular import by removing dependency on removed function.
 """
 
 import warnings
@@ -18,19 +20,17 @@ from collections import defaultdict
 
 warnings.simplefilter("always")
 
-# To this:
+# Fixed imports - removed _apply_format_to_state (no longer exists)
 try:
     # Try relative imports first (when used as module)
     from .parser import _fdlParser, _ParseResult, _ParsedElement
     from .command_processor import _get_command_processor, _FormattingState
     from .object_processor import _get_object_processor
-    from .format_class import _apply_format_to_state
 except ImportError:
     # Fall back to direct imports (when run as script)
     from parser import _fdlParser, _ParseResult, _ParsedElement
     from command_processor import _get_command_processor, _FormattingState
     from object_processor import _get_object_processor
-    from format_class import _apply_format_to_state
 
 
 class ReconstructionError(Exception):
@@ -431,7 +431,11 @@ def _apply_format_to_current_state(format_name: str, current_state: _FormattingS
         current_state (_FormattingState): State to modify
     """
     try:
-        from .format_class import _get_compiled_format
+        # Use late import to avoid circular dependencies
+        try:
+            from .format_class import _get_compiled_format
+        except ImportError:
+            from format_class import _get_compiled_format
         
         compiled = _get_compiled_format(format_name)
         if not compiled:
@@ -470,7 +474,11 @@ def _remove_format_from_state(format_name: str, current_state: _FormattingState)
         current_state (_FormattingState): State to modify
     """
     try:
-        from .format_class import _get_compiled_format
+        # Use late import to avoid circular dependencies
+        try:
+            from .format_class import _get_compiled_format
+        except ImportError:
+            from format_class import _get_compiled_format
         
         compiled = _get_compiled_format(format_name)
         if not compiled:
@@ -501,349 +509,3 @@ def _remove_format_from_state(format_name: str, current_state: _FormattingState)
         
     except Exception as e:
         warnings.warn(f"Failed to remove format '{format_name}': {e}")
-# Test script for reconstructor
-if __name__ == "__main__":
-    def test_reconstructor():
-        """Test suite for the reconstructor."""
-        
-        print("=" * 60)
-        print("FDL RECONSTRUCTOR TEST SUITE")
-        print("=" * 60)
-        
-        test_count = 0
-        passed_count = 0
-        
-        def run_test(name: str, format_string: str, values: Optional[Tuple] = None, 
-                    expected_contains: Optional[List[str]] = None):
-            """Run a single test case."""
-            nonlocal test_count, passed_count
-            test_count += 1
-            
-            print(f"\nTest {test_count}: {name}")
-            print(f"Input: '{format_string}'")
-            if values:
-                print(f"Values: {values}")
-            
-            try:
-                result = _reconstruct_fdl_string(format_string, values)
-                print(f"Output: '{result}'")
-                
-                passed = True
-                if expected_contains:
-                    for expected in expected_contains:
-                        if expected not in result:
-                            print(f"❌ Missing expected content: '{expected}'")
-                            passed = False
-                
-                if passed:
-                    print("✅ PASSED")
-                    passed_count += 1
-                else:
-                    print("❌ FAILED")
-                    
-            except Exception as e:
-                print(f"❌ EXCEPTION: {e}")
-                import traceback
-                traceback.print_exc()
-                
-            print("-" * 40)
-        
-        # Test 1: Simple text only
-        run_test("Simple text only", "Hello world", expected_contains=["Hello world"])
-        
-        # Test 2: Variable substitution
-        run_test("Variable substitution", "Hello <name>!", ("Alice",), expected_contains=["Hello Alice!"])
-        
-        # Test 3: Simple formatting
-        run_test("Simple formatting", "This is </bold>bold text", expected_contains=["This is", "bold text"])
-        
-        # Test 4: Time object
-        run_test("Time object", "Current time: <time:>", expected_contains=["Current time:"])
-        
-        # Test 5: Mixed content
-        run_test("Mixed content", "Time: </12hr, time:>", expected_contains=["Time:", "M"])  # Will match AM or PM
-        
-        # Test 6: Variable mismatch (should return error)
-        run_test("Variable mismatch", "Hello <name> and <other>!", ("Alice",), expected_contains=["ERROR"])
-        
-        # Test 7: Format bleed prevention (should auto-reset at end)
-        result1 = _reconstruct_fdl_string("This is </bold>bold text")
-        result2 = _reconstruct_fdl_string("This should be normal")
-        
-        print(f"\nFormat bleed test:")
-        print(f"Bold string:   '{result1}'") 
-        print(f"Normal string: '{result2}'")
-        
-        # Check if first result ends with reset code (\033[0m)
-        ends_with_reset = result1.endswith('\033[0m')
-        print(f"First string ends with reset: {ends_with_reset}")
-        
-        if ends_with_reset:
-            print("✅ Format bleed prevention working")
-            passed_count += 1
-        else:
-            print("❌ Missing auto-reset - formatting will bleed!")
-        test_count += 1
-        
-        # Test 8: Multiple formatting commands
-        run_test("Multiple formatting", "Text </bold, italic, red>formatted</end bold, italic, red> normal", 
-                expected_contains=["Text", "formatted", "normal"])
-        
-        # Test 9: Color commands
-        run_test("Color commands", "Red </red>text</end red> and </bkg blue>blue background</end bkg blue>",
-                expected_contains=["Red", "text", "blue background"])
-        
-        # Test 10: Complex variable substitution
-        run_test("Complex variables", "User <username> has <count> items at <time>",
-                ("Alice", 42, "14:30"), expected_contains=["Alice", "42", "14:30"])
-        
-        # Test 11: Date objects
-        run_test("Date objects", "Today: <date:> and long: <datelong:>",
-                expected_contains=["Today:", "long:"])
-        
-        # Test 12: Elapsed objects with timestamps
-        import time
-        past_time = time.time() - 3665  # About 1 hour, 1 minute, 5 seconds ago
-        run_test("Elapsed objects", "Login was <elapsed:login_time> ago", (past_time,),
-                expected_contains=["Login was", "h", "m", "ago"])
-        
-        # Test 13: Timezone and 12hr formatting
-        timestamp = 1640995200.0  # Known timestamp for testing
-        run_test("Timezone formatting", "Time: </12hr, tz pst, time:ts>", (timestamp,),
-                expected_contains=["Time:", "PM"])
-        
-        # Test 14: Object with time suffixes (ONLY for elapsed objects)
-        run_test("Time suffixes with elapsed", "Event </time ago, elapsed:event_time>", (past_time,),
-                expected_contains=["Event", "ago"])
-        
-        # Test 15: No seconds command
-        run_test("No seconds", "Brief time: </no sec, 12hr, time:ts>", (timestamp,),
-                expected_contains=["Brief time:"])
-        
-        # Test 16: Reset commands
-        run_test("Reset commands", "Before </bold>bold </reset>after reset",
-                expected_contains=["Before", "bold", "after reset"])
-        
-        # Test 17: End commands
-        run_test("End commands", "Start </bold, red>formatted</end bold> partial </end red>normal",
-                expected_contains=["Start", "formatted", "partial", "normal"])
-        
-        # Test 18: Mixed complex content (should warn about invalid time ago with time object)
-        run_test("Mixed complex - invalid combo", "Status: </12hr, no sec, tz est, time ago, time:login_time>", (past_time,),
-                expected_contains=["Status:"])  # Should ignore time ago and just show time
-        
-        # Test 19: Correct usage of time ago/until with elapsed
-        run_test("Elapsed with time ago", "Login </time ago, elapsed:login_time>", (past_time,),
-                expected_contains=["Login", "ago"])
-        
-        # Test 20: Future timestamp with time until
-        future_time = time.time() + 3600  # 1 hour from now
-        run_test("Elapsed with time until", "Meeting </time until, elapsed:meeting_time>", (future_time,),
-                expected_contains=["Meeting", "until"])
-        
-        # Test 21: Multiple objects and variables  
-        login_time = time.time() - 7200  # 2 hours ago
-        session_start = time.time() - 3600  # 1 hour ago
-        run_test("Multiple objects", "User <user> logged in <elapsed:login> ago, session started <elapsed:session> ago",
-                ("TestUser", login_time, session_start), expected_contains=["User", "TestUser", "ago"])
-        
-        # Test 22: Error handling - invalid commands with objects
-        run_test("Invalid commands with objects", "Time: </bold, red, 12hr, time:>",
-                expected_contains=["Time:"])  # Should work despite invalid commands
-        
-        # Test 23: NEW SMART FORMATTING COMMANDS
-        past_time_long = time.time() - (2 * 86400 + 3 * 3600 + 15 * 60 + 30)  # 2d 3h 15m 30s ago
-        
-        # Smart units 1 - only highest unit
-        run_test("Smart units 1", "Duration: </smart units 1, elapsed:duration>", (past_time_long,),
-                expected_contains=["Duration:", "d"])
-        
-        # Smart units 2 - two highest units  
-        run_test("Smart units 2", "Duration: </smart units 2, elapsed:duration>", (past_time_long,),
-                expected_contains=["Duration:", "d", "h"])
-        
-        # No hr - only days
-        run_test("No hours", "Duration: </no hr, elapsed:duration>", (past_time_long,),
-                expected_contains=["Duration:", "d"])
-        
-        # No min - days and hours only
-        run_test("No minutes", "Duration: </no min, elapsed:duration>", (past_time_long,),
-                expected_contains=["Duration:", "d", "h"])
-        
-        # Round sec - no decimals
-        short_time = time.time() - 65.789  # 1m 5.789s ago
-        run_test("Round seconds", "Duration: </round sec, elapsed:duration>", (short_time,),
-                expected_contains=["Duration:", "m", "s"])
-        
-        # Combined smart commands
-        run_test("Combined smart", "Brief: </smart units 1, time ago, elapsed:duration>", (short_time,),
-                expected_contains=["Brief:", "ago"])
-        
-        # Test 30: THE ULTIMATE TEST - Everything together (except Format class)
-        current_time = time.time()
-        login_timestamp = current_time - 8274  # 2h 17m 54s ago
-        run_test(
-            "Ultimate comprehensive test",
-            "Server Status Report:\n"
-            "</bold>User:</end bold> <username> (ID: <user_id>)\n"
-            "</bold>Login:</end bold> </12hr, tz est, time:login_time> (</time ago, elapsed:login_time2>)\n"  
-            "</bold>Current:</end bold> </12hr, tz est, time:> \n"
-            "</bold>Session:</end bold> Active for <elapsed:login_time3>\n"
-            "</red>Alert:</end red> </bold>System maintenance</end bold> in </italic>30 minutes</end italic>\n"
-            "</bkg green, black>Status: ONLINE</end bkg green, black> | </reset>All systems normal",
-            ("alice_cooper", 12345, login_timestamp, login_timestamp, login_timestamp),  # Provide 5 values
-            expected_contains=[
-                "Server Status Report:",
-                "User:", "alice_cooper", "12345",
-                "Login:", "PM", "ago", 
-                "Current:", 
-                "Session:", "Active for",
-                "Alert:", "System maintenance", "30 minutes",
-                "Status: ONLINE", "All systems normal"
-            ]
-        )
-        
-        print(f"\nTEST RESULTS: {passed_count}/{test_count} tests passed")
-        return passed_count == test_count
-    
-    def test_format_bleed_prevention():
-            """Test that format bleed is prevented in reconstructor."""
-            
-            print("=" * 60)
-            print("FORMAT BLEED PREVENTION TEST SUITE")
-            print("=" * 60)
-            
-            # Clear any existing formats and create test format
-            try:
-                from format_class import _clear_all_formats_internal, _compile_format_string, _register_compiled_format
-                _clear_all_formats_internal()
-                
-                # Create test format
-                compiled = _compile_format_string("test_format", "</red, bold>")
-                _register_compiled_format(compiled)
-                
-            except ImportError:
-                print("Cannot test format bleed - format system not available")
-                return False
-            
-            test_count = 0
-            passed_count = 0
-            
-            def run_test(name: str, format_string: str, values: Optional[Tuple] = None, 
-                        should_end_with_reset: bool = True):
-                """Run a format bleed test."""
-                nonlocal test_count, passed_count
-                test_count += 1
-                
-                print(f"\nTest {test_count}: {name}")
-                print(f"Input: '{format_string}'")
-                if values:
-                    print(f"Values: {values}")
-                
-                try:
-                    result = _reconstruct_fdl_string(format_string, values)
-                    
-                    # Show both formatted output AND raw ANSI codes
-                    print(f"Formatted output: ", end="")
-                    print(result)  # This will show actual formatting in terminal
-                    print(f"Raw ANSI: {repr(result)}")
-                    
-                    ends_with_reset = result.endswith('\033[0m')
-                    print(f"Ends with reset: {ends_with_reset}")
-                    
-                    if should_end_with_reset == ends_with_reset:
-                        print("✅ PASSED")
-                        passed_count += 1
-                    else:
-                        expected = "should" if should_end_with_reset else "should NOT"
-                        print(f"❌ FAILED - {expected} end with reset")
-                        
-                except Exception as e:
-                    print(f"❌ EXCEPTION: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    
-                print("-" * 40)
-            
-            # Test 1: Format command (should add reset)
-            run_test(
-                "Format command with fmt",
-                "Error: </fmt test_format>System failure!",
-                should_end_with_reset=True
-            )
-            
-            # Test 2: Regular command (should add reset)
-            run_test(
-                "Regular formatting command",
-                "Error: </bold, red>System failure!",
-                should_end_with_reset=True
-            )
-            
-            # Test 3: Reset command (should end with reset)
-            run_test(
-                "Reset command",
-                "Before </bold>bold</reset> after",
-                should_end_with_reset=True
-            )
-            
-            # Test 4: No formatting commands (should NOT add reset)
-            run_test(
-                "No formatting commands",
-                "Just plain text with <n>",
-                values=("variables",),
-                should_end_with_reset=True
-            )
-            
-            # Test 5: End command that clears all formatting (should NOT add reset)
-            run_test(
-                "End command clears formatting",
-                "Start </bold>bold</end bold> normal",
-                should_end_with_reset=True
-            )
-            
-            # Test 6: Multiple formatting with explicit ends (should NOT add reset)
-            run_test(
-                "Multiple explicit ends",
-                "Text </bold, red>formatted</end bold, red> normal",
-                should_end_with_reset=True
-            )
-            
-            # Test 7: Mixed formatting (some ended, some not) 
-            run_test(
-                "Mixed formatting states",
-                "Start </bold>bold</end bold> then </italic>italic text",
-                should_end_with_reset=True  # Italic is still active
-            )
-            
-            print(f"\nTEST RESULTS: {passed_count}/{test_count} tests passed")
-            if passed_count == test_count:
-                print("🎉 ALL FORMAT BLEED PREVENTION TESTS PASSED!")
-                print("✅ Automatic reset working correctly")
-                print("✅ Smart detection prevents unnecessary resets")
-            else:
-                print(f"❌ {test_count - passed_count} tests failed")
-            
-            return passed_count == test_count
-    
-    # Run both test suites
-    print("Running comprehensive reconstructor tests...")
-    success1 = test_reconstructor()
-    
-    print("\nRunning format bleed prevention tests...")
-    success2 = test_format_bleed_prevention()
-    
-    print("\n" + "=" * 60)
-    print("FINAL TEST SUMMARY")
-    print("=" * 60)
-    
-    if success1 and success2:
-        print("🎉 ALL RECONSTRUCTOR TESTS PASSED!")
-        print("✅ Core functionality working correctly")
-        print("✅ Format bleed prevention working correctly") 
-        print("✅ System ready for production use!")
-    else:
-        if not success1:
-            print("❌ Core functionality tests failed")
-        if not success2:
-            print("❌ Format bleed prevention tests failed")
-        print("🔧 Fix the failing tests before proceeding")

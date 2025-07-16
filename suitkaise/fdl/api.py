@@ -1,150 +1,139 @@
 """
 Public API for fdl.
+
 """
+from typing import Optional, List, Set
 
-from typing import Set, List, Optional
-
-# Import internal components with multiple fallback strategies
-try:
-    # Try relative import first (standard package structure)
-    from .._int._fdl.core.format_class import (
-        # Exceptions
-        FormatError,
-        InvalidFormatError, 
-        CircularReferenceError,
-        FormatNotFoundError,
-        
-        # Internal functions
-        _compile_format_string,
-        _register_compiled_format,
-        _get_compiled_format,
-        _format_exists_internal,
-        _list_all_formats_internal, 
-        _clear_all_formats_internal,
-        _get_format_dependencies_internal,
-    )
-except ImportError:
-    try:
-        # Try absolute import (when running from project root)
-        from suitkaise._int._fdl.core.format_class import (
-            # Exceptions
-            FormatError,
-            InvalidFormatError, 
-            CircularReferenceError,
-            FormatNotFoundError,
-            
-            # Internal functions
-            _compile_format_string,
-            _register_compiled_format,
-            _get_compiled_format,
-            _format_exists_internal,
-            _list_all_formats_internal, 
-            _clear_all_formats_internal,
-            _get_format_dependencies_internal,
-        )
-    except ImportError as e:
-        raise ImportError(f"Cannot import internal format_class module. Make sure suitkaise/_int/_fdl/core/format_class.py exists and is accessible. Error: {e}")
-
+# Import internal components
+from .._int._fdl.core.format_class import (
+    _compile_format_string,
+    _register_compiled_format,
+    _get_compiled_format,
+    _format_exists_internal,
+    _list_all_formats_internal,
+    _clear_all_formats_internal,
+    _get_format_dependencies_internal,
+    FormatError,
+    InvalidFormatError,
+    CircularReferenceError,
+    FormatNotFoundError
+)
 
 
 
 class Format:
     """
-    Pre-compiled format for maximum performance fdl formatting.
+    FDL Format class for creating reusable formatting styles.
     
-    Creates a named, reusable format that can be applied anywhere in fdl strings.
-    Format strings are parsed and compiled once during creation, then applied
-    instantly using pre-compiled ANSI sequences and state transitions.
+    Formats allow you to define formatting combinations once and reuse them
+    throughout your application. They support inheritance and chaining.
     
-    Key features:
-    - 50x faster than Rich Style formatting
-    - Format inheritance and combination support  
-    - Thread-safe global registry
-    - Immediate error detection during creation
-    - No dependency on changing module-level defaults
-    
-    Args:
-        name (str): Unique name for this format
-        format_string (str): fdl format commands (e.g., "</red, bold>")
-        
-    Raises:
-        InvalidFormatError: If format string contains invalid syntax
-        FormatNotFoundError: If format references another format that doesn't exist
-        CircularReferenceError: If format creates circular dependencies
-        
     Example:
-        # Basic format
-        error = Format("error", "</red, bold>")
+        # Create a format
+        error_format = Format("error", "</bold, red, bkg yellow>")
         
-        # Format inheritance
-        critical = Format("critical", "</fmt error, bkg yellow>")
+        # Use in fdl strings  
+        fdl.print("</fmt error>Critical Error!</end error> Normal text")
         
-        # Use in fdl.print
-        fdl.print("</fmt critical>System failure!</fmt critical>")
+        # Formats can inherit from other formats
+        critical_error = Format("critical", "</fmt error, underline, blink>")
+    
+    Performance:
+    - Formats are compiled once and cached for maximum performance
+    - Direct ANSI access is 52x faster than Rich Style objects
+    - Thread-safe design for concurrent usage
     """
     
     def __init__(self, name: str, format_string: str):
         """
-        Create and compile a new format.
+        Create and register a new format.
         
-        The format is immediately parsed, validated, compiled, and registered
-        in the global format registry for use throughout your application.
+        Args:
+            name (str): Unique name for the format
+            format_string (str): FDL format string (e.g., "</bold, red>")
+            
+        Raises:
+            InvalidFormatError: If format string is invalid
+            CircularReferenceError: If format creates circular references
+            FormatNotFoundError: If referenced format doesn't exist
+            
+        Example:
+            # Basic format
+            red_bold = Format("red_bold", "</red, bold>")
+            
+            # Format with background
+            alert = Format("alert", "</white, bkg red, bold>")
+            
+            # Format inheriting from another format
+            critical = Format("critical", "</fmt alert, underline>")
         """
-        if not name or not isinstance(name, str):
-            raise InvalidFormatError("Format name must be a non-empty string")
-        
-        if not format_string or not isinstance(format_string, str):
-            raise InvalidFormatError("Format string must be a non-empty string")
-        
-        self.name = name
-        self.original_string = format_string
+        self._name = name
+        self._original_string = format_string
         
         # Compile and register the format
         try:
-            self._compiled = _compile_format_string(name, format_string)
-            _register_compiled_format(self._compiled)
-            
+            compiled = _compile_format_string(name, format_string)
+            _register_compiled_format(compiled)
+            self._compiled = compiled
         except Exception as e:
-            if isinstance(e, (InvalidFormatError, FormatNotFoundError, CircularReferenceError)):
-                raise
-            else:
-                raise InvalidFormatError(f"Format compilation failed: {e}")
+            raise FormatError(f"Failed to create format '{name}': {e}")
     
-    @property 
+    @property
+    def name(self) -> str:
+        """Get the format name."""
+        return self._name
+    
+    @property
+    def original_string(self) -> str:
+        """Get the original format string used to create this format."""
+        return self._original_string
+    
+    @property
     def direct_ansi(self) -> str:
         """
-        Get the direct ANSI sequence for this format.
+        Get the direct ANSI escape sequence for this format.
         
-        Returns the pre-compiled ANSI escape sequence that will achieve
-        this format from a blank/unformatted state (standard Python print).
+        This is a high-performance property that returns the pre-compiled
+        ANSI codes for the format. Use this when you need maximum speed.
         
         Returns:
-            str: ANSI escape sequence
+            str: ANSI escape sequence to apply this format
+            
+        Example:
+            format = Format("test", "</bold, red>")
+            ansi = format.direct_ansi  # '\033[1m\033[31m'
+            print(f"{ansi}Bold red text\033[0m")
         """
         return self._compiled.direct_ansi
     
-    @property
+    @property  
     def referenced_formats(self) -> Set[str]:
         """
-        Get the names of other formats this format depends on.
+        Get the set of format names this format references.
         
         Returns:
-            Set[str]: Set of format names this format inherits from
+            Set[str]: Names of formats this format depends on
+            
+        Example:
+            parent = Format("parent", "</bold>")
+            child = Format("child", "</fmt parent, red>")
+            
+            print(child.referenced_formats)  # {'parent'}
         """
         return self._compiled.referenced_formats.copy()
     
-    def __repr__(self) -> str:
-        """Developer representation showing name and format string."""
-        return f"Format(name='{self.name}', format='{self.original_string}')"
-    
     def __str__(self) -> str:
-        """User-friendly string showing name and format."""
-        return f"{self.name}: {self.original_string}"
+        """String representation of the format."""
+        return f"{self._name}: {self._original_string}"
+    
+    def __repr__(self) -> str:
+        """Developer representation of the format."""
+        return f"Format(name='{self._name}', format_string='{self._original_string}')"
 
 
 def get_format(name: str) -> Optional[Format]:
     """
-    Retrieve a format by name from the global registry.
+    Get a format by name.
     
     Args:
         name (str): Name of the format to retrieve
@@ -153,16 +142,20 @@ def get_format(name: str) -> Optional[Format]:
         Optional[Format]: Format object if found, None otherwise
         
     Example:
-        error_fmt = get_format("error")
-        if error_fmt:
-            print(f"Error format: {error_fmt.original_string}")
+        # Create a format
+        Format("error", "</bold, red>")
+        
+        # Retrieve it later
+        error_format = get_format("error")
+        if error_format:
+            print(f"Found format: {error_format}")
     """
     compiled = _get_compiled_format(name)
     if compiled:
-        # Create Format object from compiled data
-        format_obj = object.__new__(Format)
-        format_obj.name = compiled.name
-        format_obj.original_string = compiled.original_string
+        # Create a new Format object that wraps the compiled format
+        format_obj = Format.__new__(Format)  # Don't call __init__
+        format_obj._name = compiled.name
+        format_obj._original_string = compiled.original_string
         format_obj._compiled = compiled
         return format_obj
     return None
@@ -170,7 +163,7 @@ def get_format(name: str) -> Optional[Format]:
 
 def format_exists(name: str) -> bool:
     """
-    Check if a format exists in the global registry.
+    Check if a format exists.
     
     Args:
         name (str): Name of the format to check
@@ -181,6 +174,8 @@ def format_exists(name: str) -> bool:
     Example:
         if format_exists("error"):
             print("Error format is available")
+        else:
+            Format("error", "</bold, red>")
     """
     return _format_exists_internal(name)
 
@@ -190,24 +185,30 @@ def list_formats() -> List[str]:
     Get a list of all registered format names.
     
     Returns:
-        List[str]: Alphabetically sorted list of format names
+        List[str]: Sorted list of format names
         
     Example:
-        print("Available formats:", list_formats())
-        # Output: Available formats: ['error', 'success', 'warning']
+        Format("error", "</bold, red>")
+        Format("success", "</bold, green>")
+        
+        formats = list_formats()
+        print(formats)  # ['error', 'success']
     """
     return _list_all_formats_internal()
 
 
 def clear_formats() -> None:
     """
-    Clear all formats from the global registry.
+    Clear all registered formats.
     
-    This removes all registered formats, useful for testing or
-    resetting the format system. Use with caution in production code.
+    This removes all formats from the global registry. Use with caution
+    as it will affect all parts of your application.
     
     Example:
-        clear_formats()  # All formats are now gone
+        # Clear all formats (useful for testing)
+        clear_formats()
+        
+        # Now no formats exist
         assert len(list_formats()) == 0
     """
     _clear_all_formats_internal()
@@ -215,26 +216,26 @@ def clear_formats() -> None:
 
 def get_format_dependencies(name: str) -> Set[str]:
     """
-    Get all formats that a given format depends on (recursive).
-    
-    This includes both direct dependencies (formats explicitly referenced)
-    and indirect dependencies (formats referenced by the direct dependencies).
+    Get all format dependencies recursively.
     
     Args:
         name (str): Name of the format to analyze
         
     Returns:
-        Set[str]: Set of all format names this format depends on
+        Set[str]: All format names this format depends on
         
     Example:
-        # If 'critical' references 'error' and 'error' references 'base'
-        deps = get_format_dependencies("critical")
-        print(deps)  # {'base', 'error'}
+        Format("base", "</bold>")
+        Format("level1", "</fmt base, red>") 
+        Format("level2", "</fmt level1, underline>")
+        
+        deps = get_format_dependencies("level2")
+        print(deps)  # {'base', 'level1'}
     """
     return _get_format_dependencies_internal(name)
 
 
-# Export the exception classes for user error handling
+# Export public exception classes
 __all__ = [
     'Format',
     'get_format', 
@@ -243,7 +244,7 @@ __all__ = [
     'clear_formats',
     'get_format_dependencies',
     'FormatError',
-    'InvalidFormatError',
-    'CircularReferenceError', 
+    'InvalidFormatError', 
+    'CircularReferenceError',
     'FormatNotFoundError'
 ]

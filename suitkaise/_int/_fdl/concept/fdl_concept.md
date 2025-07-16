@@ -850,6 +850,7 @@ We will start by creating private equivalents to all of these methods so that an
 
 3. fdl Format class
 4. Renderer - Combine everything into final output
+- also handle output to other destinations (files, MarkDown and HTML)
 5. Internal `_print()` functions that tie basic execution together
 
 ### Advanced objects
@@ -864,9 +865,12 @@ We will start by creating private equivalents to all of these methods so that an
 12. Message Types - Standard logging levels and other convenience messages (success, setToNone, etc.)
 13. special Format classes - TimeFormat, NameFormat (WIP), TypeFormat (WIP), and message format (`fdl.Format`)
 
+### Finishing Renderer
+14. finish MarkDown and HTML output support
+
 ### API
-14. Decorators - `@fdl.autoformat`, `@fdl.autodebug`
-15. Public API - wrapping internal functions with public interface to match this conceptual code
-16. Optimizations - reviewing and adjusting caching, speed, and resource usage
+15. Decorators - `@fdl.autoformat`, `@fdl.autodebug`
+16. Public API - wrapping internal functions with public interface to match this conceptual code
+17. Optimizations - reviewing and adjusting caching, speed, and resource usage
 
 
