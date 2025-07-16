@@ -705,6 +705,10 @@ class _CommandProcessor:
             'round sec',      # Round to nearest second
             'smart units 1',  # Smart formatting
             'smart units 2',  # Smart formatting
+            'spinner dots',
+            'spinner arrows',
+            'spinner letters',
+            'spinner dqpb'
         ]
         
         # Check exact matches

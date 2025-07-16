@@ -1,5 +1,3 @@
-# internal printing functions (will be wrapped by public API)
-
 """
 Internal FDL print functions - Foundation for public API
 

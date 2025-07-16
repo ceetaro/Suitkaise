@@ -344,6 +344,8 @@ class _ObjectProcessor:
                 result = self._process_datelong_object(value, parsed_commands)
             elif obj_type == 'elapsed':
                 result = self._process_elapsed_object(value, parsed_commands)
+            elif obj_type == 'spinner':
+                result = self._process_spinner_object(value, parsed_commands)
             else:
                 raise UnsupportedObjectError(f"Unsupported object type: {obj_type}")
             
@@ -683,6 +685,28 @@ class _ObjectProcessor:
             parts.append("0m")
         
         return parts
+    
+    def _process_spinner_object(self, spinner_type: Optional[str], commands: _ObjectCommands) -> str:
+        """
+        Process spinner object: <spinner:type>
+        
+        Args:
+            spinner_type: Type of spinner (dots, arrow3, dqpb)
+            commands: Object-specific commands (ignored for spinners)
+            
+        Returns:
+            str: Current spinner frame
+        """
+        if not spinner_type:
+            spinner_type = 'dots'  # Default spinner
+        
+        # Import here to avoid circular imports
+        try:
+            from ..objects.spinners import process_spinner_object
+            return process_spinner_object(spinner_type.strip(), "")
+        except Exception as e:
+            warnings.warn(f"Spinner processing failed: {e}")
+            return "[SPINNER_ERROR]"
     
     def get_performance_stats(self) -> Dict[str, int]:
         """Get performance statistics."""
