@@ -1,5 +1,5 @@
 """
-Custom Spinner Implementation for fdl - 20x faster than Rich!
+Custom Spinner Implementation for fdl.
 
 High-performance spinner system that avoids Rich's threading bottlenecks.
 Features:
@@ -63,7 +63,7 @@ class _SpinnerManager:
         'dots': _SpinnerStyle(
             name='dots',
             frames=['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧'],
-            interval=0.08,  # 80ms - smooth but not too fast
+            interval=0.1,  #100ms - smooth but not too fast
             is_unicode=True
         ),
         'arrows': _SpinnerStyle(
@@ -78,7 +78,7 @@ class _SpinnerManager:
             interval=0.15,  # 150ms - moderate speed for ASCII
             is_unicode=False
         ),
-        
+
         # Aliases for convenience
         'letters': _SpinnerStyle(
             name='letters',

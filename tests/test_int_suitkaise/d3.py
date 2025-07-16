@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Performance Benchmark: FDL vs Rich
+FIXED Performance Benchmark: FDL vs Rich
 
-Comprehensive performance testing of our custom spinners and progress bars
-against Rich's implementations at various load levels.
+This benchmark focuses on CORE update efficiency rather than animation overhead.
+Tests the actual bottlenecks and measures what matters for performance.
 
-Tests our claims:
-- Spinners: 20x faster than Rich
-- Progress bars: 50x faster than Rich
-
-Run with: python benchmark_vs_rich.py
+Key fixes:
+1. Separate animation from core update tests
+2. Measure CPU/memory during pure updates (no animation)
+3. Test batching efficiency 
+4. Proper output suppression
+5. Focus on threading performance and update throughput
 """
 
 import sys
@@ -20,7 +21,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
+from io import StringIO
 
 # Add project paths
 current_file = Path(__file__).resolve()
@@ -31,7 +33,7 @@ sys.path.insert(0, str(objects_path))
 
 # Try to import Rich for comparison
 try:
-    from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.progress import Progress, BarColumn, TextColumn
     from rich.spinner import Spinner
     from rich.console import Console
     from rich.live import Live
@@ -40,7 +42,6 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
     print("❌ Rich not available - install with: pip install rich")
-    print("   Benchmark will only test FDL performance")
 
 # Import our implementations
 try:
@@ -58,316 +59,271 @@ except ImportError as e:
 class BenchmarkResult:
     """Results from a single benchmark test."""
     name: str
-    implementation: str  # "FDL" or "Rich"
-    duration: float
+    implementation: str
     updates_per_second: float
     cpu_percent: float
     memory_mb: float
-    success_rate: float
+    duration: float
+    total_updates: int
     notes: str = ""
 
 
+@contextmanager
+def proper_output_suppression():
+    """Properly suppress all output during benchmarks."""
+    # Create string buffers for output
+    stdout_buffer = StringIO()
+    stderr_buffer = StringIO()
+    
+    # Save original stdout/stderr
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    try:
+        # Redirect to buffers
+        sys.stdout = stdout_buffer
+        sys.stderr = stderr_buffer
+        yield
+    finally:
+        # Restore original
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+
+
 class PerformanceMonitor:
-    """Monitor CPU and memory usage during tests."""
+    """Lightweight performance monitoring."""
     
     def __init__(self):
         self.process = psutil.Process()
-        self.monitoring = False
-        self.cpu_samples = []
-        self.memory_samples = []
+        self.start_time = None
+        self.start_cpu_time = None
+        self.start_memory = None
     
     def start(self):
         """Start monitoring."""
-        self.monitoring = True
-        self.cpu_samples = []
-        self.memory_samples = []
-        
-        def monitor():
-            while self.monitoring:
-                try:
-                    cpu = self.process.cpu_percent()
-                    memory = self.process.memory_info().rss / 1024 / 1024  # MB
-                    self.cpu_samples.append(cpu)
-                    self.memory_samples.append(memory)
-                    time.sleep(0.1)  # Sample every 100ms
-                except:
-                    pass
-        
-        self.monitor_thread = threading.Thread(target=monitor)
-        self.monitor_thread.start()
+        self.start_time = time.time()
+        self.start_cpu_time = self.process.cpu_times()
+        self.start_memory = self.process.memory_info().rss / 1024 / 1024
     
-    def stop(self) -> Tuple[float, float]:
-        """Stop monitoring and return average CPU% and memory MB."""
-        self.monitoring = False
-        if hasattr(self, 'monitor_thread'):
-            self.monitor_thread.join(timeout=1.0)
+    def stop(self) -> Tuple[float, float, float]:
+        """Stop monitoring and return duration, CPU%, memory MB."""
+        end_time = time.time()
+        end_cpu_time = self.process.cpu_times()
+        end_memory = self.process.memory_info().rss / 1024 / 1024
         
-        avg_cpu = sum(self.cpu_samples) / len(self.cpu_samples) if self.cpu_samples else 0
-        avg_memory = sum(self.memory_samples) / len(self.memory_samples) if self.memory_samples else 0
+        duration = end_time - self.start_time
+        cpu_used = (end_cpu_time.user - self.start_cpu_time.user) + \
+                   (end_cpu_time.system - self.start_cpu_time.system)
+        cpu_percent = (cpu_used / duration) * 100 if duration > 0 else 0
         
-        return avg_cpu, avg_memory
+        return duration, cpu_percent, end_memory
 
 
-@contextmanager
-def suppress_output():
-    """Suppress stdout during benchmarks to avoid interference."""
-    with open(os.devnull, 'w') as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-
-
-class SpinnerBenchmark:
-    """Benchmark spinner performance."""
+class CoreUpdateBenchmark:
+    """Test core update performance without animation overhead."""
     
-    def benchmark_fdl_spinner(self, updates: int, update_interval: float) -> BenchmarkResult:
-        """Benchmark FDL spinner performance."""
+    def benchmark_fdl_core_updates(self, total_updates: int) -> BenchmarkResult:
+        """Benchmark FDL core update performance (no animation)."""
         monitor = PerformanceMonitor()
         monitor.start()
         
-        start_time = time.time()
-        errors = 0
+        with proper_output_suppression():
+            # Create progress bar but DON'T start animation
+            bar = fdl_create_progress_bar(total_updates, "blue")
+            
+            # Pure update test - no animation, no display
+            for i in range(total_updates):
+                bar.update(1)
+                # Don't call tick() or display - pure logical updates only
         
-        try:
-            with suppress_output():
-                spinner = fdl_create_spinner('dots', 'Benchmark test')
-                
-                for i in range(updates):
-                    spinner.tick()
-                    time.sleep(update_interval)
-                
-                fdl_stop_spinner()
-                
-        except Exception as e:
-            errors += 1
-        
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
+        duration, cpu_percent, memory_mb = monitor.stop()
         
         return BenchmarkResult(
-            name=f"Spinner {updates} updates @ {1/update_interval:.1f}Hz",
+            name=f"Core Updates ({total_updates})",
             implementation="FDL",
+            updates_per_second=total_updates / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
             duration=duration,
-            updates_per_second=updates / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(updates - errors) / updates
+            total_updates=total_updates,
+            notes="Pure logical updates, no animation"
         )
     
-    def benchmark_rich_spinner(self, updates: int, update_interval: float) -> Optional[BenchmarkResult]:
-        """Benchmark Rich spinner performance."""
+    def benchmark_rich_core_updates(self, total_updates: int) -> Optional[BenchmarkResult]:
+        """Benchmark Rich core update performance."""
         if not RICH_AVAILABLE:
             return None
         
         monitor = PerformanceMonitor()
         monitor.start()
         
-        start_time = time.time()
-        errors = 0
-        
-        try:
-            with suppress_output():
-                console = Console(file=open(os.devnull, 'w'))
+        with proper_output_suppression():
+            console = Console(file=StringIO())  # Use string buffer instead of /dev/null
+            
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                console=console,
+                refresh_per_second=1  # Minimal refresh for pure update test
+            ) as progress:
+                task = progress.add_task("Test", total=total_updates)
                 
-                with Live(Spinner('dots'), console=console, refresh_per_second=60) as live:
-                    for i in range(updates):
-                        live.update(Spinner('dots'))
-                        time.sleep(update_interval)
-                        
-        except Exception as e:
-            errors += 1
+                # Pure update test
+                for i in range(total_updates):
+                    progress.update(task, advance=1)
         
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
+        duration, cpu_percent, memory_mb = monitor.stop()
         
         return BenchmarkResult(
-            name=f"Spinner {updates} updates @ {1/update_interval:.1f}Hz",
+            name=f"Core Updates ({total_updates})",
             implementation="Rich",
+            updates_per_second=total_updates / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
             duration=duration,
-            updates_per_second=updates / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(updates - errors) / updates
+            total_updates=total_updates,
+            notes="Pure logical updates, minimal refresh"
         )
 
 
-class ProgressBarBenchmark:
-    """Benchmark progress bar performance."""
+class BatchingBenchmark:
+    """Test batching efficiency."""
     
-    def benchmark_fdl_progress(self, total: int, update_pattern: str) -> BenchmarkResult:
-        """Benchmark FDL progress bar performance."""
+    def benchmark_fdl_batching(self, batch_size: int, num_batches: int) -> BenchmarkResult:
+        """Test FDL batching performance."""
+        total_updates = batch_size * num_batches
         monitor = PerformanceMonitor()
         monitor.start()
         
-        start_time = time.time()
-        errors = 0
-        updates_made = 0
+        with proper_output_suppression():
+            bar = fdl_create_progress_bar(total_updates, "green")
+            
+            # Batched updates
+            for batch in range(num_batches):
+                bar.update(batch_size)
+                # Small delay between batches to simulate real usage
+                time.sleep(0.001)
         
-        try:
-            with suppress_output():
-                bar = fdl_create_progress_bar(total, "blue")
-                bar.display_bar()
-                
-                # Start animation thread for smooth updates
-                animating = True
-                def animate():
-                    while animating:
-                        bar.tick()
-                        time.sleep(0.016)  # 60fps
-                
-                anim_thread = threading.Thread(target=animate)
-                anim_thread.start()
-                
-                if update_pattern == "steady":
-                    # Steady updates
-                    for i in range(total):
-                        bar.update(1)
-                        updates_made += 1
-                        time.sleep(0.01)  # 10ms between updates
-                        
-                elif update_pattern == "burst":
-                    # Bursty updates
-                    chunk_size = total // 10
-                    for chunk in range(10):
-                        for i in range(chunk_size):
-                            bar.update(1)
-                            updates_made += 1
-                        time.sleep(0.1)  # Pause between bursts
-                        
-                elif update_pattern == "rapid":
-                    # Very rapid updates
-                    for i in range(total):
-                        bar.update(1)
-                        updates_made += 1
-                        time.sleep(0.001)  # 1ms between updates
-                
-                # Let animation catch up
-                time.sleep(0.5)
-                animating = False
-                anim_thread.join()
-                bar.stop()
-                
-        except Exception as e:
-            errors += 1
-            animating = False
-        
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
+        duration, cpu_percent, memory_mb = monitor.stop()
         
         return BenchmarkResult(
-            name=f"Progress {total} updates ({update_pattern})",
+            name=f"Batching {num_batches}x{batch_size}",
             implementation="FDL",
+            updates_per_second=total_updates / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
             duration=duration,
-            updates_per_second=updates_made / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(updates_made - errors) / updates_made if updates_made > 0 else 0
+            total_updates=total_updates,
+            notes=f"Batched updates: {batch_size} per batch"
         )
     
-    def benchmark_rich_progress(self, total: int, update_pattern: str) -> Optional[BenchmarkResult]:
-        """Benchmark Rich progress bar performance."""
+    def benchmark_rich_batching(self, batch_size: int, num_batches: int) -> Optional[BenchmarkResult]:
+        """Test Rich batching performance."""
         if not RICH_AVAILABLE:
             return None
         
+        total_updates = batch_size * num_batches
         monitor = PerformanceMonitor()
         monitor.start()
         
-        start_time = time.time()
-        errors = 0
-        updates_made = 0
-        
-        try:
-            with suppress_output():
-                console = Console(file=open(os.devnull, 'w'))
+        with proper_output_suppression():
+            console = Console(file=StringIO())
+            
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                console=console,
+                refresh_per_second=10
+            ) as progress:
+                task = progress.add_task("Test", total=total_updates)
                 
-                with Progress(
-                    TextColumn("[progress.description]{task.description}"),
-                    BarColumn(),
-                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                    console=console,
-                    refresh_per_second=60
-                ) as progress:
-                    
-                    task = progress.add_task("Benchmark", total=total)
-                    
-                    if update_pattern == "steady":
-                        # Steady updates
-                        for i in range(total):
-                            progress.update(task, advance=1)
-                            updates_made += 1
-                            time.sleep(0.01)  # 10ms between updates
-                            
-                    elif update_pattern == "burst":
-                        # Bursty updates  
-                        chunk_size = total // 10
-                        for chunk in range(10):
-                            progress.update(task, advance=chunk_size)
-                            updates_made += chunk_size
-                            time.sleep(0.1)  # Pause between bursts
-                            
-                    elif update_pattern == "rapid":
-                        # Very rapid updates
-                        for i in range(total):
-                            progress.update(task, advance=1)
-                            updates_made += 1
-                            time.sleep(0.001)  # 1ms between updates
-                
-        except Exception as e:
-            errors += 1
+                # Batched updates
+                for batch in range(num_batches):
+                    progress.update(task, advance=batch_size)
+                    time.sleep(0.001)
         
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
+        duration, cpu_percent, memory_mb = monitor.stop()
         
         return BenchmarkResult(
-            name=f"Progress {total} updates ({update_pattern})",
+            name=f"Batching {num_batches}x{batch_size}",
             implementation="Rich",
+            updates_per_second=total_updates / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
             duration=duration,
-            updates_per_second=updates_made / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(updates_made - errors) / updates_made if updates_made > 0 else 0
+            total_updates=total_updates,
+            notes=f"Batched updates: {batch_size} per batch"
         )
 
 
 class ThreadingBenchmark:
-    """Benchmark threading performance."""
+    """Test threading efficiency with proper isolation."""
     
     def benchmark_fdl_threading(self, num_threads: int, updates_per_thread: int) -> BenchmarkResult:
-        """Benchmark FDL threading performance."""
-        monitor = PerformanceMonitor()
-        monitor.start()
-        
-        start_time = time.time()
+        """Test FDL threading without animation overhead."""
         total_updates = num_threads * updates_per_thread
-        errors = 0
+        monitor = PerformanceMonitor()
         
-        try:
-            with suppress_output():
-                bar = fdl_create_progress_bar(total_updates, "green")
-                bar.display_bar()
+        with proper_output_suppression():
+            bar = fdl_create_progress_bar(total_updates, "red")
+            
+            # Start timing after setup
+            monitor.start()
+            
+            def worker():
+                for i in range(updates_per_thread):
+                    bar.update(1)
+                    # Minimal delay to simulate work
+                    time.sleep(0.0001)
+            
+            threads = []
+            for i in range(num_threads):
+                t = threading.Thread(target=worker)
+                threads.append(t)
+                t.start()
+            
+            for t in threads:
+                t.join()
+        
+        duration, cpu_percent, memory_mb = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Threading {num_threads}x{updates_per_thread}",
+            implementation="FDL",
+            updates_per_second=total_updates / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
+            duration=duration,
+            total_updates=total_updates,
+            notes=f"No animation overhead"
+        )
+    
+    def benchmark_rich_threading(self, num_threads: int, updates_per_thread: int) -> Optional[BenchmarkResult]:
+        """Test Rich threading."""
+        if not RICH_AVAILABLE:
+            return None
+        
+        total_updates = num_threads * updates_per_thread
+        monitor = PerformanceMonitor()
+        
+        with proper_output_suppression():
+            console = Console(file=StringIO())
+            
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                console=console,
+                refresh_per_second=10
+            ) as progress:
+                task = progress.add_task("Test", total=total_updates)
                 
-                # Animation thread
-                animating = True
-                def animate():
-                    while animating:
-                        bar.tick()
-                        time.sleep(0.016)
+                # Start timing after setup
+                monitor.start()
                 
-                anim_thread = threading.Thread(target=animate)
-                anim_thread.start()
-                
-                # Worker threads
                 def worker():
                     for i in range(updates_per_thread):
-                        bar.update(1)
-                        time.sleep(0.001)  # 1ms per update
+                        progress.update(task, advance=1)
+                        time.sleep(0.0001)
                 
                 threads = []
                 for i in range(num_threads):
@@ -377,315 +333,275 @@ class ThreadingBenchmark:
                 
                 for t in threads:
                     t.join()
-                
-                time.sleep(0.5)  # Let animation catch up
-                animating = False
-                anim_thread.join()
-                bar.stop()
-                
-        except Exception as e:
-            errors += 1
-            animating = False
         
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
-        
-        return BenchmarkResult(
-            name=f"Threading {num_threads}x{updates_per_thread}",
-            implementation="FDL",
-            duration=duration,
-            updates_per_second=total_updates / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(total_updates - errors) / total_updates
-        )
-    
-    def benchmark_rich_threading(self, num_threads: int, updates_per_thread: int) -> Optional[BenchmarkResult]:
-        """Benchmark Rich threading performance."""
-        if not RICH_AVAILABLE:
-            return None
-        
-        monitor = PerformanceMonitor()
-        monitor.start()
-        
-        start_time = time.time()
-        total_updates = num_threads * updates_per_thread
-        errors = 0
-        
-        try:
-            with suppress_output():
-                console = Console(file=open(os.devnull, 'w'))
-                
-                with Progress(
-                    TextColumn("[progress.description]{task.description}"),
-                    BarColumn(),
-                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-                    console=console,
-                    refresh_per_second=60
-                ) as progress:
-                    
-                    task = progress.add_task("Threading", total=total_updates)
-                    
-                    def worker():
-                        for i in range(updates_per_thread):
-                            progress.update(task, advance=1)
-                            time.sleep(0.001)  # 1ms per update
-                    
-                    threads = []
-                    for i in range(num_threads):
-                        t = threading.Thread(target=worker)
-                        threads.append(t)
-                        t.start()
-                    
-                    for t in threads:
-                        t.join()
-                
-        except Exception as e:
-            errors += 1
-        
-        end_time = time.time()
-        duration = end_time - start_time
-        avg_cpu, avg_memory = monitor.stop()
+        duration, cpu_percent, memory_mb = monitor.stop()
         
         return BenchmarkResult(
             name=f"Threading {num_threads}x{updates_per_thread}",
             implementation="Rich",
-            duration=duration,
             updates_per_second=total_updates / duration,
-            cpu_percent=avg_cpu,
-            memory_mb=avg_memory,
-            success_rate=(total_updates - errors) / total_updates
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
+            duration=duration,
+            total_updates=total_updates,
+            notes="Standard Rich threading"
         )
 
 
-def run_comprehensive_benchmark():
-    """Run the full benchmark suite."""
-    print("\n🚀 COMPREHENSIVE PERFORMANCE BENCHMARK")
+class MemoryLeakTest:
+    """Test for memory leaks during intensive usage."""
+    
+    def test_fdl_memory_stability(self, iterations: int) -> BenchmarkResult:
+        """Test FDL memory stability over many iterations."""
+        monitor = PerformanceMonitor()
+        monitor.start()
+        
+        with proper_output_suppression():
+            for i in range(iterations):
+                bar = fdl_create_progress_bar(100, "purple")
+                for j in range(100):
+                    bar.update(1)
+                bar.stop()
+                # Force garbage collection periodically
+                if i % 100 == 0:
+                    import gc
+                    gc.collect()
+        
+        duration, cpu_percent, memory_mb = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Memory Stability ({iterations} iterations)",
+            implementation="FDL",
+            updates_per_second=(iterations * 100) / duration,
+            cpu_percent=cpu_percent,
+            memory_mb=memory_mb,
+            duration=duration,
+            total_updates=iterations * 100,
+            notes="Create/destroy cycles"
+        )
+
+
+def run_focused_benchmark():
+    """Run focused performance tests that isolate bottlenecks."""
+    print("\n🎯 FOCUSED PERFORMANCE BENCHMARK")
     print("=" * 60)
-    print("Testing FDL vs Rich at various load levels...")
+    print("Testing core update efficiency (no animation overhead)")
     
     results = []
     
-    # 1. Spinner Benchmarks
-    print("\n🌀 SPINNER BENCHMARKS")
+    # 1. Core Update Performance
+    print("\n⚡ CORE UPDATE TESTS")
     print("-" * 30)
     
-    spinner_bench = SpinnerBenchmark()
+    core_bench = CoreUpdateBenchmark()
     
-    # Test different update frequencies
-    spinner_tests = [
-        (100, 0.01),   # 100 updates at 100Hz
-        (500, 0.005),  # 500 updates at 200Hz  
-        (1000, 0.002), # 1000 updates at 500Hz
-    ]
-    
-    for updates, interval in spinner_tests:
-        print(f"Testing {updates} updates @ {1/interval:.0f}Hz...")
+    for updates in [1000, 5000, 10000]:
+        print(f"Testing {updates} core updates...")
         
-        # FDL spinner
-        fdl_result = spinner_bench.benchmark_fdl_spinner(updates, interval)
+        fdl_result = core_bench.benchmark_fdl_core_updates(updates)
         results.append(fdl_result)
         
-        # Rich spinner
-        rich_result = spinner_bench.benchmark_rich_spinner(updates, interval)
+        rich_result = core_bench.benchmark_rich_core_updates(updates)
         if rich_result:
             results.append(rich_result)
         
-        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        print(f"  FDL:  {fdl_result.updates_per_second:6.0f} ups, {fdl_result.cpu_percent:4.1f}% CPU")
         if rich_result:
-            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            print(f"  Rich: {rich_result.updates_per_second:6.0f} ups, {rich_result.cpu_percent:4.1f}% CPU")
             speedup = fdl_result.updates_per_second / rich_result.updates_per_second
-            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+            cpu_ratio = rich_result.cpu_percent / fdl_result.cpu_percent if fdl_result.cpu_percent > 0 else 1
+            print(f"  📊 FDL is {speedup:.1f}x faster, uses {cpu_ratio:.1f}x less CPU")
         print()
     
-    # 2. Progress Bar Benchmarks
-    print("\n📊 PROGRESS BAR BENCHMARKS")
+    # 2. Batching Performance
+    print("\n📦 BATCHING TESTS")
     print("-" * 30)
     
-    progress_bench = ProgressBarBenchmark()
+    batch_bench = BatchingBenchmark()
     
-    progress_tests = [
-        (1000, "steady"),  # Steady updates
-        (2000, "burst"),   # Bursty updates
-        (5000, "rapid"),   # Rapid updates
+    batch_tests = [
+        (10, 100),    # Small batches
+        (100, 50),    # Medium batches
+        (500, 10),    # Large batches
     ]
     
-    for total, pattern in progress_tests:
-        print(f"Testing {total} {pattern} updates...")
+    for batch_size, num_batches in batch_tests:
+        print(f"Testing {num_batches} batches of {batch_size}...")
         
-        # FDL progress bar
-        fdl_result = progress_bench.benchmark_fdl_progress(total, pattern)
+        fdl_result = batch_bench.benchmark_fdl_batching(batch_size, num_batches)
         results.append(fdl_result)
         
-        # Rich progress bar
-        rich_result = progress_bench.benchmark_rich_progress(total, pattern)
+        rich_result = batch_bench.benchmark_rich_batching(batch_size, num_batches)
         if rich_result:
             results.append(rich_result)
         
-        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        print(f"  FDL:  {fdl_result.updates_per_second:6.0f} ups, {fdl_result.cpu_percent:4.1f}% CPU")
         if rich_result:
-            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            print(f"  Rich: {rich_result.updates_per_second:6.0f} ups, {rich_result.cpu_percent:4.1f}% CPU")
             speedup = fdl_result.updates_per_second / rich_result.updates_per_second
-            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+            print(f"  📊 FDL is {speedup:.1f}x faster")
         print()
     
-    # 3. Threading Benchmarks
-    print("\n🧵 THREADING BENCHMARKS")
+    # 3. Threading Performance (focused)
+    print("\n🧵 FOCUSED THREADING TESTS")
     print("-" * 30)
     
-    threading_bench = ThreadingBenchmark()
+    thread_bench = ThreadingBenchmark()
     
     threading_tests = [
-        (2, 500),   # 2 threads, 500 updates each
-        (5, 200),   # 5 threads, 200 updates each
-        (10, 100),  # 10 threads, 100 updates each
+        (2, 500),
+        (4, 250),
+        (8, 125),
     ]
     
     for threads, updates in threading_tests:
-        print(f"Testing {threads} threads x {updates} updates...")
+        print(f"Testing {threads} threads × {updates} updates...")
         
-        # FDL threading
-        fdl_result = threading_bench.benchmark_fdl_threading(threads, updates)
+        fdl_result = thread_bench.benchmark_fdl_threading(threads, updates)
         results.append(fdl_result)
         
-        # Rich threading
-        rich_result = threading_bench.benchmark_rich_threading(threads, updates)
+        rich_result = thread_bench.benchmark_rich_threading(threads, updates)
         if rich_result:
             results.append(rich_result)
         
-        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        print(f"  FDL:  {fdl_result.updates_per_second:6.0f} ups, {fdl_result.cpu_percent:4.1f}% CPU")
         if rich_result:
-            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            print(f"  Rich: {rich_result.updates_per_second:6.0f} ups, {rich_result.cpu_percent:4.1f}% CPU")
             speedup = fdl_result.updates_per_second / rich_result.updates_per_second
-            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+            print(f"  📊 FDL is {speedup:.1f}x faster")
         print()
+    
+    # 4. Memory Stability Test
+    print("\n💾 MEMORY STABILITY TEST")
+    print("-" * 30)
+    
+    memory_test = MemoryLeakTest()
+    fdl_memory = memory_test.test_fdl_memory_stability(500)
+    results.append(fdl_memory)
+    
+    print(f"FDL Memory Test: {fdl_memory.updates_per_second:.0f} ups, {fdl_memory.memory_mb:.1f} MB")
     
     return results
 
 
-def generate_report(results: List[BenchmarkResult]):
-    """Generate comprehensive performance report."""
-    print("\n📊 PERFORMANCE REPORT")
+def analyze_bottlenecks(results: List[BenchmarkResult]):
+    """Analyze what's causing performance differences."""
+    print("\n🔍 BOTTLENECK ANALYSIS")
     print("=" * 60)
     
-    # Group results by test type and implementation
     fdl_results = [r for r in results if r.implementation == "FDL"]
     rich_results = [r for r in results if r.implementation == "Rich"]
     
-    # Calculate overall stats
-    if fdl_results:
-        fdl_avg_ups = sum(r.updates_per_second for r in fdl_results) / len(fdl_results)
-        fdl_avg_cpu = sum(r.cpu_percent for r in fdl_results) / len(fdl_results)
-        fdl_avg_mem = sum(r.memory_mb for r in fdl_results) / len(fdl_results)
+    if not rich_results:
+        print("❌ Cannot compare - Rich not available")
+        return
     
-    if rich_results:
-        rich_avg_ups = sum(r.updates_per_second for r in rich_results) / len(rich_results)
-        rich_avg_cpu = sum(r.cpu_percent for r in rich_results) / len(rich_results)
-        rich_avg_mem = sum(r.memory_mb for r in rich_results) / len(rich_results)
+    # Group by test type
+    core_fdl = [r for r in fdl_results if "Core Updates" in r.name]
+    core_rich = [r for r in rich_results if "Core Updates" in r.name]
     
-    print("\n🏆 OVERALL PERFORMANCE SUMMARY")
+    batch_fdl = [r for r in fdl_results if "Batching" in r.name]
+    batch_rich = [r for r in rich_results if "Batching" in r.name]
+    
+    thread_fdl = [r for r in fdl_results if "Threading" in r.name]
+    thread_rich = [r for r in rich_results if "Threading" in r.name]
+    
+    def avg_performance(results_list):
+        if not results_list:
+            return 0, 0
+        avg_ups = sum(r.updates_per_second for r in results_list) / len(results_list)
+        avg_cpu = sum(r.cpu_percent for r in results_list) / len(results_list)
+        return avg_ups, avg_cpu
+    
+    # Analyze each category
+    print("\n📊 PERFORMANCE BY CATEGORY")
     print("-" * 40)
     
-    if fdl_results and rich_results:
-        print(f"Average Updates/Second:")
-        print(f"  FDL:  {fdl_avg_ups:8.0f} ups")
-        print(f"  Rich: {rich_avg_ups:8.0f} ups")
-        print(f"  ⚡ FDL is {fdl_avg_ups/rich_avg_ups:.1f}x faster overall")
-        
-        print(f"\nAverage CPU Usage:")
-        print(f"  FDL:  {fdl_avg_cpu:6.1f}%")
-        print(f"  Rich: {rich_avg_cpu:6.1f}%") 
-        print(f"  💚 FDL uses {rich_avg_cpu/fdl_avg_cpu:.1f}x less CPU")
-        
-        print(f"\nAverage Memory Usage:")
-        print(f"  FDL:  {fdl_avg_mem:6.1f} MB")
-        print(f"  Rich: {rich_avg_mem:6.1f} MB")
-        print(f"  💚 FDL uses {rich_avg_mem/fdl_avg_mem:.1f}x less memory")
+    if core_fdl and core_rich:
+        fdl_ups, fdl_cpu = avg_performance(core_fdl)
+        rich_ups, rich_cpu = avg_performance(core_rich)
+        print(f"💡 Core Updates:")
+        print(f"   FDL:  {fdl_ups:6.0f} ups, {fdl_cpu:4.1f}% CPU")
+        print(f"   Rich: {rich_ups:6.0f} ups, {rich_cpu:4.1f}% CPU")
+        print(f"   🎯 FDL is {fdl_ups/rich_ups:.1f}x faster")
     
-    # Detailed breakdown
-    print("\n📋 DETAILED RESULTS")
+    if batch_fdl and batch_rich:
+        fdl_ups, fdl_cpu = avg_performance(batch_fdl)
+        rich_ups, rich_cpu = avg_performance(batch_rich)
+        print(f"📦 Batching:")
+        print(f"   FDL:  {fdl_ups:6.0f} ups, {fdl_cpu:4.1f}% CPU")
+        print(f"   Rich: {rich_ups:6.0f} ups, {rich_cpu:4.1f}% CPU")
+        print(f"   🎯 FDL is {fdl_ups/rich_ups:.1f}x faster")
+    
+    if thread_fdl and thread_rich:
+        fdl_ups, fdl_cpu = avg_performance(thread_fdl)
+        rich_ups, rich_cpu = avg_performance(thread_rich)
+        print(f"🧵 Threading:")
+        print(f"   FDL:  {fdl_ups:6.0f} ups, {fdl_cpu:4.1f}% CPU")
+        print(f"   Rich: {rich_ups:6.0f} ups, {rich_cpu:4.1f}% CPU")
+        print(f"   🎯 FDL is {fdl_ups/rich_ups:.1f}x faster")
+    
+    # Identify bottlenecks
+    print("\n🚨 BOTTLENECK IDENTIFICATION")
     print("-" * 40)
     
-    for result in results:
-        print(f"{result.implementation:4s} | {result.name:30s} | "
-              f"{result.updates_per_second:6.0f} ups | "
-              f"{result.cpu_percent:5.1f}% CPU | "
-              f"{result.memory_mb:5.1f} MB | "
-              f"{result.success_rate:5.1%}")
+    bottlenecks = []
     
-    # Performance claims validation
-    print("\n✅ CLAIMS VALIDATION")
-    print("-" * 40)
+    if thread_fdl and thread_rich:
+        fdl_thread_ups, _ = avg_performance(thread_fdl)
+        rich_thread_ups, _ = avg_performance(thread_rich)
+        if rich_thread_ups > fdl_thread_ups * 1.5:
+            bottlenecks.append("Threading: Rich scales better with multiple threads")
     
-    if fdl_results and rich_results:
-        overall_speedup = fdl_avg_ups / rich_avg_ups
-        
-        # Spinner claim: 20x faster
-        spinner_fdl = [r for r in fdl_results if "Spinner" in r.name]
-        spinner_rich = [r for r in rich_results if "Spinner" in r.name]
-        
-        if spinner_fdl and spinner_rich:
-            spinner_speedup = (sum(r.updates_per_second for r in spinner_fdl) / len(spinner_fdl)) / \
-                             (sum(r.updates_per_second for r in spinner_rich) / len(spinner_rich))
-            
-            print(f"🌀 Spinner Performance: {spinner_speedup:.1f}x faster than Rich")
-            if spinner_speedup >= 15:
-                print("   ✅ CLAIM VALIDATED: ~20x faster than Rich!")
-            elif spinner_speedup >= 10:
-                print("   ⚠️  CLAIM PARTIAL: 10-20x faster than Rich")
-            else:
-                print("   ❌ CLAIM UNVALIDATED: <10x faster than Rich")
-        
-        # Progress bar claim: 50x faster
-        progress_fdl = [r for r in fdl_results if "Progress" in r.name]
-        progress_rich = [r for r in rich_results if "Progress" in r.name]
-        
-        if progress_fdl and progress_rich:
-            progress_speedup = (sum(r.updates_per_second for r in progress_fdl) / len(progress_fdl)) / \
-                              (sum(r.updates_per_second for r in progress_rich) / len(progress_rich))
-            
-            print(f"📊 Progress Bar Performance: {progress_speedup:.1f}x faster than Rich")
-            if progress_speedup >= 30:
-                print("   ✅ CLAIM VALIDATED: ~50x faster than Rich!")
-            elif progress_speedup >= 20:
-                print("   ⚠️  CLAIM PARTIAL: 20-50x faster than Rich")
-            else:
-                print("   ❌ CLAIM UNVALIDATED: <20x faster than Rich")
-        
-        print(f"\n🎯 Overall System Performance: {overall_speedup:.1f}x faster than Rich")
+    if core_fdl and core_rich:
+        fdl_core_ups, _ = avg_performance(core_fdl)
+        rich_core_ups, _ = avg_performance(core_rich)
+        if rich_core_ups > fdl_core_ups * 1.2:
+            bottlenecks.append("Core Updates: Rich has more efficient update logic")
     
+    if bottlenecks:
+        for bottleneck in bottlenecks:
+            print(f"⚠️  {bottleneck}")
     else:
-        print("❌ Cannot validate claims - Rich not available for comparison")
-        print("   Install Rich with: pip install rich")
+        print("✅ No major bottlenecks identified - FDL performs well!")
+    
+    print("\n💡 OPTIMIZATION RECOMMENDATIONS")
+    print("-" * 40)
+    
+    if thread_fdl and thread_rich:
+        fdl_thread_ups, _ = avg_performance(thread_fdl)
+        rich_thread_ups, _ = avg_performance(thread_rich)
+        if rich_thread_ups > fdl_thread_ups * 1.3:
+            print("🔧 Consider optimizing FDL's locking strategy for better thread scaling")
+            print("   - Use fewer locks or lock-free data structures")
+            print("   - Batch updates before acquiring locks")
+    
+    print("🔧 Consider separating animation from core logic completely")
+    print("🔧 Profile with py-spy or cProfile to find specific hot spots")
 
 
 def main():
-    """Run the benchmark suite."""
-    print("🏁 FDL vs Rich Performance Benchmark")
-    print("Testing our performance claims...")
+    """Run the focused benchmark suite."""
+    print("🎯 FOCUSED FDL vs Rich Performance Benchmark")
+    print("Testing core performance without animation overhead...")
     
     if not RICH_AVAILABLE:
-        print("\n⚠️  WARNING: Rich not available")
+        print("\n⚠️  WARNING: Rich not available for comparison")
         print("   Install with: pip install rich")
-        print("   Will only test FDL performance (no comparison)")
     
     print(f"\n🔧 Test Environment:")
     print(f"   Python: {sys.version.split()[0]}")
     print(f"   CPU Count: {psutil.cpu_count()}")
-    print(f"   Memory: {psutil.virtual_memory().total // (1024**3)} GB")
     
     try:
-        results = run_comprehensive_benchmark()
-        generate_report(results)
+        results = run_focused_benchmark()
+        analyze_bottlenecks(results)
         
-        print(f"\n🎉 Benchmark Complete!")
-        print(f"   Total tests run: {len(results)}")
-        print(f"   FDL tests: {len([r for r in results if r.implementation == 'FDL'])}")
-        print(f"   Rich tests: {len([r for r in results if r.implementation == 'Rich'])}")
+        print(f"\n🎉 Focused Benchmark Complete!")
+        print(f"   Tests run: {len(results)}")
         
     except KeyboardInterrupt:
-        print("\n⏹️  Benchmark interrupted by user")
+        print("\n⏹️  Benchmark interrupted")
     except Exception as e:
         print(f"\n❌ Benchmark failed: {e}")
         import traceback
