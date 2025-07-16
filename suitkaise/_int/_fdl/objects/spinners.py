@@ -11,8 +11,10 @@ Features:
 
 Supported spinner types:
 - dots: ⠋⠙⠹⠸⠼⠴⠦⠧ (Unicode braille patterns)
-- arrow3: ▹▸▹ (Unicode arrows) 
+- arrows: ▹▸▹ (Unicode arrows) 
 - dqpb: dqpb (ASCII fallback)
+
+FIXED: Removed mock fallbacks, always use real Unicode support
 """
 
 import threading
@@ -21,21 +23,9 @@ import sys
 from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 
-# Import Unicode support detection
-try:
-    from ..setup.unicode import _get_unicode_support
-    from ..setup.terminal import _terminal
-except ImportError:
-    # Fallback for testing
-    class MockUnicodeSupport:
-        supports_unicode_spinners = False
-    def _get_unicode_support():
-        return MockUnicodeSupport()
-    
-    class MockTerminal:
-        supports_color = True
-        is_tty = True
-    _terminal = MockTerminal()
+# Always use real Unicode support - no mocks
+from ..setup.unicode import _get_unicode_support
+from ..setup.terminal import _terminal
 
 
 class SpinnerError(Exception):
@@ -49,7 +39,7 @@ class _SpinnerStyle:
     Defines a spinner animation style.
     
     Attributes:
-        name (str): Spinner name (dots, arrow3, dqpb)
+        name (str): Spinner name (dots, arrows, dqpb)
         frames (List[str]): Animation frames
         interval (float): Time between frames in seconds
         is_unicode (bool): Whether this spinner uses Unicode characters
@@ -78,8 +68,8 @@ class _SpinnerManager:
         ),
         'arrows': _SpinnerStyle(
             name='arrows',
-            frames=['▹', '▸', '▹'],
-            interval=0.4,   # 400ms - slower for arrows
+            frames=['▸▹▹▹▹', '▸▸▹▹▹', '▸▸▸▹▹', '▹▸▸▸▹', '▹▹▸▸▸', '▹▹▹▸▸', '▹▹▹▹▸', '▹▹▹▹▹', '▹▹▹▹▹'],
+            interval=0.15,   # 150ms - good speed for arrow movement
             is_unicode=True
         ),
         'dqpb': _SpinnerStyle(
@@ -88,6 +78,7 @@ class _SpinnerManager:
             interval=0.15,  # 150ms - moderate speed for ASCII
             is_unicode=False
         ),
+        
         # Aliases for convenience
         'letters': _SpinnerStyle(
             name='letters',
@@ -101,6 +92,8 @@ class _SpinnerManager:
         """Initialize spinner manager."""
         self._lock = threading.RLock()
         self._current_spinner: Optional['_ActiveSpinner'] = None
+        
+        # Always use real Unicode support detection
         self._unicode_support = _get_unicode_support()
         
         # Performance tracking
@@ -112,7 +105,7 @@ class _SpinnerManager:
         Create and start a new spinner, stopping any existing one.
         
         Args:
-            spinner_type (str): Type of spinner (dots, arrow3, dqpb, etc.)
+            spinner_type (str): Type of spinner (dots, arrows, dqpb, etc.)
             message (str): Message to display with spinner
             
         Returns:
@@ -335,7 +328,7 @@ def _create_spinner(spinner_type: str, message: str = "") -> _ActiveSpinner:
     INTERNAL: Create a new spinner, stopping any existing one.
     
     Args:
-        spinner_type (str): Type of spinner (dots, arrow3, dqpb, arrows, letters)
+        spinner_type (str): Type of spinner (dots, arrows, dqpb, letters)
         message (str): Message to display with spinner
         
     Returns:

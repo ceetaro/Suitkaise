@@ -1,569 +1,696 @@
 #!/usr/bin/env python3
 """
-Complete Pygments Token Types Reference
-Shows every token type with example code and explanations
+Performance Benchmark: FDL vs Rich
+
+Comprehensive performance testing of our custom spinners and progress bars
+against Rich's implementations at various load levels.
+
+Tests our claims:
+- Spinners: 20x faster than Rich
+- Progress bars: 50x faster than Rich
+
+Run with: python benchmark_vs_rich.py
 """
 
-from rich.console import Console
-from rich.syntax import Syntax
-from rich.panel import Panel
-from rich.table import Table
-from rich.columns import Columns
-from pygments.style import Style
-from pygments.token import (
-    Token, Whitespace, Error, Other, Keyword, Name, Literal, String, Number, 
-    Punctuation, Operator, Comment, Generic, Escape
-)
+import sys
+import time
+import threading
+import psutil
+import os
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
+from contextlib import contextmanager
 
-# Complete custom theme showing ALL token types
-class CompleteTokenTheme(Style):
-    """
-    Complete theme showing every possible token type
-    Each token type gets a unique color/style for demonstration
-    """
-    
-    name = 'complete_tokens'
-    
-    styles = {
-        # Base tokens
-        Token:                    '#f8f8f2',           # Default text color
-        Whitespace:              '',                   # Whitespace (usually transparent)
-        Error:                   'bg:#ff0000 #ffffff', # Errors - white text on red background
-        Other:                   '#f8f8f2',           # Other/unknown tokens
-        
-        # Comment tokens
-        Comment:                 'italic #6272a4',     # Base comment style
-        Comment.Hashbang:        'italic bold #6272a4', # #!/usr/bin/env python
-        Comment.Multiline:       'italic #6272a4',     # /* multiline comments */
-        Comment.Preproc:         'italic #ff79c6',     # #include, #define
-        Comment.PreprocFile:     'italic #ff79c6',     # #include <file.h>
-        Comment.Single:          'italic #6272a4',     # // single line comments
-        Comment.Special:         'italic bold #6272a4', # TODO, FIXME, etc.
-        
-        # Keyword tokens
-        Keyword:                 'bold #ff79c6',       # Base keyword
-        Keyword.Constant:        'bold #bd93f9',       # true, false, null
-        Keyword.Declaration:     'bold #ff79c6',       # var, let, const
-        Keyword.Namespace:       'bold #ff79c6',       # import, from, namespace
-        Keyword.Pseudo:          'bold #ff79c6',       # self, this
-        Keyword.Reserved:        'bold #ff79c6',       # Reserved keywords
-        Keyword.Type:            'bold #8be9fd',       # int, str, bool
-        
-        # Name tokens (identifiers)
-        Name:                    '#f8f8f2',           # Base name/identifier
-        Name.Attribute:          '#50fa7b',           # object.attribute
-        Name.Builtin:            '#8be9fd',           # print, len, range
-        Name.Builtin.Pseudo:     '#8be9fd',           # __name__, __main__
-        Name.Class:              'bold #8be9fd',      # class ClassName
-        Name.Constant:           '#bd93f9',           # CONSTANT_NAME
-        Name.Decorator:          '#50fa7b',           # @decorator
-        Name.Entity:             '#f1fa8c',           # HTML entities &amp;
-        Name.Exception:          'bold #ff5555',      # Exception, ValueError
-        Name.Function:           'bold #50fa7b',      # def function_name
-        Name.Function.Magic:     'bold #50fa7b',      # __init__, __str__
-        Name.Label:              '#f8f8f2',           # goto labels
-        Name.Namespace:          '#f8f8f2',           # module names
-        Name.Other:              '#f8f8f2',           # Other names
-        Name.Property:           '#50fa7b',           # @property
-        Name.Tag:                '#ff79c6',           # HTML/XML tags
-        Name.Variable:           '#f8f8f2',           # variable names
-        Name.Variable.Class:     '#f8f8f2',           # cls, self
-        Name.Variable.Global:    '#f8f8f2',           # global variables
-        Name.Variable.Instance:  '#f8f8f2',           # instance variables
-        Name.Variable.Magic:     '#bd93f9',           # __file__, __doc__
-        
-        # Literal tokens (values)
-        Literal:                 '#f1fa8c',           # Base literal
-        Literal.Date:            '#f1fa8c',           # Date literals
-        
-        # String tokens
-        String:                  '#f1fa8c',           # Base string
-        String.Affix:            '#ff79c6',           # r"", u"", b""
-        String.Backtick:         '#f1fa8c',           # `backtick strings`
-        String.Char:             '#f1fa8c',           # 'c' character literals
-        String.Delimiter:        '#f1fa8c',           # String delimiters
-        String.Doc:              'italic #f1fa8c',    # """docstrings"""
-        String.Double:           '#f1fa8c',           # "double quoted"
-        String.Escape:           '#ff79c6',           # \n, \t, \\
-        String.Heredoc:          '#f1fa8c',           # Heredoc strings
-        String.Interpol:         '#ff79c6',           # f"string {interpolation}"
-        String.Other:            '#f1fa8c',           # Other string types
-        String.Regex:            '#f1fa8c',           # /regex/patterns/
-        String.Single:           '#f1fa8c',           # 'single quoted'
-        String.Symbol:           '#f1fa8c',           # :symbol (Ruby)
-        
-        # Number tokens
-        Number:                  '#bd93f9',           # Base number
-        Number.Bin:              '#bd93f9',           # 0b1010 binary
-        Number.Float:            '#bd93f9',           # 3.14 floats
-        Number.Hex:              '#bd93f9',           # 0xFF hex
-        Number.Integer:          '#bd93f9',           # 42 integers
-        Number.Integer.Long:     '#bd93f9',           # 42L long integers
-        Number.Oct:              '#bd93f9',           # 0o755 octal
-        
-        # Operator tokens
-        Operator:                '#ff79c6',           # Base operator
-        Operator.Word:           '#ff79c6',           # and, or, not, in
-        
-        # Punctuation tokens
-        Punctuation:             '#f8f8f2',           # Base punctuation
-        Punctuation.Marker:      '#f8f8f2',           # Markup punctuation
-        
-        # Generic tokens (for diffs, markup, etc.)
-        Generic:                 '#f8f8f2',           # Base generic
-        Generic.Deleted:         '#ff5555',           # - deleted lines
-        Generic.Emph:            'italic',            # *emphasis*
-        Generic.Error:           'bold #ff5555',      # Error messages
-        Generic.Heading:         'bold #8be9fd',      # # Headings
-        Generic.Inserted:        '#50fa7b',           # + inserted lines
-        Generic.Output:          '#f8f8f2',           # Program output
-        Generic.Prompt:          'bold #f8f8f2',      # >>> prompts
-        Generic.Strong:          'bold',              # **strong**
-        Generic.Subheading:      'bold #f1fa8c',      # ## Subheadings
-        Generic.Traceback:       '#ff5555',           # Traceback info
-        
-        # Escape tokens
-        Escape:                  '#ff79c6',           # Escape sequences
-    }
+# Add project paths
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+objects_path = project_root / "suitkaise" / "_int" / "_fdl" / "objects"
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(objects_path))
 
-def create_comprehensive_examples():
-    """Create code examples that trigger every token type"""
-    
-    examples = {
-        "Python Complete": '''#!/usr/bin/env python3
-"""
-This is a docstring showing String.Doc tokens.
-It demonstrates various Python token types.
-TODO: This comment shows Comment.Special
-"""
-
-# Single line comment (Comment.Single)
-# -*- coding: utf-8 -*- (Comment.Special)
-
-import os  # Keyword.Namespace, Name.Namespace
-from typing import List, Dict, Optional  # Name.Builtin
-
-# Global constant (Name.Constant)
-GLOBAL_CONSTANT = 42
-
-class ExampleClass:  # Keyword, Name.Class
-    """Class docstring (String.Doc)"""
-    
-    def __init__(self, value: int = 0):  # Name.Function.Magic, Keyword.Type
-        self.value = value  # Name.Variable.Instance
-        self._private = "private"  # String.Double
-        
-    @property  # Name.Decorator
-    def formatted_value(self) -> str:  # Name.Property, Keyword.Type
-        """Property docstring"""
-        return f"Value: {self.value}"  # String.Interpol
-    
-    @staticmethod  # Name.Decorator
-    def static_method():  # Name.Function
-        pass  # Keyword
-    
-    def __str__(self) -> str:  # Name.Function.Magic
-        return f"ExampleClass({self.value})"
-
-# Various number types
-binary_num = 0b1010  # Number.Bin
-hex_num = 0xFF  # Number.Hex
-oct_num = 0o755  # Number.Oct
-float_num = 3.14159  # Number.Float
-int_num = 42  # Number.Integer
-
-# String types
-single_string = 'single quotes'  # String.Single
-double_string = "double quotes"  # String.Double
-raw_string = r"raw string with \\n"  # String.Affix
-byte_string = b"byte string"  # String.Affix
-f_string = f"formatted {int_num}"  # String.Interpol
-
-# Escape sequences (String.Escape)
-escaped_string = "newline\\n tab\\t quote\\""
-
-# Boolean constants (Keyword.Constant)
-is_true = True
-is_false = False
-is_none = None
-
-# Operators (Operator, Operator.Word)
-result = 1 + 2 * 3 / 4 - 5  # Operator
-logical = True and False or not None  # Operator.Word
-membership = "x" in "example"  # Operator.Word
-
-# Built-in functions (Name.Builtin)
-length = len([1, 2, 3])
-printed = print("hello")
-ranged = range(10)
-
-# Exception handling (Name.Exception)
+# Try to import Rich for comparison
 try:
-    raise ValueError("example error")  # Name.Exception
-except Exception as e:  # Name.Exception
-    pass
+    from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.spinner import Spinner
+    from rich.console import Console
+    from rich.live import Live
+    RICH_AVAILABLE = True
+    print("✅ Rich imported for comparison")
+except ImportError:
+    RICH_AVAILABLE = False
+    print("❌ Rich not available - install with: pip install rich")
+    print("   Benchmark will only test FDL performance")
 
-# Magic variables (Name.Variable.Magic)
-if __name__ == "__main__":  # Name.Variable.Magic
-    print(__file__)  # Name.Variable.Magic
-''',
+# Import our implementations
+try:
+    from suitkaise._int._fdl.objects.progress_bars import _create_progress_bar as fdl_create_progress_bar
+    from suitkaise._int._fdl.objects.spinners import _create_spinner as fdl_create_spinner, _stop_spinner as fdl_stop_spinner
+    FDL_AVAILABLE = True
+    print("✅ FDL components imported")
+except ImportError as e:
+    FDL_AVAILABLE = False
+    print(f"❌ FDL components not available: {e}")
+    sys.exit(1)
 
-        "JavaScript/TypeScript": '''#!/usr/bin/env node
-/**
- * Multiline comment (Comment.Multiline)
- * Shows JavaScript/TypeScript tokens
- */
 
-// Single line comment (Comment.Single)
+@dataclass
+class BenchmarkResult:
+    """Results from a single benchmark test."""
+    name: str
+    implementation: str  # "FDL" or "Rich"
+    duration: float
+    updates_per_second: float
+    cpu_percent: float
+    memory_mb: float
+    success_rate: float
+    notes: str = ""
 
-// Import statements (Keyword.Namespace)
-import { Component } from 'react';
-import * as fs from 'fs';
 
-// Type declarations (TypeScript)
-interface User {  // Keyword, Name.Class
-    id: number;  // Name.Attribute, Keyword.Type
-    name: string;  // Keyword.Type
-    email?: string;  // Keyword.Type, Operator
-}
-
-// Class declaration
-class UserManager {  // Keyword, Name.Class
-    private users: User[] = [];  // Keyword, Name.Attribute
+class PerformanceMonitor:
+    """Monitor CPU and memory usage during tests."""
     
-    constructor(config: object) {  // Name.Function, Keyword.Type
-        this.users = [];  // Keyword.Pseudo
-    }
+    def __init__(self):
+        self.process = psutil.Process()
+        self.monitoring = False
+        self.cpu_samples = []
+        self.memory_samples = []
     
-    // Method with various number types
-    processNumbers(): void {  // Name.Function, Keyword.Type
-        const binary = 0b1010;  // Number.Bin
-        const hex = 0xFF;  // Number.Hex
-        const float = 3.14;  // Number.Float
-        const integer = 42;  // Number.Integer
-    }
-    
-    // String types
-    processStrings(): void {
-        const single = 'single quotes';  // String.Single
-        const double = "double quotes";  // String.Double
-        const template = `template ${this.users.length}`;  // String.Interpol
-        const escaped = "escaped\\n\\t\\"";  // String.Escape
-    }
-    
-    // Async function
-    async fetchData(url: string): Promise<User[]> {  // Keyword, Name.Function
-        try {
-            const response = await fetch(url);  // Keyword
-            return await response.json();
-        } catch (error) {  // Name.Exception
-            throw new Error("Failed to fetch");  // Name.Exception
-        }
-    }
-}
-
-// Constants and operators
-const TRUE_VALUE = true;  // Name.Constant, Keyword.Constant
-const FALSE_VALUE = false;  // Keyword.Constant
-const NULL_VALUE = null;  // Keyword.Constant
-const UNDEFINED_VALUE = undefined;  // Keyword.Constant
-
-// Operators
-const result = 1 + 2 * 3 / 4 - 5;  // Operator
-const logical = true && false || !null;  // Operator
-const comparison = 5 > 3 && 2 < 4;  // Operator
-''',
-
-        "SQL": '''-- Single line comment (Comment.Single)
-/* 
- * Multiline comment (Comment.Multiline)
- * SQL token examples
- */
-
--- DDL Keywords (Keyword)
-CREATE TABLE users (  -- Keyword, Name.Table
-    id INTEGER PRIMARY KEY,  -- Name.Attribute, Keyword.Type, Keyword
-    name VARCHAR(255) NOT NULL,  -- Keyword.Type, Keyword
-    email TEXT UNIQUE,  -- Keyword.Type, Keyword
-    created_at TIMESTAMP DEFAULT NOW(),  -- Keyword.Type, Keyword, Name.Builtin
-    age DECIMAL(3,0) CHECK (age >= 0)  -- Keyword.Type, Number.Integer, Operator
-);
-
--- DML Keywords
-INSERT INTO users (name, email, age)  -- Keyword, Name.Table, Name.Attribute
-VALUES ('John Doe', 'john@example.com', 25);  -- Keyword, String.Single, Number.Integer
-
--- Query with various elements
-SELECT   -- Keyword
-    u.id,  -- Name.Attribute
-    u.name,
-    u.email,
-    COUNT(o.id) as order_count,  -- Name.Builtin, Name.Attribute
-    SUM(o.total) as total_spent,  -- Name.Builtin
-    AVG(o.total) as avg_order  -- Name.Builtin
-FROM users u  -- Keyword, Name.Table
-LEFT JOIN orders o ON u.id = o.user_id  -- Keyword, Name.Table, Operator
-WHERE u.created_at >= '2024-01-01'  -- Keyword, Name.Attribute, Operator, String.Single
-    AND u.age BETWEEN 18 AND 65  -- Operator.Word, Keyword
-    AND u.email IS NOT NULL  -- Operator.Word, Keyword
-GROUP BY u.id, u.name  -- Keyword, Name.Attribute
-HAVING COUNT(o.id) > 5  -- Keyword, Name.Builtin, Operator, Number.Integer
-ORDER BY total_spent DESC  -- Keyword, Name.Attribute, Keyword
-LIMIT 100;  -- Keyword, Number.Integer
-
--- String types and escapes
-UPDATE users 
-SET name = 'O''Brien',  -- String.Single with String.Escape
-    email = "user@domain.com"  -- String.Double
-WHERE id = 1;
-
--- Numbers
-SELECT 
-    42 as integer_num,  -- Number.Integer
-    3.14159 as float_num,  -- Number.Float
-    0xFF as hex_num,  -- Number.Hex
-    1.5e10 as scientific  -- Number.Float
-FROM dual;
-''',
-
-        "HTML/XML": '''<!DOCTYPE html>  <!-- Comment -->
-<!-- This is an HTML comment (Comment) -->
-<html lang="en">  <!-- Name.Tag, Name.Attribute -->
-<head>
-    <meta charset="utf-8">  <!-- Name.Tag, Name.Attribute, String -->
-    <title>Token Examples</title>  <!-- Name.Tag -->
-    <style type="text/css">  <!-- Name.Tag, Name.Attribute, String -->
-        /* CSS comment (Comment.Multiline) */
-        body { color: #ff0000; }  /* Name.Tag, Name.Attribute, Number.Hex */
-    </style>
-</head>
-<body class="main-content" id="page">  <!-- Name.Attribute, String -->
-    <h1>Title with &amp; entity</h1>  <!-- Name.Tag, Name.Entity -->
-    <p>Regular text with <em>emphasis</em></p>  <!-- Name.Tag -->
-    
-    <script type="text/javascript">  <!-- Name.Tag, Name.Attribute -->
-        // JavaScript in HTML (Comment.Single)
-        const message = "Hello, world!";  // String.Double
-        console.log(message);  // Name.Builtin
-    </script>
-</body>
-</html>
-''',
-
-        "JSON": '''{
-  "name": "example",          // String key, String value
-  "version": "1.0.0",         // String value
-  "number": 42,               // Number.Integer
-  "float": 3.14,              // Number.Float
-  "boolean": true,            // Keyword.Constant
-  "null_value": null,         // Keyword.Constant
-  "array": [1, 2, 3],         // Number.Integer
-  "nested": {                 // Object
-    "key": "value"            // String key-value
-  }
-}''',
-
-        "Regex": r'''# Regular expression examples (String.Regex)
-
-# Email validation
-email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-
-# Phone number with groups
-phone_pattern = r"(\d{3})-(\d{3})-(\d{4})"
-
-# URL matching with named groups
-url_pattern = r"(?P<scheme>https?)://(?P<domain>[^/]+)(?P<path>/.*)?$"
-
-# Character classes and quantifiers
-complex_pattern = r"[A-Za-z]\w{2,15}[!@#$%^&*]+"
-''',
-
-        "Diff Example": '''--- old_file.py  (Generic.Deleted context)
-+++ new_file.py  (Generic.Inserted context)
-@@ -1,5 +1,6 @@  (Generic.Heading)
- def old_function():  (unchanged line)
--    return "old"  (Generic.Deleted)
-+    return "new"  (Generic.Inserted)
-+    # Added comment  (Generic.Inserted)
-     pass
-     
- # This line unchanged
-'''
-    }
-    
-    return examples
-
-def demo_all_token_types():
-    """Demonstrate every token type with examples"""
-    console = Console()
-    
-    console.print("[bold blue]🎨 Complete Pygments Token Types Reference[/bold blue]\n")
-    console.print("[dim]Every token type with real code examples[/dim]\n")
-    
-    examples = create_comprehensive_examples()
-    
-    for title, code in examples.items():
-        # Determine language
-        lang_map = {
-            "Python Complete": "python",
-            "JavaScript/TypeScript": "typescript", 
-            "SQL": "sql",
-            "HTML/XML": "html",
-            "JSON": "json",
-            "Regex": "python",  # Show regex in Python context
-            "Diff Example": "diff"
-        }
+    def start(self):
+        """Start monitoring."""
+        self.monitoring = True
+        self.cpu_samples = []
+        self.memory_samples = []
         
-        language = lang_map.get(title, "text")
+        def monitor():
+            while self.monitoring:
+                try:
+                    cpu = self.process.cpu_percent()
+                    memory = self.process.memory_info().rss / 1024 / 1024  # MB
+                    self.cpu_samples.append(cpu)
+                    self.memory_samples.append(memory)
+                    time.sleep(0.1)  # Sample every 100ms
+                except:
+                    pass
         
-        console.print(f"[bold green]📝 {title}[/bold green]")
+        self.monitor_thread = threading.Thread(target=monitor)
+        self.monitor_thread.start()
+    
+    def stop(self) -> Tuple[float, float]:
+        """Stop monitoring and return average CPU% and memory MB."""
+        self.monitoring = False
+        if hasattr(self, 'monitor_thread'):
+            self.monitor_thread.join(timeout=1.0)
         
-        # Show with complete token theme
-        syntax = Syntax(
-            code, 
-            language, 
-            theme="complete_tokens",
-            line_numbers=True,
-            word_wrap=True
+        avg_cpu = sum(self.cpu_samples) / len(self.cpu_samples) if self.cpu_samples else 0
+        avg_memory = sum(self.memory_samples) / len(self.memory_samples) if self.memory_samples else 0
+        
+        return avg_cpu, avg_memory
+
+
+@contextmanager
+def suppress_output():
+    """Suppress stdout during benchmarks to avoid interference."""
+    with open(os.devnull, 'w') as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+
+
+class SpinnerBenchmark:
+    """Benchmark spinner performance."""
+    
+    def benchmark_fdl_spinner(self, updates: int, update_interval: float) -> BenchmarkResult:
+        """Benchmark FDL spinner performance."""
+        monitor = PerformanceMonitor()
+        monitor.start()
+        
+        start_time = time.time()
+        errors = 0
+        
+        try:
+            with suppress_output():
+                spinner = fdl_create_spinner('dots', 'Benchmark test')
+                
+                for i in range(updates):
+                    spinner.tick()
+                    time.sleep(update_interval)
+                
+                fdl_stop_spinner()
+                
+        except Exception as e:
+            errors += 1
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Spinner {updates} updates @ {1/update_interval:.1f}Hz",
+            implementation="FDL",
+            duration=duration,
+            updates_per_second=updates / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(updates - errors) / updates
         )
+    
+    def benchmark_rich_spinner(self, updates: int, update_interval: float) -> Optional[BenchmarkResult]:
+        """Benchmark Rich spinner performance."""
+        if not RICH_AVAILABLE:
+            return None
         
-        console.print(Panel(
-            syntax, 
-            title=f"{title} - All Token Types",
-            subtitle=f"Language: {language}"
-        ))
-        console.print()
+        monitor = PerformanceMonitor()
+        monitor.start()
+        
+        start_time = time.time()
+        errors = 0
+        
+        try:
+            with suppress_output():
+                console = Console(file=open(os.devnull, 'w'))
+                
+                with Live(Spinner('dots'), console=console, refresh_per_second=60) as live:
+                    for i in range(updates):
+                        live.update(Spinner('dots'))
+                        time.sleep(update_interval)
+                        
+        except Exception as e:
+            errors += 1
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Spinner {updates} updates @ {1/update_interval:.1f}Hz",
+            implementation="Rich",
+            duration=duration,
+            updates_per_second=updates / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(updates - errors) / updates
+        )
 
-def create_token_reference_table():
-    """Create a reference table of all token types"""
-    console = Console()
+
+class ProgressBarBenchmark:
+    """Benchmark progress bar performance."""
     
-    console.print("\n[bold blue]📋 Token Types Quick Reference[/bold blue]\n")
+    def benchmark_fdl_progress(self, total: int, update_pattern: str) -> BenchmarkResult:
+        """Benchmark FDL progress bar performance."""
+        monitor = PerformanceMonitor()
+        monitor.start()
+        
+        start_time = time.time()
+        errors = 0
+        updates_made = 0
+        
+        try:
+            with suppress_output():
+                bar = fdl_create_progress_bar(total, "blue")
+                bar.display_bar()
+                
+                # Start animation thread for smooth updates
+                animating = True
+                def animate():
+                    while animating:
+                        bar.tick()
+                        time.sleep(0.016)  # 60fps
+                
+                anim_thread = threading.Thread(target=animate)
+                anim_thread.start()
+                
+                if update_pattern == "steady":
+                    # Steady updates
+                    for i in range(total):
+                        bar.update(1)
+                        updates_made += 1
+                        time.sleep(0.01)  # 10ms between updates
+                        
+                elif update_pattern == "burst":
+                    # Bursty updates
+                    chunk_size = total // 10
+                    for chunk in range(10):
+                        for i in range(chunk_size):
+                            bar.update(1)
+                            updates_made += 1
+                        time.sleep(0.1)  # Pause between bursts
+                        
+                elif update_pattern == "rapid":
+                    # Very rapid updates
+                    for i in range(total):
+                        bar.update(1)
+                        updates_made += 1
+                        time.sleep(0.001)  # 1ms between updates
+                
+                # Let animation catch up
+                time.sleep(0.5)
+                animating = False
+                anim_thread.join()
+                bar.stop()
+                
+        except Exception as e:
+            errors += 1
+            animating = False
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Progress {total} updates ({update_pattern})",
+            implementation="FDL",
+            duration=duration,
+            updates_per_second=updates_made / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(updates_made - errors) / updates_made if updates_made > 0 else 0
+        )
     
-    # Group tokens by category
-    token_categories = {
-        "Base Tokens": [
-            ("Token", "Default text color"),
-            ("Whitespace", "Whitespace (usually invisible)"),
-            ("Error", "Syntax errors"),
-            ("Other", "Unknown/other tokens"),
-        ],
+    def benchmark_rich_progress(self, total: int, update_pattern: str) -> Optional[BenchmarkResult]:
+        """Benchmark Rich progress bar performance."""
+        if not RICH_AVAILABLE:
+            return None
         
-        "Comments": [
-            ("Comment", "Base comment style"),
-            ("Comment.Hashbang", "#!/usr/bin/env shebang"),
-            ("Comment.Multiline", "/* */ block comments"),
-            ("Comment.Preproc", "#include preprocessor"),
-            ("Comment.Single", "// line comments"),
-            ("Comment.Special", "TODO, FIXME, etc."),
-        ],
+        monitor = PerformanceMonitor()
+        monitor.start()
         
-        "Keywords": [
-            ("Keyword", "if, def, class, etc."),
-            ("Keyword.Constant", "true, false, null"),
-            ("Keyword.Declaration", "var, let, const"),
-            ("Keyword.Namespace", "import, from"),
-            ("Keyword.Pseudo", "self, this"),
-            ("Keyword.Reserved", "Reserved words"),
-            ("Keyword.Type", "int, str, bool"),
-        ],
+        start_time = time.time()
+        errors = 0
+        updates_made = 0
         
-        "Names/Identifiers": [
-            ("Name", "Variable names"),
-            ("Name.Attribute", "object.attribute"),
-            ("Name.Builtin", "print, len, range"),
-            ("Name.Class", "class ClassName"),
-            ("Name.Constant", "CONSTANT_NAME"),
-            ("Name.Decorator", "@decorator"),
-            ("Name.Exception", "ValueError, Exception"),
-            ("Name.Function", "def function_name"),
-            ("Name.Function.Magic", "__init__, __str__"),
-            ("Name.Variable.Magic", "__name__, __file__"),
-        ],
+        try:
+            with suppress_output():
+                console = Console(file=open(os.devnull, 'w'))
+                
+                with Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    console=console,
+                    refresh_per_second=60
+                ) as progress:
+                    
+                    task = progress.add_task("Benchmark", total=total)
+                    
+                    if update_pattern == "steady":
+                        # Steady updates
+                        for i in range(total):
+                            progress.update(task, advance=1)
+                            updates_made += 1
+                            time.sleep(0.01)  # 10ms between updates
+                            
+                    elif update_pattern == "burst":
+                        # Bursty updates  
+                        chunk_size = total // 10
+                        for chunk in range(10):
+                            progress.update(task, advance=chunk_size)
+                            updates_made += chunk_size
+                            time.sleep(0.1)  # Pause between bursts
+                            
+                    elif update_pattern == "rapid":
+                        # Very rapid updates
+                        for i in range(total):
+                            progress.update(task, advance=1)
+                            updates_made += 1
+                            time.sleep(0.001)  # 1ms between updates
+                
+        except Exception as e:
+            errors += 1
         
-        "Strings": [
-            ("String", "Base string style"),
-            ("String.Affix", "r'', u'', b''"),
-            ("String.Doc", "\"\"\"docstrings\"\"\""),
-            ("String.Double", "\"double quoted\""),
-            ("String.Escape", "\\n, \\t, \\\\"),
-            ("String.Interpol", "f\"string {var}\""),
-            ("String.Regex", "/regex/patterns/"),
-            ("String.Single", "'single quoted'"),
-        ],
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
         
-        "Numbers": [
-            ("Number", "Base number style"),
-            ("Number.Bin", "0b1010 binary"),
-            ("Number.Float", "3.14 floats"),
-            ("Number.Hex", "0xFF hexadecimal"),
-            ("Number.Integer", "42 integers"),
-            ("Number.Oct", "0o755 octal"),
-        ],
-        
-        "Operators": [
-            ("Operator", "+, -, *, /"),
-            ("Operator.Word", "and, or, not, in"),
-        ],
-        
-        "Generic (Markup/Diffs)": [
-            ("Generic.Deleted", "- deleted lines"),
-            ("Generic.Emph", "*emphasis*"),
-            ("Generic.Error", "Error messages"),
-            ("Generic.Heading", "# Headings"),
-            ("Generic.Inserted", "+ inserted lines"),
-            ("Generic.Strong", "**strong**"),
-        ]
-    }
+        return BenchmarkResult(
+            name=f"Progress {total} updates ({update_pattern})",
+            implementation="Rich",
+            duration=duration,
+            updates_per_second=updates_made / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(updates_made - errors) / updates_made if updates_made > 0 else 0
+        )
+
+
+class ThreadingBenchmark:
+    """Benchmark threading performance."""
     
-    for category, tokens in token_categories.items():
-        table = Table(title=f"[bold]{category}[/bold]", show_header=True)
-        table.add_column("Token Type", style="cyan", no_wrap=True)
-        table.add_column("Description", style="white")
-        table.add_column("Example", style="green")
+    def benchmark_fdl_threading(self, num_threads: int, updates_per_thread: int) -> BenchmarkResult:
+        """Benchmark FDL threading performance."""
+        monitor = PerformanceMonitor()
+        monitor.start()
         
-        for token_name, description in tokens:
-            # Create simple examples for each token
-            examples = {
-                "Comment": "# This is a comment",
-                "Keyword": "def, class, if",
-                "Name.Function": "my_function()",
-                "String": "'hello world'",
-                "Number.Integer": "42",
-                "Operator": "+ - * /",
-            }
+        start_time = time.time()
+        total_updates = num_threads * updates_per_thread
+        errors = 0
+        
+        try:
+            with suppress_output():
+                bar = fdl_create_progress_bar(total_updates, "green")
+                bar.display_bar()
+                
+                # Animation thread
+                animating = True
+                def animate():
+                    while animating:
+                        bar.tick()
+                        time.sleep(0.016)
+                
+                anim_thread = threading.Thread(target=animate)
+                anim_thread.start()
+                
+                # Worker threads
+                def worker():
+                    for i in range(updates_per_thread):
+                        bar.update(1)
+                        time.sleep(0.001)  # 1ms per update
+                
+                threads = []
+                for i in range(num_threads):
+                    t = threading.Thread(target=worker)
+                    threads.append(t)
+                    t.start()
+                
+                for t in threads:
+                    t.join()
+                
+                time.sleep(0.5)  # Let animation catch up
+                animating = False
+                anim_thread.join()
+                bar.stop()
+                
+        except Exception as e:
+            errors += 1
+            animating = False
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Threading {num_threads}x{updates_per_thread}",
+            implementation="FDL",
+            duration=duration,
+            updates_per_second=total_updates / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(total_updates - errors) / total_updates
+        )
+    
+    def benchmark_rich_threading(self, num_threads: int, updates_per_thread: int) -> Optional[BenchmarkResult]:
+        """Benchmark Rich threading performance."""
+        if not RICH_AVAILABLE:
+            return None
+        
+        monitor = PerformanceMonitor()
+        monitor.start()
+        
+        start_time = time.time()
+        total_updates = num_threads * updates_per_thread
+        errors = 0
+        
+        try:
+            with suppress_output():
+                console = Console(file=open(os.devnull, 'w'))
+                
+                with Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                    console=console,
+                    refresh_per_second=60
+                ) as progress:
+                    
+                    task = progress.add_task("Threading", total=total_updates)
+                    
+                    def worker():
+                        for i in range(updates_per_thread):
+                            progress.update(task, advance=1)
+                            time.sleep(0.001)  # 1ms per update
+                    
+                    threads = []
+                    for i in range(num_threads):
+                        t = threading.Thread(target=worker)
+                        threads.append(t)
+                        t.start()
+                    
+                    for t in threads:
+                        t.join()
+                
+        except Exception as e:
+            errors += 1
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        avg_cpu, avg_memory = monitor.stop()
+        
+        return BenchmarkResult(
+            name=f"Threading {num_threads}x{updates_per_thread}",
+            implementation="Rich",
+            duration=duration,
+            updates_per_second=total_updates / duration,
+            cpu_percent=avg_cpu,
+            memory_mb=avg_memory,
+            success_rate=(total_updates - errors) / total_updates
+        )
+
+
+def run_comprehensive_benchmark():
+    """Run the full benchmark suite."""
+    print("\n🚀 COMPREHENSIVE PERFORMANCE BENCHMARK")
+    print("=" * 60)
+    print("Testing FDL vs Rich at various load levels...")
+    
+    results = []
+    
+    # 1. Spinner Benchmarks
+    print("\n🌀 SPINNER BENCHMARKS")
+    print("-" * 30)
+    
+    spinner_bench = SpinnerBenchmark()
+    
+    # Test different update frequencies
+    spinner_tests = [
+        (100, 0.01),   # 100 updates at 100Hz
+        (500, 0.005),  # 500 updates at 200Hz  
+        (1000, 0.002), # 1000 updates at 500Hz
+    ]
+    
+    for updates, interval in spinner_tests:
+        print(f"Testing {updates} updates @ {1/interval:.0f}Hz...")
+        
+        # FDL spinner
+        fdl_result = spinner_bench.benchmark_fdl_spinner(updates, interval)
+        results.append(fdl_result)
+        
+        # Rich spinner
+        rich_result = spinner_bench.benchmark_rich_spinner(updates, interval)
+        if rich_result:
+            results.append(rich_result)
+        
+        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        if rich_result:
+            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            speedup = fdl_result.updates_per_second / rich_result.updates_per_second
+            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+        print()
+    
+    # 2. Progress Bar Benchmarks
+    print("\n📊 PROGRESS BAR BENCHMARKS")
+    print("-" * 30)
+    
+    progress_bench = ProgressBarBenchmark()
+    
+    progress_tests = [
+        (1000, "steady"),  # Steady updates
+        (2000, "burst"),   # Bursty updates
+        (5000, "rapid"),   # Rapid updates
+    ]
+    
+    for total, pattern in progress_tests:
+        print(f"Testing {total} {pattern} updates...")
+        
+        # FDL progress bar
+        fdl_result = progress_bench.benchmark_fdl_progress(total, pattern)
+        results.append(fdl_result)
+        
+        # Rich progress bar
+        rich_result = progress_bench.benchmark_rich_progress(total, pattern)
+        if rich_result:
+            results.append(rich_result)
+        
+        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        if rich_result:
+            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            speedup = fdl_result.updates_per_second / rich_result.updates_per_second
+            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+        print()
+    
+    # 3. Threading Benchmarks
+    print("\n🧵 THREADING BENCHMARKS")
+    print("-" * 30)
+    
+    threading_bench = ThreadingBenchmark()
+    
+    threading_tests = [
+        (2, 500),   # 2 threads, 500 updates each
+        (5, 200),   # 5 threads, 200 updates each
+        (10, 100),  # 10 threads, 100 updates each
+    ]
+    
+    for threads, updates in threading_tests:
+        print(f"Testing {threads} threads x {updates} updates...")
+        
+        # FDL threading
+        fdl_result = threading_bench.benchmark_fdl_threading(threads, updates)
+        results.append(fdl_result)
+        
+        # Rich threading
+        rich_result = threading_bench.benchmark_rich_threading(threads, updates)
+        if rich_result:
+            results.append(rich_result)
+        
+        print(f"  FDL: {fdl_result.updates_per_second:.0f} ups, {fdl_result.cpu_percent:.1f}% CPU")
+        if rich_result:
+            print(f"  Rich: {rich_result.updates_per_second:.0f} ups, {rich_result.cpu_percent:.1f}% CPU")
+            speedup = fdl_result.updates_per_second / rich_result.updates_per_second
+            print(f"  ⚡ FDL is {speedup:.1f}x faster")
+        print()
+    
+    return results
+
+
+def generate_report(results: List[BenchmarkResult]):
+    """Generate comprehensive performance report."""
+    print("\n📊 PERFORMANCE REPORT")
+    print("=" * 60)
+    
+    # Group results by test type and implementation
+    fdl_results = [r for r in results if r.implementation == "FDL"]
+    rich_results = [r for r in results if r.implementation == "Rich"]
+    
+    # Calculate overall stats
+    if fdl_results:
+        fdl_avg_ups = sum(r.updates_per_second for r in fdl_results) / len(fdl_results)
+        fdl_avg_cpu = sum(r.cpu_percent for r in fdl_results) / len(fdl_results)
+        fdl_avg_mem = sum(r.memory_mb for r in fdl_results) / len(fdl_results)
+    
+    if rich_results:
+        rich_avg_ups = sum(r.updates_per_second for r in rich_results) / len(rich_results)
+        rich_avg_cpu = sum(r.cpu_percent for r in rich_results) / len(rich_results)
+        rich_avg_mem = sum(r.memory_mb for r in rich_results) / len(rich_results)
+    
+    print("\n🏆 OVERALL PERFORMANCE SUMMARY")
+    print("-" * 40)
+    
+    if fdl_results and rich_results:
+        print(f"Average Updates/Second:")
+        print(f"  FDL:  {fdl_avg_ups:8.0f} ups")
+        print(f"  Rich: {rich_avg_ups:8.0f} ups")
+        print(f"  ⚡ FDL is {fdl_avg_ups/rich_avg_ups:.1f}x faster overall")
+        
+        print(f"\nAverage CPU Usage:")
+        print(f"  FDL:  {fdl_avg_cpu:6.1f}%")
+        print(f"  Rich: {rich_avg_cpu:6.1f}%") 
+        print(f"  💚 FDL uses {rich_avg_cpu/fdl_avg_cpu:.1f}x less CPU")
+        
+        print(f"\nAverage Memory Usage:")
+        print(f"  FDL:  {fdl_avg_mem:6.1f} MB")
+        print(f"  Rich: {rich_avg_mem:6.1f} MB")
+        print(f"  💚 FDL uses {rich_avg_mem/fdl_avg_mem:.1f}x less memory")
+    
+    # Detailed breakdown
+    print("\n📋 DETAILED RESULTS")
+    print("-" * 40)
+    
+    for result in results:
+        print(f"{result.implementation:4s} | {result.name:30s} | "
+              f"{result.updates_per_second:6.0f} ups | "
+              f"{result.cpu_percent:5.1f}% CPU | "
+              f"{result.memory_mb:5.1f} MB | "
+              f"{result.success_rate:5.1%}")
+    
+    # Performance claims validation
+    print("\n✅ CLAIMS VALIDATION")
+    print("-" * 40)
+    
+    if fdl_results and rich_results:
+        overall_speedup = fdl_avg_ups / rich_avg_ups
+        
+        # Spinner claim: 20x faster
+        spinner_fdl = [r for r in fdl_results if "Spinner" in r.name]
+        spinner_rich = [r for r in rich_results if "Spinner" in r.name]
+        
+        if spinner_fdl and spinner_rich:
+            spinner_speedup = (sum(r.updates_per_second for r in spinner_fdl) / len(spinner_fdl)) / \
+                             (sum(r.updates_per_second for r in spinner_rich) / len(spinner_rich))
             
-            # Get example or use description
-            example = examples.get(token_name.split('.')[-1], description.split()[0])
-            table.add_row(token_name, description, example)
+            print(f"🌀 Spinner Performance: {spinner_speedup:.1f}x faster than Rich")
+            if spinner_speedup >= 15:
+                print("   ✅ CLAIM VALIDATED: ~20x faster than Rich!")
+            elif spinner_speedup >= 10:
+                print("   ⚠️  CLAIM PARTIAL: 10-20x faster than Rich")
+            else:
+                print("   ❌ CLAIM UNVALIDATED: <10x faster than Rich")
         
-        console.print(table)
-        console.print()
+        # Progress bar claim: 50x faster
+        progress_fdl = [r for r in fdl_results if "Progress" in r.name]
+        progress_rich = [r for r in rich_results if "Progress" in r.name]
+        
+        if progress_fdl and progress_rich:
+            progress_speedup = (sum(r.updates_per_second for r in progress_fdl) / len(progress_fdl)) / \
+                              (sum(r.updates_per_second for r in progress_rich) / len(progress_rich))
+            
+            print(f"📊 Progress Bar Performance: {progress_speedup:.1f}x faster than Rich")
+            if progress_speedup >= 30:
+                print("   ✅ CLAIM VALIDATED: ~50x faster than Rich!")
+            elif progress_speedup >= 20:
+                print("   ⚠️  CLAIM PARTIAL: 20-50x faster than Rich")
+            else:
+                print("   ❌ CLAIM UNVALIDATED: <20x faster than Rich")
+        
+        print(f"\n🎯 Overall System Performance: {overall_speedup:.1f}x faster than Rich")
+    
+    else:
+        print("❌ Cannot validate claims - Rich not available for comparison")
+        print("   Install Rich with: pip install rich")
+
 
 def main():
-    """Main demo function"""
-    console = Console()
+    """Run the benchmark suite."""
+    print("🏁 FDL vs Rich Performance Benchmark")
+    print("Testing our performance claims...")
     
-    console.print("[bold green]🎯 Complete Token Types Guide[/bold green]")
-    console.print("[dim]See every Pygments token type in action[/dim]\n")
+    if not RICH_AVAILABLE:
+        print("\n⚠️  WARNING: Rich not available")
+        print("   Install with: pip install rich")
+        print("   Will only test FDL performance (no comparison)")
+    
+    print(f"\n🔧 Test Environment:")
+    print(f"   Python: {sys.version.split()[0]}")
+    print(f"   CPU Count: {psutil.cpu_count()}")
+    print(f"   Memory: {psutil.virtual_memory().total // (1024**3)} GB")
     
     try:
-        # Show all examples
-        demo_all_token_types()
+        results = run_comprehensive_benchmark()
+        generate_report(results)
         
-        # Show reference table
-        create_token_reference_table()
+        print(f"\n🎉 Benchmark Complete!")
+        print(f"   Total tests run: {len(results)}")
+        print(f"   FDL tests: {len([r for r in results if r.implementation == 'FDL'])}")
+        print(f"   Rich tests: {len([r for r in results if r.implementation == 'Rich'])}")
         
-        console.print("\n[bold green]✅ Complete Token Reference Done![/bold green]")
-        console.print("\n[bold]Key Takeaways:[/bold]")
-        console.print("• Each token type controls a specific code element")
-        console.print("• You can style each token independently")
-        console.print("• Some tokens are language-specific")
-        console.print("• Use this reference when creating custom themes")
-        console.print("• Test your themes with multiple languages")
-        
+    except KeyboardInterrupt:
+        print("\n⏹️  Benchmark interrupted by user")
     except Exception as e:
-        console.print(f"[red]Error in demo: {e}[/red]")
+        print(f"\n❌ Benchmark failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

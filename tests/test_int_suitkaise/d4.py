@@ -5,6 +5,8 @@ FDL Spinners & Progress Bars Visual Demo
 Live demonstration of high-performance spinners and progress bars.
 Shows real-time animation, batching efficiency, and performance improvements.
 
+UPDATED: Fixed display corruption, backwards progress, and new arrow spinner pattern
+
 Run with: python fdl_visual_demo.py
 """
 
@@ -29,7 +31,7 @@ DEMO_AVAILABLE = True
 import_errors = []
 
 try:
-    from spinners import (
+    from suitkaise._int._fdl.objects.spinners import (
         _create_spinner, _stop_spinner, _get_available_spinners, 
         _get_spinner_performance_stats, SpinnerError
     )
@@ -40,7 +42,7 @@ except Exception as e:
     DEMO_AVAILABLE = False
 
 try:
-    from progress_bars import (
+    from suitkaise._int._fdl.objects.progress_bars import (
         _ProgressBar, _create_progress_bar, ProgressBarError
     )
     print("✓ Progress Bars imported successfully")
@@ -83,7 +85,15 @@ def demo_spinner_types():
             print(f"  Frames: {spinner.style.frames}")
             print(f"  Unicode: {spinner.style.is_unicode}")
             print(f"  Interval: {spinner.style.interval}s")
-            print(f"  Animation: ", end="", flush=True)
+            
+            # UPDATED: Special display for new arrows spinner
+            if spinner_type == 'arrows':
+                print(f"  Pattern: White arrow (▸) moves left to right through 5 positions")
+                print(f"  Animation sequence:")
+                for i, frame in enumerate(spinner.style.frames):
+                    print(f"    Step {i+1}: {frame}")
+            
+            print(f"  Live animation: ", end="", flush=True)
             
             # Animate for 3 seconds
             start_time = time.time()
@@ -197,17 +207,20 @@ def demo_progress_batching():
     print("-" * 40)
     
     print("This demonstrates why we're 50x faster than Rich!")
-    print("Sending 1000 rapid updates...")
     
     bar = _ProgressBar(1000, color="blue", update_interval=0.1)  # 100ms batching
     bar.display_bar()
+    
+    # FIXED: Use force_newline() before printing status to prevent corruption
+    bar.force_newline()
+    print("Sending 1000 rapid updates...")
     
     start_time = time.time()
     
     # Rapid fire updates - these will be batched
     for i in range(1000):
         bar.update(1)
-        if i % 100 == 0:
+        if i % 200 == 0:
             bar.tick()  # Force occasional display update
             time.sleep(0.05)  # Small pause to show batching effect
     
@@ -220,7 +233,7 @@ def demo_progress_batching():
     total_time = end_time - start_time
     updates_per_second = 1000 / total_time
     
-    print(f"\n✅ Batching demo complete!")
+    print(f"✅ Batching demo complete!")
     print(f"   1000 updates in {total_time:.4f}s")
     print(f"   Rate: {updates_per_second:.0f} updates/second")
     
@@ -242,8 +255,6 @@ def demo_progress_threading():
     print("\n🧵 MULTI-THREADED PROGRESS DEMO")
     print("-" * 40)
     
-    print("5 threads simultaneously updating progress...")
-    
     bar = _ProgressBar(500, color="magenta")
     bar.display_bar()
     
@@ -260,7 +271,10 @@ def demo_progress_threading():
     
     start_time = time.time()
     
+    # FIXED: Use force_newline() before printing to prevent display corruption
+    bar.force_newline()
     print(f"Starting {num_threads} worker threads...")
+    
     for i in range(num_threads):
         thread = threading.Thread(target=worker_thread, args=(i, updates_per_thread))
         threads.append(thread)
@@ -282,7 +296,7 @@ def demo_progress_threading():
     total_time = end_time - start_time
     expected_total = num_threads * updates_per_thread
     
-    print(f"\n✅ Threading demo complete!")
+    print(f"✅ Threading demo complete!")
     print(f"   Expected total: {expected_total}")
     print(f"   Actual total: {bar.current}")
     print(f"   Time: {total_time:.4f}s")
@@ -296,8 +310,8 @@ def demo_spinner_with_progress():
     
     print("Simulating a real-world task with status spinner and progress...")
     
-    # Start a status spinner
-    status_spinner = _create_spinner('dots', 'Initializing...')
+    # UPDATED: Start a status spinner with new arrows pattern
+    status_spinner = _create_spinner('arrows', 'Initializing...')
     time.sleep(1)
     
     # Update spinner message
@@ -316,18 +330,23 @@ def demo_spinner_with_progress():
     items_per_phase = 40
     
     for phase, speed in enumerate(speeds):
+        # FIXED: Use force_newline() before showing phase info to prevent corruption
+        if phase > 0:
+            progress.force_newline()
+            print(f"  Phase {phase + 1}: Processing at {1/speed:.0f} items/sec")
+        
         for i in range(items_per_phase):
             progress.update(1)
             time.sleep(speed)
     
     progress.stop()
     
-    # Final status
-    _create_spinner('arrows', 'Finalizing...')
+    # UPDATED: Final status with new arrows spinner
+    final_spinner = _create_spinner('arrows', 'Finalizing...')
     time.sleep(1.5)
     _stop_spinner()
     
-    print("\n✅ Combined demo complete!")
+    print("✅ Combined demo complete!")
 
 
 def demo_unicode_fallback():
@@ -339,7 +358,6 @@ def demo_unicode_fallback():
     
     # Test spinner Unicode support
     spinner = _create_spinner('dots', 'Unicode test')
-    print(f"Terminal is TTY: {spinner.style._unicode_support.supports_unicode_spinners if hasattr(spinner.style, '_unicode_support') else 'Unknown'}")
     print(f"Dots spinner Unicode: {spinner.style.is_unicode}")
     print(f"Frames: {spinner.style.frames}")
     
@@ -348,6 +366,12 @@ def demo_unicode_fallback():
     print(f"Terminal encoding: {getattr(sys.stdout, 'encoding', 'unknown')}")
     
     spinner.stop()
+    
+    # UPDATED: Test new arrows spinner Unicode support
+    arrows_spinner = _create_spinner('arrows', 'Arrows test')
+    print(f"Arrows spinner Unicode: {arrows_spinner.style.is_unicode}")
+    print(f"Arrows frames: {arrows_spinner.style.frames}")
+    arrows_spinner.stop()
     
     # Test progress bar Unicode support  
     bar = _ProgressBar(100, color="green")
@@ -361,7 +385,7 @@ def demo_unicode_fallback():
     
     # Test character encoding directly
     print(f"\nDirect character encoding test:")
-    unicode_chars = ['█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '⠋', '⠙', '⠹']
+    unicode_chars = ['█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '⠋', '⠙', '⠹', '▸', '▹']
     try:
         encoding = getattr(sys.stdout, 'encoding', 'ascii') or 'ascii'
         for char in unicode_chars:
@@ -384,17 +408,20 @@ def performance_comparison():
     print("     - No threading bottlenecks")
     print("     - Manual tick() control")
     print("     - Direct ANSI output")
+    print("     - UPDATED: New 5-arrow animation pattern")
     
     print("  📊 Progress bars: 50x faster than Rich")
     print("     - Batched updates system")
     print("     - Cached terminal width")
     print("     - Thread-safe without performance cost")
+    print("     - FIXED: No backwards progress movement")
+    print("     - FIXED: Display corruption prevention")
     
     # Quick performance demonstration
     print("\nQuick performance test:")
     
-    # Spinner performance
-    spinner = _create_spinner('dqpb', 'Speed test')
+    # Spinner performance (test new arrows spinner)
+    spinner = _create_spinner('arrows', 'Speed test')
     start = time.time()
     for i in range(100):
         spinner.tick()
@@ -403,15 +430,48 @@ def performance_comparison():
     
     # Progress performance
     bar = _ProgressBar(100)
+    bar.display_bar()
     start = time.time()
     for i in range(100):
         bar.update(1)
     bar.tick()
     progress_time = time.time() - start
+    bar.stop()
     
-    print(f"  Spinner: 100 ticks in {spinner_time*1000:.2f}ms")
+    print(f"  Arrows Spinner: 100 ticks in {spinner_time*1000:.2f}ms")
     print(f"  Progress: 100 updates in {progress_time*1000:.2f}ms")
     print("  🎯 Excellent performance for smooth real-time animation!")
+
+
+def demo_display_isolation():
+    """NEW: Demonstrate display isolation and corruption prevention."""
+    print("\n🖥️  DISPLAY ISOLATION DEMO")
+    print("-" * 40)
+    
+    print("This demonstrates the fixes for display corruption...")
+    
+    # Create a progress bar
+    bar = _ProgressBar(200, color="green")
+    bar.display_bar()
+    
+    # Update progress in chunks, printing status between updates
+    chunks = [40, 60, 50, 50]
+    for i, chunk in enumerate(chunks):
+        # Update progress
+        for j in range(chunk):
+            bar.update(1)
+            time.sleep(0.01)  # 10ms per update
+        
+        # FIXED: Use force_newline() before printing status to prevent corruption
+        bar.force_newline()
+        print(f"   ✅ Phase {i+1} complete: Updated by {chunk}, total: {bar.current}")
+        
+        # Small pause between phases
+        time.sleep(0.5)
+    
+    bar.stop()
+    print("✅ Display isolation demo complete!")
+    print("   Notice: No display corruption between progress and status messages")
 
 
 def interactive_menu():
@@ -426,13 +486,14 @@ def interactive_menu():
         ("7", "Combined Spinner + Progress", demo_spinner_with_progress),
         ("8", "Unicode Fallback Test", demo_unicode_fallback),
         ("9", "Performance Comparison", performance_comparison),
+        ("10", "Display Isolation (NEW)", demo_display_isolation),
         ("0", "Run All Demos", None),
         ("q", "Quit", None)
     ]
     
     while True:
         print("\n" + "=" * 60)
-        print("FDL VISUAL DEMO MENU")
+        print("FDL VISUAL DEMO MENU (UPDATED)")
         print("=" * 60)
         
         for key, name, _ in demos:
@@ -484,6 +545,11 @@ def main():
     print("  📊 Progress Bars: 50x faster than Rich")
     print("  🎯 Thread-safe with no performance cost")
     print("  🔤 Unicode support with automatic fallback")
+    print("\nUPDATED FIXES:")
+    print("  ✅ Fixed backwards progress movement")
+    print("  ✅ New 5-arrow spinner animation")
+    print("  ✅ Display corruption prevention")
+    print("  ✅ Thread-safe concurrent output")
     
     try:
         interactive_menu()
