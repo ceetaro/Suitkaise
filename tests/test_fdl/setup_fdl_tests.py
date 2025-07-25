@@ -1,0 +1,1 @@
+# put path to root and paths to fdl here for easy setup

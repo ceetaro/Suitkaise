@@ -1,1 +1,0 @@
-# detects if code is HTML code, exports to .html file and formats html correctly if so

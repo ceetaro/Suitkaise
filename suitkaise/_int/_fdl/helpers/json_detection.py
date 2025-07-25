@@ -1,1 +1,0 @@
-# detects if code is JSON code, exports to .json file and formats json correctly if so
