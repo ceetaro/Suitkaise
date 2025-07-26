@@ -21,7 +21,7 @@ class TestTerminalInfo:
         terminal = _TerminalInfo()
         
         # Should have detected basic properties
-        assert terminal.width >= 80  # Should always be at least 80
+        assert terminal.width >= 60
         assert terminal.height >= 1  # Should have some height
         assert isinstance(terminal.supports_color, bool)
         assert isinstance(terminal.is_tty, bool)
@@ -35,7 +35,7 @@ class TestTerminalInfo:
         # Width must be accessible and reasonable
         width = terminal.width
         assert isinstance(width, int)
-        assert width >= 80  # Hard minimum
+        assert width >= 60  # Hard minimum
         assert width <= 1000  # Reasonable maximum
     
     def test_height_property_graceful_fallback(self):
@@ -160,7 +160,7 @@ class TestTerminalInfo:
             terminal = _TerminalInfo()
             
             # Should use fallback values
-            assert terminal.width == 80
+            assert terminal.width == 60
             assert terminal.height == 24
             assert terminal.supports_color is False
             assert terminal.is_tty is False
@@ -234,7 +234,7 @@ class TestGlobalTerminalInstance:
         """Test that global terminal has valid properties."""
         # Width is critical
         assert isinstance(_terminal.width, int)
-        assert _terminal.width >= 80
+        assert _terminal.width >= 60
         
         # Other properties should be accessible
         assert isinstance(_terminal.height, int)
@@ -249,7 +249,7 @@ class TestGlobalTerminalInstance:
         
         # Properties should still be valid after refresh
         assert isinstance(_terminal.width, int)
-        assert _terminal.width >= 80
+        assert _terminal.width >= 60
 
 
 class TestTerminalErrorHandling:
@@ -270,10 +270,10 @@ class TestTerminalErrorHandling:
         pass  # Implementation would depend on specific mocking scenario
     
     def test_minimum_width_enforcement(self):
-        """Test that minimum width of 80 is enforced."""
-        # Even if detection returns smaller value, should be at least 80
+        """Test that minimum width of 60 is enforced."""
+        # Even if detection returns smaller value, should be at least 60
         terminal = _TerminalInfo()
-        assert terminal.width >= 80
+        assert terminal.width >= 60
     
     @patch('os.get_terminal_size')
     def test_invalid_size_values_handling(self, mock_os_size):
@@ -288,7 +288,7 @@ class TestTerminalErrorHandling:
         try:
             terminal = _TerminalInfo()
             # If it succeeds, width should still be reasonable
-            assert terminal.width >= 80
+            assert terminal.width >= 60
         except TerminalWidthError:
             # This is also acceptable if no fallback works
             pass
@@ -311,7 +311,7 @@ def run_tests():
     failed_tests = []
     
     print("🧪 Running Terminal Detection Test Suite...")
-    print("=" * 80)
+    print("=" * 60)
     
     # Show visual examples first
     print("\n🖥️  DETECTED TERMINAL INFORMATION")
@@ -424,7 +424,7 @@ def run_tests():
     print(f"  Global:     {_terminal.width}x{_terminal.height} color={_terminal.supports_color}")
     print(f"  Consistent: {terminal1.width == terminal2.width == _terminal.width}")
     
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 60)
     print("🧪 RUNNING UNIT TESTS")
     
     for test_class in test_classes:
@@ -454,7 +454,7 @@ def run_tests():
                     print("    " + "\n    ".join(traceback.format_exc().split('\n')))
     
     # Summary
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 60)
     print(f"📊 Test Results: {passed_tests}/{total_tests} passed")
     
     if failed_tests:

@@ -104,10 +104,10 @@ class _BoxGenerator:
                 from .terminal import _terminal
                 self.terminal_width = _terminal.width
             except (ImportError, AttributeError):
-                self.terminal_width = 80
+                self.terminal_width = 60
         
         # Ensure minimum terminal width
-        self.terminal_width = max(80, self.terminal_width or 80)
+        self.terminal_width = max(60, self.terminal_width or 60)
         
         # Determine actual style to use (fallback to ASCII if needed)
         self.actual_style = self._get_actual_style()

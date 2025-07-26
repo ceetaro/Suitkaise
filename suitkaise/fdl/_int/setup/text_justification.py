@@ -1,4 +1,4 @@
-# setup/text_justification.py
+# setup/text_justification.py - REVERTED TO PURE JUSTIFICATION
 """
 Internal text justification utilities for FDL.
 
@@ -32,12 +32,20 @@ class _TextJustifier:
             terminal_width: Override terminal width (uses detected width if None)
         """
         # Import here to avoid circular imports
-        try:
-            from .terminal import _get_terminal
-            terminal = _get_terminal()
-            self.terminal_width = terminal_width or terminal.width
-        except (ImportError, AttributeError):
-            self.terminal_width = terminal_width or 60
+        if terminal_width is not None:
+            # Use explicit width if provided (no minimum enforcement for explicit widths)
+            self.terminal_width = terminal_width
+        else:
+            # Only use detected terminal width if no explicit width provided
+            try:
+                from .terminal import _get_terminal
+                terminal = _get_terminal()
+                self.terminal_width = terminal.width
+            except (ImportError, AttributeError):
+                self.terminal_width = 60
+            
+            # Only enforce minimum when using detected/default width
+            self.terminal_width = max(60, self.terminal_width)
             
         # ANSI escape sequence pattern for stripping codes
         self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -189,12 +197,17 @@ class _TextJustifier:
 
 
 # Global text justifier instance
-try:
-    from .terminal import _get_terminal
-    terminal = _get_terminal()
-    _text_justifier = _TextJustifier(terminal.width)
-except (ImportError, AttributeError):
-    _text_justifier = _TextJustifier(60)
+def _create_text_justifier():
+    """Create text justifier instance with proper error handling."""
+    try:
+        from .terminal import _get_terminal
+        terminal = _get_terminal()
+        return _TextJustifier(terminal.width)
+    except (ImportError, AttributeError):
+        return _TextJustifier(60)
+
+
+_text_justifier = _create_text_justifier()
 
 
 def _justify_text(text: str, justify: str, terminal_width: Optional[int] = None) -> str:

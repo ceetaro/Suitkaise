@@ -1,8 +1,8 @@
-# setup/text_wrapping.py
+# setup/text_wrapping.py - CLEAN PRIORITY SYSTEM IMPLEMENTATION
 """
 Smart text wrapping system for FDL that handles:
 - Visual width measurement using wcwidth (terminal-accurate)
-- Custom break points (spaces, punctuation, slashes, dashes)
+- Prioritized break points: 1) whitespace, 2) after punctuation/slashes/dashes
 - Word preservation (no mid-word breaks unless necessary)
 - Terminal width constraints
 - ANSI code safety to prevent color bleeding
@@ -22,12 +22,12 @@ except ImportError:
 
 class _TextWrapper:
     """
-    Advanced text wrapper that handles visual width and smart break points.
+    Advanced text wrapper that handles visual width and prioritized break points.
     
     Features:
     - Visual width measurement using wcwidth (terminal-accurate)
     - ANSI code awareness (strips for measurement, preserves in output)
-    - Smart break points: spaces, punctuation, slashes, dashes
+    - Prioritized break points: 1) whitespace, 2) after punctuation/slashes/dashes
     - Word preservation (avoids mid-word breaks)
     - Forced breaks for extremely long words
     """
@@ -39,31 +39,29 @@ class _TextWrapper:
         Args:
             width: Maximum line width (uses terminal width if None)
         """
-        # Import here to avoid circular imports
-        try:
-            from .terminal import _get_terminal
-            terminal = _get_terminal()
-            self.width = width or terminal.width
-        except (ImportError, AttributeError):
-            self.width = width or 60
-        
-        # Ensure minimum width
-        self.width = max(20, self.width)  # Reduced minimum from higher values
+        if width is not None:
+            # Use explicit width if provided (no minimum enforcement for explicit widths)
+            self.width = width
+        else:
+            # Only use detected terminal width if no explicit width provided
+            try:
+                from .terminal import _get_terminal
+                terminal = _get_terminal()
+                self.width = terminal.width
+            except (ImportError, AttributeError):
+                self.width = 60
+            
+            # Only enforce minimum when using detected/default width
+            self.width = max(60, self.width)
         
         # ANSI escape sequence pattern
         self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         
-        # Break point patterns (in order of preference)
-        self._break_patterns = [
-            r'[ \t]+',              # Spaces and tabs (highest preference)
-            r'[.!?:;,]+',           # Punctuation marks
-            r'[/\\]+',              # Slashes
-            r'[-—–]+',              # Dashes (various types)
-        ]
+        # Priority 1: Whitespace (spaces, tabs)
+        self._whitespace_pattern = re.compile(r'[ \t]+')
         
-        # Compiled break pattern (matches any break point)
-        break_chars = r'[ \t.!?:;,/\\—–-]'
-        self._break_pattern = re.compile(f'({break_chars}+)')
+        # Priority 2: After punctuation/slashes/dashes (but not underscores or apostrophes)
+        self._punctuation_chars = '.!?:;,/\\—–-'
     
     def wrap_text(self, text: str, preserve_newlines: bool = True) -> List[str]:
         """
@@ -97,7 +95,7 @@ class _TextWrapper:
     
     def _wrap_line(self, line: str) -> List[str]:
         """
-        Wrap a single line of text.
+        Wrap a single line of text using prioritized break points.
         
         Args:
             line: Line to wrap
@@ -110,121 +108,137 @@ class _TextWrapper:
         
         # Check if line fits without wrapping
         if self._get_visual_width(line) <= self.width:
-            # Even if it fits, ensure ANSI safety
             return [self._ensure_ansi_reset(line)]
         
-        # Split line into tokens (words and break points)
-        tokens = self._tokenize_line(line)
-        
-        # Build wrapped lines
         wrapped_lines = []
-        current_line = ""
-        current_width = 0
+        remaining_text = line
         
-        i = 0
-        while i < len(tokens):
-            token = tokens[i]
-            token_width = self._get_visual_width(token)
+        while remaining_text and remaining_text.strip():
+            current_line, remaining_text = self._fit_line_with_priority_breaks(remaining_text)
             
-            # Check if adding this token would exceed width
-            if current_width + token_width > self.width and current_line:
-                # Current line is full, start new line
-                # Ensure ANSI safety before adding to wrapped lines
-                safe_line = self._ensure_ansi_reset(current_line.rstrip())
-                wrapped_lines.append(safe_line)
-                current_line = ""
-                current_width = 0
-                
-                # Skip leading whitespace on new line
-                if self._is_whitespace(token):
-                    i += 1
-                    continue
-            
-            # Handle extremely long tokens that don't fit on any line
-            if token_width > self.width and not current_line:
-                # Force break the token
-                broken_parts = self._force_break_token(token)
-                # Ensure ANSI safety for each part
-                safe_parts = [self._ensure_ansi_reset(part) for part in broken_parts[:-1]]
-                wrapped_lines.extend(safe_parts)
-                if broken_parts:
-                    current_line = broken_parts[-1]
-                    current_width = self._get_visual_width(current_line)
-            else:
-                # Add token to current line
-                current_line += token
-                current_width += token_width
-            
-            i += 1
-        
-        # Add final line if not empty, ensuring ANSI safety
-        if current_line:
-            safe_line = self._ensure_ansi_reset(current_line.rstrip())
-            wrapped_lines.append(safe_line)
+            if current_line:
+                wrapped_lines.append(self._ensure_ansi_reset(current_line.rstrip()))
         
         return wrapped_lines if wrapped_lines else ['']
     
-    def _tokenize_line(self, line: str) -> List[str]:
+    def _fit_line_with_priority_breaks(self, text: str) -> Tuple[str, str]:
         """
-        Split line into tokens (words and break points).
+        Fit as much text as possible on one line using prioritized break points.
         
         Args:
-            line: Line to tokenize
+            text: Text to fit
             
         Returns:
-            List[str]: List of tokens
+            Tuple: (line_content, remaining_text)
         """
-        # Split on break points while preserving them
-        tokens = self._break_pattern.split(line)
+        if not text:
+            return ('', '')
         
-        # Remove empty tokens
-        return [token for token in tokens if token]
+        # If entire text fits, return it all
+        if self._get_visual_width(text) <= self.width:
+            return (text, '')
+        
+        # Find how much text we can fit
+        max_fit_pos = self._find_max_fit_position(text)
+        
+        if max_fit_pos == 0:
+            # Even first character doesn't fit, force take it anyway
+            return (text[0], text[1:])
+        
+        # Look for best break point within the fitting text
+        break_pos = self._find_best_break_point(text, max_fit_pos)
+        
+        if break_pos > 0:
+            line_content = text[:break_pos]
+            remaining_text = text[break_pos:].lstrip()  # Remove leading whitespace from next line
+            return (line_content, remaining_text)
+        else:
+            # No good break point found, force break at max fit position
+            return (text[:max_fit_pos], text[max_fit_pos:])
     
-    def _is_whitespace(self, token: str) -> bool:
+    def _find_max_fit_position(self, text: str) -> int:
         """
-        Check if token is whitespace.
+        Find the maximum position where text still fits within width.
         
         Args:
-            token: Token to check
+            text: Text to measure
             
         Returns:
-            bool: True if token is whitespace
+            int: Maximum position that fits
         """
-        return bool(re.match(r'^[ \t]+$', token))
-    
-    def _force_break_token(self, token: str) -> List[str]:
-        """
-        Force break a token that's too long for any line.
+        if not text:
+            return 0
         
-        Args:
-            token: Token to break
-            
-        Returns:
-            List[str]: List of token parts
-        """
-        if not token:
-            return ['']
-        
-        parts = []
-        current_part = ""
-        current_width = 0
-        
-        # Break character by character if necessary
-        for char in token:
-            char_width = self._get_char_visual_width(char)
-            
-            if current_width + char_width > self.width and current_part:
-                parts.append(current_part)
-                current_part = char
-                current_width = char_width
+        # Simple iteration for reliability with ANSI codes
+        max_fit = 0
+        for i in range(1, len(text) + 1):
+            if self._get_visual_width(text[:i]) <= self.width:
+                max_fit = i
             else:
-                current_part += char
-                current_width += char_width
+                break
         
-        if current_part:
-            parts.append(current_part)
+        return max_fit
+    
+    def _find_best_break_point(self, text: str, max_pos: int) -> int:
+        """
+        Find the best break point within max_pos using priority system.
         
-        return parts if parts else ['']
+        Args:
+            text: Text to search in
+            max_pos: Maximum position to consider
+            
+        Returns:
+            int: Best break position (0 if no good break found)
+        """
+        search_text = text[:max_pos]
+        
+        # Priority 1: Find the last whitespace break
+        best_whitespace = self._find_last_whitespace_break(search_text)
+        if best_whitespace > 0:
+            return best_whitespace
+        
+        # Priority 2: Find the last punctuation break (after punctuation)
+        best_punctuation = self._find_last_punctuation_break(search_text)
+        if best_punctuation > 0:
+            return best_punctuation
+        
+        # No good break point found
+        return 0
+    
+    def _find_last_whitespace_break(self, text: str) -> int:
+        """
+        Find the last whitespace break point.
+        
+        Args:
+            text: Text to search
+            
+        Returns:
+            int: Position after last whitespace (0 if none found)
+        """
+        # Find all whitespace matches and return the end of the last one
+        matches = list(self._whitespace_pattern.finditer(text))
+        if matches:
+            return matches[-1].end()  # Break after the whitespace
+        return 0
+    
+    def _find_last_punctuation_break(self, text: str) -> int:
+        """
+        Find the last punctuation break point (after punctuation).
+        
+        Args:
+            text: Text to search
+            
+        Returns:
+            int: Position after last punctuation (0 if none found)
+        """
+        best_pos = 0
+        
+        # Look for punctuation characters and find the last one
+        for i, char in enumerate(text):
+            if char in self._punctuation_chars:
+                best_pos = i + 1  # Break AFTER the punctuation
+        
+        return best_pos
     
     def _get_visual_width(self, text: str) -> int:
         """
@@ -346,12 +360,17 @@ class _TextWrapper:
 
 
 # Global text wrapper instance
-try:
-    from .terminal import _get_terminal
-    terminal = _get_terminal()
-    _text_wrapper = _TextWrapper(terminal.width)
-except (ImportError, AttributeError):
-    _text_wrapper = _TextWrapper(60)
+def _create_text_wrapper():
+    """Create text wrapper instance with proper error handling."""
+    try:
+        from .terminal import _get_terminal
+        terminal = _get_terminal()
+        return _TextWrapper(terminal.width)  # This will use detected width with minimum enforcement
+    except (ImportError, AttributeError):
+        return _TextWrapper()  # This will use default 60 with minimum enforcement
+
+
+_text_wrapper = _create_text_wrapper()
 
 
 def _wrap_text(text: str, width: Optional[int] = None, 
