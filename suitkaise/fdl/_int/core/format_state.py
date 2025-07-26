@@ -17,7 +17,7 @@ try:
 except ImportError:
     # Fallback for testing/development
     class _MockTerminal:
-        width = 80
+        width = 60
     _terminal = _MockTerminal()
 
 # Avoid circular imports
@@ -72,7 +72,7 @@ class _FormatState:
     debug_mode: bool = False
     
     # Terminal information
-    terminal_width: int = 80
+    terminal_width: int = 60
     
     # Progress bar state
     bar_active: bool = False
@@ -92,8 +92,8 @@ class _FormatState:
 
     def __post_init__(self):
         """Initialize calculated values after object creation."""
-        # Ensure minimum terminal width of 80
-        self.terminal_width = max(80, self.terminal_width)
+        # Ensure minimum terminal width of 60
+        self.terminal_width = max(60, self.terminal_width)
         
         # Calculate maximum box width
         self.box_width = self._calculate_max_box_width()
@@ -358,7 +358,7 @@ def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = Non
         _FormatState: Initialized format state object
     """
     if terminal_width is None:
-        terminal_width = max(80, _terminal.width)
+        terminal_width = max(60, _terminal.width)
     
     return _FormatState(
         values=values,
