@@ -71,6 +71,7 @@ class _ColorConverter:
         """Initialize color converter."""
         # Regex patterns for color parsing
         self._hex_pattern = re.compile(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$')
+        # Updated RGB pattern to accept any digits (validation happens in parsing)
         self._rgb_pattern = re.compile(r'^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$')
     
     def get_named_colors(self) -> set:
@@ -108,7 +109,10 @@ class _ColorConverter:
     
     def is_rgb_color(self, color: str) -> bool:
         """
-        Check if color is a valid rgb() color.
+        Check if color is a valid rgb() color format.
+        
+        This only checks the format, not the value ranges.
+        Value validation happens during parsing.
         
         Args:
             color: Color string to check
@@ -116,7 +120,16 @@ class _ColorConverter:
         Returns:
             bool: True if color is valid rgb() format
         """
-        return bool(self._rgb_pattern.match(color.strip()))
+        match = self._rgb_pattern.match(color.strip())
+        if not match:
+            return False
+        
+        # Additional validation for value ranges
+        try:
+            r, g, b = map(int, match.groups())
+            return all(0 <= val <= 255 for val in (r, g, b))
+        except ValueError:
+            return False
     
     def is_valid_color(self, color: str) -> bool:
         """
@@ -128,6 +141,9 @@ class _ColorConverter:
         Returns:
             bool: True if color is valid
         """
+        if not color or not isinstance(color, str):
+            return False
+            
         return (
             self.is_named_color(color) or
             self.is_hex_color(color) or 
@@ -145,6 +161,9 @@ class _ColorConverter:
         Returns:
             str: ANSI foreground code, empty string if invalid
         """
+        if not color or not isinstance(color, str):
+            return ""
+            
         color = color.strip().lower()
         
         # Named colors
@@ -174,6 +193,9 @@ class _ColorConverter:
         Returns:
             str: ANSI background code, empty string if invalid
         """
+        if not color or not isinstance(color, str):
+            return ""
+            
         color = color.strip().lower()
         
         # Named colors
@@ -273,7 +295,10 @@ class _ColorConverter:
         if not match:
             raise ValueError(f"Invalid rgb color: {rgb_color}")
         
-        r, g, b = map(int, match.groups())
+        try:
+            r, g, b = map(int, match.groups())
+        except ValueError:
+            raise ValueError(f"Invalid rgb values: {rgb_color}")
         
         # Validate RGB ranges
         if not all(0 <= val <= 255 for val in (r, g, b)):
@@ -292,6 +317,9 @@ class _ColorConverter:
         Returns:
             str: Color normalized for HTML/CSS use
         """
+        if not color or not isinstance(color, str):
+            return color
+            
         color = color.strip().lower()
         
         # Named colors that are valid in CSS
@@ -323,6 +351,17 @@ class _ColorConverter:
         Returns:
             dict: Color information and conversion results
         """
+        if not color or not isinstance(color, str):
+            return {
+                'original': color,
+                'normalized': '',
+                'is_valid': False,
+                'color_type': 'unknown',
+                'ansi_fg': '',
+                'ansi_bg': '',
+                'html_normalized': str(color) if color else ''
+            }
+            
         info = {
             'original': color,
             'normalized': color.strip().lower(),

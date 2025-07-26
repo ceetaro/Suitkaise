@@ -5,13 +5,13 @@ Smart text wrapping system for FDL that handles:
 - Custom break points (spaces, punctuation, slashes, dashes)
 - Word preservation (no mid-word breaks unless necessary)
 - Terminal width constraints
+- ANSI code safety to prevent color bleeding
 
 This is internal to the FDL engine and not exposed to users.
 """
 
 import re
 from typing import List, Tuple, Optional
-from .terminal import _terminal
 
 try:
     import wcwidth
@@ -39,7 +39,16 @@ class _TextWrapper:
         Args:
             width: Maximum line width (uses terminal width if None)
         """
-        self.width = width or _terminal.width
+        # Import here to avoid circular imports
+        try:
+            from .terminal import _get_terminal
+            terminal = _get_terminal()
+            self.width = width or terminal.width
+        except (ImportError, AttributeError):
+            self.width = width or 60
+        
+        # Ensure minimum width
+        self.width = max(20, self.width)  # Reduced minimum from higher values
         
         # ANSI escape sequence pattern
         self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -101,7 +110,8 @@ class _TextWrapper:
         
         # Check if line fits without wrapping
         if self._get_visual_width(line) <= self.width:
-            return [line]
+            # Even if it fits, ensure ANSI safety
+            return [self._ensure_ansi_reset(line)]
         
         # Split line into tokens (words and break points)
         tokens = self._tokenize_line(line)
@@ -119,7 +129,9 @@ class _TextWrapper:
             # Check if adding this token would exceed width
             if current_width + token_width > self.width and current_line:
                 # Current line is full, start new line
-                wrapped_lines.append(current_line.rstrip())
+                # Ensure ANSI safety before adding to wrapped lines
+                safe_line = self._ensure_ansi_reset(current_line.rstrip())
+                wrapped_lines.append(safe_line)
                 current_line = ""
                 current_width = 0
                 
@@ -132,7 +144,9 @@ class _TextWrapper:
             if token_width > self.width and not current_line:
                 # Force break the token
                 broken_parts = self._force_break_token(token)
-                wrapped_lines.extend(broken_parts[:-1])  # Add all but last part
+                # Ensure ANSI safety for each part
+                safe_parts = [self._ensure_ansi_reset(part) for part in broken_parts[:-1]]
+                wrapped_lines.extend(safe_parts)
                 if broken_parts:
                     current_line = broken_parts[-1]
                     current_width = self._get_visual_width(current_line)
@@ -143,9 +157,10 @@ class _TextWrapper:
             
             i += 1
         
-        # Add final line if not empty
+        # Add final line if not empty, ensuring ANSI safety
         if current_line:
-            wrapped_lines.append(current_line.rstrip())
+            safe_line = self._ensure_ansi_reset(current_line.rstrip())
+            wrapped_lines.append(safe_line)
         
         return wrapped_lines if wrapped_lines else ['']
     
@@ -225,7 +240,7 @@ class _TextWrapper:
             return 0
         
         # Strip ANSI codes first
-        clean_text = self._ansi_pattern.sub('', text)
+        clean_text = self._strip_ansi_codes(text)
         
         if wcwidth is None:
             # Fallback to simple len() if wcwidth not available
@@ -268,6 +283,41 @@ class _TextWrapper:
         # wcwidth returns None for control characters
         return width if width is not None else 0
     
+    def _strip_ansi_codes(self, text: str) -> str:
+        """
+        Strip ANSI escape codes from text for length measurement.
+        
+        Args:
+            text: Text with potential ANSI codes
+            
+        Returns:
+            str: Text without ANSI codes
+        """
+        return self._ansi_pattern.sub('', text)
+    
+    def _ensure_ansi_reset(self, text: str) -> str:
+        """
+        Ensure text ends with ANSI reset if it contains ANSI codes.
+        
+        Args:
+            text: Text that may contain ANSI codes
+            
+        Returns:
+            str: Text with proper ANSI reset to prevent bleeding
+        """
+        if not text:
+            return text
+        
+        # Check if text contains ANSI codes
+        if self._ansi_pattern.search(text):
+            # Check if it already ends with a reset code
+            reset_pattern = re.compile(r'\x1B\[0?m$')
+            if not reset_pattern.search(text):
+                # Add reset code to prevent color bleeding
+                return text + '\x1B[0m'
+        
+        return text
+    
     def get_visual_width(self, text: str) -> int:
         """
         Public method to get visual width of text.
@@ -296,7 +346,12 @@ class _TextWrapper:
 
 
 # Global text wrapper instance
-_text_wrapper = _TextWrapper()
+try:
+    from .terminal import _get_terminal
+    terminal = _get_terminal()
+    _text_wrapper = _TextWrapper(terminal.width)
+except (ImportError, AttributeError):
+    _text_wrapper = _TextWrapper(60)
 
 
 def _wrap_text(text: str, width: Optional[int] = None, 

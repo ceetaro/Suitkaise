@@ -18,8 +18,6 @@ import sys
 import warnings
 from typing import Dict, List, Optional
 
-from .terminal import _terminal
-
 
 class _UnicodeSupport:
     """
@@ -43,10 +41,27 @@ class _UnicodeSupport:
         Immediately tests all required characters and builds the supported
         character dictionary.
         """
-        self._terminal = terminal_info if terminal_info else _terminal
-        self._is_tty = self._terminal.is_tty
+        if terminal_info is not None:
+            self._terminal = terminal_info
+        else:
+            try:
+                from .terminal import _terminal
+                self._terminal = _terminal
+            except (ImportError, AttributeError):
+                # Fallback terminal if import fails
+                class _FallbackTerminal:
+                    is_tty = False
+                    encoding = 'ascii'
+                self._terminal = _FallbackTerminal()
         
-        self._encoding = self._terminal.encoding or 'ascii'
+        # Safely get terminal properties with fallbacks
+        self._is_tty = getattr(self._terminal, 'is_tty', False)
+        
+        # Handle encoding more safely
+        encoding = getattr(self._terminal, 'encoding', 'ascii')
+        if encoding is None or not isinstance(encoding, str):
+            encoding = 'ascii'
+        self._encoding = encoding
         
         # Feature support flags
         self._supports_box_drawing = False
@@ -71,13 +86,17 @@ class _UnicodeSupport:
         if not self._is_tty:
             return False
         
+        # If encoding is not available or is ASCII, skip Unicode
+        if not self._encoding or self._encoding == 'ascii':
+            return False
+        
         # Test each character set, then each character in the set
         for char_set in characters:
             for char in char_set:
                 try:
                     # Try to encode each character using the terminal's encoding
                     char.encode(self._encoding)
-                except (UnicodeEncodeError, LookupError):
+                except (UnicodeEncodeError, LookupError, AttributeError, TypeError):
                     return False  # If any character fails, the feature is unsupported
                 
         return True
@@ -114,14 +133,14 @@ class _UnicodeSupport:
         ]
         spinner_chars = [dots, arrow3, dqpb]
         progress_bar_chars = [progress_bar]
-        status_chars = [status_chars]
+        status_chars_list = [status_chars]
 
         
         # Test each feature set
         self._supports_box_drawing = self._test_feature_set(box_chars)
         self._supports_unicode_spinners = self._test_feature_set(spinner_chars)
         self._supports_progress_blocks = self._test_feature_set(progress_bar_chars)
-        self._supports_status_chars = self._test_feature_set(status_chars)
+        self._supports_status_chars = self._test_feature_set(status_chars_list)
 
         # Warning messages for unsupported features
         if not self._supports_box_drawing:

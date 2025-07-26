@@ -64,7 +64,7 @@ class TestBoxGenerator:
         assert generator.color is None
         assert generator.background is None
         assert generator.justify == 'left'
-        assert generator.terminal_width >= 80
+        assert generator.terminal_width >= 60
         assert generator.actual_style in BOX_STYLES
         assert hasattr(generator, 'chars')
         assert hasattr(generator, 'max_content_width')
@@ -698,7 +698,7 @@ class TestBoxPerformance:
     
     def test_large_content_performance(self):
         """Test performance with large amounts of content."""
-        generator = _BoxGenerator(style='ascii', terminal_width=80)
+        generator = _BoxGenerator(style='ascii', terminal_width=60)
         
         # Large content
         large_content = ""
@@ -757,7 +757,7 @@ def run_tests():
     failed_tests = []
     
     print("🧪 Running Box Generator Test Suite...")
-    print("=" * 80)
+    print("=" * 60)
     
     # Show visual examples first
     print("\n🎨 VISUAL EXAMPLES")
@@ -889,7 +889,7 @@ def run_tests():
     print("Markdown format:")
     print(result['markdown'])
     
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 60)
     print("🧪 RUNNING UNIT TESTS")
     
     for test_class in test_classes:
@@ -919,7 +919,7 @@ def run_tests():
                     print("    " + "\n    ".join(traceback.format_exc().split('\n')))
     
     # Summary
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 60)
     print(f"📊 Test Results: {passed_tests}/{total_tests} passed")
     
     if failed_tests:

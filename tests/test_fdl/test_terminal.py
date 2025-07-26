@@ -408,10 +408,11 @@ def run_tests():
     
     # Terminal size demonstration
     print(f"\n📐 Width Demonstration:")
-    ruler = "".join(str(i % 10) for i in range(_terminal.width))
+    # Create ruler starting from 1 instead of 0 for clarity
+    ruler = "".join(str((i % 10) if i > 0 else " ") for i in range(1, _terminal.width + 1))
     print(ruler)
     print('└' + '─' * (_terminal.width - 2) + '┘')
-    print(f"Terminal width: {_terminal.width} characters")
+    print(f"Terminal width: {_terminal.width} characters (counting from 1)")
     
     # Multiple instance test
     print(f"\n🔄 Multiple Instance Test:")

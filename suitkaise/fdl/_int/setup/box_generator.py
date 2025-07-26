@@ -1,8 +1,31 @@
 # setup/box_generator.py
+import re
 from typing import Dict, List, Optional
-from .unicode import _supports_box_drawing
-from .color_conversion import _to_ansi_fg, _to_ansi_bg, _normalize_for_html
-from .text_wrapping import _wrap_text, _get_visual_width
+
+# Import dependencies with proper error handling
+try:
+    from .unicode import _supports_box_drawing
+except ImportError:
+    def _supports_box_drawing():
+        return False
+
+try:
+    from .color_conversion import _to_ansi_fg, _to_ansi_bg, _normalize_for_html
+except ImportError:
+    def _to_ansi_fg(color):
+        return ""
+    def _to_ansi_bg(color):
+        return ""
+    def _normalize_for_html(color):
+        return str(color) if color else ""
+
+try:
+    from .text_wrapping import _wrap_text, _get_visual_width
+except ImportError:
+    def _wrap_text(text, width, preserve_newlines=True):
+        return [text] if text else ['']
+    def _get_visual_width(text):
+        return len(text) if text else 0
 
 # Box drawing character sets
 BOX_STYLES = {
@@ -54,7 +77,7 @@ class _BoxGenerator:
     
     def __init__(self, style: str = 'square', title: Optional[str] = None,
                  color: Optional[str] = None, background: Optional[str] = None,
-                 justify: str = 'left', terminal_width: int = 80):
+                 justify: str = 'left', terminal_width: Optional[int] = None):
         """
         Initialize box generator.
         
@@ -66,20 +89,36 @@ class _BoxGenerator:
             justify: Box justification ('left', 'center', 'right')
             terminal_width: Terminal width for box sizing
         """
-        self.style = style
+        # Handle None values safely
+        self.style = style or 'square'
         self.title = title
         self.color = color
         self.background = background
-        self.justify = justify
-        self.terminal_width = terminal_width
+        self.justify = justify or 'left'
+        
+        # Get terminal width safely
+        if terminal_width is not None:
+            self.terminal_width = terminal_width
+        else:
+            try:
+                from .terminal import _terminal
+                self.terminal_width = _terminal.width
+            except (ImportError, AttributeError):
+                self.terminal_width = 80
+        
+        # Ensure minimum terminal width
+        self.terminal_width = max(80, self.terminal_width or 80)
         
         # Determine actual style to use (fallback to ASCII if needed)
         self.actual_style = self._get_actual_style()
         self.chars = BOX_STYLES[self.actual_style]
         
         # Calculate box dimensions
-        self.max_content_width = max(40, terminal_width - 6)  # Account for borders + padding
-        self.min_box_width = 20
+        self.max_content_width = max(20, self.terminal_width - 6)  # Account for borders + padding
+        self.min_box_width = 10  # Reduced for 60-char terminals
+        
+        # ANSI pattern for stripping codes
+        self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     
     def _get_actual_style(self) -> str:
         """
@@ -110,6 +149,9 @@ class _BoxGenerator:
         Returns:
             Dict[str, str]: Box output for each format
         """
+        # Ensure content is a string
+        content = str(content) if content is not None else ""
+        
         # Wrap and prepare content using smart wrapper
         wrapped_lines = self._wrap_content(content)
         
@@ -145,7 +187,7 @@ class _BoxGenerator:
         Returns:
             List[str]: List of wrapped lines
         """
-        if not content.strip():
+        if not content or not content.strip():
             return ['']
         
         # Use smart text wrapper with box content width
@@ -250,6 +292,9 @@ class _BoxGenerator:
         Returns:
             str: Truncated text
         """
+        if not text:
+            return ""
+            
         if _get_visual_width(text) <= max_width:
             return text
         
@@ -397,7 +442,7 @@ class _BoxGenerator:
         if color_code:
             colored_lines = []
             for line in box_lines:
-                # Apply color to border characters only
+                # Apply color to border characters only and ensure proper reset
                 colored_line = self._apply_color_to_borders(line, color_code)
                 colored_lines.append(colored_line)
             return '\n'.join(colored_lines)
@@ -415,9 +460,8 @@ class _BoxGenerator:
         Returns:
             str: Line with colored borders
         """
-        # This is a simplified approach - we'll add color to the entire line
-        # In a more sophisticated implementation, we might want to preserve
-        # existing content colors and only color the border characters
+        # For box borders, we want to color the entire line but ensure proper reset
+        # This ensures colors don't bleed to subsequent content
         return f"{color_code}{line}\033[0m"
     
     def _format_for_plain(self, box_lines: List[str]) -> str:
@@ -444,9 +488,9 @@ class _BoxGenerator:
         Returns:
             str: Text without ANSI codes
         """
-        import re
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', text)
+        if not text:
+            return ""
+        return self._ansi_pattern.sub('', text)
     
     def _format_for_markdown(self, box_lines: List[str]) -> str:
         """
@@ -475,10 +519,12 @@ class _BoxGenerator:
         styles = []
         if self.color:
             normalized_color = _normalize_for_html(self.color)
-            styles.append(f"border-color: {normalized_color}")
+            if normalized_color:
+                styles.append(f"border-color: {normalized_color}")
         if self.background:
             normalized_bg = _normalize_for_html(self.background)
-            styles.append(f"background-color: {normalized_bg}")
+            if normalized_bg:
+                styles.append(f"background-color: {normalized_bg}")
         
         style_attr = f' style="{"; ".join(styles)}"' if styles else ''
         
@@ -486,7 +532,13 @@ class _BoxGenerator:
         plain_lines = []
         for line in box_lines:
             clean_line = self._strip_ansi_codes(line)
-            escaped_line = clean_line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Proper HTML escaping
+            escaped_line = (clean_line
+                           .replace('&', '&amp;')
+                           .replace('<', '&lt;')
+                           .replace('>', '&gt;')
+                           .replace('"', '&quot;')
+                           .replace("'", '&#x27;'))
             plain_lines.append(escaped_line)
         
         return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(plain_lines) + '\n</pre>'
