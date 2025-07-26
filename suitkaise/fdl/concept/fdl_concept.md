@@ -678,6 +678,9 @@ fdl.print("</box rounded, title Important>a message")
 
 # adding a color to the box (if no color, takes current text color)
 fdl.print("</box rounded, title Important, green>a message")
+
+# justifying box (boxes are left by default, but box text is centered by default!)
+fdl.print("</box rounded, title Important, green, justify right>a message")
 ```
 
 ## Justifying text

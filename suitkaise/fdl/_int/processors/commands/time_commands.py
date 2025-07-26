@@ -1,6 +1,6 @@
 # processors/commands/_time_commands.py
-from core.command_registry import _CommandProcessor, _command_processor
-from core.format_state import _FormatState
+from ...core.command_registry import _CommandProcessor, _command_processor
+from ...core.format_state import _FormatState
 
 @_command_processor(priority=20)
 class _TimeCommandProcessor(_CommandProcessor):

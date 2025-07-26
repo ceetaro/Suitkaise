@@ -1,7 +1,7 @@
 # processors/objects/_time_objects.py
 import time
-from core.object_registry import _ObjectProcessor, _object_processor
-from core.format_state import _FormatState
+from ...core.object_registry import _ObjectProcessor, _object_processor
+from ...core.format_state import _FormatState
 
 @_object_processor
 class _TimeObjectProcessor(_ObjectProcessor):

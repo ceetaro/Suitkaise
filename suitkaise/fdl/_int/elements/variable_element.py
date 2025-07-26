@@ -8,7 +8,7 @@ This is internal to the FDL engine and not exposed to users.
 """
 
 from .base_element import _ElementProcessor
-from core.format_state import _FormatState
+from ..core.format_state import _FormatState
 
 
 class _VariableElement(_ElementProcessor):

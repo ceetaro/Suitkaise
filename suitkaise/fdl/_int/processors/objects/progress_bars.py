@@ -15,11 +15,11 @@ from typing import Dict, Optional, Union, Set
 from collections import deque
 from dataclasses import dataclass, field
 
-from core.object_registry import _ObjectProcessor, _object_processor
-from core.format_state import _FormatState
-from setup.unicode import _get_unicode_support
-from setup.terminal import _terminal
-from setup.color_conversion import _to_ansi_fg
+from ...core.object_registry import _ObjectProcessor, _object_processor
+from ...core.format_state import _FormatState
+from ...setup.unicode import _get_unicode_support
+from ...setup.terminal import _terminal
+from ...setup.color_conversion import _to_ansi_fg
 
 
 class ProgressBarError(Exception):

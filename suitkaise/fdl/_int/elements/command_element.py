@@ -9,8 +9,8 @@ This is internal to the FDL engine and not exposed to users.
 
 from typing import List
 from .base_element import _ElementProcessor
-from core.format_state import _FormatState
-from core.command_registry import _CommandRegistry, UnknownCommandError
+from ..core.format_state import _FormatState
+from ..core.command_registry import _CommandRegistry, UnknownCommandError
 
 
 class _CommandElement(_ElementProcessor):

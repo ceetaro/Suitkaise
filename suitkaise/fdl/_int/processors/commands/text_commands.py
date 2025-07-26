@@ -1,7 +1,7 @@
 # processors/commands/_text_commands.py
-from core.command_registry import _CommandProcessor, _command_processor
-from core.format_state import _FormatState
-from setup.color_conversion import _get_named_colors, _is_valid_color
+from ...core.command_registry import _CommandProcessor, _command_processor
+from ...core.format_state import _FormatState
+from ...setup.color_conversion import _get_named_colors, _is_valid_color
 
 @_command_processor(priority=10)
 class _TextCommandProcessor(_CommandProcessor):

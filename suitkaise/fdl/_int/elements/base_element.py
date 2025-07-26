@@ -39,33 +39,56 @@ class _ElementProcessor(ABC):
     
     def _add_to_outputs(self, format_state: _FormatState, content: str) -> None:
         """
-        Add content to all output streams with appropriate formatting.
-        
-        This is the main method element processors use to add their content
-        to the output. It applies the current formatting state to generate
-        the appropriate output for each format type. Respects progress bar
-        mode by queuing output when a progress bar is active.
-        
-        Args:
-            format_state: Current formatting state
-            content: Raw content to add
+        Add content to all output streams with automatic wrapping and justification.
         """
         if not content:
             return
         
-        # Format content for all output types
-        terminal_content = self._format_for_terminal(content, format_state)
-        plain_content = self._format_for_plain(content, format_state)
-        markdown_content = self._format_for_markdown(content, format_state)
-        html_content = self._format_for_html(content, format_state)
-        
-        # Add to appropriate streams (main or queued based on progress bar state)
-        format_state.add_to_output_streams(
-            terminal=terminal_content,
-            plain=plain_content,
-            markdown=markdown_content,
-            html=html_content
-        )
+        if format_state.in_box:
+            # Inside box - add directly without wrapping (box handles it)
+            terminal_content = self._format_for_terminal(content, format_state)
+            plain_content = self._format_for_plain(content, format_state)
+            markdown_content = self._format_for_markdown(content, format_state)
+            html_content = self._format_for_html(content, format_state)
+            
+            format_state.add_to_output_streams(
+                terminal=terminal_content,
+                plain=plain_content,
+                markdown=markdown_content,
+                html=html_content
+            )
+        else:
+            # Outside box - apply wrapping and justification
+            from ..setup.text_wrapping import _wrap_text
+            from ..setup.text_justification import _justify_text
+            
+            # Wrap text to terminal width
+            wrapped_lines = _wrap_text(content, format_state.terminal_width, True)
+            justify = format_state.justify or 'left'
+            
+            for i, line in enumerate(wrapped_lines):
+                if not line.strip() and i == 0:
+                    continue
+                
+                if i > 0:
+                    # Add newline between wrapped lines
+                    format_state.add_to_output_streams('\n', '\n', '\n', '<br>\n')
+                
+                # Apply justification to terminal output
+                justified_line = _justify_text(line, justify, format_state.terminal_width) if justify != 'left' else line
+                
+                # Format and add to streams
+                terminal_content = self._format_for_terminal(justified_line, format_state)
+                plain_content = self._format_for_plain(line, format_state)
+                markdown_content = self._format_for_markdown(line, format_state)
+                html_content = self._format_for_html(line, format_state)
+                
+                format_state.add_to_output_streams(
+                    terminal=terminal_content,
+                    plain=plain_content,
+                    markdown=markdown_content,
+                    html=html_content
+                )
     
     def _format_for_terminal(self, content: str, format_state: _FormatState) -> str:
         """

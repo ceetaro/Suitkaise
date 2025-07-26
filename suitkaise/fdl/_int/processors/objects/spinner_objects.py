@@ -16,10 +16,10 @@ import sys
 from typing import Set, Optional, Dict, List, Union
 from dataclasses import dataclass
 
-from core.object_registry import _ObjectProcessor, _object_processor
-from core.format_state import _FormatState
-from setup.unicode import _get_unicode_support
-from setup.terminal import _terminal
+from ...core.object_registry import _ObjectProcessor, _object_processor
+from ...core.format_state import _FormatState
+from ...setup.unicode import _get_unicode_support
+from ...setup.terminal import _terminal
 
 
 class SpinnerError(Exception):
