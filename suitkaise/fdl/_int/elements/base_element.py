@@ -9,7 +9,8 @@ This is internal to the FDL engine and not exposed to users.
 """
 
 from abc import ABC, abstractmethod
-from core.format_state import _FormatState
+from ..core.format_state import _FormatState
+from ..setup.color_conversion import _to_ansi_fg, _to_ansi_bg, _normalize_for_html
 
 
 class _ElementProcessor(ABC):
@@ -42,7 +43,8 @@ class _ElementProcessor(ABC):
         
         This is the main method element processors use to add their content
         to the output. It applies the current formatting state to generate
-        the appropriate output for each format type.
+        the appropriate output for each format type. Respects progress bar
+        mode by queuing output when a progress bar is active.
         
         Args:
             format_state: Current formatting state
@@ -51,21 +53,19 @@ class _ElementProcessor(ABC):
         if not content:
             return
         
-        # Terminal output (with ANSI codes)
+        # Format content for all output types
         terminal_content = self._format_for_terminal(content, format_state)
-        format_state.terminal_output.append(terminal_content)
-        
-        # Plain text output (no formatting)
         plain_content = self._format_for_plain(content, format_state)
-        format_state.plain_output.append(plain_content)
-        
-        # Markdown output
         markdown_content = self._format_for_markdown(content, format_state)
-        format_state.markdown_output.append(markdown_content)
-        
-        # HTML output
         html_content = self._format_for_html(content, format_state)
-        format_state.html_output.append(html_content)
+        
+        # Add to appropriate streams (main or queued based on progress bar state)
+        format_state.add_to_output_streams(
+            terminal=terminal_content,
+            plain=plain_content,
+            markdown=markdown_content,
+            html=html_content
+        )
     
     def _format_for_terminal(self, content: str, format_state: _FormatState) -> str:
         """
@@ -137,12 +137,14 @@ class _ElementProcessor(ABC):
         if not self._needs_html_formatting(format_state):
             return content
         
-        # Build CSS styles
+        # Build CSS styles using centralized color conversion
         styles = []
         if format_state.text_color:
-            styles.append(f"color: {self._normalize_color_for_html(format_state.text_color)}")
+            normalized_color = _normalize_for_html(format_state.text_color)
+            styles.append(f"color: {normalized_color}")
         if format_state.background_color:
-            styles.append(f"background-color: {self._normalize_color_for_html(format_state.background_color)}")
+            normalized_bg = _normalize_for_html(format_state.background_color)
+            styles.append(f"background-color: {normalized_bg}")
         
         # Build CSS classes for text formatting
         classes = []
@@ -176,45 +178,11 @@ class _ElementProcessor(ABC):
             format_state.strikethrough
         )
     
-    def _normalize_color_for_html(self, color: str) -> str:
-        """
-        Normalize color for HTML output.
-        
-        Args:
-            color: Color in various formats (named, hex, rgb())
-            
-        Returns:
-            str: Color suitable for HTML/CSS
-        """
-        color = color.strip()
-        
-        # Named colors - pass through as-is
-        if color in ['red', 'green', 'blue', 'yellow', 'purple', 'cyan', 'magenta',
-                     'orange', 'pink', 'brown', 'tan', 'black', 'white', 'gray']:
-            return color
-        
-        # Hex colors - pass through as-is
-        if color.startswith('#'):
-            return color
-        
-        # RGB colors - convert rgb(r,g,b) to rgb(r, g, b) if needed
-        if color.startswith('rgb(') and color.endswith(')'):
-            rgb_content = color[4:-1]
-            rgb_parts = [part.strip() for part in rgb_content.split(',')]
-            if len(rgb_parts) == 3:
-                try:
-                    r, g, b = map(int, rgb_parts)
-                    return f'rgb({r}, {g}, {b})'
-                except ValueError:
-                    # If conversion fails, just return the original color
-                    return color
-        
-        # Fallback
-        return color
-    
     def _generate_ansi_codes(self, format_state: _FormatState) -> str:
         """
         Generate ANSI escape codes for current formatting state.
+        
+        Uses centralized color conversion system for all color handling.
         
         Args:
             format_state: Current formatting state
@@ -224,15 +192,15 @@ class _ElementProcessor(ABC):
         """
         codes = []
         
-        # Text color
+        # Text color using centralized color conversion
         if format_state.text_color:
-            color_code = self._color_to_ansi(format_state.text_color)
+            color_code = _to_ansi_fg(format_state.text_color)
             if color_code:
                 codes.append(color_code)
         
-        # Background color
+        # Background color using centralized color conversion
         if format_state.background_color:
-            bg_code = self._bg_color_to_ansi(format_state.background_color)
+            bg_code = _to_ansi_bg(format_state.background_color)
             if bg_code:
                 codes.append(bg_code)
         
@@ -247,127 +215,3 @@ class _ElementProcessor(ABC):
             codes.append("\033[9m")
         
         return "".join(codes)
-    
-    def _color_to_ansi(self, color: str) -> str:
-        """Convert color to ANSI foreground code."""
-        color = color.strip().lower()
-        
-        # Named colors
-        named_colors = {
-            'red': '\033[31m',
-            'green': '\033[32m',
-            'yellow': '\033[33m',
-            'blue': '\033[34m',
-            'magenta': '\033[35m',
-            'purple': '\033[35m',
-            'cyan': '\033[36m',
-            'white': '\033[97m',
-            'black': '\033[30m',
-            'gray': '\033[37m',
-            'orange': '\033[38;5;208m',
-            'pink': '\033[38;5;205m',
-            'brown': '\033[38;5;94m',
-            'tan': '\033[38;5;180m',
-        }
-        
-        if color in named_colors:
-            return named_colors[color]
-        
-        # Hex colors
-        if color.startswith('#'):
-            return self._hex_to_ansi_fg(color)
-        
-        # RGB colors
-        if color.startswith('rgb(') and color.endswith(')'):
-            return self._rgb_to_ansi_fg(color)
-        
-        return ""
-    
-    def _bg_color_to_ansi(self, color: str) -> str:
-        """Convert color to ANSI background code."""
-        color = color.strip().lower()
-        
-        # Named background colors
-        named_bg_colors = {
-            'red': '\033[41m',
-            'green': '\033[42m',
-            'yellow': '\033[43m',
-            'blue': '\033[44m',
-            'magenta': '\033[45m',
-            'purple': '\033[45m',
-            'cyan': '\033[46m',
-            'white': '\033[107m',
-            'black': '\033[40m',
-            'gray': '\033[47m',
-            'orange': '\033[48;5;208m',
-            'pink': '\033[48;5;205m',
-            'brown': '\033[48;5;94m',
-            'tan': '\033[48;5;180m',
-        }
-        
-        if color in named_bg_colors:
-            return named_bg_colors[color]
-        
-        # Hex colors
-        if color.startswith('#'):
-            return self._hex_to_ansi_bg(color)
-        
-        # RGB colors
-        if color.startswith('rgb(') and color.endswith(')'):
-            return self._rgb_to_ansi_bg(color)
-        
-        return ""
-    
-    def _hex_to_ansi_fg(self, hex_color: str) -> str:
-        """Convert hex color to ANSI foreground."""
-        try:
-            if len(hex_color) == 4:  # #RGB
-                r = int(hex_color[1] * 2, 16)
-                g = int(hex_color[2] * 2, 16)
-                b = int(hex_color[3] * 2, 16)
-            elif len(hex_color) == 7:  # #RRGGBB
-                r = int(hex_color[1:3], 16)
-                g = int(hex_color[3:5], 16)
-                b = int(hex_color[5:7], 16)
-            else:
-                return ""
-            
-            return f'\033[38;2;{r};{g};{b}m'
-        except ValueError:
-            return ""
-    
-    def _hex_to_ansi_bg(self, hex_color: str) -> str:
-        """Convert hex color to ANSI background."""
-        try:
-            if len(hex_color) == 4:  # #RGB
-                r = int(hex_color[1] * 2, 16)
-                g = int(hex_color[2] * 2, 16)
-                b = int(hex_color[3] * 2, 16)
-            elif len(hex_color) == 7:  # #RRGGBB
-                r = int(hex_color[1:3], 16)
-                g = int(hex_color[3:5], 16)
-                b = int(hex_color[5:7], 16)
-            else:
-                return ""
-            
-            return f'\033[48;2;{r};{g};{b}m'
-        except ValueError:
-            return ""
-    
-    def _rgb_to_ansi_fg(self, rgb_color: str) -> str:
-        """Convert rgb() color to ANSI foreground."""
-        try:
-            rgb_content = rgb_color[4:-1]  # Remove 'rgb(' and ')'
-            r, g, b = map(int, [x.strip() for x in rgb_content.split(',')])
-            return f'\033[38;2;{r};{g};{b}m'
-        except (ValueError, IndexError):
-            return ""
-    
-    def _rgb_to_ansi_bg(self, rgb_color: str) -> str:
-        """Convert rgb() color to ANSI background."""
-        try:
-            rgb_content = rgb_color[4:-1]  # Remove 'rgb(' and ')'
-            r, g, b = map(int, [x.strip() for x in rgb_content.split(',')])
-            return f'\033[48;2;{r};{g};{b}m'
-        except (ValueError, IndexError):
-            return ""

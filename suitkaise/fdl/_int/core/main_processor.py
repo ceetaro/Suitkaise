@@ -1,4 +1,4 @@
-# core/_processor.py
+# core/main_processor.py
 import re
 from typing import List, Dict, Tuple, Optional
 from .format_state import _FormatState, _create_format_state
@@ -18,10 +18,25 @@ class _FDLProcessor:
         # Regex for parsing
         self._all_brackets_pattern = re.compile(r'<[^>]*>')
     
-    def process_string(self, fdl_string: str, values: Tuple = ()) -> Dict[str, str]:
-        """Process FDL string and return all output formats."""
+    def process_string(self, fdl_string: str, values: Tuple = (), 
+                      check_progress_bar: bool = True) -> Dict[str, str]:
+        """
+        Process FDL string and return all output formats.
+        
+        Args:
+            fdl_string: FDL string to process
+            values: Tuple of values for variable substitution
+            check_progress_bar: Whether to check for active progress bars
+            
+        Returns:
+            Dict[str, str]: All output formats
+        """
         # Create initial state
         format_state = _create_format_state(values)
+        
+        # Check if progress bar is active and integrate with format state
+        if check_progress_bar:
+            self._integrate_progress_bar_state(format_state)
         
         # Parse into elements
         elements = self._parse_sequential(fdl_string)
@@ -34,6 +49,20 @@ class _FDLProcessor:
         self._apply_final_formatting(format_state)
         
         return format_state.get_final_outputs()
+    
+    def _integrate_progress_bar_state(self, format_state: _FormatState) -> None:
+        """Integrate progress bar state with format state."""
+        try:
+            # Import here to avoid circular imports
+            from ..processors.objects.progress_bars import _ProgressBarManager
+            
+            active_bar = _ProgressBarManager.get_active_bar()
+            if active_bar and not active_bar.is_stopped:
+                # Start progress bar mode in format state
+                format_state.start_progress_bar_mode(active_bar)
+        except ImportError:
+            # Progress bar module not available, continue normally
+            pass
     
     def _parse_sequential(self, fdl_string: str) -> List[_ElementProcessor]:
         """Parse FDL string into sequential elements."""
@@ -95,9 +124,12 @@ class _FDLProcessor:
     
     def _apply_final_formatting(self, format_state: _FormatState):
         """Apply final formatting like wrapping and justification."""
-        # For now, just add reset codes to terminal output
-        if format_state.terminal_output:
+        # Add reset codes to appropriate output streams
+        if format_state.terminal_output or format_state.queued_terminal_output:
             # Add reset at end to prevent format bleeding
-            format_state.terminal_output.append('\033[0m')
+            if format_state.bar_active:
+                format_state.queued_terminal_output.append('\033[0m')
+            else:
+                format_state.terminal_output.append('\033[0m')
         
         # TODO: Add text wrapping and justification here

@@ -4,8 +4,6 @@
 **All commands are prefaced by a `/` as well.**
 
 **PERFORMANCE ARCHITECTURE:**
-- Uses **hybrid approach**: Rich for static elements (Panels, Themes), custom implementations for performance-critical components
-- **FDL Format system**: 52x faster than Rich Style, only 3x slower than direct ANSI when cached
 - **Thread-safe design**: Custom progress bars, spinners, and tables avoid Rich's threading bottlenecks
 - **Batched updates**: Progress bars use submitted updates with smooth animation
 - **Cached terminal detection**: Terminal width/capabilities detected once at startup
@@ -612,6 +610,9 @@ def fibonacci(n):
 ```
 
 ## Creating progress bars
+
+Progress bars can be created, and when they do, you cannot print anything new to the terminal until it completes, is removed, or stopped (except for progress bar messages)
+
 ```python
 from suitkaise.fdl import ProgressBar
 
@@ -622,11 +623,13 @@ bar.display_bar(color="green")
 # updating progress bar N number of increments
 # Uses batched updates for smooth performance in threading
 # Still animates bar progression smoothly
-bar.update(7)
+# message goes under the bar, and line with message gets replaced when another message comes in.
+bar.update(7, "message")
 
-# removing bar early
-bar.remove()
-# blocking bar from updating further
+# if this bar reaches 100, text can be outputted again.
+
+# blocking bar from updating further (stays in output, but does not complete.)
+# allows text to be outputted again.
 bar.stop()
 ```
 

@@ -1,14 +1,15 @@
 """
-Internal Format State for FDL processing.
+Internal Format State for FDL processing with Progress Bar support.
 
 This module contains the private state object that tracks all formatting,
-layout, and processing state throughout FDL string processing.
+layout, and processing state throughout FDL string processing, including
+progress bar output queuing.
 
 This is internal to the FDL engine and not exposed to users.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Set
+from typing import List, Optional, Tuple, Set, TYPE_CHECKING
 
 # Import terminal detection
 try:
@@ -19,6 +20,10 @@ except ImportError:
         width = 80
     _terminal = _MockTerminal()
 
+# Avoid circular imports
+if TYPE_CHECKING:
+    from ..processors.objects.progress_bars import _ProgressBar
+
 
 @dataclass
 class _FormatState:
@@ -26,7 +31,7 @@ class _FormatState:
     Private central state object for FDL processing.
     
     Tracks all formatting, layout, time settings, box state, variables,
-    and output streams throughout the processing pipeline.
+    output streams, and progress bar state throughout the processing pipeline.
     
     This class is internal and should never be exposed to end users.
     """
@@ -69,12 +74,22 @@ class _FormatState:
     # Terminal information
     terminal_width: int = 80
     
+    # Progress bar state
+    bar_active: bool = False
+    active_progress_bar: Optional['_ProgressBar'] = None
+    
     # Output streams - all processed content goes here
     terminal_output: List[str] = field(default_factory=list)
     plain_output: List[str] = field(default_factory=list)
     markdown_output: List[str] = field(default_factory=list)
     html_output: List[str] = field(default_factory=list)
     
+    # Queued output (used when progress bar is active)
+    queued_terminal_output: List[str] = field(default_factory=list)
+    queued_plain_output: List[str] = field(default_factory=list)
+    queued_markdown_output: List[str] = field(default_factory=list)
+    queued_html_output: List[str] = field(default_factory=list)
+
     def __post_init__(self):
         """Initialize calculated values after object creation."""
         # Ensure minimum terminal width of 80
@@ -142,8 +157,85 @@ class _FormatState:
             # Terminal info
             terminal_width=self.terminal_width,
             
+            # Progress bar state (don't copy active bar reference)
+            bar_active=False,
+            active_progress_bar=None,
+            
             # Output streams start empty in copy
         )
+    
+    def start_progress_bar_mode(self, progress_bar: '_ProgressBar') -> None:
+        """
+        Start progress bar mode - queue all future output.
+        
+        Args:
+            progress_bar: The active progress bar instance
+        """
+        self.bar_active = True
+        self.active_progress_bar = progress_bar
+        
+        # Clear any existing queued output
+        self.queued_terminal_output.clear()
+        self.queued_plain_output.clear()
+        self.queued_markdown_output.clear()
+        self.queued_html_output.clear()
+    
+    def stop_progress_bar_mode(self, flush_output: bool = True) -> None:
+        """
+        Stop progress bar mode and optionally flush queued output.
+        
+        Args:
+            flush_output: Whether to flush queued output to main streams
+        """
+        if flush_output:
+            self.flush_queued_output()
+        
+        self.bar_active = False
+        self.active_progress_bar = None
+        
+        # Clear queued output
+        self.queued_terminal_output.clear()
+        self.queued_plain_output.clear()
+        self.queued_markdown_output.clear()
+        self.queued_html_output.clear()
+    
+    def flush_queued_output(self) -> None:
+        """Move all queued output to main output streams."""
+        self.terminal_output.extend(self.queued_terminal_output)
+        self.plain_output.extend(self.queued_plain_output)
+        self.markdown_output.extend(self.queued_markdown_output)
+        self.html_output.extend(self.queued_html_output)
+    
+    def add_to_output_streams(self, terminal: str, plain: str, markdown: str, html: str) -> None:
+        """
+        Add content to appropriate output streams (main or queued based on bar state).
+        
+        Args:
+            terminal: Terminal output with ANSI codes
+            plain: Plain text output
+            markdown: Markdown formatted output  
+            html: HTML formatted output
+        """
+        if self.bar_active:
+            # Queue ALL output while progress bar is active
+            if terminal:
+                self.queued_terminal_output.append(terminal)
+            if plain:
+                self.queued_plain_output.append(plain)
+            if markdown:
+                self.queued_markdown_output.append(markdown)
+            if html:
+                self.queued_html_output.append(html)
+        else:
+            # Normal output to main streams
+            if terminal:
+                self.terminal_output.append(terminal)
+            if plain:
+                self.plain_output.append(plain)
+            if markdown:
+                self.markdown_output.append(markdown)
+            if html:
+                self.html_output.append(html)
     
     def reset_formatting(self):
         """Reset all text formatting to defaults."""
@@ -191,6 +283,12 @@ class _FormatState:
         self.plain_output.clear()
         self.markdown_output.clear()
         self.html_output.clear()
+        
+        # Also reset queued output
+        self.queued_terminal_output.clear()
+        self.queued_plain_output.clear()
+        self.queued_markdown_output.clear()
+        self.queued_html_output.clear()
 
     def get_next_value(self):
         """
@@ -215,10 +313,30 @@ class _FormatState:
     
     def get_final_outputs(self) -> dict:
         """
-        Get all output streams as final strings.
+        Get all output streams as final strings, including queued content.
+        
+        This ensures perfect synchronization - all formats contain exactly
+        the same content in exactly the same order, regardless of progress bar state.
         
         Returns:
-            dict: All output formats joined as strings
+            dict: All output formats joined as strings (main + queued)
+        """
+        return {
+            'terminal': ''.join(self.terminal_output + self.queued_terminal_output),
+            'plain': ''.join(self.plain_output + self.queued_plain_output),
+            'markdown': ''.join(self.markdown_output + self.queued_markdown_output),
+            'html': ''.join(self.html_output + self.queued_html_output)
+        }
+    
+    def get_immediate_outputs(self) -> dict:
+        """
+        Get output streams that are immediately available (not queued).
+        
+        This is used internally by the progress bar system to determine
+        what content can be displayed immediately vs. what should wait.
+        
+        Returns:
+            dict: Main output streams only (excludes queued content)
         """
         return {
             'terminal': ''.join(self.terminal_output),
