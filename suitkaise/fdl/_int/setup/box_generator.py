@@ -528,8 +528,15 @@ class _BoxGenerator:
         
         for segment in segments:
             if segment['type'] == 'ansi':
-                # Preserve ANSI codes as-is
-                result += segment['content']
+                # Handle ANSI codes carefully to avoid double resets
+                ansi_code = segment['content']
+                if '\033[0m' in ansi_code and bg_color:
+                    # This is a reset code, but we want to maintain background
+                    # Replace the reset with reset + background to maintain continuity
+                    result += f"\033[0m{bg_color}"
+                else:
+                    # Regular ANSI code, preserve as-is
+                    result += ansi_code
             elif segment['type'] == 'text':
                 # Process text segment - separate box chars from content
                 text = segment['text']
@@ -560,21 +567,21 @@ class _BoxGenerator:
                         
                         content_chunk = text[i:j]
                         if content_chunk:
-                            # For content chunks, be smart about color application
-                            
-                            if current_text_color and bg_color and not current_bg_color:
-                                # Text has existing color, add background
-                                # Don't duplicate the current color since it's already active
-                                result += f"{bg_color}{content_chunk}\033[0m"
-                            elif bg_color and not current_text_color and not current_bg_color:
-                                # Plain text, add background only
-                                result += f"{bg_color}{content_chunk}\033[0m"
+                            # For content chunks, apply background if needed
+                            if bg_color and not current_bg_color:
+                                # Add background only, don't duplicate existing text color
+                                result += f"{bg_color}{content_chunk}"
+                                # Don't add reset here - let the original ANSI flow handle it
                             else:
                                 # Either has background already or no colors needed
                                 result += content_chunk
                         
                         i = j
         
+        # Add final reset only if we ended with colors but no reset
+        if (border_color or bg_color) and not result.endswith('\033[0m'):
+            result += '\033[0m'
+            
         return result
     
     def _parse_ansi_segments(self, line: str):
