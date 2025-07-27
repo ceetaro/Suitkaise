@@ -497,7 +497,7 @@ class _BoxGenerator:
         segments = self._parse_ansi_segments(line)
         
         # Step 2: Determine if this is a pure border line or content line
-        border_chars = set('+-|─━═│║┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬')
+        border_chars = set('+-|─━═│║┃┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬┣┫')
         
         # Check if line contains only border characters (ignoring ANSI codes and spaces)
         text_only = ''.join(seg['text'] for seg in segments if seg['type'] == 'text')
@@ -540,7 +540,7 @@ class _BoxGenerator:
                 i = 0
                 while i < len(text):
                     if text[i] in border_chars:
-                        # Box character - apply box colors
+                        # Box character - apply box colors (both border and background)
                         box_color_combo = ''
                         if border_color:
                             box_color_combo += border_color
@@ -560,20 +560,17 @@ class _BoxGenerator:
                         
                         content_chunk = text[i:j]
                         if content_chunk:
-                            # Apply colors to the entire content chunk
-                            # Strategy: Only add background if no existing background
-                            # Don't re-add foreground colors that are already active
+                            # For content chunks, be smart about color application
                             
-                            chunk_color_combo = ''
-                            
-                            # Only add box background if no existing background
-                            if bg_color and not current_bg_color:
-                                chunk_color_combo += bg_color
-                            
-                            if chunk_color_combo:
-                                result += f"{chunk_color_combo}{content_chunk}\033[0m"
+                            if current_text_color and bg_color and not current_bg_color:
+                                # Text has existing color, add background
+                                # Don't duplicate the current color since it's already active
+                                result += f"{bg_color}{content_chunk}\033[0m"
+                            elif bg_color and not current_text_color and not current_bg_color:
+                                # Plain text, add background only
+                                result += f"{bg_color}{content_chunk}\033[0m"
                             else:
-                                # No additional coloring needed - text keeps existing colors
+                                # Either has background already or no colors needed
                                 result += content_chunk
                         
                         i = j
