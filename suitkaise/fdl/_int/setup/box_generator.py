@@ -525,6 +525,7 @@ class _BoxGenerator:
         
         # Step 3: Content line - process each segment carefully
         result = ""
+        last_ansi_was_color = False
         
         for segment in segments:
             if segment['type'] == 'ansi':
@@ -534,9 +535,12 @@ class _BoxGenerator:
                     # This is a reset code, but we want to maintain background
                     # Replace the reset with reset + background to maintain continuity
                     result += f"\033[0m{bg_color}"
+                    last_ansi_was_color = False
                 else:
                     # Regular ANSI code, preserve as-is
                     result += ansi_code
+                    # Track if this was a color code
+                    last_ansi_was_color = ('\033[3' in ansi_code or '\033[4' in ansi_code or '\033[1m' in ansi_code)
             elif segment['type'] == 'text':
                 # Process text segment - separate box chars from content
                 text = segment['text']
@@ -559,6 +563,7 @@ class _BoxGenerator:
                         else:
                             result += text[i]
                         i += 1
+                        last_ansi_was_color = False
                     else:
                         # Find the next box char or end of text to process content chunk
                         j = i
@@ -567,16 +572,27 @@ class _BoxGenerator:
                         
                         content_chunk = text[i:j]
                         if content_chunk:
-                            # For content chunks, apply background if needed
+                            # For content chunks, properly combine text and background colors
+                            chunk_color_combo = ''
+                            
+                            # Only add text color if it wasn't just applied by previous ANSI segment
+                            if current_text_color and not last_ansi_was_color:
+                                chunk_color_combo += current_text_color
+                            
+                            # Add background color if no existing background
                             if bg_color and not current_bg_color:
-                                # Add background only, don't duplicate existing text color
-                                result += f"{bg_color}{content_chunk}"
-                                # Don't add reset here - let the original ANSI flow handle it
+                                chunk_color_combo += bg_color
+                            elif current_bg_color:
+                                # Keep existing background
+                                chunk_color_combo += current_bg_color
+                            
+                            if chunk_color_combo:
+                                result += f"{chunk_color_combo}{content_chunk}"
                             else:
-                                # Either has background already or no colors needed
                                 result += content_chunk
                         
                         i = j
+                        last_ansi_was_color = False
         
         # Add final reset only if we ended with colors but no reset
         if (border_color or bg_color) and not result.endswith('\033[0m'):
