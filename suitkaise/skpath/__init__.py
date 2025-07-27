@@ -13,7 +13,7 @@ Key Features:
 """
 
 # Import all API functions and classes
-from .api import (
+from .public_api import (
     # Main class
     SKPath,
     

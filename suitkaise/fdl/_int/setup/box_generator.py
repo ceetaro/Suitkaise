@@ -1,4 +1,4 @@
-# setup/box_generator.py
+# setup/box_generator.py - REDESIGNED FROM SCRATCH
 import re
 from typing import Dict, List, Optional
 
@@ -20,12 +20,16 @@ except ImportError:
         return str(color) if color else ""
 
 try:
-    from .text_wrapping import _wrap_text, _get_visual_width
+    from .text_wrapping import _get_visual_width
 except ImportError:
-    def _wrap_text(text, width, preserve_newlines=True):
-        return [text] if text else ['']
     def _get_visual_width(text):
         return len(text) if text else 0
+
+try:
+    from .text_justification import _justify_text
+except ImportError:
+    def _justify_text(text, justify, terminal_width=None):
+        return text
 
 # Box drawing character sets
 BOX_STYLES = {
@@ -66,35 +70,51 @@ BOX_STYLES = {
     }
 }
 
+# Box character visual width mapping (measured once to save resources)
+BOX_CHAR_WIDTHS = {}
+
+def _measure_box_char_widths():
+    """Measure visual width of all box characters once to save resources."""
+    global BOX_CHAR_WIDTHS
+    if BOX_CHAR_WIDTHS:  # Already measured
+        return
+    
+    for style_name, chars in BOX_STYLES.items():
+        BOX_CHAR_WIDTHS[style_name] = {}
+        for char_name, char in chars.items():
+            BOX_CHAR_WIDTHS[style_name][char_name] = _get_visual_width(char)
+
+# Measure widths on module import
+_measure_box_char_widths()
+
+
 class _BoxGenerator:
     """
     Internal box generator for creating formatted boxes with borders and content.
     
-    Handles different box styles, colors, titles, and content wrapping.
-    Automatically falls back to ASCII if Unicode box drawing isn't supported.
-    Uses smart text wrapping that handles visual width and break points correctly.
+    Takes pre-wrapped and pre-justified content lines, adds borders around them,
+    then justifies the entire box. Handles different box styles, colors, titles.
     """
     
     def __init__(self, style: str = 'square', title: Optional[str] = None,
                  color: Optional[str] = None, background: Optional[str] = None,
-                 justify: str = 'left', terminal_width: Optional[int] = None):
+                 box_justify: str = 'left', terminal_width: Optional[int] = None):
         """
         Initialize box generator.
         
         Args:
-            style: Box style ('square', 'rounded', etc.)
-            title: Optional box title
+            style: Box style ('square', 'rounded', 'double', 'heavy', 'heavy_head', 'horizontals', 'ascii')
+            title: Optional box title (always centered in border)
             color: Optional box border color
-            background: Optional box background color
-            justify: Box justification ('left', 'center', 'right')
-            terminal_width: Terminal width for box sizing
+            background: Optional box background color  
+            box_justify: Box position justification ('left', 'center', 'right')
+            terminal_width: Terminal width for box sizing and justification
         """
-        # Handle None values safely
         self.style = style or 'square'
         self.title = title
         self.color = color
         self.background = background
-        self.justify = justify or 'left'
+        self.box_justify = box_justify or 'left'
         
         # Get terminal width safely
         if terminal_width is not None:
@@ -112,10 +132,7 @@ class _BoxGenerator:
         # Determine actual style to use (fallback to ASCII if needed)
         self.actual_style = self._get_actual_style()
         self.chars = BOX_STYLES[self.actual_style]
-        
-        # Calculate box dimensions
-        self.max_content_width = max(20, self.terminal_width - 6)  # Account for borders + padding
-        self.min_box_width = 10  # Reduced for 60-char terminals
+        self.char_widths = BOX_CHAR_WIDTHS[self.actual_style]
         
         # ANSI pattern for stripping codes
         self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -139,106 +156,111 @@ class _BoxGenerator:
         # Unknown style, default to square or ASCII
         return 'square' if _supports_box_drawing() else 'ascii'
     
-    def generate_box(self, content: str) -> Dict[str, str]:
+    def generate_box(self, content_lines: List[str]) -> Dict[str, str]:
         """
-        Generate box with content for all output formats.
+        Generate box with pre-wrapped content for all output formats.
         
         Args:
-            content: Content to put inside the box
+            content_lines: List of pre-wrapped and pre-justified content lines
             
         Returns:
-            Dict[str, str]: Box output for each format
+            Dict[str, str]: Box output for each format {'terminal', 'plain', 'markdown', 'html'}
         """
-        # Ensure content is a string
-        content = str(content) if content is not None else ""
+        # Step 1: Handle empty content (8 spaces + 4 padding = 12 total width)
+        if not content_lines or all(not line.strip() for line in content_lines):
+            content_lines = [' ' * 8]  # 8 spaces for empty content
         
-        # Wrap and prepare content using smart wrapper
-        wrapped_lines = self._wrap_content(content)
+        # Step 2: Calculate box width based on widest line + 4 padding
+        box_width = self._calculate_box_width(content_lines)
         
-        # Calculate box width
-        box_width = self._calculate_box_width(wrapped_lines)
+        # Step 3: Add box borders around content  
+        box_lines = self._add_box_borders(content_lines, box_width)
         
-        # Generate box parts
-        top_border = self._generate_top_border(box_width)
-        bottom_border = self._generate_bottom_border(box_width)
-        content_lines = self._generate_content_lines(wrapped_lines, box_width)
+        # Step 4: Add newlines before and after box
+        box_lines_with_newlines = [''] + box_lines + ['']
         
-        # Combine all parts
-        box_lines = [top_border] + content_lines + [bottom_border]
+        # Step 5: Justify entire box
+        box_text = '\n'.join(box_lines_with_newlines)
+        justified_box_text = _justify_text(box_text, self.box_justify, self.terminal_width)
+        justified_box_lines = justified_box_text.split('\n')
         
-        # Apply justification to entire box
-        justified_lines = self._apply_box_justification(box_lines)
-        
-        # Generate output for all formats
+        # Step 6: Generate output for all formats (colors applied in format methods)
         return {
-            'terminal': self._format_for_terminal(justified_lines),
-            'plain': self._format_for_plain(justified_lines),
-            'markdown': self._format_for_markdown(justified_lines),
-            'html': self._format_for_html(justified_lines)
+            'terminal': self._format_for_terminal(justified_box_lines),
+            'plain': self._format_for_plain(justified_box_lines),
+            'markdown': self._format_for_markdown(justified_box_lines),
+            'html': self._format_for_html(justified_box_lines)
         }
-    
-    def _wrap_content(self, content: str) -> List[str]:
-        """
-        Wrap content to fit within box width using smart text wrapper.
-        
-        Args:
-            content: Raw content string
-            
-        Returns:
-            List[str]: List of wrapped lines
-        """
-        if not content or not content.strip():
-            return ['']
-        
-        # Use smart text wrapper with box content width
-        wrapped_lines = _wrap_text(
-            text=content,
-            width=self.max_content_width,
-            preserve_newlines=True
-        )
-        
-        return wrapped_lines
     
     def _calculate_box_width(self, content_lines: List[str]) -> int:
         """
-        Calculate the width needed for the box using visual width measurement.
+        Calculate box width needed: widest content line + 4 padding.
         
         Args:
             content_lines: List of content lines
             
         Returns:
-            int: Box width in characters
+            int: Total box width including borders
         """
-        # Find the longest content line using visual width
-        max_content_length = 0
+        # Find widest content line using visual width
+        max_content_width = 0
         for line in content_lines:
-            # Use visual width measurement instead of len()
-            visual_length = _get_visual_width(line)
-            max_content_length = max(max_content_length, visual_length)
+            visual_width = _get_visual_width(line)
+            max_content_width = max(max_content_width, visual_width)
         
-        # Account for title if present using visual width
-        title_length = 0
+        # Account for title if present
+        title_width = 0
         if self.title:
-            title_length = _get_visual_width(self.title) + 4  # " Title " with spaces
+            title_with_spaces = f" {self.title} "
+            title_width = _get_visual_width(title_with_spaces)
         
-        # Box width = content + padding + borders
-        content_width = max(max_content_length, title_length)
-        box_width = content_width + 4  # 2 chars padding + 2 chars borders
+        # Box width = max(content, title) + padding + borders  
+        content_area_width = max(max_content_width, title_width)
         
-        # Ensure minimum width
-        box_width = max(box_width, self.min_box_width)
+        # Add 4 padding (2 left + 2 right) + border widths
+        left_border_width = self.char_widths['v']
+        right_border_width = self.char_widths['v'] 
+        box_width = content_area_width + 4 + left_border_width + right_border_width
         
         # Ensure doesn't exceed terminal width
-        box_width = min(box_width, self.terminal_width - 2)
+        box_width = min(box_width, self.terminal_width)
         
         return box_width
+    
+    def _add_box_borders(self, content_lines: List[str], box_width: int) -> List[str]:
+        """
+        Add box borders around content lines.
+        
+        Args:
+            content_lines: List of content lines
+            box_width: Total box width
+            
+        Returns:
+            List[str]: Box lines with borders
+        """
+        box_lines = []
+        
+        # Generate top border (with title if present)
+        top_border = self._generate_top_border(box_width)
+        box_lines.append(top_border)
+        
+        # Generate content lines with side borders
+        for line in content_lines:
+            content_line = self._generate_content_line(line, box_width)
+            box_lines.append(content_line)
+        
+        # Generate bottom border
+        bottom_border = self._generate_bottom_border(box_width)
+        box_lines.append(bottom_border)
+        
+        return box_lines
     
     def _generate_top_border(self, box_width: int) -> str:
         """
         Generate top border with optional title.
         
         Args:
-            box_width: Width of the box
+            box_width: Total box width
             
         Returns:
             str: Top border line
@@ -250,32 +272,34 @@ class _BoxGenerator:
     
     def _generate_title_border(self, box_width: int) -> str:
         """
-        Generate top border with title using visual width measurement.
+        Generate top border with centered title.
         
         Args:
-            box_width: Width of the box
+            box_width: Total box width
             
         Returns:
-            str: Top border with title
+            str: Top border with centered title
         """
         title_with_spaces = f" {self.title} "
-        title_visual_length = _get_visual_width(title_with_spaces)
+        title_visual_width = _get_visual_width(title_with_spaces)
         
-        # Calculate remaining space for horizontal lines
-        remaining_width = box_width - 2 - title_visual_length  # -2 for corners
+        # Calculate available space for horizontal lines
+        corner_width = self.char_widths['tl'] + self.char_widths['tr']
+        available_width = box_width - corner_width - title_visual_width
         
-        if remaining_width <= 0:
-            # Title too long, truncate based on visual width
-            max_title_visual_length = box_width - 6  # Account for corners and minimum borders
-            truncated_title = self._truncate_to_visual_width(self.title, max_title_visual_length)
+        if available_width <= 0:
+            # Title too long, truncate it
+            max_title_width = box_width - corner_width - 4  # Leave some space for borders
+            truncated_title = self._truncate_to_visual_width(self.title, max_title_width)
             title_with_spaces = f" {truncated_title} "
-            remaining_width = box_width - 2 - _get_visual_width(title_with_spaces)
+            title_visual_width = _get_visual_width(title_with_spaces)
+            available_width = box_width - corner_width - title_visual_width
         
-        # Split remaining space on both sides
-        left_width = max(0, remaining_width // 2)
-        right_width = max(0, remaining_width - left_width)
+        # Split available space evenly
+        left_width = max(0, available_width // 2)
+        right_width = max(0, available_width - left_width)
         
-        # Build border
+        # Build title border
         left_part = self.chars['h'] * left_width
         right_part = self.chars['h'] * right_width
         
@@ -346,59 +370,45 @@ class _BoxGenerator:
         Generate simple border line (top or bottom).
         
         Args:
-            box_width: Width of the box
+            box_width: Total box width
             position: 'top' or 'bottom'
             
         Returns:
             str: Border line
         """
-        corner_left = self.chars['tl'] if position == 'top' else self.chars['bl']
-        corner_right = self.chars['tr'] if position == 'top' else self.chars['br']
+        if position == 'top':
+            left_corner = self.chars['tl']
+            right_corner = self.chars['tr']
+        else:  # bottom
+            left_corner = self.chars['bl']
+            right_corner = self.chars['br']
         
-        horizontal = self.chars['h'] * (box_width - 2)
-        return f"{corner_left}{horizontal}{corner_right}"
+        # Calculate horizontal line width
+        corner_width = self.char_widths['tl'] + self.char_widths['tr']  # Assume corners same width
+        horizontal_width = box_width - corner_width
+        
+        horizontal_line = self.chars['h'] * horizontal_width
+        return f"{left_corner}{horizontal_line}{right_corner}"
     
     def _generate_bottom_border(self, box_width: int) -> str:
         """
         Generate bottom border.
         
         Args:
-            box_width: Width of the box
+            box_width: Total box width
             
         Returns:
             str: Bottom border line
         """
         return self._generate_simple_border(box_width, 'bottom')
     
-    def _generate_content_lines(self, content_lines: List[str], box_width: int) -> List[str]:
+    def _generate_content_line(self, content: str, box_width: int) -> str:
         """
-        Generate content lines with borders and padding.
+        Generate content line with side borders and padding.
         
         Args:
-            content_lines: List of content lines
-            box_width: Width of the box
-            
-        Returns:
-            List[str]: Content lines with borders
-        """
-        formatted_lines = []
-        content_width = box_width - 4  # Account for borders and padding
-        
-        for line in content_lines:
-            # Center the content by default (as specified in requirements)
-            centered_line = self._center_text(line, content_width)
-            bordered_line = f"{self.chars['v']} {centered_line} {self.chars['v']}"
-            formatted_lines.append(bordered_line)
-        
-        return formatted_lines
-    
-    def _center_text(self, text: str, width: int) -> str:
-        """
-        Center text within given width using visual width measurement.
-        
-        Args:
-            text: Text to center
-            width: Available width
+            content: Content line (pre-justified)
+            box_width: Total box width
             
         Returns:
             str: Centered text with padding
@@ -418,38 +428,6 @@ class _BoxGenerator:
         
         return ' ' * left_padding + text + ' ' * right_padding
     
-    def _apply_box_justification(self, box_lines: List[str]) -> List[str]:
-        """
-        Apply justification to the entire box.
-        
-        Args:
-            box_lines: List of box lines
-            
-        Returns:
-            List[str]: Justified box lines
-        """
-        if self.justify == 'left':
-            return box_lines
-        
-        # Find box width using visual width measurement
-        if not box_lines:
-            return box_lines
-        
-        box_visual_width = _get_visual_width(box_lines[0])
-        terminal_width = self.terminal_width
-        
-        if box_visual_width >= terminal_width:
-            return box_lines
-        
-        if self.justify == 'center':
-            padding = (terminal_width - box_visual_width) // 2
-            return [' ' * padding + line for line in box_lines]
-        elif self.justify == 'right':
-            padding = terminal_width - box_visual_width
-            return [' ' * padding + line for line in box_lines]
-        
-        return box_lines
-    
     def _format_for_terminal(self, box_lines: List[str]) -> str:
         """
         Format box for terminal output with ANSI colors.
@@ -463,6 +441,24 @@ class _BoxGenerator:
         if not self.color and not self.background:
             return '\n'.join(box_lines)
         
+        # Apply colors to border characters only
+        colored_lines = []
+        for line in box_lines:
+            colored_line = self._apply_color_to_borders(line)
+            colored_lines.append(colored_line)
+        
+        return '\n'.join(colored_lines)
+    
+    def _apply_color_to_borders(self, line: str) -> str:
+        """
+        Apply color to border characters while preserving content formatting.
+        
+        Args:
+            line: Box line
+            
+        Returns:
+            str: Line with colored borders
+        """
         # Generate color codes
         color_code = ''
         if self.color:
@@ -548,13 +544,13 @@ class _BoxGenerator:
         Returns:
             str: Plain text box
         """
-        # Strip any ANSI codes that might be in the content
+        # Strip any ANSI codes
         plain_lines = [self._strip_ansi_codes(line) for line in box_lines]
         return '\n'.join(plain_lines)
     
     def _strip_ansi_codes(self, text: str) -> str:
         """
-        Strip ANSI escape codes from text for length measurement.
+        Strip ANSI escape codes from text.
         
         Args:
             text: Text with potential ANSI codes
@@ -589,7 +585,7 @@ class _BoxGenerator:
         Returns:
             str: HTML formatted box
         """
-        # Create CSS styles for the box
+        # Create CSS styles
         styles = []
         if self.color:
             normalized_color = _normalize_for_html(self.color)
@@ -602,17 +598,16 @@ class _BoxGenerator:
         
         style_attr = f' style="{"; ".join(styles)}"' if styles else ''
         
-        # Strip ANSI codes and escape HTML
-        plain_lines = []
+        # Escape HTML and strip ANSI codes
+        escaped_lines = []
         for line in box_lines:
             clean_line = self._strip_ansi_codes(line)
-            # Proper HTML escaping
             escaped_line = (clean_line
                            .replace('&', '&amp;')
                            .replace('<', '&lt;')
                            .replace('>', '&gt;')
                            .replace('"', '&quot;')
                            .replace("'", '&#x27;'))
-            plain_lines.append(escaped_line)
+            escaped_lines.append(escaped_line)
         
-        return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(plain_lines) + '\n</pre>'
+        return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(escaped_lines) + '\n</pre>'

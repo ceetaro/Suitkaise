@@ -15,7 +15,7 @@ from .exceptions import (
     PreloopError, MainLoopError, PostLoopError,
     PreloopTimeoutError, MainLoopTimeoutError, PostLoopTimeoutError
 )
-from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
+from suitkaise._int.time.time_ops import _get_current_time, _elapsed_time
 from suitkaise._int.core.format_ops import _create_debug_message
 
 

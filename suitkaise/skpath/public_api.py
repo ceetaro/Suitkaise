@@ -22,7 +22,7 @@ from functools import wraps
 
 # Import internal path operations with fallback
 try:
-    from .._int.core.path_ops import (
+    from .._int.path.path_ops import (
         _get_non_sk_caller_file_path,
         _get_project_root,
         _get_cwd,
