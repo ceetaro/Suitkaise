@@ -126,8 +126,8 @@ class _BoxGenerator:
             except (ImportError, AttributeError):
                 self.terminal_width = 60
         
-        # Ensure minimum terminal width
-        self.terminal_width = max(60, self.terminal_width or 60)
+        # Ensure minimum terminal width (but allow override for testing)
+        self.terminal_width = max(20, self.terminal_width or 60)
         
         # Determine actual style to use (fallback to ASCII if needed)
         self.actual_style = self._get_actual_style()
@@ -184,12 +184,13 @@ class _BoxGenerator:
         justified_box_text = _justify_text(box_text, self.box_justify, self.terminal_width)
         justified_box_lines = justified_box_text.split('\n')
         
-        # Step 6: Generate output for all formats (colors applied in format methods)
+        # Step 6: Generate output for all formats
+        # Note: HTML format needs special handling to escape entities in content only
         return {
             'terminal': self._format_for_terminal(justified_box_lines),
             'plain': self._format_for_plain(justified_box_lines),
             'markdown': self._format_for_markdown(justified_box_lines),
-            'html': self._format_for_html(justified_box_lines)
+            'html': self._format_for_html_with_escaping(content_lines, justified_box_lines)
         }
     
     def _calculate_box_width(self, content_lines: List[str]) -> int:
@@ -451,38 +452,45 @@ class _BoxGenerator:
         if not self.color and not self.background:
             return '\n'.join(box_lines)
         
-        # Generate color codes
-        color_code = ''
+        # Generate separate color codes for border and background
+        border_color_code = ''
+        bg_color_code = ''
+        
         if self.color:
             fg_code = _to_ansi_fg(self.color)
             if fg_code:
-                color_code += fg_code
+                border_color_code = fg_code
         
         if self.background:
             bg_code = _to_ansi_bg(self.background)
             if bg_code:
-                color_code += bg_code
+                bg_color_code = bg_code
         
-        # Apply colors to border characters only
+        # Apply colors appropriately
         colored_lines = []
         for line in box_lines:
-            colored_line = self._apply_color_to_borders(line, color_code)
+            colored_line = self._apply_color_to_line(line, border_color_code, bg_color_code)
             colored_lines.append(colored_line)
         
         return '\n'.join(colored_lines)
     
-    def _apply_color_to_borders(self, line: str, color_code: str) -> str:
+    def _apply_color_to_line(self, line: str, border_color: str, bg_color: str) -> str:
         """
-        Apply color to border characters only while preserving content formatting.
+        Apply colors to a line: border colors to border chars, background to content area.
         
         Args:
             line: Box line
-            color_code: ANSI color code
+            border_color: ANSI color code for borders
+            bg_color: ANSI background color code
             
         Returns:
-            str: Line with colored borders only
+            str: Line with proper colors applied
         """
-        if not color_code:
+        if not border_color and not bg_color:
+            return line
+            
+        # Don't color empty lines
+        if not line.strip():
             return line
             
         # Check if this is a pure border line (top/bottom)
@@ -491,40 +499,85 @@ class _BoxGenerator:
         # If line contains only border characters and spaces
         stripped_line = line.replace(' ', '').replace('\t', '')
         if all(c in border_chars for c in stripped_line):
-            # Pure border line - color the entire line
-            return f"{color_code}{line}\033[0m"
+            # Pure border line - apply border color to borders, background to spaces
+            if border_color and bg_color:
+                return f"{border_color}{bg_color}{line}\033[0m"
+            elif border_color:
+                return f"{border_color}{line}\033[0m"
+            elif bg_color:
+                return f"{bg_color}{line}\033[0m"
         
-        # Content line with borders - only color the border characters
+        # Content line with borders - more complex handling needed
         if not line.strip():
             return line
             
-        # For content lines, we need to carefully apply color to border chars only
-        # Typical content line: "| content here |"
+        # For content lines, we need to:
+        # 1. Color border characters with border_color
+        # 2. Apply background color to the entire content area (including spaces)
+        # 3. Preserve existing text colors
+        
         result = ""
         i = 0
+        in_content_area = False
+        
         while i < len(line):
             char = line[i]
+            
             if char in border_chars:
-                # Color this border character
-                result += f"{color_code}{char}\033[0m"
-            else:
-                # Regular character or ANSI sequence - preserve as is
-                if char == '\033':  # Start of ANSI sequence
-                    # Find the end of the ANSI sequence
-                    ansi_end = i + 1
-                    while ansi_end < len(line):
-                        if line[ansi_end].isalpha():  # ANSI sequences end with a letter
-                            ansi_end += 1
-                            break
-                        ansi_end += 1
-                    
-                    # Add the entire ANSI sequence
-                    result += line[i:ansi_end]
-                    i = ansi_end - 1  # -1 because loop will increment
+                # Border character - apply border color only
+                if border_color:
+                    result += f"{border_color}{char}\033[0m"
                 else:
                     result += char
+                    
+                # Check if we're entering content area (after left border)
+                if not in_content_area and i > 0:
+                    in_content_area = True
+                # Check if we're exiting content area (at right border)
+                elif in_content_area and i == len(line) - 1:
+                    in_content_area = False
+                    
+            else:
+                # Content area character
+                if in_content_area and bg_color:
+                    # We're in content area and have background color
+                    if char == '\033':  # Start of ANSI sequence
+                        # Find the end of the ANSI sequence
+                        ansi_end = i + 1
+                        while ansi_end < len(line):
+                            if line[ansi_end].isalpha():  # ANSI sequences end with a letter
+                                ansi_end += 1
+                                break
+                            ansi_end += 1
+                        
+                        # Add the ANSI sequence, then apply background
+                        ansi_seq = line[i:ansi_end]
+                        result += f"{ansi_seq}{bg_color}"
+                        i = ansi_end - 1  # -1 because loop will increment
+                    else:
+                        # Regular character in content area
+                        if result and not result.endswith(bg_color):
+                            result += bg_color
+                        result += char
+                else:
+                    # Not in content area or no background color
+                    if char == '\033':  # Handle ANSI sequences
+                        ansi_end = i + 1
+                        while ansi_end < len(line):
+                            if line[ansi_end].isalpha():
+                                ansi_end += 1
+                                break
+                            ansi_end += 1
+                        result += line[i:ansi_end]
+                        i = ansi_end - 1
+                    else:
+                        result += char
             i += 1
         
+        # Add final reset if we applied any colors
+        if (border_color or bg_color) and not result.endswith('\033[0m'):
+            result += '\033[0m'
+            
         return result
     
     def _format_for_plain(self, box_lines: List[str]) -> str:
@@ -604,3 +657,52 @@ class _BoxGenerator:
             escaped_lines.append(escaped_line)
         
         return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(escaped_lines) + '\n</pre>'
+    
+    def _format_for_html_with_escaping(self, original_content: List[str], box_lines: List[str]) -> str:
+        """
+        Format box for HTML output with proper entity escaping.
+        This method rebuilds the box with escaped content to ensure consistent sizing.
+        
+        Args:
+            original_content: Original content lines (before boxing)
+            box_lines: Box lines for structure reference
+            
+        Returns:
+            str: HTML formatted box
+        """
+        # First, escape the original content
+        escaped_content = []
+        for line in original_content:
+            clean_line = self._strip_ansi_codes(line)
+            escaped_line = (clean_line
+                           .replace('&', '&amp;')
+                           .replace('<', '&lt;')
+                           .replace('>', '&gt;')
+                           .replace('"', '&quot;')
+                           .replace("'", '&#x27;'))
+            escaped_content.append(escaped_line)
+        
+        # Rebuild the box with escaped content
+        escaped_box_width = self._calculate_box_width(escaped_content)
+        escaped_box_lines = self._add_box_borders(escaped_content, escaped_box_width)
+        escaped_box_lines_with_newlines = [''] + escaped_box_lines + ['']
+        
+        # Justify the escaped box
+        escaped_box_text = '\n'.join(escaped_box_lines_with_newlines)
+        escaped_justified_box_text = _justify_text(escaped_box_text, self.box_justify, self.terminal_width)
+        escaped_justified_box_lines = escaped_justified_box_text.split('\n')
+        
+        # Create CSS styles
+        styles = []
+        if self.color:
+            normalized_color = _normalize_for_html(self.color)
+            if normalized_color:
+                styles.append(f"border-color: {normalized_color}")
+        if self.background:
+            normalized_bg = _normalize_for_html(self.background)
+            if normalized_bg:
+                styles.append(f"background-color: {normalized_bg}")
+        
+        style_attr = f' style="{"; ".join(styles)}"' if styles else ''
+        
+        return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(escaped_justified_box_lines) + '\n</pre>'

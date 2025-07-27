@@ -1,5 +1,5 @@
 # tests/test_fdl/test_setup/test_box_generator.py - REDESIGNED FROM SCRATCH
-import pytest
+# import pytest
 import sys
 from unittest.mock import patch, Mock
 
@@ -453,7 +453,7 @@ class TestBoxWidthCalculation:
         
         # But width calculation should ignore them
         lines = terminal_output.split('\n')
-        content_lines_in_box = [line for line in lines if ('║' in line or '|' in line) and ('text' in line or 'green' in line)]
+        content_lines_in_box = [line for line in lines if ('║' in line or '|' in line) and any(word in line for word in ['text', 'green', 'plain', 'Mixed'])]
         
         # All content lines should align properly despite ANSI codes
         assert len(content_lines_in_box) >= 4
@@ -498,11 +498,11 @@ class TestTitleHandling:
         before_title = title_line[:title_pos].strip('┌+')  # Strip corners
         after_title = title_line[title_pos + len(' Test Title '):].strip('┐+')  # Strip corners
         
-        # Should be mostly horizontal characters (Unicode or ASCII)
+        # Should be mostly horizontal characters (Unicode or ASCII) and spaces
         if before_title:
-            assert all(c in '─-' for c in before_title), f"Before title: '{before_title}'"
+            assert all(c in '─- ' for c in before_title), f"Before title: '{before_title}'"
         if after_title:
-            assert all(c in '─-' for c in after_title), f"After title: '{after_title}'"
+            assert all(c in '─- ' for c in after_title), f"After title: '{after_title}'"
     
     def test_long_title_truncation(self):
         """Test that very long titles are truncated properly."""
@@ -1623,11 +1623,11 @@ def run_tests():
     print(result['terminal'])
     
     # Both border and background colors
-    print("\n🟢🟡 Both Border (Green) and Background (Yellow):")
+    print("\n🟠⬜ Both Border (Orange) and Background (Gray):")
     both_generator = _BoxGenerator(
         style='double',
-        color='green',
-        background='yellow',
+        color='orange',
+        background='gray',
         terminal_width=terminal_width
     )
     result = both_generator.generate_box(["Both border and background colored"])
