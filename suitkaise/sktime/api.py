@@ -20,7 +20,7 @@ from functools import wraps
 
 # Import internal time operations with fallback
 try:
-    from .._int.core.time_ops import (
+    from .._int.time.time_ops import (
         _elapsed_time,
         _Yawn,
         _Stopwatch, 

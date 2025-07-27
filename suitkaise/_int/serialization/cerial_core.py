@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Set, Optional, Union, Callable, Type, Tuple,
 from functools import wraps
 from enum import Enum
 
-from suitkaise._int.core.path_ops import _is_suitkaise_module, _get_module_file_path
+from suitkaise._int.path.path_ops import _is_suitkaise_module, _get_module_file_path
 
 # ============================================================================
 # EXCEPTION CLASSES

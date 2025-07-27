@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Union
 
-from suitkaise._int.core.path_ops import _is_suitkaise_module, _get_module_file_path
+from suitkaise._int.path.path_ops import _is_suitkaise_module, _get_module_file_path
 
 try:
     from ..cerial_core import _NSO_Handler
