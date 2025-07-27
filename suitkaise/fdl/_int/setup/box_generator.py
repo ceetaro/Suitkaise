@@ -307,30 +307,63 @@ class _BoxGenerator:
     
     def _truncate_to_visual_width(self, text: str, max_width: int) -> str:
         """
-        Truncate text to fit within visual width.
+        Truncate text to fit within visual width while preserving ANSI codes.
         
         Args:
-            text: Text to truncate
+            text: Text to truncate (may contain ANSI codes)
             max_width: Maximum visual width
             
         Returns:
-            str: Truncated text with ellipsis if needed
+            str: Truncated text with ANSI codes preserved
         """
         if not text:
             return ""
-        
-        if _get_visual_width(text) <= max_width:
+            
+        current_visual_width = _get_visual_width(text)
+        if current_visual_width <= max_width:
             return text
         
-        # Truncate character by character until it fits with ellipsis
-        truncated = ""
-        for char in text:
-            test_text = truncated + char + "..."
-            if _get_visual_width(test_text) > max_width:
-                break
-            truncated += char
+        # For text with ANSI codes, we need to be more careful
+        # Parse the text into segments: ANSI codes and visible text
+        result = ""
+        current_width = 0
+        i = 0
         
-        return truncated + "..." if truncated else ""
+        while i < len(text) and current_width < max_width:
+            # Check if we're at the start of an ANSI sequence
+            if text[i:i+1] == '\033':
+                # Find the end of the ANSI sequence
+                ansi_end = i + 1
+                while ansi_end < len(text):
+                    if text[ansi_end].isalpha():  # ANSI sequences end with a letter
+                        ansi_end += 1
+                        break
+                    ansi_end += 1
+                
+                # Add the entire ANSI sequence (doesn't count toward width)
+                result += text[i:ansi_end]
+                i = ansi_end
+            else:
+                # Regular character - check if it fits
+                char = text[i]
+                char_width = 1  # Simple fallback
+                
+                # Use wcwidth if available for accurate width
+                try:
+                    import wcwidth
+                    char_width = wcwidth.wcwidth(char) or 0
+                except ImportError:
+                    char_width = 1 if ord(char) >= 32 else 0  # Printable chars = 1 width
+                
+                if current_width + char_width <= max_width:
+                    result += char
+                    current_width += char_width
+                    i += 1
+                else:
+                    # Adding this character would exceed width
+                    break
+        
+        return result
     
     def _generate_simple_border(self, box_width: int, position: str) -> str:
         """
@@ -384,19 +417,26 @@ class _BoxGenerator:
         border_width = self.char_widths['v'] * 2  # Left + right borders
         content_area_width = box_width - border_width - 4  # Subtract borders and 4 padding
         
-        # Pad content to fill content area
+        # Center the content within the content area
         content_visual_width = _get_visual_width(content)
         if content_visual_width < content_area_width:
+            # Center the content
             padding_needed = content_area_width - content_visual_width
-            content = content + (' ' * padding_needed)
+            left_padding = padding_needed // 2
+            right_padding = padding_needed - left_padding
+            centered_content = ' ' * left_padding + content + ' ' * right_padding
         elif content_visual_width > content_area_width:
             # Content too wide, truncate
-            content = self._truncate_to_visual_width(content, content_area_width)
-            remaining_padding = content_area_width - _get_visual_width(content)
-            content = content + (' ' * remaining_padding)
+            centered_content = self._truncate_to_visual_width(content, content_area_width)
+            # Pad to exact width
+            remaining_padding = content_area_width - _get_visual_width(centered_content)
+            centered_content = centered_content + (' ' * remaining_padding)
+        else:
+            # Perfect fit
+            centered_content = content
         
         # Add borders and padding
-        return f"{self.chars['v']}  {content}  {self.chars['v']}"
+        return f"{self.chars['v']}  {centered_content}  {self.chars['v']}"
     
     def _format_for_terminal(self, box_lines: List[str]) -> str:
         """
@@ -411,24 +451,6 @@ class _BoxGenerator:
         if not self.color and not self.background:
             return '\n'.join(box_lines)
         
-        # Apply colors to border characters only
-        colored_lines = []
-        for line in box_lines:
-            colored_line = self._apply_color_to_borders(line)
-            colored_lines.append(colored_line)
-        
-        return '\n'.join(colored_lines)
-    
-    def _apply_color_to_borders(self, line: str) -> str:
-        """
-        Apply color to border characters while preserving content formatting.
-        
-        Args:
-            line: Box line
-            
-        Returns:
-            str: Line with colored borders
-        """
         # Generate color codes
         color_code = ''
         if self.color:
@@ -441,11 +463,69 @@ class _BoxGenerator:
             if bg_code:
                 color_code += bg_code
         
-        if color_code:
-            # Apply color to entire line but ensure proper reset
+        # Apply colors to border characters only
+        colored_lines = []
+        for line in box_lines:
+            colored_line = self._apply_color_to_borders(line, color_code)
+            colored_lines.append(colored_line)
+        
+        return '\n'.join(colored_lines)
+    
+    def _apply_color_to_borders(self, line: str, color_code: str) -> str:
+        """
+        Apply color to border characters only while preserving content formatting.
+        
+        Args:
+            line: Box line
+            color_code: ANSI color code
+            
+        Returns:
+            str: Line with colored borders only
+        """
+        if not color_code:
+            return line
+            
+        # Check if this is a pure border line (top/bottom)
+        border_chars = set('+-|─━═┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬')
+        
+        # If line contains only border characters and spaces
+        stripped_line = line.replace(' ', '').replace('\t', '')
+        if all(c in border_chars for c in stripped_line):
+            # Pure border line - color the entire line
             return f"{color_code}{line}\033[0m"
         
-        return line
+        # Content line with borders - only color the border characters
+        if not line.strip():
+            return line
+            
+        # For content lines, we need to carefully apply color to border chars only
+        # Typical content line: "| content here |"
+        result = ""
+        i = 0
+        while i < len(line):
+            char = line[i]
+            if char in border_chars:
+                # Color this border character
+                result += f"{color_code}{char}\033[0m"
+            else:
+                # Regular character or ANSI sequence - preserve as is
+                if char == '\033':  # Start of ANSI sequence
+                    # Find the end of the ANSI sequence
+                    ansi_end = i + 1
+                    while ansi_end < len(line):
+                        if line[ansi_end].isalpha():  # ANSI sequences end with a letter
+                            ansi_end += 1
+                            break
+                        ansi_end += 1
+                    
+                    # Add the entire ANSI sequence
+                    result += line[i:ansi_end]
+                    i = ansi_end - 1  # -1 because loop will increment
+                else:
+                    result += char
+            i += 1
+        
+        return result
     
     def _format_for_plain(self, box_lines: List[str]) -> str:
         """
