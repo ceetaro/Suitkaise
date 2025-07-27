@@ -494,88 +494,94 @@ class _BoxGenerator:
             return line
             
         # Check if this is a pure border line (top/bottom)
-        border_chars = set('+-|─━═┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬')
+        border_chars = set('+-|─━═│║┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬')
         
-        # If line contains only border characters and spaces
+        # If line contains only border characters and spaces (title line or pure border)
         stripped_line = line.replace(' ', '').replace('\t', '')
-        if all(c in border_chars for c in stripped_line):
-            # Pure border line - apply border color to borders, background to spaces
-            if border_color and bg_color:
-                return f"{border_color}{bg_color}{line}\033[0m"
-            elif border_color:
-                return f"{border_color}{line}\033[0m"
-            elif bg_color:
-                return f"{bg_color}{line}\033[0m"
         
-        # Content line with borders - more complex handling needed
-        if not line.strip():
-            return line
+        # Remove any existing ANSI codes to check the actual characters
+        import re
+        ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        clean_stripped_line = ansi_pattern.sub('', stripped_line)
+        
+        if all(c in border_chars for c in clean_stripped_line):
+            # Pure border line or title line - apply both border and background colors
+            combined_color = ''
+            if border_color:
+                combined_color += border_color
+            if bg_color:
+                combined_color += bg_color
             
-        # For content lines, we need to:
-        # 1. Color border characters with border_color
-        # 2. Apply background color to the entire content area (including spaces)
-        # 3. Preserve existing text colors
-        
-        result = ""
-        i = 0
-        in_content_area = False
-        
-        while i < len(line):
-            char = line[i]
-            
-            if char in border_chars:
-                # Border character - apply border color only
-                if border_color:
-                    result += f"{border_color}{char}\033[0m"
-                else:
-                    result += char
-                    
-                # Check if we're entering content area (after left border)
-                if not in_content_area and i > 0:
-                    in_content_area = True
-                # Check if we're exiting content area (at right border)
-                elif in_content_area and i == len(line) - 1:
-                    in_content_area = False
-                    
+            if combined_color:
+                return f"{combined_color}{line}\033[0m"
             else:
-                # Content area character
-                if in_content_area and bg_color:
-                    # We're in content area and have background color
-                    if char == '\033':  # Start of ANSI sequence
-                        # Find the end of the ANSI sequence
-                        ansi_end = i + 1
-                        while ansi_end < len(line):
-                            if line[ansi_end].isalpha():  # ANSI sequences end with a letter
-                                ansi_end += 1
-                                break
-                            ansi_end += 1
-                        
-                        # Add the ANSI sequence, then apply background
-                        ansi_seq = line[i:ansi_end]
-                        result += f"{ansi_seq}{bg_color}"
-                        i = ansi_end - 1  # -1 because loop will increment
-                    else:
-                        # Regular character in content area
-                        if result and not result.endswith(bg_color):
-                            result += bg_color
-                        result += char
-                else:
-                    # Not in content area or no background color
-                    if char == '\033':  # Handle ANSI sequences
-                        ansi_end = i + 1
-                        while ansi_end < len(line):
-                            if line[ansi_end].isalpha():
-                                ansi_end += 1
-                                break
-                            ansi_end += 1
-                        result += line[i:ansi_end]
-                        i = ansi_end - 1
-                    else:
-                        result += char
-            i += 1
+                return line
         
-        # Add final reset if we applied any colors
-        if (border_color or bg_color) and not result.endswith('\033[0m'):
+        # Content line with borders - split into: left_border + content + right_border
+        # Typical format: "│  content here  │"
+        
+        # Find first and last border characters
+        first_border_pos = -1
+        last_border_pos = -1
+        
+        for i, char in enumerate(line):
+            if char in border_chars:
+                if first_border_pos == -1:
+                    first_border_pos = i
+                last_border_pos = i
+        
+        if first_border_pos == -1:
+            # No border characters, treat as plain content
+            if bg_color:
+                return f"{bg_color}{line}\033[0m"
+            else:
+                return line
+        
+        # Split the line into parts
+        left_border = line[first_border_pos:first_border_pos+1]  # Just the border char
+        content_area = line[first_border_pos+1:last_border_pos] if last_border_pos > first_border_pos else ""
+        right_border = line[last_border_pos:last_border_pos+1] if last_border_pos > first_border_pos else ""
+        
+        # Build the result
+        result = ""
+        
+        # Left border with colors
+        if left_border:
+            border_and_bg = ''
+            if border_color:
+                border_and_bg += border_color
+            if bg_color:
+                border_and_bg += bg_color
+            if border_and_bg:
+                result += f"{border_and_bg}{left_border}\033[0m"
+            else:
+                result += left_border
+        
+        # Content area with background color
+        if content_area:
+            if bg_color:
+                # Apply background to content area, but preserve any existing ANSI codes
+                content_with_bg = f"{bg_color}{content_area}"
+                # Fix any reset codes to reapply background
+                content_with_bg = content_with_bg.replace('\033[0m', f'\033[0m{bg_color}')
+                result += content_with_bg
+            else:
+                result += content_area
+        
+        # Right border with colors
+        if right_border:
+            border_and_bg = ''
+            if border_color:
+                border_and_bg += border_color
+            if bg_color:
+                border_and_bg += bg_color
+            if border_and_bg:
+                result += f"{border_and_bg}{right_border}\033[0m"
+            else:
+                result += right_border
+        
+        # Final reset if we used background color
+        if bg_color and not result.endswith('\033[0m'):
             result += '\033[0m'
             
         return result
