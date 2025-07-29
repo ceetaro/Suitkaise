@@ -74,3 +74,100 @@ key2: value2
 - **Automatic detection**: Intelligently chooses best format
 - **Extensible**: Easy to add new data types and formats
 - **Performance-aware**: Efficient formatting for large data structures
+
+## Examples
+
+### Basic Data Formatting
+
+```python
+from suitkaise import fdprint as fd
+import time
+
+# its as easy as...
+value1 = {
+    "dict": {"a": "dict"},
+    "list": []
+}
+
+fd.fprint("This is value1: {value1}", value1)
+```
+
+### Time and Date Formatting
+
+```python
+# printing dates or times
+now = time.time()
+
+# print using our default time format (see report section for more details)
+fd.fprint("Printing {value1} at {time:now}", (value1, now))
+# or...
+# print using our default date format
+fd.fprint("Printing {value1} at {date:now}", (value1, now))
+
+# using custom time and date formats
+
+# print using hours, minutes, seconds and microseconds
+fd.fprint("Printing {value1} at {hms6:now}", (value1, now))
+# print using date and timezone
+fd.fprint("Printing {value1} at {datePST:now}", (value1, now))
+```
+
+### Debug Formatting
+
+```python
+# using debugging formats automatically
+fd.dprint("Your message with vars", (tuple_of_vars), priority_level_1_to_5)
+
+# toggling if debug messages should be printed
+
+# will only print messages at level 2 or higher
+fd.set_dprint_level(2)
+```
+
+### Format Comparison
+
+**Raw Python Output:**
+```
+['hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality']
+{'key1': 'value1', 'key2': 'value2', 'key3': 'value3', 'key4': 'value4', 'key5': 'value5'}
+{'banana', 'apple', 'cherry', 'elderberry', 'date'}
+('first', 'second', 'third', 'fourth', 'fifth')
+```
+
+**Display Format:**
+```
+hello, world, this, is, a, test, of, the, list, functionality
+
+key1: value1
+key2: value2
+key3: value3 
+key4: value4
+key5: value5
+
+banana, apple, cherry, elderberry, date
+
+(first, second, third, fourth, fifth)
+```
+
+**Debug Format:**
+```
+(list) [
+    'hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality'
+] (list)
+
+(dict) {
+   'key1': 'value1', 
+   'key2': 'value2', 
+   'key3': 'value3', 
+   'key4': 'value4', 
+   'key5': 'value5'
+} (dict)
+
+(set) {
+    'banana', 'apple', 'cherry', 'elderberry', 'date'
+} (set)
+
+(tuple) (
+    'first', 'second', 'third', 'fourth', 'fifth'
+) (tuple)
+```
