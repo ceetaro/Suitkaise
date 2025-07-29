@@ -486,6 +486,10 @@ class _BoxGenerator:
         Returns:
             str: Line with proper colors applied
         """
+        # Ensure we always return a string
+        if line is None:
+            return ""
+            
         if not border_color and not bg_color:
             return line
             
@@ -522,13 +526,23 @@ class _BoxGenerator:
                 return line
         
         # Content line - use span-based approach
-        return self._apply_colors_span_based(line, border_color, bg_color, border_chars)
+        result = self._apply_colors_span_based(line, border_color, bg_color, border_chars)
+        
+        # Ensure we never return None
+        if result is None:
+            return line
+        
+        return result
     
     def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str, border_chars: set) -> str:
         """
         Apply colors using dynamic ANSI recalculation approach.
         Each ANSI code is recalculated to combine text color + box background.
         """
+        # Ensure we have a valid line
+        if line is None:
+            return ""
+            
         import re
         
         # Find all ANSI sequences and their positions
@@ -615,7 +629,8 @@ class _BoxGenerator:
                         
                         i = j
         
-        return result
+        # Ensure we never return None - fallback to original line
+        return result if result is not None else line
     
     def _recalculate_ansi_with_background(self, ansi_code: str, box_bg_color: str, current_bg_color: str) -> str:
         """
