@@ -58,14 +58,7 @@
 
 ---
 
-## 🚧 **IN PROGRESS - Missing Core Components**
-
-### Public API Layer
-- [ ] **HIGH PRIORITY**: Implement `fdl.print()` public function
-- [ ] **HIGH PRIORITY**: Implement `fdl.dprint()` debug function  
-- [ ] **MEDIUM**: Implement `fdl.codeprint()` code syntax highlighting
-- [ ] **MEDIUM**: Implement `fdl.mdprint()` and `fdl.mdfileprint()` markdown printing
-- [ ] **LOW**: Implement `fdl.stop_spinner()` public function
+## 🔄 **MAJOR MISSING SYSTEMS (HIGH PRIORITY)**
 
 ### Missing Command Processors
 - [ ] **HIGH PRIORITY**: Debug commands processor (`</debug>`, `<type:variable>`)
@@ -78,17 +71,6 @@
 - [ ] **MEDIUM**: Type objects processor (`<type:variable>` type annotations)
 - [ ] **MEDIUM**: Nested collection objects (`<nested_collection>` with level-based coloring)
 - [ ] **LOW**: Code objects processor (syntax highlighted code blocks)
-
-### Multi-Format Output System
-- [ ] **HIGH PRIORITY**: Complete plain text output generation
-- [ ] **HIGH PRIORITY**: Complete markdown output generation  
-- [ ] **HIGH PRIORITY**: Complete HTML output generation
-- [ ] **MEDIUM**: Output format selection and routing
-- [ ] **MEDIUM**: File output support for all formats
-
----
-
-## 🔄 **MAJOR MISSING SYSTEMS**
 
 ### Logging System (Complete Implementation Required)
 - [ ] **CRITICAL**: `fdl.log.from_current_file()` reporter creation
@@ -110,17 +92,17 @@
 - [ ] **MEDIUM**: Thread-safe error display
 - [ ] **LOW**: Debug mode error context
 
-### Advanced Features
+### Advanced Internal Features
 - [ ] **HIGH PRIORITY**: `fdl.Format()` class implementation and caching
 - [ ] **HIGH PRIORITY**: `fdl.Table()`, `fdl.ColumnTable()`, `fdl.RowTable()` classes
-- [ ] **HIGH PRIORITY**: `fdl.ProgressBar()` public class (wrapping internal implementation)
+- [ ] **HIGH PRIORITY**: Internal `_ProgressBar()` class refinement
 - [ ] **MEDIUM**: `@fdl.autoformat()` and `@fdl.autodebug()` decorators
-- [ ] **MEDIUM**: `fdl.get_default_color_names()` and `fdl.get_default_text_formatting()`
+- [ ] **MEDIUM**: Internal color name and formatting utilities
 - [ ] **LOW**: Custom format registration system
 
 ---
 
-## 🔧 **INTEGRATION & POLISH**
+## 🔧 **INTEGRATION & POLISH (MEDIUM PRIORITY)**
 
 ### SKPath Integration
 - [ ] **HIGH PRIORITY**: Integrate SKPath for clean file paths in errors
@@ -147,13 +129,35 @@
 
 ---
 
+## 🎨 **PUBLIC API LAYER (LOWEST PRIORITY - DO LAST)**
+
+### Public Functions
+- [ ] **LOW**: Implement `fdl.print()` public function
+- [ ] **LOW**: Implement `fdl.dprint()` debug function  
+- [ ] **LOW**: Implement `fdl.codeprint()` code syntax highlighting
+- [ ] **LOW**: Implement `fdl.mdprint()` and `fdl.mdfileprint()` markdown printing
+- [ ] **LOW**: Implement `fdl.stop_spinner()` public function
+
+### Public Classes
+- [ ] **LOW**: Public `fdl.Format()` wrapper class
+- [ ] **LOW**: Public `fdl.Table()`, `fdl.ColumnTable()`, `fdl.RowTable()` wrapper classes
+- [ ] **LOW**: Public `fdl.ProgressBar()` wrapper class
+- [ ] **LOW**: Public utility functions (`fdl.get_default_color_names()`, etc.)
+
+### API Integration
+- [ ] **LOW**: Wire public API to internal engine
+- [ ] **LOW**: Add API error handling and validation
+- [ ] **LOW**: API documentation and examples
+
+---
+
 ## 📋 **IMPLEMENTATION NOTES**
 
 ### Critical Path
-1. **TESTING & INTEGRATION** → **Public API** → **Logging System** → **Error Handling** → **Advanced Features**
-2. **Must validate current processors work correctly before building on top of them**
+1. **TESTING & INTEGRATION** → **Missing Processors** → **Logging System** → **Error Handling** → **Advanced Features** → **Polish** → **Public API**
+2. **Complete internal engine must work perfectly before adding any public API**
 3. **Setup integration is critical - processors need to use all helper functions properly**
-4. **Multi-format output must be tested and working before public API**
+4. **Multi-format output must be tested and working throughout**
 
 ### Architecture Strengths
 - Registry system makes adding new processors trivial
@@ -163,11 +167,11 @@
 
 ### Key Dependencies
 - **CRITICAL**: All processors must properly integrate with setup/ helpers
-- **CRITICAL**: Multi-format output must work before public API
+- **CRITICAL**: Multi-format output must work throughout the engine
+- **CRITICAL**: Complete internal engine before any public API
 - SKPath integration needed for clean error display
 - Terminal detection and unicode support already solid
 - Color conversion and text processing systems complete
-- Progress bar system ready, just needs public API wrapper
 
 ### Testing Strategy
 - **Phase 1**: Test individual processors in isolation
@@ -175,3 +179,6 @@
 - **Phase 3**: Test complete processing flow end-to-end
 - **Phase 4**: Test multi-format output consistency
 - **Phase 5**: Test edge cases and error handling
+- **Phase 6**: Complete missing processors and systems
+- **Phase 7**: Polish and optimize internal engine
+- **Phase 8**: Build public API layer (LAST)
