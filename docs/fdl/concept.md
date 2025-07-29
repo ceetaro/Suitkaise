@@ -1,173 +1,99 @@
-# FDL (Format/Debug Library) Concept
+# fdl - Formatting, Debugging, and Logging for suitkaise
 
-## Overview
+**NOTE: F-strings are not supported by fdl print. Use `<>` syntax instead!**  
+**All commands are prefaced by a `/` as well.**
 
-fdprint (format/debug print) is a super formatter that can format any standard data type, date and time, and more. It's a tool that allows users to automatically print data in better formats, formatted for better display or better debugging.
+**PERFORMANCE ARCHITECTURE:**
+- **Thread-safe design**: Custom progress bars, spinners, and tables avoid Rich's threading bottlenecks
+- **Batched updates**: Progress bars use submitted updates with smooth animation
+- **Cached terminal detection**: Terminal width/capabilities detected once at startup
+
+## Goal API Design
+
+The FDL API aims to provide powerful formatting, debugging, and logging capabilities with an intuitive command-based syntax:
+
+### Basic Logging
+```python
+from suitkaise import fdl
+
+# Create reporter from current file
+rptr = fdl.log.from_current_file()
+
+# Standard logging with variable substitution
+rptr.info("Module initialized: <module_name>", (module_name,))
+rptr.error("Connection failed: <error>", (connection_error,))
+
+# Quick context switching
+with fdl.log.Quickly("different/module") as lq:
+    lq.warning("Temporary issue: <issue>", (issue,))
+```
+
+### Advanced Formatting
+```python
+# Rich text formatting with commands
+fdl.print("</bold, red>Critical Error:</end bold, red> System failure detected")
+
+# Time and date formatting
+fdl.print("Login at <time:login_timestamp>", (login_timestamp,))
+fdl.print("Session lasted <elapsed:start_time>", (start_time,))
+
+# Complex nested structures with smart coloring
+fdl.print("Data structure: <nested_data>", (complex_dict,))
+```
+
+### Progress Tracking
+```python
+from suitkaise.fdl import ProgressBar
+
+# Thread-safe progress bars with batched updates
+bar = ProgressBar(100)
+bar.display_bar(color="green")
+bar.update(25, "Processing data...")
+```
+
+### Tables and Layout
+```python
+# Smart table creation with formatting
+table = fdl.Table(box="rounded")
+table.add_columns(["Process", "Memory", "Status"])
+table.populate("worker_1", "Memory", "128MB")
+table.display_table()
+```
+
+The API emphasizes simplicity and performance while providing Rich-like capabilities with better threading support and cleaner syntax.
 
 ## Core Philosophy
 
-FDL provides intelligent formatting that adapts to the context - whether you need clean display output or detailed debugging information with type annotations and structure visualization.
+FDL transforms complex formatting and logging into intuitive, command-based operations that feel natural while maintaining high performance and thread safety. The system uses caching and batched updates to provide smooth user experiences without the bottlenecks found in other formatting libraries.
 
 ## Key Features
 
-### Automatic Data Type Formatting
-- **Lists, dictionaries, sets, tuples**: Intelligent structure formatting
-- **Primitive types**: Enhanced display for numbers, booleans, None
-- **Complex types**: Bytes, complex numbers, ranges
-- **Nested structures**: Recursive formatting for complex data
+### Command-Based Formatting
+- Simple syntax: `</bold, red>text</end bold, red>`
+- No F-string conflicts - uses `<variable>` syntax
+- Cached command processing for performance
+- Thread-safe operation
 
-### Display vs Debug Modes
+### Smart Time Handling
+- Multiple time formats: `<time:>`, `<date:>`, `<elapsed:>`
+- Timezone support with daylight savings
+- Smart unit selection (days, hours, minutes, seconds)
+- Configurable precision and display options
 
-**Display Mode (`fprint`)**:
-- Clean, readable output for end users
-- Comma-separated lists
-- Key-value pairs for dictionaries
-- Minimal visual noise
+### Advanced Data Visualization
+- Nested collection formatting with level-based coloring
+- Type-sorted display within collections
+- Custom progress bars and spinners
+- Flexible table layouts
 
-**Debug Mode (`dprint`)**:
-- Type annotations for every element
-- Structural indicators (brackets, indentation)
-- Detailed formatting for debugging
-- Color coding for easier identification
+### Integrated Logging System
+- File and key-based reporters
+- Multiple output destinations (console, files)
+- Configurable message formats
+- Context-aware logging with quick switching
 
-### Time and Date Formatting
-- **Default formats**: Automatic time/date formatting
-- **Custom formats**: `{hms6:now}`, `{datePST:now}` style formatting
-- **Threshold-based**: Automatic format selection based on time ranges
-- **Timezone support**: Multiple timezone formatting options
-
-### Priority-Based Debug Levels
-- **Level system**: 1-5 priority levels for debug messages
-- **Configurable filtering**: `fd.set_dprint_level(2)` to show only level 2+
-- **Context-aware**: Different detail levels for different situations
-
-## Format Examples
-
-### Raw Python Output
-```python
-['hello', 'world', 'this', 'is', 'a', 'test']
-{'key1': 'value1', 'key2': 'value2'}
-```
-
-### Display Format
-```
-hello, world, this, is, a, test
-
-key1: value1
-key2: value2
-```
-
-### Debug Format
-```
-(list) [
-    'hello', 'world', 'this', 'is', 'a', 'test'
-] (list)
-
-(dict) {
-   'key1': 'value1',
-   'key2': 'value2'
-} (dict)
-```
-
-## Integration Benefits
-- **Cross-module compatibility**: Works with all SK data types
-- **Automatic detection**: Intelligently chooses best format
-- **Extensible**: Easy to add new data types and formats
-- **Performance-aware**: Efficient formatting for large data structures
-
-## Examples
-
-### Basic Data Formatting
-
-```python
-from suitkaise import fdprint as fd
-import time
-
-# its as easy as...
-value1 = {
-    "dict": {"a": "dict"},
-    "list": []
-}
-
-fd.fprint("This is value1: {value1}", value1)
-```
-
-### Time and Date Formatting
-
-```python
-# printing dates or times
-now = time.time()
-
-# print using our default time format (see report section for more details)
-fd.fprint("Printing {value1} at {time:now}", (value1, now))
-# or...
-# print using our default date format
-fd.fprint("Printing {value1} at {date:now}", (value1, now))
-
-# using custom time and date formats
-
-# print using hours, minutes, seconds and microseconds
-fd.fprint("Printing {value1} at {hms6:now}", (value1, now))
-# print using date and timezone
-fd.fprint("Printing {value1} at {datePST:now}", (value1, now))
-```
-
-### Debug Formatting
-
-```python
-# using debugging formats automatically
-fd.dprint("Your message with vars", (tuple_of_vars), priority_level_1_to_5)
-
-# toggling if debug messages should be printed
-
-# will only print messages at level 2 or higher
-fd.set_dprint_level(2)
-```
-
-### Format Comparison
-
-**Raw Python Output:**
-```
-['hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality']
-{'key1': 'value1', 'key2': 'value2', 'key3': 'value3', 'key4': 'value4', 'key5': 'value5'}
-{'banana', 'apple', 'cherry', 'elderberry', 'date'}
-('first', 'second', 'third', 'fourth', 'fifth')
-```
-
-**Display Format:**
-```
-hello, world, this, is, a, test, of, the, list, functionality
-
-key1: value1
-key2: value2
-key3: value3 
-key4: value4
-key5: value5
-
-banana, apple, cherry, elderberry, date
-
-(first, second, third, fourth, fifth)
-```
-
-**Debug Format:**
-```
-(list) [
-    'hello', 'world', 'this', 'is', 'a', 'test', 'of', 'the', 'list', 'functionality'
-] (list)
-
-(dict) {
-   'key1': 'value1', 
-   'key2': 'value2', 
-   'key3': 'value3', 
-   'key4': 'value4', 
-   'key5': 'value5'
-} (dict)
-
-(set) {
-    'banana', 'apple', 'cherry', 'elderberry', 'date'
-} (set)
-
-(tuple) (
-    'first', 'second', 'third', 'fourth', 'fifth'
-) (tuple)
-```
+### Performance Optimizations
+- Cached ANSI code generation
+- Batched progress bar updates
+- Terminal capability detection at startup
+- Thread-safe design throughout
