@@ -159,36 +159,40 @@ class _FDLProcessor:
         if format_state.terminal_output:
             content = ''.join(format_state.terminal_output)
             if content.strip():  # Only process non-empty content
-                # Step 1: Wrap text (handles ANSI codes with visual width)
-                wrapped = wrapper.wrap_text(content)
-                # Step 2: Justify each line (preserves ANSI codes)
-                justified = justifier.justify_text(wrapped, justify_mode)
+                # Step 1: Wrap text (returns list of lines, handles ANSI codes with visual width)
+                wrapped_lines = wrapper.wrap_text(content)
+                # Step 2: Join lines and justify (preserves ANSI codes)
+                wrapped_text = '\n'.join(wrapped_lines)
+                justified = justifier.justify_text(wrapped_text, justify_mode)
                 format_state.terminal_output = [justified]
         
         # Apply to queued terminal output - ANSI codes preserved
         if format_state.queued_terminal_output:
             content = ''.join(format_state.queued_terminal_output)
             if content.strip():  # Only process non-empty content
-                # Step 1: Wrap text (handles ANSI codes with visual width)
-                wrapped = wrapper.wrap_text(content)
-                # Step 2: Justify each line (preserves ANSI codes)
-                justified = justifier.justify_text(wrapped, justify_mode)
+                # Step 1: Wrap text (returns list of lines, handles ANSI codes with visual width)
+                wrapped_lines = wrapper.wrap_text(content)
+                # Step 2: Join lines and justify (preserves ANSI codes)
+                wrapped_text = '\n'.join(wrapped_lines)
+                justified = justifier.justify_text(wrapped_text, justify_mode)
                 format_state.queued_terminal_output = [justified]
         
         # Apply to plain text output (no ANSI codes, but still wrap/justify)
         if format_state.plain_output:
             content = ''.join(format_state.plain_output)
             if content.strip():
-                # Step 1: Wrap text (no ANSI codes to handle)
-                wrapped = wrapper.wrap_text(content)
-                # Step 2: Justify each line
-                justified = justifier.justify_text(wrapped, justify_mode)
+                # Step 1: Wrap text (returns list of lines, no ANSI codes to handle)
+                wrapped_lines = wrapper.wrap_text(content)
+                # Step 2: Join lines and justify
+                wrapped_text = '\n'.join(wrapped_lines)
+                justified = justifier.justify_text(wrapped_text, justify_mode)
                 format_state.plain_output = [justified]
         
         # Apply to markdown output (wrap and justify, but no ANSI codes)
         if format_state.markdown_output:
             content = ''.join(format_state.markdown_output)
             if content.strip():
-                wrapped = wrapper.wrap_text(content)
-                justified = justifier.justify_text(wrapped, justify_mode)
+                wrapped_lines = wrapper.wrap_text(content)
+                wrapped_text = '\n'.join(wrapped_lines)
+                justified = justifier.justify_text(wrapped_text, justify_mode)
                 format_state.markdown_output = [justified]
