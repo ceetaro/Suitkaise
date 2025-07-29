@@ -567,12 +567,12 @@ class _BoxGenerator:
                 i = 0
                 while i < len(part):
                     if part[i] in border_chars:
-                        # Border character - apply border colors
+                        # Border character - apply border colors (background first!)
                         border_combo = ''
-                        if border_color:
-                            border_combo += border_color
                         if bg_color:
-                            border_combo += bg_color
+                            border_combo += bg_color  # Background first
+                        if border_color:
+                            border_combo += border_color  # Then border color
                         
                         if border_combo:
                             result += f"{border_combo}{part[i]}\033[0m"
@@ -613,8 +613,8 @@ class _BoxGenerator:
             # No box background needed, or already has background
             return ansi_code
         
-        # RECALCULATE: combine the text color with box background
-        return f"{ansi_code}{box_bg_color}"
+        # RECALCULATE: combine the box background with text color (background first!)
+        return f"{box_bg_color}{ansi_code}"
     
     def _recalculate_text_chunk_colors(self, current_text_color: str, current_bg_color: str, box_bg_color: str) -> str:
         """
