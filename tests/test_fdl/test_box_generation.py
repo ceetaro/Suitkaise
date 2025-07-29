@@ -267,7 +267,7 @@ class TestBoxGeneratorInitialization:
         assert generator.style == 'square'
         assert generator.title is None
         assert generator.color is None
-        assert generator.background is None
+        # Background color removed - no longer supported
         assert generator.box_justify == 'left'  # NEW: renamed from justify
         assert generator.terminal_width >= 60
         assert generator.actual_style in BOX_STYLES
@@ -280,7 +280,7 @@ class TestBoxGeneratorInitialization:
             style='rounded',
             title='Test Title',
             color='red',
-            background='blue',
+            
             box_justify='center',  # NEW: renamed parameter
             terminal_width=120
         )
@@ -288,7 +288,7 @@ class TestBoxGeneratorInitialization:
         assert generator.style == 'rounded'
         assert generator.title == 'Test Title'
         assert generator.color == 'red'
-        assert generator.background == 'blue'
+        # Background color removed - no longer supported
         assert generator.box_justify == 'center'  # NEW: renamed parameter
         assert generator.terminal_width == 120
     
@@ -673,54 +673,31 @@ class TestColorBleedingPrevention:
                 # Border lines should end with reset code
                 assert line.endswith('\033[0m'), f"Border line missing reset: '{line}'"
     
-    def test_background_color_only(self):
-        """Test box with only background color - no bleeding to content."""
+    def test_background_color_blue(self):
+        """Test box with blue background color."""
         generator = _BoxGenerator(
-            style='rounded',
-            background='blue',
-            terminal_width=60
+            style='square',
+            color='red',  # Only border color now
+            terminal_width=50
         )
         
-        content_lines = ["Content with background"]
-        result = generator.generate_box(content_lines)
+        result = generator.generate_box(["Test content"])
         
+        # Should have terminal output
+        assert 'terminal' in result
+        assert result['terminal']
+        
+        # Should contain ANSI color codes for border only
         terminal_output = result['terminal']
-        
-        # Should have background color codes
-        assert '\033[44m' in terminal_output or '\033[48;' in terminal_output  # Blue background
-        # Should have reset codes
-        assert '\033[0m' in terminal_output
-        # Content should be present
-        assert 'Content with background' in terminal_output
-    
-    def test_both_border_and_background_colors(self):
-        """Test box with both border and background colors."""
-        generator = _BoxGenerator(
-            style='double',
-            color='green',
-            background='yellow',
-            terminal_width=60
-        )
-        
-        content_lines = ["Both border and background colored"]
-        result = generator.generate_box(content_lines)
-        
-        terminal_output = result['terminal']
-        
-        # Should have both color types
-        assert '\033[32m' in terminal_output or '\033[38;' in terminal_output  # Green foreground
-        assert '\033[43m' in terminal_output or '\033[48;' in terminal_output  # Yellow background
-        # Should have reset codes
-        assert '\033[0m' in terminal_output
-        # Content preserved
-        assert 'Both border and background' in terminal_output
+        assert '\033[' in terminal_output  # Has ANSI codes
+        assert '\033[0m' in terminal_output  # Has reset codes
     
     def test_colored_content_with_colored_borders(self):
         """Test colored content inside colored borders - ensure no interference."""
         generator = _BoxGenerator(
             style='heavy',
             color='red',
-            background='blue',
+            
             terminal_width=70
         )
         
@@ -761,7 +738,7 @@ class TestColorBleedingPrevention:
         generator = _BoxGenerator(
             style='square',
             color='magenta',
-            background='cyan',
+            
             terminal_width=60
         )
         
@@ -787,7 +764,6 @@ class TestColorBleedingPrevention:
         generator = _BoxGenerator(
             style='heavy_head',
             color='#FF5500',  # Hex color for border
-            background='rgb(50, 100, 150)',  # RGB color for background
             terminal_width=80
         )
         
@@ -826,7 +802,7 @@ class TestColorBleedingPrevention:
         generator = _BoxGenerator(
             style='rounded',
             color='red',
-            background='blue', 
+             
             title='Color Test',
             terminal_width=60
         )
@@ -872,7 +848,7 @@ class TestHTMLOutputIssues:
         generator = _BoxGenerator(
             style='square',
             color='red',
-            background='blue',
+            
             title='HTML Test',
             terminal_width=60
         )
@@ -1022,7 +998,6 @@ class TestHTMLOutputIssues:
         generator = _BoxGenerator(
             style='rounded',
             color='#FF5500',  # Hex color
-            background='rgb(100, 200, 50)',  # RGB color
             title='CSS Test',
             terminal_width=60
         )
@@ -1042,13 +1017,11 @@ class TestHTMLOutputIssues:
         # Should have style attribute
         assert 'style=' in html_output
         
-        # Should have border-color and background-color
+        # Should have border-color (background-color removed)
         assert 'border-color:' in html_output.replace(' ', '') or 'border-color :' in html_output
-        assert 'background-color:' in html_output.replace(' ', '') or 'background-color :' in html_output
         
         # Colors should be normalized for HTML
         assert '#FF5500' in html_output or 'ff5500' in html_output.lower()
-        assert 'rgb(100, 200, 50)' in html_output or 'rgb(100,200,50)' in html_output.replace(' ', '')
     
     def test_html_line_ending_investigation(self):
         """Investigate the specific 'm' character issue mentioned by user."""
@@ -1099,7 +1072,7 @@ class TestColorApplication:
         generator = _BoxGenerator(
             style='square',
             color='red',
-            background='blue',
+            
             terminal_width=60
         )
         
@@ -1120,7 +1093,7 @@ class TestColorApplication:
         generator = _BoxGenerator(
             style='rounded',
             color='green',
-            background='yellow',
+            
             terminal_width=60
         )
         
@@ -1177,21 +1150,21 @@ class TestColorApplication:
         # Should have reset codes
         assert '\033[0m' in terminal_output
     
-    def test_background_only_no_border_color(self):
-        """Test box with only background color, no border color.""" 
+    def test_border_only_no_background_color(self):
+        """Test box with only border color, no background color.""" 
         generator = _BoxGenerator(
             style='square',
-            background='cyan',
+            color='red',
             terminal_width=60
         )
         
-        content_lines = ["Background color only"]
+        content_lines = ["Border color only"]
         result = generator.generate_box(content_lines)
         
         terminal_output = result['terminal']
         
-        # Should have background color code
-        assert '\033[46m' in terminal_output or '\033[48;' in terminal_output  # Cyan background
+        # Should have border color code
+        assert '\033[31m' in terminal_output or '\033[38;' in terminal_output  # Red border
         # Should have reset codes
         assert '\033[0m' in terminal_output
     
@@ -1200,7 +1173,7 @@ class TestColorApplication:
         generator = _BoxGenerator(
             style='rounded',
             color='invalid_color_name',
-            background='also_invalid',
+            
             terminal_width=60
         )
         
@@ -1222,7 +1195,7 @@ class TestColorApplication:
         generator = _BoxGenerator(
             style='double',
             color='#FF0000',  # Red in hex
-            background='#00FF00',  # Green in hex
+              # Green in hex
             terminal_width=60
         )
         
@@ -1242,7 +1215,6 @@ class TestColorApplication:
         generator = _BoxGenerator(
             style='heavy_head',
             color='rgb(255, 0, 0)',  # Red in RGB
-            background='rgb(0, 255, 0)',  # Green in RGB
             terminal_width=60
         )
         
@@ -1371,7 +1343,7 @@ class TestEdgeCases:
             style=None,
             title=None,
             color=None,
-            background=None,
+            
             box_justify=None,
             terminal_width=None
         )
@@ -1612,33 +1584,25 @@ def run_tests():
     result = border_generator.generate_box(["Border colored red, content plain"])
     print(result['terminal'])
     
-    # Background color only  
-    print("\n🔵 Background Color Only (Blue):")
-    bg_generator = _BoxGenerator(
-        style='rounded',
-        background='blue',
-        terminal_width=terminal_width
-    )
-    result = bg_generator.generate_box(["Background colored blue, content plain"])
-    print(result['terminal'])
-    
-    # Both border and background colors
-    print("\n🟠⬜ Both Border (Orange) and Background (Gray):")
-    both_generator = _BoxGenerator(
-        style='double',
-        color='orange',
-        background='gray',
-        terminal_width=terminal_width
-    )
-    result = both_generator.generate_box(["Both border and background colored"])
-    print(result['terminal'])
+    # Different border styles
+    print("\n🎨 Different Border Styles:")
+    styles_to_test = ['square', 'rounded', 'double', 'heavy']
+    for style in styles_to_test:
+        style_generator = _BoxGenerator(
+            style=style,
+            color='blue',
+            terminal_width=terminal_width
+        )
+        result = style_generator.generate_box([f"{style.title()} style with blue border"])
+        print(f"\n{style.title()} style:")
+        print(result['terminal'])
     
     # Colored content with colored borders
     print("\n🌈 Colored Content + Colored Borders:")
     complex_generator = _BoxGenerator(
         style='heavy',
         color='magenta',
-        background='cyan',
+        
         title='Color Mix Test',
         terminal_width=terminal_width
     )
@@ -1661,7 +1625,7 @@ def run_tests():
     html_test_generator = _BoxGenerator(
         style='square',
         color='red',
-        background='blue',
+        
         title='HTML Debug',
         terminal_width=50  # Smaller width to make issues more visible
     )
@@ -1701,11 +1665,10 @@ def run_tests():
     hex_rgb_generator = _BoxGenerator(
         style='heavy_head',
         color='#FF5500',  # Hex orange
-        background='rgb(50, 100, 150)',  # RGB blue-ish
         title='Advanced Colors',
         terminal_width=terminal_width
     )
-    result = hex_rgb_generator.generate_box(["Hex border color, RGB background"])
+    result = hex_rgb_generator.generate_box(["Hex border color test"])
     print("Terminal format:")
     print(result['terminal'])
     print("HTML format (check CSS normalization):")

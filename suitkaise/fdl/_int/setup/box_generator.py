@@ -450,8 +450,8 @@ class _BoxGenerator:
     
     def _apply_colors_span_based(self, line: str, border_color: str) -> str:
         """
-        Apply colors using optimized span-based approach with proper ordering.
-        Background colors are always applied before foreground colors to prevent warping.
+        Apply colors using simplified approach - only color border characters.
+        All text colors are preserved exactly as-is.
         """
         if not line:
             return ""
@@ -465,17 +465,10 @@ class _BoxGenerator:
                 continue
             
             if part.startswith('\x1B'):
-                # ANSI escape sequence
-                if '\033[0m' in part:
-                    result += part
-                elif '\033[3' in part or '\033[1m' in part:  # Text color or bold
-                    result += part
-                elif '\033[4' in part:  # Background color
-                    result += part
-                else:
-                    result += part
+                # ANSI escape sequence - preserve exactly as-is
+                result += part
             else:
-                # Text content - process efficiently
+                # Text content - only color border characters
                 result += self._process_text_content(part, border_color)
         
         return result
