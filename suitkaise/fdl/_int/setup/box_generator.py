@@ -192,7 +192,7 @@ class _BoxGenerator:
             'terminal': self._format_for_terminal(justified_box_lines),
             'plain': self._format_for_plain(justified_box_lines),
             'markdown': self._format_for_markdown(justified_box_lines),
-            'html': self._format_for_html_with_escaping(content_lines, justified_box_lines)
+            'html': self._format_for_html(content_lines, justified_box_lines)
         }
     
     def _calculate_box_width(self, content_lines: List[str]) -> int:
@@ -546,7 +546,7 @@ class _BoxGenerator:
         plain_lines = [_ANSI_PATTERN.sub('', line) for line in box_lines]
         return '```\n' + '\n'.join(plain_lines) + '\n```'
     
-    def _format_for_html_with_escaping(self, original_content: List[str], box_lines: List[str]) -> str:
+    def _format_for_html(self, original_content: List[str], box_lines: List[str]) -> str:
         """
         Format box for HTML output with proper entity escaping.
         Rebuilds the box with escaped content to ensure consistent sizing.
