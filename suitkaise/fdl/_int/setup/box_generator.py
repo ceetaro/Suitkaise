@@ -526,10 +526,9 @@ class _BoxGenerator:
     
     def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str, border_chars: set) -> str:
         """
-        Apply colors using dynamic ANSI recalculation approach.
-        Each ANSI code is recalculated to combine text color + box background.
+        Apply colors by preserving original text colors and only adding background where needed.
+        NO recalculation - preserve text colors exactly as they are.
         """
-        # Ensure we have a valid line
         if line is None:
             return ""
             
@@ -540,44 +539,25 @@ class _BoxGenerator:
         parts = ansi_pattern.split(line)
         
         result = ""
-        current_text_color = ""  # Current text color (foreground)
-        current_bg_color = ""    # Current background color
+        current_has_bg = False   # Track if current text has background
         
         for part in parts:
             if not part:
                 continue
                 
             if part.startswith('\x1B'):
-                # ANSI escape sequence - RECALCULATE instead of just preserving
+                # ANSI escape sequence - preserve exactly as-is
+                result += part
+                
+                # Track background state
                 if '\033[0m' in part:
-                    # Reset code - recalculate with box background if needed
-                    result += '\033[0m'
-                    if bg_color and not current_bg_color:
-                        # After reset, apply box background
-                        result += bg_color
-                    current_text_color = ""
-                    current_bg_color = ""
-                    
-                elif '\033[3' in part or '\033[1m' in part:  # Text color or bold
-                    # Text color code - RECALCULATE to include box background
-                    current_text_color = part
-                    
-                    # RECALCULATE: combine text color + box background
-                    recalculated_code = self._recalculate_ansi_with_background(
-                        part, bg_color, current_bg_color
-                    )
-                    result += recalculated_code
-                    
+                    # Reset - no longer has background
+                    current_has_bg = False
                 elif '\033[4' in part:  # Background color
-                    # Background color - use as-is, update tracking
-                    result += part
-                    current_bg_color = part
-                    
-                else:
-                    # Other ANSI codes - preserve as-is
-                    result += part
+                    # Text has its own background
+                    current_has_bg = True
             else:
-                # Text content - process in chunks
+                # Text content - apply background only where needed
                 i = 0
                 while i < len(part):
                     if part[i] in border_chars:
@@ -601,25 +581,14 @@ class _BoxGenerator:
                         
                         text_chunk = part[i:j]
                         if text_chunk:
-                            # For text chunks, only apply colors if no recent ANSI recalculation
-                            # Check if we just processed a recalculated ANSI code
-                            if current_text_color and not current_bg_color and bg_color:
-                                # Text color was just recalculated with background - don't duplicate
-                                result += text_chunk
+                            # Only add background if text doesn't have its own background
+                            if bg_color and not current_has_bg:
+                                result += f"{bg_color}{text_chunk}\033[0m"
                             else:
-                                # RECALCULATE colors if needed
-                                chunk_combo = self._recalculate_text_chunk_colors(
-                                    current_text_color, current_bg_color, bg_color
-                                )
-                                
-                                if chunk_combo:
-                                    result += f"{chunk_combo}{text_chunk}\033[0m"
-                                else:
-                                    result += text_chunk
+                                result += text_chunk
                         
                         i = j
         
-        # Ensure we never return None - fallback to original line
         return result if result is not None else line
     
     def _recalculate_ansi_with_background(self, ansi_code: str, box_bg_color: str, current_bg_color: str) -> str:
