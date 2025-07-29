@@ -20,6 +20,44 @@
 
 ---
 
+## 🔥 **CRITICAL - Testing & Integration (HIGHEST PRIORITY)**
+
+### Current Processor Testing & Validation
+- [ ] **CRITICAL**: Test main processor end-to-end with complex FDL strings
+- [ ] **CRITICAL**: Test registry system with all current processors
+- [ ] **CRITICAL**: Test format state management through complete processing cycles
+- [ ] **CRITICAL**: Test element parsing with edge cases and malformed input
+- [ ] **CRITICAL**: Validate sequential processing maintains correct state flow
+
+### Setup Integration & Refactoring
+- [ ] **CRITICAL**: Refactor text command processor to use setup/text_wrapping.py correctly
+- [ ] **CRITICAL**: Refactor text command processor to use setup/color_conversion.py fully
+- [ ] **CRITICAL**: Refactor box command processor to use setup/box_generator.py properly
+- [ ] **CRITICAL**: Refactor layout command processor to use setup/text_justification.py correctly
+- [ ] **CRITICAL**: Refactor all processors to use setup/unicode.py for unicode detection
+- [ ] **CRITICAL**: Refactor all processors to use setup/terminal.py for width detection
+
+### Multi-Format Output Integration
+- [ ] **CRITICAL**: Test and fix plain text output generation in base_element.py
+- [ ] **CRITICAL**: Test and fix markdown output generation in base_element.py
+- [ ] **CRITICAL**: Test and fix HTML output generation in base_element.py
+- [ ] **CRITICAL**: Ensure all processors generate consistent multi-format output
+
+### Progress Bar & Spinner Integration Testing
+- [ ] **CRITICAL**: Test progress bar integration with format state and output streams
+- [ ] **CRITICAL**: Test spinner integration with terminal detection and unicode support
+- [ ] **CRITICAL**: Test thread safety of progress bars and spinners with concurrent processing
+- [ ] **CRITICAL**: Validate progress bar output queuing and terminal blocking behavior
+
+### Error Handling & Edge Cases
+- [ ] **CRITICAL**: Test processor error handling with invalid commands/objects
+- [ ] **CRITICAL**: Test format state error recovery and cleanup
+- [ ] **CRITICAL**: Test registry error handling with missing or broken processors
+- [ ] **CRITICAL**: Test element parsing with malformed brackets and syntax errors
+- [ ] **CRITICAL**: Add comprehensive error messages for debugging processor issues
+
+---
+
 ## 🚧 **IN PROGRESS - Missing Core Components**
 
 ### Public API Layer
@@ -112,10 +150,10 @@
 ## 📋 **IMPLEMENTATION NOTES**
 
 ### Critical Path
-1. **Public API** → **Logging System** → **Error Handling** → **Advanced Features**
-2. Focus on `fdl.print()` and basic logging first
-3. Multi-format output should work alongside terminal output
-4. Table and Format classes are needed for full concept compatibility
+1. **TESTING & INTEGRATION** → **Public API** → **Logging System** → **Error Handling** → **Advanced Features**
+2. **Must validate current processors work correctly before building on top of them**
+3. **Setup integration is critical - processors need to use all helper functions properly**
+4. **Multi-format output must be tested and working before public API**
 
 ### Architecture Strengths
 - Registry system makes adding new processors trivial
@@ -124,7 +162,16 @@
 - Element parsing is robust and extensible
 
 ### Key Dependencies
+- **CRITICAL**: All processors must properly integrate with setup/ helpers
+- **CRITICAL**: Multi-format output must work before public API
 - SKPath integration needed for clean error display
 - Terminal detection and unicode support already solid
 - Color conversion and text processing systems complete
 - Progress bar system ready, just needs public API wrapper
+
+### Testing Strategy
+- **Phase 1**: Test individual processors in isolation
+- **Phase 2**: Test processor integration with setup helpers
+- **Phase 3**: Test complete processing flow end-to-end
+- **Phase 4**: Test multi-format output consistency
+- **Phase 5**: Test edge cases and error handling
