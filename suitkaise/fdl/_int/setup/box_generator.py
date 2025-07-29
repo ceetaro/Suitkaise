@@ -486,10 +486,6 @@ class _BoxGenerator:
         Returns:
             str: Line with proper colors applied
         """
-        # Ensure we always return a string
-        if line is None:
-            return ""
-            
         if not border_color and not bg_color:
             return line
             
@@ -526,13 +522,7 @@ class _BoxGenerator:
                 return line
         
         # Content line - use span-based approach
-        result = self._apply_colors_span_based(line, border_color, bg_color, border_chars)
-        
-        # Ensure we never return None
-        if result is None:
-            return line
-        
-        return result
+        return self._apply_colors_span_based(line, border_color, bg_color, border_chars)
     
     def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str, border_chars: set) -> str:
         """
