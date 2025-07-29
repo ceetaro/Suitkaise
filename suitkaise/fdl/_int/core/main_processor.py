@@ -124,6 +124,9 @@ class _FDLProcessor:
     
     def _apply_final_formatting(self, format_state: _FormatState):
         """Apply final formatting like wrapping and justification."""
+        # Apply text wrapping and justification to all output streams
+        self._apply_wrapping_and_justification(format_state)
+        
         # Add reset codes to appropriate output streams
         if format_state.terminal_output or format_state.queued_terminal_output:
             # Add reset at end to prevent format bleeding
@@ -131,5 +134,38 @@ class _FDLProcessor:
                 format_state.queued_terminal_output.append('\033[0m')
             else:
                 format_state.terminal_output.append('\033[0m')
+    
+    def _apply_wrapping_and_justification(self, format_state: _FormatState):
+        """Apply text wrapping and justification to all output streams."""
+        from ..setup.text_wrapping import _TextWrapper
+        from ..setup.text_justification import _TextJustifier
         
-        # TODO: Add text wrapping and justification here
+        # Get terminal width for consistent formatting
+        terminal_width = format_state.terminal_width
+        
+        # Create wrapper and justifier
+        wrapper = _TextWrapper(width=terminal_width)
+        justifier = _TextJustifier(terminal_width=terminal_width)
+        
+        # Apply to terminal output (main and queued)
+        if format_state.terminal_output:
+            content = ''.join(format_state.terminal_output)
+            if content.strip():  # Only process non-empty content
+                wrapped = wrapper.wrap_text(content)
+                justified = justifier.justify_text(wrapped, format_state.justify or 'left')
+                format_state.terminal_output = [justified]
+        
+        if format_state.queued_terminal_output:
+            content = ''.join(format_state.queued_terminal_output)
+            if content.strip():  # Only process non-empty content
+                wrapped = wrapper.wrap_text(content)
+                justified = justifier.justify_text(wrapped, format_state.justify or 'left')
+                format_state.queued_terminal_output = [justified]
+        
+        # Apply to plain text output (no ANSI codes, but still wrap/justify)
+        if format_state.plain_output:
+            content = ''.join(format_state.plain_output)
+            if content.strip():
+                wrapped = wrapper.wrap_text(content)
+                justified = justifier.justify_text(wrapped, format_state.justify or 'left')
+                format_state.plain_output = [justified]

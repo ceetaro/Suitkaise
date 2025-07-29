@@ -1,7 +1,7 @@
 # processors/commands/_text_commands.py
 from ...core.command_registry import _CommandProcessor, _command_processor
 from ...core.format_state import _FormatState
-from ...setup.color_conversion import _get_named_colors, _is_valid_color
+from ...setup.color_conversion import _get_named_colors, _is_valid_color, _ColorConverter
 
 @_command_processor(priority=10)
 class _TextCommandProcessor(_CommandProcessor):
@@ -10,6 +10,17 @@ class _TextCommandProcessor(_CommandProcessor):
     NAMED_COLORS = _get_named_colors()
     
     TEXT_FORMATTING = {'bold', 'italic', 'underline', 'strikethrough'}
+    
+    # ANSI codes for text formatting
+    FORMATTING_CODES = {
+        'bold': '\033[1m',
+        'italic': '\033[3m', 
+        'underline': '\033[4m',
+        'strikethrough': '\033[9m'
+    }
+    
+    # Create color converter instance
+    _color_converter = _ColorConverter()
     
     @classmethod
     def can_process(cls, command: str) -> bool:
@@ -85,28 +96,40 @@ class _TextCommandProcessor(_CommandProcessor):
         # Reset all formatting
         if command_lower == 'reset':
             format_state.reset_formatting()
+            cls._add_ansi_code(format_state, '\033[0m')  # ANSI reset code
         
         # Text formatting
         elif command_lower in cls.TEXT_FORMATTING:
             setattr(format_state, command_lower, True)
+            ansi_code = cls.FORMATTING_CODES.get(command_lower, '')
+            if ansi_code:
+                cls._add_ansi_code(format_state, ansi_code)
         
         # Named colors
         elif command_lower in cls.NAMED_COLORS:
             format_state.text_color = command_lower
+            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+            cls._add_ansi_code(format_state, ansi_code)
         
         # Hex colors
         elif command_lower.startswith('#') and _is_valid_color(command_lower):
             format_state.text_color = command_lower
+            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+            cls._add_ansi_code(format_state, ansi_code)
         
         # RGB colors
         elif command_lower.startswith('rgb(') and _is_valid_color(command_lower):
             format_state.text_color = command_lower
+            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+            cls._add_ansi_code(format_state, ansi_code)
         
         # Background colors
         elif command_lower.startswith('bkg '):
             bg_color = command[4:].strip()
             if _is_valid_color(bg_color):
                 format_state.background_color = bg_color
+                ansi_code = cls._color_converter.to_ansi_bg(bg_color)
+                cls._add_ansi_code(format_state, ansi_code)
         
         # End commands
         elif command_lower.startswith('end '):
@@ -128,17 +151,60 @@ class _TextCommandProcessor(_CommandProcessor):
         # End text formatting
         if target_lower in cls.TEXT_FORMATTING:
             setattr(format_state, target_lower, False)
+            # Generate ANSI code to turn off specific formatting
+            cls._add_end_formatting_ansi(format_state, target_lower)
         
         # End text colors (named, hex, or rgb)
         elif (target_lower in cls.NAMED_COLORS or 
               target_lower.startswith('#') or 
               target_lower.startswith('rgb(')):
             format_state.text_color = None
+            cls._add_ansi_code(format_state, '\033[39m')  # Reset to default foreground color
         
         # End background colors
         elif target_lower.startswith('bkg'):
             format_state.background_color = None
+            cls._add_ansi_code(format_state, '\033[49m')  # Reset to default background color
         
         # Special case: end all formatting
         elif target_lower in ['all', 'everything']:
             format_state.reset_formatting()
+            cls._add_ansi_code(format_state, '\033[0m')  # ANSI reset code
+    
+    @classmethod
+    def _add_ansi_code(cls, format_state: _FormatState, ansi_code: str):
+        """
+        Add ANSI code to terminal output streams only.
+        
+        Args:
+            format_state: Current format state
+            ansi_code: ANSI escape code to add
+        """
+        # Only add ANSI codes to terminal output, not plain text or other formats
+        if format_state.bar_active:
+            # Add to queued output if progress bar is active
+            format_state.queued_terminal_output.append(ansi_code)
+        else:
+            # Add to normal terminal output
+            format_state.terminal_output.append(ansi_code)
+    
+    @classmethod
+    def _add_end_formatting_ansi(cls, format_state: _FormatState, formatting_type: str):
+        """
+        Add ANSI code to end specific formatting.
+        
+        Args:
+            format_state: Current format state
+            formatting_type: Type of formatting to end
+        """
+        # ANSI codes to end specific formatting
+        end_codes = {
+            'bold': '\033[22m',      # End bold/dim
+            'italic': '\033[23m',    # End italic
+            'underline': '\033[24m', # End underline
+            'strikethrough': '\033[29m'  # End strikethrough
+        }
+        
+        ansi_code = end_codes.get(formatting_type)
+        if ansi_code:
+            cls._add_ansi_code(format_state, ansi_code)
