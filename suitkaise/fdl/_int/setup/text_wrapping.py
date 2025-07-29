@@ -84,7 +84,7 @@ class _TextWrapper:
             
             for line in lines:
                 if not line.strip():
-                    wrapped_lines.append('')
+                    wrapped_lines.append(line)  # Preserve whitespace-only lines as-is
                 else:
                     wrapped_lines.extend(self._wrap_line(line))
             
@@ -104,7 +104,7 @@ class _TextWrapper:
             List[str]: List of wrapped line segments
         """
         if not line.strip():
-            return ['']
+            return [line]  # Preserve whitespace-only lines as-is
         
         # Check if line fits without wrapping
         if self._get_visual_width(line) <= self.width:

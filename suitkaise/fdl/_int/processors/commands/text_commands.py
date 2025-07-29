@@ -35,6 +35,7 @@ class _TextCommandProcessor(_CommandProcessor):
         - Background colors: bkg <color>
         - End commands: end <formatting/color>
         - Reset command: reset
+        - Comma-separated commands: red, bold, etc.
         
         Args:
             command: Command string to check
@@ -42,6 +43,19 @@ class _TextCommandProcessor(_CommandProcessor):
         Returns:
             bool: True if this processor can handle the command
         """
+        command = command.strip().lower()
+        
+        # Handle comma-separated commands
+        if ',' in command:
+            # Split by comma and check each part
+            parts = [part.strip() for part in command.split(',')]
+            return all(cls._can_process_single_command(part) for part in parts)
+        else:
+            return cls._can_process_single_command(command)
+    
+    @classmethod
+    def _can_process_single_command(cls, command: str) -> bool:
+        """Check if a single command (no commas) can be processed."""
         command = command.strip().lower()
         
         # Basic formatting and reset
@@ -84,7 +98,7 @@ class _TextCommandProcessor(_CommandProcessor):
         Process a text formatting command and update format state.
         
         Args:
-            command: Command to process
+            command: Command to process (may be comma-separated)
             format_state: Current format state
             
         Returns:
@@ -93,38 +107,51 @@ class _TextCommandProcessor(_CommandProcessor):
         command = command.strip()
         command_lower = command.lower()
         
+        # Handle comma-separated commands
+        if ',' in command_lower:
+            # Process each command part separately
+            parts = [part.strip() for part in command_lower.split(',')]
+            for part in parts:
+                format_state = cls._process_single_command(part, format_state)
+            return format_state
+        else:
+            return cls._process_single_command(command_lower, format_state)
+    
+    @classmethod
+    def _process_single_command(cls, command: str, format_state: _FormatState) -> _FormatState:
+        """Process a single command (no commas)."""
         # Reset all formatting
-        if command_lower == 'reset':
+        if command == 'reset':
             format_state.reset_formatting()
             cls._add_ansi_code(format_state, '\033[0m')  # ANSI reset code
         
         # Text formatting
-        elif command_lower in cls.TEXT_FORMATTING:
-            setattr(format_state, command_lower, True)
-            ansi_code = cls.FORMATTING_CODES.get(command_lower, '')
+        elif command in cls.TEXT_FORMATTING:
+            setattr(format_state, command, True)
+            ansi_code = cls.FORMATTING_CODES.get(command, '')
             if ansi_code:
                 cls._add_ansi_code(format_state, ansi_code)
         
         # Named colors
-        elif command_lower in cls.NAMED_COLORS:
-            format_state.text_color = command_lower
-            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+        elif command in cls.NAMED_COLORS:
+            format_state.text_color = command
+            ansi_code = cls._color_converter.to_ansi_fg(command)
             cls._add_ansi_code(format_state, ansi_code)
         
         # Hex colors
-        elif command_lower.startswith('#') and _is_valid_color(command_lower):
-            format_state.text_color = command_lower
-            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+        elif command.startswith('#') and _is_valid_color(command):
+            format_state.text_color = command
+            ansi_code = cls._color_converter.to_ansi_fg(command)
             cls._add_ansi_code(format_state, ansi_code)
         
         # RGB colors
-        elif command_lower.startswith('rgb(') and _is_valid_color(command_lower):
-            format_state.text_color = command_lower
-            ansi_code = cls._color_converter.to_ansi_fg(command_lower)
+        elif command.startswith('rgb(') and _is_valid_color(command):
+            format_state.text_color = command
+            ansi_code = cls._color_converter.to_ansi_fg(command)
             cls._add_ansi_code(format_state, ansi_code)
         
         # Background colors
-        elif command_lower.startswith('bkg '):
+        elif command.startswith('bkg '):
             bg_color = command[4:].strip()
             if _is_valid_color(bg_color):
                 format_state.background_color = bg_color
@@ -132,7 +159,7 @@ class _TextCommandProcessor(_CommandProcessor):
                 cls._add_ansi_code(format_state, ansi_code)
         
         # End commands
-        elif command_lower.startswith('end '):
+        elif command.startswith('end '):
             cls._process_end_command(command[4:].strip(), format_state)
         
         return format_state
