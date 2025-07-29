@@ -110,8 +110,8 @@ class _BoxGenerator:
     """
     
     def __init__(self, style: str = 'square', title: Optional[str] = None,
-                 color: Optional[str] = None, background: Optional[str] = None,
-                 box_justify: str = 'left', terminal_width: Optional[int] = None):
+                 color: Optional[str] = None, box_justify: str = 'left', 
+                 terminal_width: Optional[int] = None):
         """
         Initialize optimized box generator.
         
@@ -119,14 +119,12 @@ class _BoxGenerator:
             style: Box style ('square', 'rounded', 'double', 'heavy', 'heavy_head', 'horizontals', 'ascii')
             title: Optional box title (always centered in border)
             color: Optional box border color
-            background: Optional box background color  
             box_justify: Box position justification ('left', 'center', 'right')
             terminal_width: Terminal width for box sizing and justification
         """
         self.style = style or 'square'
         self.title = title
         self.color = color
-        self.background = background
         self.box_justify = box_justify or 'left'
         
         # Get terminal width with fallback
@@ -402,34 +400,32 @@ class _BoxGenerator:
         Returns:
             str: Terminal formatted box
         """
-        if not self.color and not self.background:
+        if not self.color:
             return '\n'.join(box_lines)
         
         # Generate color codes
         border_color_code = _to_ansi_fg(self.color) if self.color else ''
-        bg_color_code = _to_ansi_bg(self.background) if self.background else ''
         
         # Apply colors to each line
         colored_lines = [
-            self._apply_color_to_line(line, border_color_code, bg_color_code)
+            self._apply_color_to_line(line, border_color_code)
             for line in box_lines
         ]
         
         return '\n'.join(colored_lines)
     
-    def _apply_color_to_line(self, line: str, border_color: str, bg_color: str) -> str:
+    def _apply_color_to_line(self, line: str, border_color: str) -> str:
         """
         Apply colors to a line with proper ordering (background before foreground).
         
         Args:
             line: Box line
             border_color: ANSI color code for borders
-            bg_color: ANSI background color code
             
         Returns:
             str: Line with proper colors applied
         """
-        if not border_color and not bg_color:
+        if not border_color:
             return line
         
         if not line.strip():
@@ -447,13 +443,12 @@ class _BoxGenerator:
         
         if is_pure_border:
             # Pure border line - apply colors to everything
-            combined_color = (bg_color or '') + (border_color or '')
-            return f"{combined_color}{line}\033[0m" if combined_color else line
+            return f"{border_color}{line}\033[0m"
         
         # Content line - use optimized span-based approach
-        return self._apply_colors_span_based(line, border_color, bg_color)
+        return self._apply_colors_span_based(line, border_color)
     
-    def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str) -> str:
+    def _apply_colors_span_based(self, line: str, border_color: str) -> str:
         """
         Apply colors using optimized span-based approach with proper ordering.
         Background colors are always applied before foreground colors to prevent warping.
@@ -464,7 +459,6 @@ class _BoxGenerator:
         # Split line into ANSI codes and text parts
         parts = _ANSI_SPLIT_PATTERN.split(line)
         result = ""
-        current_has_bg = False
         
         for part in parts:
             if not part:
@@ -474,35 +468,29 @@ class _BoxGenerator:
                 # ANSI escape sequence
                 if '\033[0m' in part:
                     result += part
-                    current_has_bg = False
                 elif '\033[3' in part or '\033[1m' in part:  # Text color or bold
-                    # Add background BEFORE text color if needed
-                    if bg_color and not current_has_bg:
-                        result += bg_color
                     result += part
                 elif '\033[4' in part:  # Background color
                     result += part
-                    current_has_bg = True
                 else:
                     result += part
             else:
                 # Text content - process efficiently
-                result += self._process_text_content(part, border_color, bg_color, current_has_bg)
+                result += self._process_text_content(part, border_color)
         
         return result
     
-    def _process_text_content(self, text: str, border_color: str, bg_color: str, current_has_bg: bool) -> str:
+    def _process_text_content(self, text: str, border_color: str) -> str:
         """
-        Process text content, applying colors to border characters and background to regular text.
+        Process text content, applying colors only to border characters.
+        Regular text is preserved exactly as-is.
         
         Args:
             text: Text content to process
             border_color: Border color code
-            bg_color: Background color code
-            current_has_bg: Whether text already has background
             
         Returns:
-            str: Processed text with colors applied
+            str: Processed text with colors applied only to borders
         """
         if not text:
             return ""
@@ -512,10 +500,9 @@ class _BoxGenerator:
         
         while i < len(text):
             if text[i] in _BORDER_CHARS:
-                # Border character - apply both colors (background first!)
-                border_combo = (bg_color or '') + (border_color or '')
-                if border_combo:
-                    result += f"{border_combo}{text[i]}\033[0m"
+                # Border character - apply border color
+                if border_color:
+                    result += f"{border_color}{text[i]}\033[0m"
                 else:
                     result += text[i]
                 i += 1
@@ -527,11 +514,8 @@ class _BoxGenerator:
                 
                 text_chunk = text[i:j]
                 if text_chunk:
-                    # Add background to plain text only
-                    if bg_color and not current_has_bg:
-                        result += f"{bg_color}{text_chunk}\033[0m"
-                    else:
-                        result += text_chunk
+                    # Regular text - preserve exactly as-is
+                    result += text_chunk
                 
                 i = j
         
@@ -580,10 +564,6 @@ class _BoxGenerator:
             normalized_color = _normalize_for_html(self.color)
             if normalized_color:
                 styles.append(f"border-color: {normalized_color}")
-        if self.background:
-            normalized_bg = _normalize_for_html(self.background)
-            if normalized_bg:
-                styles.append(f"background-color: {normalized_bg}")
         
         style_attr = f' style="{"; ".join(styles)}"' if styles else ''
         
