@@ -95,10 +95,9 @@ class _LayoutCommandProcessor(_CommandProcessor):
         if current_justify != 'left' and current_justify != direction:
             cls._add_newline_to_outputs(format_state)
         
-        # Apply justification to current content if there's any
-        cls._apply_justification_to_current_content(format_state, direction)
-        
         # Set new justification for future content
+        # Note: Actual justification will be applied by main processor at the end
+        # This ensures proper order: ANSI codes → wrapping → justification
         format_state.justify = direction
         
         return format_state
@@ -140,41 +139,7 @@ class _LayoutCommandProcessor(_CommandProcessor):
             html='<br>\n'
         )
     
-    @classmethod
-    def _apply_justification_to_current_content(cls, format_state: _FormatState, direction: str) -> None:
-        """
-        Apply justification to current content in output streams.
-        
-        Args:
-            format_state: Current format state
-            direction: Justification direction
-        """
-        # Only apply if there's content and we're not in a box (boxes handle their own justification)
-        if format_state.in_box:
-            return
-            
-        justifier = _TextJustifier(terminal_width=format_state.terminal_width)
-        
-        # Apply to terminal output
-        if format_state.terminal_output:
-            content = ''.join(format_state.terminal_output)
-            if content.strip():
-                justified = justifier.justify_text(content, direction)
-                format_state.terminal_output = [justified]
-        
-        # Apply to queued terminal output
-        if format_state.queued_terminal_output:
-            content = ''.join(format_state.queued_terminal_output)
-            if content.strip():
-                justified = justifier.justify_text(content, direction)
-                format_state.queued_terminal_output = [justified]
-        
-        # Apply to plain text output
-        if format_state.plain_output:
-            content = ''.join(format_state.plain_output)
-            if content.strip():
-                justified = justifier.justify_text(content, direction)
-                format_state.plain_output = [justified]
+
 
 
 def _is_layout_command(command: str) -> bool:
