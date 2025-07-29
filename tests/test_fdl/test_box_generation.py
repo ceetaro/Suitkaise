@@ -7,7 +7,7 @@ from unittest.mock import patch, Mock
 from setup_fdl_tests import FDL_INT_PATH
 sys.path.insert(0, str(FDL_INT_PATH))
 
-from setup.box_generator import _BoxGenerator, BOX_STYLES, BOX_CHAR_WIDTHS, _measure_box_char_widths
+from setup.box_generator import _BoxGenerator, BOX_STYLES, _BOX_CHAR_WIDTHS, _measure_box_char_widths
 from setup.terminal import _terminal
 
 
@@ -21,34 +21,34 @@ class TestBoxCharacterWidthMapping:
         
         # Should have width data for all styles
         for style_name in BOX_STYLES.keys():
-            assert style_name in BOX_CHAR_WIDTHS
+            assert style_name in _BOX_CHAR_WIDTHS
             
             # Should have width for all character types
             for char_name in BOX_STYLES[style_name].keys():
-                assert char_name in BOX_CHAR_WIDTHS[style_name]
-                width = BOX_CHAR_WIDTHS[style_name][char_name]
+                assert char_name in _BOX_CHAR_WIDTHS[style_name]
+                width = _BOX_CHAR_WIDTHS[style_name][char_name]
                 assert isinstance(width, int)
                 assert width >= 0  # Width should be non-negative
     
     def test_ascii_characters_width_one(self):
         """Test that ASCII box characters have width 1."""
-        ascii_widths = BOX_CHAR_WIDTHS['ascii']
+        ascii_widths = _BOX_CHAR_WIDTHS['ascii']
         
         for char_name, width in ascii_widths.items():
             assert width == 1, f"ASCII character '{char_name}' should have width 1, got {width}"
     
     def test_width_measurement_consistency(self):
         """Test that width measurements are consistent."""
-        global BOX_CHAR_WIDTHS
+        global _BOX_CHAR_WIDTHS
         # Re-measure and compare
-        original_widths = BOX_CHAR_WIDTHS.copy()
+        original_widths = _BOX_CHAR_WIDTHS.copy()
         
         # Clear and re-measure
-        BOX_CHAR_WIDTHS.clear()
+        _BOX_CHAR_WIDTHS.clear()
         _measure_box_char_widths()
         
         # Should be identical
-        assert BOX_CHAR_WIDTHS == original_widths
+        assert _BOX_CHAR_WIDTHS == original_widths
 
 
 class TestBoxStyles:

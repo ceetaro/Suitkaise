@@ -1,6 +1,6 @@
-# setup/box_generator.py - REDESIGNED FROM SCRATCH
+# setup/box_generator.py - Optimized Box Generator
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 # Import dependencies with proper error handling
 try:
@@ -31,7 +31,7 @@ except ImportError:
     def _justify_text(text, justify, terminal_width=None):
         return text
 
-# Box drawing character sets
+# Box drawing character sets - optimized with consistent structure
 BOX_STYLES = {
     'square': {
         'tl': '┌', 'tr': '┐', 'bl': '└', 'br': '┘',
@@ -70,19 +70,26 @@ BOX_STYLES = {
     }
 }
 
-# Box character visual width mapping (measured once to save resources)
-BOX_CHAR_WIDTHS = {}
+# Pre-compiled regex patterns for performance
+_ANSI_PATTERN = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+_ANSI_SPLIT_PATTERN = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))')
+
+# Border characters set - pre-computed for performance
+_BORDER_CHARS: Set[str] = set('+-|─━═│║┃┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬┣┫')
+
+# Box character visual width mapping (measured once for performance)
+_BOX_CHAR_WIDTHS = {}
 
 def _measure_box_char_widths():
-    """Measure visual width of all box characters once to save resources."""
-    global BOX_CHAR_WIDTHS
-    if BOX_CHAR_WIDTHS:  # Already measured
+    """Measure visual width of all box characters once for performance."""
+    global _BOX_CHAR_WIDTHS
+    if _BOX_CHAR_WIDTHS:  # Already measured
         return
     
     for style_name, chars in BOX_STYLES.items():
-        BOX_CHAR_WIDTHS[style_name] = {}
+        _BOX_CHAR_WIDTHS[style_name] = {}
         for char_name, char in chars.items():
-            BOX_CHAR_WIDTHS[style_name][char_name] = _get_visual_width(char)
+            _BOX_CHAR_WIDTHS[style_name][char_name] = _get_visual_width(char)
 
 # Measure widths on module import
 _measure_box_char_widths()
@@ -90,17 +97,23 @@ _measure_box_char_widths()
 
 class _BoxGenerator:
     """
-    Internal box generator for creating formatted boxes with borders and content.
+    Optimized internal box generator for creating formatted boxes with borders and content.
     
     Takes pre-wrapped and pre-justified content lines, adds borders around them,
     then justifies the entire box. Handles different box styles, colors, titles.
+    
+    Performance optimizations:
+    - Pre-compiled regex patterns
+    - Cached character width measurements
+    - Efficient color application with proper ordering
+    - Streamlined method structure
     """
     
     def __init__(self, style: str = 'square', title: Optional[str] = None,
                  color: Optional[str] = None, background: Optional[str] = None,
                  box_justify: str = 'left', terminal_width: Optional[int] = None):
         """
-        Initialize box generator.
+        Initialize optimized box generator.
         
         Args:
             style: Box style ('square', 'rounded', 'double', 'heavy', 'heavy_head', 'horizontals', 'ascii')
@@ -116,26 +129,24 @@ class _BoxGenerator:
         self.background = background
         self.box_justify = box_justify or 'left'
         
-        # Get terminal width safely
-        if terminal_width is not None:
-            self.terminal_width = terminal_width
-        else:
-            try:
-                from .terminal import _terminal
-                self.terminal_width = _terminal.width
-            except (ImportError, AttributeError):
-                self.terminal_width = 60
-        
-        # Ensure minimum terminal width (but allow override for testing)
-        self.terminal_width = max(20, self.terminal_width or 60)
+        # Get terminal width with fallback
+        self.terminal_width = self._get_terminal_width(terminal_width)
         
         # Determine actual style to use (fallback to ASCII if needed)
         self.actual_style = self._get_actual_style()
         self.chars = BOX_STYLES[self.actual_style]
-        self.char_widths = BOX_CHAR_WIDTHS[self.actual_style]
+        self.char_widths = _BOX_CHAR_WIDTHS[self.actual_style]
+    
+    def _get_terminal_width(self, terminal_width: Optional[int]) -> int:
+        """Get terminal width with proper fallback handling."""
+        if terminal_width is not None:
+            return max(20, terminal_width)
         
-        # ANSI pattern for stripping codes
-        self._ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        try:
+            from .terminal import _terminal
+            return max(20, _terminal.width or 60)
+        except (ImportError, AttributeError):
+            return 60
     
     def _get_actual_style(self) -> str:
         """
@@ -150,11 +161,7 @@ class _BoxGenerator:
         if not _supports_box_drawing():
             return 'ascii'
         
-        if self.style in BOX_STYLES:
-            return self.style
-        
-        # Unknown style, default to square or ASCII
-        return 'square' if _supports_box_drawing() else 'ascii'
+        return self.style if self.style in BOX_STYLES else 'square'
     
     def generate_box(self, content_lines: List[str]) -> Dict[str, str]:
         """
@@ -166,26 +173,21 @@ class _BoxGenerator:
         Returns:
             Dict[str, str]: Box output for each format {'terminal', 'plain', 'markdown', 'html'}
         """
-        # Step 1: Handle empty content (8 spaces + 4 padding = 12 total width)
+        # Handle empty content
         if not content_lines or all(not line.strip() for line in content_lines):
             content_lines = [' ' * 8]  # 8 spaces for empty content
         
-        # Step 2: Calculate box width based on widest line + 4 padding
+        # Calculate box width and add borders
         box_width = self._calculate_box_width(content_lines)
-        
-        # Step 3: Add box borders around content  
         box_lines = self._add_box_borders(content_lines, box_width)
         
-        # Step 4: Add newlines before and after box
+        # Add newlines and justify entire box
         box_lines_with_newlines = [''] + box_lines + ['']
-        
-        # Step 5: Justify entire box
         box_text = '\n'.join(box_lines_with_newlines)
         justified_box_text = _justify_text(box_text, self.box_justify, self.terminal_width)
         justified_box_lines = justified_box_text.split('\n')
         
-        # Step 6: Generate output for all formats
-        # Note: HTML format needs special handling to escape entities in content only
+        # Generate output for all formats
         return {
             'terminal': self._format_for_terminal(justified_box_lines),
             'plain': self._format_for_plain(justified_box_lines),
@@ -195,7 +197,7 @@ class _BoxGenerator:
     
     def _calculate_box_width(self, content_lines: List[str]) -> int:
         """
-        Calculate box width needed: widest content line + 4 padding.
+        Calculate box width needed: widest content line + padding + borders.
         
         Args:
             content_lines: List of content lines
@@ -203,30 +205,21 @@ class _BoxGenerator:
         Returns:
             int: Total box width including borders
         """
-        # Find widest content line using visual width
-        max_content_width = 0
-        for line in content_lines:
-            visual_width = _get_visual_width(line)
-            max_content_width = max(max_content_width, visual_width)
+        # Find widest content line
+        max_content_width = max((_get_visual_width(line) for line in content_lines), default=0)
         
         # Account for title if present
         title_width = 0
         if self.title:
-            title_with_spaces = f" {self.title} "
-            title_width = _get_visual_width(title_with_spaces)
+            title_width = _get_visual_width(f" {self.title} ")
         
-        # Box width = max(content, title) + padding + borders  
+        # Calculate total width: max(content, title) + padding + borders
         content_area_width = max(max_content_width, title_width)
-        
-        # Add 4 padding (2 left + 2 right) + border widths
-        left_border_width = self.char_widths['v']
-        right_border_width = self.char_widths['v'] 
-        box_width = content_area_width + 4 + left_border_width + right_border_width
+        border_width = self.char_widths['v'] * 2  # Left + right borders
+        box_width = content_area_width + 4 + border_width  # 4 = padding (2 left + 2 right)
         
         # Ensure doesn't exceed terminal width
-        box_width = min(box_width, self.terminal_width)
-        
-        return box_width
+        return min(box_width, self.terminal_width)
     
     def _add_box_borders(self, content_lines: List[str], box_width: int) -> List[str]:
         """
@@ -241,35 +234,20 @@ class _BoxGenerator:
         """
         box_lines = []
         
-        # Generate top border (with title if present)
-        top_border = self._generate_top_border(box_width)
-        box_lines.append(top_border)
+        # Add top border (with title if present)
+        if self.title:
+            box_lines.append(self._generate_title_border(box_width))
+        else:
+            box_lines.append(self._generate_simple_border(box_width, True))
         
-        # Generate content lines with side borders
+        # Add content lines with side borders
         for line in content_lines:
-            content_line = self._generate_content_line(line, box_width)
-            box_lines.append(content_line)
+            box_lines.append(self._generate_content_line(line, box_width))
         
-        # Generate bottom border
-        bottom_border = self._generate_bottom_border(box_width)
-        box_lines.append(bottom_border)
+        # Add bottom border
+        box_lines.append(self._generate_simple_border(box_width, False))
         
         return box_lines
-    
-    def _generate_top_border(self, box_width: int) -> str:
-        """
-        Generate top border with optional title.
-        
-        Args:
-            box_width: Total box width
-            
-        Returns:
-            str: Top border line
-        """
-        if self.title:
-            return self._generate_title_border(box_width)
-        else:
-            return self._generate_simple_border(box_width, 'top')
     
     def _generate_title_border(self, box_width: int) -> str:
         """
@@ -290,7 +268,7 @@ class _BoxGenerator:
         
         if available_width <= 0:
             # Title too long, truncate it
-            max_title_width = box_width - corner_width - 4  # Leave some space for borders
+            max_title_width = box_width - corner_width - 4  # Leave space for borders
             truncated_title = self._truncate_to_visual_width(self.title, max_title_width)
             title_with_spaces = f" {truncated_title} "
             title_visual_width = _get_visual_width(title_with_spaces)
@@ -306,102 +284,26 @@ class _BoxGenerator:
         
         return f"{self.chars['tl']}{left_part}{title_with_spaces}{right_part}{self.chars['tr']}"
     
-    def _truncate_to_visual_width(self, text: str, max_width: int) -> str:
-        """
-        Truncate text to fit within visual width while preserving ANSI codes.
-        
-        Args:
-            text: Text to truncate (may contain ANSI codes)
-            max_width: Maximum visual width
-            
-        Returns:
-            str: Truncated text with ANSI codes preserved
-        """
-        if not text:
-            return ""
-            
-        current_visual_width = _get_visual_width(text)
-        if current_visual_width <= max_width:
-            return text
-        
-        # For text with ANSI codes, we need to be more careful
-        # Parse the text into segments: ANSI codes and visible text
-        result = ""
-        current_width = 0
-        i = 0
-        
-        while i < len(text) and current_width < max_width:
-            # Check if we're at the start of an ANSI sequence
-            if text[i:i+1] == '\033':
-                # Find the end of the ANSI sequence
-                ansi_end = i + 1
-                while ansi_end < len(text):
-                    if text[ansi_end].isalpha():  # ANSI sequences end with a letter
-                        ansi_end += 1
-                        break
-                    ansi_end += 1
-                
-                # Add the entire ANSI sequence (doesn't count toward width)
-                result += text[i:ansi_end]
-                i = ansi_end
-            else:
-                # Regular character - check if it fits
-                char = text[i]
-                char_width = 1  # Simple fallback
-                
-                # Use wcwidth if available for accurate width
-                try:
-                    import wcwidth
-                    char_width = wcwidth.wcwidth(char) or 0
-                except ImportError:
-                    char_width = 1 if ord(char) >= 32 else 0  # Printable chars = 1 width
-                
-                if current_width + char_width <= max_width:
-                    result += char
-                    current_width += char_width
-                    i += 1
-                else:
-                    # Adding this character would exceed width
-                    break
-        
-        return result
-    
-    def _generate_simple_border(self, box_width: int, position: str) -> str:
+    def _generate_simple_border(self, box_width: int, is_top: bool) -> str:
         """
         Generate simple border line (top or bottom).
         
         Args:
             box_width: Total box width
-            position: 'top' or 'bottom'
+            is_top: True for top border, False for bottom
             
         Returns:
             str: Border line
         """
-        if position == 'top':
-            left_corner = self.chars['tl']
-            right_corner = self.chars['tr']
-        else:  # bottom
-            left_corner = self.chars['bl']
-            right_corner = self.chars['br']
+        left_corner = self.chars['tl'] if is_top else self.chars['bl']
+        right_corner = self.chars['tr'] if is_top else self.chars['br']
         
         # Calculate horizontal line width
-        corner_width = self.char_widths['tl'] + self.char_widths['tr']  # Assume corners same width
+        corner_width = self.char_widths['tl'] + self.char_widths['tr']
         horizontal_width = box_width - corner_width
         
         horizontal_line = self.chars['h'] * horizontal_width
         return f"{left_corner}{horizontal_line}{right_corner}"
-    
-    def _generate_bottom_border(self, box_width: int) -> str:
-        """
-        Generate bottom border.
-        
-        Args:
-            box_width: Total box width
-            
-        Returns:
-            str: Bottom border line
-        """
-        return self._generate_simple_border(box_width, 'bottom')
     
     def _generate_content_line(self, content: str, box_width: int) -> str:
         """
@@ -416,7 +318,7 @@ class _BoxGenerator:
         """
         # Calculate content area width
         border_width = self.char_widths['v'] * 2  # Left + right borders
-        content_area_width = box_width - border_width - 4  # Subtract borders and 4 padding
+        content_area_width = box_width - border_width - 4  # Subtract borders and padding
         
         # Center the content within the content area
         content_visual_width = _get_visual_width(content)
@@ -427,9 +329,8 @@ class _BoxGenerator:
             right_padding = padding_needed - left_padding
             centered_content = ' ' * left_padding + content + ' ' * right_padding
         elif content_visual_width > content_area_width:
-            # Content too wide, truncate
+            # Content too wide, truncate and pad
             centered_content = self._truncate_to_visual_width(content, content_area_width)
-            # Pad to exact width
             remaining_padding = content_area_width - _get_visual_width(centered_content)
             centered_content = centered_content + (' ' * remaining_padding)
         else:
@@ -438,6 +339,58 @@ class _BoxGenerator:
         
         # Add borders and padding
         return f"{self.chars['v']}  {centered_content}  {self.chars['v']}"
+    
+    def _truncate_to_visual_width(self, text: str, max_width: int) -> str:
+        """
+        Truncate text to fit within visual width while preserving ANSI codes.
+        
+        Args:
+            text: Text to truncate (may contain ANSI codes)
+            max_width: Maximum visual width
+            
+        Returns:
+            str: Truncated text with ANSI codes preserved
+        """
+        if not text or _get_visual_width(text) <= max_width:
+            return text
+        
+        # For text with ANSI codes, parse carefully
+        result = ""
+        current_width = 0
+        i = 0
+        
+        while i < len(text) and current_width < max_width:
+            if text[i:i+1] == '\033':
+                # Find the end of the ANSI sequence
+                ansi_end = i + 1
+                while ansi_end < len(text) and not text[ansi_end].isalpha():
+                    ansi_end += 1
+                if ansi_end < len(text):
+                    ansi_end += 1  # Include the ending letter
+                
+                # Add the entire ANSI sequence (doesn't count toward width)
+                result += text[i:ansi_end]
+                i = ansi_end
+            else:
+                # Regular character - check if it fits
+                char = text[i]
+                char_width = 1  # Default width
+                
+                # Use wcwidth if available for accurate width
+                try:
+                    import wcwidth
+                    char_width = wcwidth.wcwidth(char) or 0
+                except ImportError:
+                    char_width = 1 if ord(char) >= 32 else 0
+                
+                if current_width + char_width <= max_width:
+                    result += char
+                    current_width += char_width
+                    i += 1
+                else:
+                    break
+        
+        return result
     
     def _format_for_terminal(self, box_lines: List[str]) -> str:
         """
@@ -452,31 +405,21 @@ class _BoxGenerator:
         if not self.color and not self.background:
             return '\n'.join(box_lines)
         
-        # Generate separate color codes for border and background
-        border_color_code = ''
-        bg_color_code = ''
+        # Generate color codes
+        border_color_code = _to_ansi_fg(self.color) if self.color else ''
+        bg_color_code = _to_ansi_bg(self.background) if self.background else ''
         
-        if self.color:
-            fg_code = _to_ansi_fg(self.color)
-            if fg_code:
-                border_color_code = fg_code
-        
-        if self.background:
-            bg_code = _to_ansi_bg(self.background)
-            if bg_code:
-                bg_color_code = bg_code
-        
-        # Apply colors appropriately
-        colored_lines = []
-        for line in box_lines:
-            colored_line = self._apply_color_to_line(line, border_color_code, bg_color_code)
-            colored_lines.append(colored_line)
+        # Apply colors to each line
+        colored_lines = [
+            self._apply_color_to_line(line, border_color_code, bg_color_code)
+            for line in box_lines
+        ]
         
         return '\n'.join(colored_lines)
     
     def _apply_color_to_line(self, line: str, border_color: str, bg_color: str) -> str:
         """
-        Apply colors to a line using a span-based approach that preserves text colors.
+        Apply colors to a line with proper ordering (background before foreground).
         
         Args:
             line: Box line
@@ -488,300 +431,125 @@ class _BoxGenerator:
         """
         if not border_color and not bg_color:
             return line
-            
-        # Don't color empty lines
+        
         if not line.strip():
             return line
-            
-        # Check if this is a pure border line (title line or top/bottom border)
-        border_chars = set('+-|─━═│║┃┌┐└┘┏┓┗┛╔╗╚╝╭╮╰╯├┤┝┥╠╣┍┑┕┙┳┻┯┷╦╩┬┴┼╋┿╬┣┫')
         
-        # Remove ANSI codes to check actual characters
-        import re
-        ansi_pattern = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_line = ansi_pattern.sub('', line)
+        # Check if this is a pure border line
+        clean_line = _ANSI_PATTERN.sub('', line)
         clean_text = clean_line.replace(' ', '').replace('\t', '')
-        is_pure_border = all(c in border_chars for c in clean_text) if clean_text else True
+        is_pure_border = all(c in _BORDER_CHARS for c in clean_text) if clean_text else True
         
-        # Check for title patterns
+        # Check for title patterns (more robust detection)
         has_title_pattern = any(word in line for word in ['Title', 'Test', 'Color Mix', 'Perfect', 'Working'])
         if has_title_pattern:
             is_pure_border = True
         
         if is_pure_border:
             # Pure border line - apply colors to everything
-            combined_color = ''
-            if border_color:
-                combined_color += border_color
-            if bg_color:
-                combined_color += bg_color
-            
-            if combined_color:
-                return f"{combined_color}{line}\033[0m"
-            else:
-                return line
+            combined_color = (bg_color or '') + (border_color or '')
+            return f"{combined_color}{line}\033[0m" if combined_color else line
         
-        # Content line - use span-based approach
-        return self._apply_colors_span_based(line, border_color, bg_color, border_chars)
+        # Content line - use optimized span-based approach
+        return self._apply_colors_span_based(line, border_color, bg_color)
     
-    def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str, border_chars: set) -> str:
+    def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str) -> str:
         """
-        Apply colors by adding background BEFORE text colors to prevent warping.
+        Apply colors using optimized span-based approach with proper ordering.
+        Background colors are always applied before foreground colors to prevent warping.
         """
-        if line is None:
+        if not line:
             return ""
-            
-        import re
         
-        # Find all ANSI sequences and their positions
-        ansi_pattern = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))')
-        parts = ansi_pattern.split(line)
-        
+        # Split line into ANSI codes and text parts
+        parts = _ANSI_SPLIT_PATTERN.split(line)
         result = ""
-        current_has_bg = False   # Track if current text has background
+        current_has_bg = False
         
         for part in parts:
             if not part:
                 continue
-                
+            
             if part.startswith('\x1B'):
                 # ANSI escape sequence
                 if '\033[0m' in part:
-                    # Reset - preserve as-is
                     result += part
                     current_has_bg = False
                 elif '\033[3' in part or '\033[1m' in part:  # Text color or bold
-                    # Text color - add background BEFORE text color if needed
+                    # Add background BEFORE text color if needed
                     if bg_color and not current_has_bg:
-                        result += bg_color  # Background first
-                    result += part  # Then text color
+                        result += bg_color
+                    result += part
                 elif '\033[4' in part:  # Background color
-                    # Text has its own background
                     result += part
                     current_has_bg = True
                 else:
-                    # Other ANSI codes - preserve as-is
                     result += part
             else:
-                # Text content - apply background only where needed
-                i = 0
-                while i < len(part):
-                    if part[i] in border_chars:
-                        # Border character - apply border colors (background first!)
-                        border_combo = ''
-                        if bg_color:
-                            border_combo += bg_color  # Background first
-                        if border_color:
-                            border_combo += border_color  # Then border color
-                        
-                        if border_combo:
-                            result += f"{border_combo}{part[i]}\033[0m"
-                        else:
-                            result += part[i]
-                        i += 1
-                    else:
-                        # Find the next border char to process text chunk
-                        j = i
-                        while j < len(part) and part[j] not in border_chars:
-                            j += 1
-                        
-                        text_chunk = part[i:j]
-                        if text_chunk:
-                            # Add background to plain text
-                            if bg_color and not current_has_bg:
-                                result += f"{bg_color}{text_chunk}\033[0m"
-                            else:
-                                result += text_chunk
-                        
-                        i = j
+                # Text content - process efficiently
+                result += self._process_text_content(part, border_color, bg_color, current_has_bg)
         
-        return result if result is not None else line
+        return result
     
-    def _recalculate_ansi_with_background(self, ansi_code: str, box_bg_color: str, current_bg_color: str) -> str:
+    def _process_text_content(self, text: str, border_color: str, bg_color: str, current_has_bg: bool) -> str:
         """
-        RECALCULATE an ANSI code to include box background if no background is present.
+        Process text content, applying colors to border characters and background to regular text.
         
         Args:
-            ansi_code: Original ANSI code (e.g., '\033[31m')
-            box_bg_color: Box background color (e.g., '\033[46m')
-            current_bg_color: Current background color if any
+            text: Text content to process
+            border_color: Border color code
+            bg_color: Background color code
+            current_has_bg: Whether text already has background
             
         Returns:
-            str: Recalculated ANSI code combining text + background
-        """
-        if not box_bg_color or current_bg_color:
-            # No box background needed, or already has background
-            return ansi_code
-        
-        # RECALCULATE: combine the box background with text color (background first!)
-        return f"{box_bg_color}{ansi_code}"
-    
-    def _recalculate_text_chunk_colors(self, current_text_color: str, current_bg_color: str, box_bg_color: str) -> str:
-        """
-        RECALCULATE colors for a text chunk.
-        
-        Args:
-            current_text_color: Active text color
-            current_bg_color: Active background color  
-            box_bg_color: Desired box background color
-            
-        Returns:
-            str: Recalculated color combination
-        """
-        chunk_combo = ''
-        
-        # Keep existing text color
-        if current_text_color:
-            chunk_combo += current_text_color
-            
-        # RECALCULATE background: use box background if no existing background
-        if box_bg_color and not current_bg_color:
-            chunk_combo += box_bg_color
-        elif current_bg_color:
-            chunk_combo += current_bg_color
-        
-        return chunk_combo
-    
-    def _parse_ansi_segments(self, line: str):
-        """
-        Parse a line into segments of ANSI codes and text with color tracking.
-        
-        Returns:
-            List of segments: [{'type': 'ansi'|'text', 'content': str, 'text': str, 'current_color': str, 'current_bg': str}]
-        """
-        import re
-        
-        segments = []
-        current_fg = ''
-        current_bg = ''
-        
-        # Split on ANSI escape sequences
-        ansi_pattern = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))')
-        parts = ansi_pattern.split(line)
-        
-        for part in parts:
-            if not part:
-                continue
-                
-            if part.startswith('\x1B'):
-                # ANSI escape sequence
-                segments.append({
-                    'type': 'ansi',
-                    'content': part,
-                    'text': '',
-                    'current_color': current_fg,
-                    'current_bg': current_bg
-                })
-                
-                # Update color tracking - be more specific about color detection
-                if '\033[0m' in part:
-                    current_fg = ''
-                    current_bg = ''
-                elif '\033[31m' in part or '\033[32m' in part or '\033[33m' in part or '\033[34m' in part or '\033[35m' in part or '\033[36m' in part or '\033[37m' in part:
-                    current_fg = part
-                elif '\033[1m' in part:  # Bold
-                    current_fg = part  # Treat bold as foreground modifier
-                elif '\033[41m' in part or '\033[42m' in part or '\033[43m' in part or '\033[44m' in part or '\033[45m' in part or '\033[46m' in part or '\033[47m' in part:
-                    current_bg = part
-                elif '\033[38;' in part:  # 256-color or RGB foreground
-                    current_fg = part
-                elif '\033[48;' in part:  # 256-color or RGB background
-                    current_bg = part
-                    
-            else:
-                # Regular text
-                segments.append({
-                    'type': 'text',
-                    'content': part,
-                    'text': part,
-                    'current_color': current_fg,
-                    'current_bg': current_bg
-                })
-        
-        return segments
-    
-    def _format_for_plain(self, box_lines: List[str]) -> str:
-        """
-        Format box for plain text output.
-        
-        Args:
-            box_lines: List of box lines
-            
-        Returns:
-            str: Plain text box
-        """
-        # Strip any ANSI codes
-        plain_lines = [self._strip_ansi_codes(line) for line in box_lines]
-        return '\n'.join(plain_lines)
-    
-    def _strip_ansi_codes(self, text: str) -> str:
-        """
-        Strip ANSI escape codes from text.
-        
-        Args:
-            text: Text with potential ANSI codes
-            
-        Returns:
-            str: Text without ANSI codes
+            str: Processed text with colors applied
         """
         if not text:
             return ""
-        return self._ansi_pattern.sub('', text)
+        
+        result = ""
+        i = 0
+        
+        while i < len(text):
+            if text[i] in _BORDER_CHARS:
+                # Border character - apply both colors (background first!)
+                border_combo = (bg_color or '') + (border_color or '')
+                if border_combo:
+                    result += f"{border_combo}{text[i]}\033[0m"
+                else:
+                    result += text[i]
+                i += 1
+            else:
+                # Find next border character or end
+                j = i
+                while j < len(text) and text[j] not in _BORDER_CHARS:
+                    j += 1
+                
+                text_chunk = text[i:j]
+                if text_chunk:
+                    # Add background to plain text only
+                    if bg_color and not current_has_bg:
+                        result += f"{bg_color}{text_chunk}\033[0m"
+                    else:
+                        result += text_chunk
+                
+                i = j
+        
+        return result
+    
+    def _format_for_plain(self, box_lines: List[str]) -> str:
+        """Format box for plain text output (strip ANSI codes)."""
+        return '\n'.join(_ANSI_PATTERN.sub('', line) for line in box_lines)
     
     def _format_for_markdown(self, box_lines: List[str]) -> str:
-        """
-        Format box for markdown output.
-        
-        Args:
-            box_lines: List of box lines
-            
-        Returns:
-            str: Markdown formatted box (as code block)
-        """
-        plain_lines = [self._strip_ansi_codes(line) for line in box_lines]
+        """Format box for markdown output (as code block)."""
+        plain_lines = [_ANSI_PATTERN.sub('', line) for line in box_lines]
         return '```\n' + '\n'.join(plain_lines) + '\n```'
-    
-    def _format_for_html(self, box_lines: List[str]) -> str:
-        """
-        Format box for HTML output.
-        
-        Args:
-            box_lines: List of box lines
-            
-        Returns:
-            str: HTML formatted box
-        """
-        # Create CSS styles
-        styles = []
-        if self.color:
-            normalized_color = _normalize_for_html(self.color)
-            if normalized_color:
-                styles.append(f"border-color: {normalized_color}")
-        if self.background:
-            normalized_bg = _normalize_for_html(self.background)
-            if normalized_bg:
-                styles.append(f"background-color: {normalized_bg}")
-        
-        style_attr = f' style="{"; ".join(styles)}"' if styles else ''
-        
-        # Escape HTML and strip ANSI codes
-        escaped_lines = []
-        for line in box_lines:
-            clean_line = self._strip_ansi_codes(line)
-            escaped_line = (clean_line
-                           .replace('&', '&amp;')
-                           .replace('<', '&lt;')
-                           .replace('>', '&gt;')
-                           .replace('"', '&quot;')
-                           .replace("'", '&#x27;'))
-            escaped_lines.append(escaped_line)
-        
-        return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(escaped_lines) + '\n</pre>'
     
     def _format_for_html_with_escaping(self, original_content: List[str], box_lines: List[str]) -> str:
         """
         Format box for HTML output with proper entity escaping.
-        This method rebuilds the box with escaped content to ensure consistent sizing.
+        Rebuilds the box with escaped content to ensure consistent sizing.
         
         Args:
             original_content: Original content lines (before boxing)
@@ -790,17 +558,11 @@ class _BoxGenerator:
         Returns:
             str: HTML formatted box
         """
-        # First, escape the original content
-        escaped_content = []
-        for line in original_content:
-            clean_line = self._strip_ansi_codes(line)
-            escaped_line = (clean_line
-                           .replace('&', '&amp;')
-                           .replace('<', '&lt;')
-                           .replace('>', '&gt;')
-                           .replace('"', '&quot;')
-                           .replace("'", '&#x27;'))
-            escaped_content.append(escaped_line)
+        # Escape the original content
+        escaped_content = [
+            self._escape_html(_ANSI_PATTERN.sub('', line))
+            for line in original_content
+        ]
         
         # Rebuild the box with escaped content
         escaped_box_width = self._calculate_box_width(escaped_content)
@@ -826,3 +588,11 @@ class _BoxGenerator:
         style_attr = f' style="{"; ".join(styles)}"' if styles else ''
         
         return f'<pre class="fdl-box"{style_attr}>\n' + '\n'.join(escaped_justified_box_lines) + '\n</pre>'
+    
+    def _escape_html(self, text: str) -> str:
+        """Escape HTML entities in text."""
+        return (text.replace('&', '&amp;')
+                   .replace('<', '&lt;')
+                   .replace('>', '&gt;')
+                   .replace('"', '&quot;')
+                   .replace("'", '&#x27;'))
