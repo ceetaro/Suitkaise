@@ -526,8 +526,7 @@ class _BoxGenerator:
     
     def _apply_colors_span_based(self, line: str, border_color: str, bg_color: str, border_chars: set) -> str:
         """
-        Apply colors by preserving original text colors and only adding background to plain spaces.
-        NEVER add background to colored text - only to spaces and uncolored text.
+        Apply colors by adding background BEFORE text colors to prevent warping.
         """
         if line is None:
             return ""
@@ -539,7 +538,6 @@ class _BoxGenerator:
         parts = ansi_pattern.split(line)
         
         result = ""
-        in_colored_text = False  # Track if we're inside colored text
         current_has_bg = False   # Track if current text has background
         
         for part in parts:
@@ -547,23 +545,25 @@ class _BoxGenerator:
                 continue
                 
             if part.startswith('\x1B'):
-                # ANSI escape sequence - preserve exactly as-is
-                result += part
-                
-                # Track state
+                # ANSI escape sequence
                 if '\033[0m' in part:
-                    # Reset - no longer in colored text
-                    in_colored_text = False
+                    # Reset - preserve as-is
+                    result += part
                     current_has_bg = False
                 elif '\033[3' in part or '\033[1m' in part:  # Text color or bold
-                    # Starting colored text - DO NOT add background to this
-                    in_colored_text = True
-                    current_has_bg = False
+                    # Text color - add background BEFORE text color if needed
+                    if bg_color and not current_has_bg:
+                        result += bg_color  # Background first
+                    result += part  # Then text color
                 elif '\033[4' in part:  # Background color
                     # Text has its own background
+                    result += part
                     current_has_bg = True
+                else:
+                    # Other ANSI codes - preserve as-is
+                    result += part
             else:
-                # Text content - apply background only to spaces and uncolored text
+                # Text content - apply background only where needed
                 i = 0
                 while i < len(part):
                     if part[i] in border_chars:
@@ -587,11 +587,10 @@ class _BoxGenerator:
                         
                         text_chunk = part[i:j]
                         if text_chunk:
-                            # CRITICAL: Only add background if NOT in colored text and no existing background
-                            if bg_color and not in_colored_text and not current_has_bg:
+                            # Add background to plain text
+                            if bg_color and not current_has_bg:
                                 result += f"{bg_color}{text_chunk}\033[0m"
                             else:
-                                # Preserve colored text exactly as-is
                                 result += text_chunk
                         
                         i = j
