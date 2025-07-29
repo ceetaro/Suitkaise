@@ -66,6 +66,9 @@ class _FormatState:
     # Layout settings
     justify: Optional[str] = None  # 'left', 'right', 'center'
     
+    # Debug mode settings
+    debug_mode: bool = False
+    
     # Variable handling
     values: Tuple = ()
     value_index: int = 0

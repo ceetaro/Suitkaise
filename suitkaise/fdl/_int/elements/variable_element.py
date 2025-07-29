@@ -50,8 +50,12 @@ class _VariableElement(_ElementProcessor):
             # Get next value from tuple
             value = format_state.get_next_value()
             
-            # Convert to string
-            text_value = str(value)
+            if format_state.debug_mode:
+                # Debug mode - special formatting with type annotations
+                text_value = self._format_debug_value(value)
+            else:
+                # Regular mode - process strings through FDL processor for formatting
+                text_value = self._format_regular_value(value, format_state)
             
             if format_state.in_box:
                 # Inside a box - accumulate content
@@ -72,6 +76,99 @@ class _VariableElement(_ElementProcessor):
                 self._add_to_outputs(format_state, error_text)
             
             return format_state
+    
+    def _format_debug_value(self, value) -> str:
+        """
+        Format a value for debug mode display.
+        
+        Debug mode rules:
+        - All values are bold and italic
+        - Numbers (int, float, complex): cyan
+        - True: standard green  
+        - False: standard red
+        - None: deep ocean blue
+        - Strings: raw display with grayish green quotes
+        - Type annotation in dim gray
+        
+        Args:
+            value: Value to format
+            
+        Returns:
+            str: Formatted debug string
+        """
+        value_type = type(value).__name__
+        
+        # ANSI color codes
+        BOLD_ITALIC = '\033[1;3m'  # Bold + Italic
+        RESET_FORMATTING = '\033[22;23m'  # Reset bold + italic
+        CYAN = '\033[36m'  # Numbers
+        GREEN = '\033[32m'  # True
+        RED = '\033[31m'  # False  
+        BLUE = '\033[34m'  # None (deep ocean blue)
+        GRAYISH_GREEN = '\033[90;32m'  # String quotes (dim + green)
+        DIM_GRAY = '\033[90m'  # Type annotations
+        RESET_COLOR = '\033[39m'  # Reset to default foreground
+        
+        # Format the value based on its type
+        if isinstance(value, bool):
+            # Handle booleans first (before int, since bool is a subclass of int)
+            if value:
+                colored_value = f'{GREEN}{BOLD_ITALIC}True{RESET_FORMATTING}{RESET_COLOR}'
+            else:
+                colored_value = f'{RED}{BOLD_ITALIC}False{RESET_FORMATTING}{RESET_COLOR}'
+        elif isinstance(value, (int, float, complex)):
+            # Numbers: cyan, bold, italic
+            colored_value = f'{CYAN}{BOLD_ITALIC}{value}{RESET_FORMATTING}{RESET_COLOR}'
+        elif value is None:
+            # None: deep ocean blue, bold, italic  
+            colored_value = f'{BLUE}{BOLD_ITALIC}None{RESET_FORMATTING}{RESET_COLOR}'
+        elif isinstance(value, str):
+            # Strings: raw display with grayish green quotes
+            # The string content is not processed for FDL commands
+            colored_value = f'{GRAYISH_GREEN}{BOLD_ITALIC}"{RESET_FORMATTING}{RESET_COLOR}{value}{GRAYISH_GREEN}{BOLD_ITALIC}"{RESET_FORMATTING}{RESET_COLOR}'
+        else:
+            # Other types: cyan (like numbers), bold, italic
+            colored_value = f'{CYAN}{BOLD_ITALIC}{value}{RESET_FORMATTING}{RESET_COLOR}'
+        
+        # Add type annotation in dim gray
+        type_annotation = f' {DIM_GRAY}({value_type}){RESET_COLOR}'
+        
+        return colored_value + type_annotation
+    
+    def _format_regular_value(self, value, format_state: _FormatState) -> str:
+        """
+        Format a value for regular mode display.
+        
+        In regular mode:
+        - Strings are processed through FDL processor for formatting
+        - Other types are converted to string normally
+        
+        Args:
+            value: Value to format
+            format_state: Current format state
+            
+        Returns:
+            str: Formatted value string
+        """
+        if isinstance(value, str):
+            # Process strings through FDL processor to handle embedded formatting
+            from ..core.main_processor import _FDLProcessor
+            processor = _FDLProcessor()
+            
+            # Process the string with the current format state values
+            # We need to create a temporary format state to avoid modifying the current one
+            temp_result = processor.process_string(value, ())
+            
+            # Return just the terminal output without the final reset
+            terminal_output = temp_result.get('terminal', str(value))
+            # Remove the final reset code that's automatically added
+            if terminal_output.endswith('\x1b[0m'):
+                terminal_output = terminal_output[:-4]
+            
+            return terminal_output
+        else:
+            # Non-strings: just convert to string
+            return str(value)
     
     def _is_valid_variable_name(self, name: str) -> bool:
         """
