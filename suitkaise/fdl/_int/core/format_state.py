@@ -206,7 +206,8 @@ class _FormatState:
         self.markdown_output.extend(self.queued_markdown_output)
         self.html_output.extend(self.queued_html_output)
     
-    def add_to_output_streams(self, terminal: str, plain: str, markdown: str, html: str) -> None:
+    def add_to_output_streams(self, terminal: str = '', plain: str = '', 
+                             markdown: str = '', html: str = '') -> None:
         """
         Add content to appropriate output streams (main or queued based on bar state).
         

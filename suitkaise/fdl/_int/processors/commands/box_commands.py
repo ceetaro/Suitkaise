@@ -282,21 +282,25 @@ class _BoxCommandProcessor(_CommandProcessor):
         """
         from ...setup.box_generator import _BoxGenerator
         
-        # Create box generator
+        # Create box generator with updated parameters
         generator = _BoxGenerator(
             style=format_state.box_style,
             title=format_state.box_title,
             color=format_state.box_color,
-            background=format_state.box_background,
-            justify=format_state.justify or 'left',
+            box_justify=format_state.justify or 'left',
             terminal_width=format_state.terminal_width
         )
         
-        # Join all box content
+        # Join all box content and split into lines for the generator
         content = ''.join(format_state.box_content)
         
+        # Wrap the content using text wrapper before passing to box generator
+        from ...setup.text_wrapping import _TextWrapper
+        wrapper = _TextWrapper(width=format_state.terminal_width - 4)  # Account for box borders
+        content_lines = wrapper.wrap_text(content) if content.strip() else [' ']
+        
         # Generate box for all formats
-        return generator.generate_box(content)
+        return generator.generate_box(content_lines)
 
 
 def _is_box_command(command: str) -> bool:

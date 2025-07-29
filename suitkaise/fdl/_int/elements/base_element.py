@@ -67,8 +67,9 @@ class _ElementProcessor(ABC):
             justify = format_state.justify or 'left'
             
             for i, line in enumerate(wrapped_lines):
-                if not line.strip() and i == 0:
-                    continue
+                # Don't skip whitespace-only lines - they preserve spacing
+                # if not line.strip() and i == 0:
+                #     continue
                 
                 if i > 0:
                     # Add newline between wrapped lines

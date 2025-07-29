@@ -124,6 +124,9 @@ class _FDLProcessor:
     
     def _apply_final_formatting(self, format_state: _FormatState):
         """Apply final formatting like wrapping and justification."""
+        # Apply text wrapping and justification to all output streams
+        self._apply_wrapping_and_justification(format_state)
+        
         # Add reset codes to appropriate output streams
         if format_state.terminal_output or format_state.queued_terminal_output:
             # Add reset at end to prevent format bleeding
@@ -131,5 +134,44 @@ class _FDLProcessor:
                 format_state.queued_terminal_output.append('\033[0m')
             else:
                 format_state.terminal_output.append('\033[0m')
+    
+    def _apply_wrapping_and_justification(self, format_state: _FormatState):
+        """
+        Apply text wrapping and justification to all output streams.
         
-        # TODO: Add text wrapping and justification here
+        Correct order: ANSI codes already applied → wrap text → justify text
+        Uses visual width calculations to handle ANSI codes properly.
+        """
+        from ..setup.text_wrapping import _TextWrapper
+        from ..setup.text_justification import _TextJustifier
+        
+        # Get terminal width for consistent formatting
+        terminal_width = format_state.terminal_width
+        
+        # Create wrapper and justifier with same terminal width
+        wrapper = _TextWrapper(width=terminal_width)
+        justifier = _TextJustifier(terminal_width=terminal_width)
+        
+        # Get justification setting
+        justify_mode = format_state.justify or 'left'
+        
+        # Helper function to avoid code duplication
+        def process_output_stream(output_list):
+            """Process a single output stream with wrapping and justification."""
+            if not output_list:
+                return
+            
+            content = ''.join(output_list)
+            if content.strip():  # Only process non-empty content
+                # Step 1: Wrap text (returns list of lines, handles ANSI codes with visual width)
+                wrapped_lines = wrapper.wrap_text(content)
+                # Step 2: Join lines and justify (preserves ANSI codes)
+                wrapped_text = '\n'.join(wrapped_lines)
+                justified = justifier.justify_text(wrapped_text, justify_mode)
+                output_list[:] = [justified]  # Replace contents in-place
+        
+        # Apply to all output streams
+        process_output_stream(format_state.terminal_output)
+        process_output_stream(format_state.queued_terminal_output) 
+        process_output_stream(format_state.plain_output)
+        process_output_stream(format_state.markdown_output)

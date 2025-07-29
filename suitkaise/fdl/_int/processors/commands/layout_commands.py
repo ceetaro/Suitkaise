@@ -1,6 +1,7 @@
 # processors/commands/layout_commands.py
 from ...core.command_registry import _CommandProcessor, _command_processor
 from ...core.format_state import _FormatState
+from ...setup.text_justification import _TextJustifier
 
 
 @_command_processor(priority=15)  # Medium priority for layout commands
@@ -94,7 +95,9 @@ class _LayoutCommandProcessor(_CommandProcessor):
         if current_justify != 'left' and current_justify != direction:
             cls._add_newline_to_outputs(format_state)
         
-        # Set new justification
+        # Set new justification for future content
+        # Note: Actual justification will be applied by main processor at the end
+        # This ensures proper order: ANSI codes → wrapping → justification
         format_state.justify = direction
         
         return format_state
@@ -135,6 +138,8 @@ class _LayoutCommandProcessor(_CommandProcessor):
             markdown='\n',
             html='<br>\n'
         )
+    
+
 
 
 def _is_layout_command(command: str) -> bool:

@@ -7,7 +7,7 @@ from ...core.format_state import _FormatState
 class _TimeObjectProcessor(_ObjectProcessor):
     
     @classmethod
-    def get_supported_types(cls):
+    def get_supported_object_types(cls):
         return {'time', 'date', 'date_words', 'day', 'time_elapsed', 'time_ago', 'time_until'}
     
     @classmethod
