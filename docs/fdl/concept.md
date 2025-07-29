@@ -491,7 +491,7 @@ TRACEBACK (red and bold)
 
 ### - Debug mode adds a type annotation right after the value, so you know what the value is. It also prints strings as is, without any formatting.
 
-![debug mode](suitkaise/_int/_fdl/concept/debug_mode.png "Debug Mode")
+![debug mode](debug_mode.png "Debug Mode")
 
 ```python
 from suitkaise import fdl
@@ -545,9 +545,9 @@ Brackets/parentheses are also bolded. Keys of dicts are bolded and colored the s
 
 Additionally, we sort data in collections by type, and annotate the type after we have listed out all of that collection's values of said type.
 
-![example nested structure](suitkaise/_int/_fdl/concept/nested_structure.png "Nested Structure Example")
+![example nested structure](nested_structure.png "Nested Structure Example")
 
-![6 layered collection](suitkaise/_int/_fdl/concept/too_many_layers.png)
+![6 layered collection](too_many_layers.png)
 
 ```python
 from suitkaise import fdl
