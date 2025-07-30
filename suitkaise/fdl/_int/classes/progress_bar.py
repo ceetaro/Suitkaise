@@ -91,7 +91,20 @@ class _ProgressBar:
         # Setup components (must be before formatting)
         self._progress_bar_generator = _ProgressBarGenerator()
         self._unicode_support = _get_unicode_support()
-        self._terminal = _get_terminal()
+        
+        # Early terminal check with helpful error (terminal-only feature)
+        try:
+            self._terminal = _get_terminal()
+            # Test that we can actually get terminal width
+            _ = self._terminal.width
+        except Exception as e:
+            raise ProgressBarError(
+                "Progress bars require a terminal environment. "
+                "This error typically occurs when running in automated environments, "
+                "CI/CD pipelines, or redirected output. "
+                f"Terminal detection failed: {e}"
+            ) from e
+        
         self._command_registry = _CommandRegistry()
         
         # Formatting (after command registry is initialized)

@@ -9,6 +9,9 @@ from unittest.mock import patch
 # Add the project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+# Enable terminal fallback for progress bar tests
+os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+
 from suitkaise.fdl._int.classes.progress_bar import _ProgressBar, ProgressBarError
 
 
@@ -165,6 +168,15 @@ def test_multi_format_output():
     assert 'terminal' in all_outputs
     assert 'plain' in all_outputs
     assert 'html' in all_outputs
+    
+    # Test that plain and HTML use simple text format
+    assert '[Progress Bar,' in plain_output
+    assert 'stopped 50/100' in plain_output or 'running 50/100' in plain_output
+    assert 'Processing...' in plain_output
+    
+    assert '[Progress Bar,' in html_output
+    assert 'stopped 50/100' in html_output or 'running 50/100' in html_output
+    assert 'Processing...' in html_output
     
     # Test invalid format
     try:

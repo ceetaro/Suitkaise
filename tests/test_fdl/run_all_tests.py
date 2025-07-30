@@ -15,6 +15,9 @@ from typing import List, Tuple, Dict
 # Add the project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+# Enable terminal fallback for progress bar tests in automated environments
+os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+
 
 class TestRunner:
     """Manages running all FDL tests and reporting results."""

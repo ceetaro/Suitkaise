@@ -93,14 +93,8 @@ class _ProgressBarGenerator:
                 current, total, progress, dimensions, format_state, 
                 message, show_percentage, show_numbers, show_rate, elapsed_time
             ),
-            'plain': self._generate_plain_output(
-                current, total, progress, dimensions, message, 
-                show_percentage, show_numbers, show_rate, elapsed_time
-            ),
-            'html': self._generate_html_output(
-                current, total, progress, message, 
-                show_percentage, show_numbers, show_rate, elapsed_time
-            )
+            'plain': self._generate_simple_text_output(current, total, message),
+            'html': self._generate_simple_text_output(current, total, message)
         }
     
     def _calculate_dimensions(self, fixed_width: Optional[int], message: str,
@@ -131,6 +125,32 @@ class _ProgressBarGenerator:
             total_width = bar_width + bracket_space + label_space
         
         return _ProgressBarDimensions(bar_width, total_width, terminal_width)
+    
+    def _generate_simple_text_output(self, current: float, total: float, message: str) -> str:
+        """
+        Generate simple text output for non-terminal formats.
+        
+        Format: [Progress Bar, status n/total] message
+        Examples:
+        - [Progress Bar, completed 150/150] Task finished
+        - [Progress Bar, stopped 68/100] Task interrupted
+        - [Progress Bar, running 45/100] Processing...
+        """
+        # Determine status
+        if current >= total:
+            status = "completed"
+        elif current > 0:
+            status = "stopped"  # Assume stopped if partial progress
+        else:
+            status = "running"  # No progress yet
+        
+        # Format the output
+        progress_text = f"[Progress Bar, {status} {int(current)}/{int(total)}]"
+        
+        if message.strip():
+            return f"{progress_text} {message.strip()}"
+        else:
+            return progress_text
     
     def _generate_terminal_output(self, current: float, total: float, progress: float,
                                  dimensions: _ProgressBarDimensions, 
