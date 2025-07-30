@@ -73,7 +73,7 @@ class _FormatState:
     active_formats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     
     # Variable handling
-    values: List = field(default_factory=list)
+    values: Tuple = ()
     value_index: int = 0
     
     # Terminal information
@@ -99,10 +99,6 @@ class _FormatState:
         """Initialize calculated values after object creation."""
         # Ensure minimum terminal width of 60
         self.terminal_width = max(60, self.terminal_width)
-        
-        # Convert values tuple to list if needed
-        if isinstance(self.values, tuple):
-            self.values = list(self.values)
         
         # Calculate maximum box width
         self.box_width = self._calculate_max_box_width()
@@ -356,7 +352,7 @@ class _FormatState:
         }
 
 
-def _create_format_state(values: Union[Tuple, List] = (), terminal_width: Optional[int] = None) -> _FormatState:
+def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = None) -> _FormatState:
     """
     Private factory function to create a _FormatState with proper initialization.
     
@@ -373,8 +369,6 @@ def _create_format_state(values: Union[Tuple, List] = (), terminal_width: Option
     # Convert values to list if it's a tuple
     if isinstance(values, tuple):
         values = list(values)
-    elif values is None:
-        values = []
     
     return _FormatState(
         values=values,

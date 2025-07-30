@@ -149,7 +149,7 @@ class TestCommandElement:
     def test_command_element_creation(self):
         """Test creating a command element."""
         element = _CommandElement("red")
-        assert element.command == "red"
+        assert element.command_string == "red"
     
     def test_command_element_process(self):
         """Test processing a command element."""

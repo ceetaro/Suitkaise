@@ -160,19 +160,6 @@ class _ObjectRegistry:
         return obj_type in cls._type_to_processor
     
     @classmethod
-    def is_supported(cls, obj_type: str) -> bool:
-        """
-        Alias for is_supported_type for backward compatibility.
-        
-        Args:
-            obj_type: Object type to check
-            
-        Returns:
-            bool: True if the object type is supported
-        """
-        return cls.is_supported_type(obj_type)
-    
-    @classmethod
     def process_object(cls, obj_type: str, variable: Optional[str], 
                       format_state: _FormatState) -> str:
         """

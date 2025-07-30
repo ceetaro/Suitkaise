@@ -96,7 +96,7 @@ class TestObjectRegistry:
         with pytest.raises(ValueError, match="Object types already registered"):
             _ObjectRegistry.register(SecondProcessor)
     
-    def test_is_supported(self):
+    def test_is_supported_type(self):
         """Test checking if object type is supported."""
         class TestProcessor(_ObjectProcessor):
             @classmethod
@@ -109,8 +109,8 @@ class TestObjectRegistry:
         
         _ObjectRegistry.register(TestProcessor)
         
-        assert _ObjectRegistry.is_supported('supported') is True
-        assert _ObjectRegistry.is_supported('unsupported') is False
+        assert _ObjectRegistry.is_supported_type('supported') is True
+        assert _ObjectRegistry.is_supported_type('unsupported') is False
     
     def test_process_object(self):
         """Test processing an object through the registry."""
@@ -233,7 +233,7 @@ class TestObjectProcessorDecorator:
         
         # Should be automatically registered
         assert _ObjectRegistry.is_registered(DecoratedProcessor)
-        assert _ObjectRegistry.is_supported('decorated')
+        assert _ObjectRegistry.is_supported_type('decorated')
     
     def test_decorator_returns_class(self):
         """Test that decorator returns the original class."""
@@ -332,7 +332,7 @@ class TestObjectRegistryEdgeCases:
         
         # First registration should work
         _ObjectRegistry.register(TestProcessor)
-        assert _ObjectRegistry.is_supported('test')
+        assert _ObjectRegistry.is_supported_type('test')
         
         # Second registration should raise error (conflict with itself)
         with pytest.raises(ValueError):

@@ -39,12 +39,6 @@ class _ObjectElement(_ElementProcessor):
         self.obj_type = obj_type.strip()
         self.variable = variable.strip() if variable else None
         
-        # Create content string for backward compatibility
-        if self.variable:
-            self.content = f"{self.obj_type}:{self.variable}"
-        else:
-            self.content = f"{self.obj_type}:"
-        
         # Validate object type is supported through registry
         if not _ObjectRegistry.is_supported_type(self.obj_type):
             raise UnsupportedObjectError(f"Unsupported object type: '{self.obj_type}'")
