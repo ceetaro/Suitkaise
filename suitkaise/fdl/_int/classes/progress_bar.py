@@ -36,6 +36,16 @@ class _ProgressBar:
     - Rate calculation and timing
     - Message display
     - Memory management
+    
+    Recommended Usage:
+        Use update() for normal progress tracking (atomic incrementation):
+        >>> progress = _ProgressBar(total=100, color="green")
+        >>> progress.display()
+        >>> progress.update(25, "Step 1 complete")  # Preferred method
+        >>> progress.update(30, "Step 2 complete")  # Thread-safe increments
+        >>> progress.finish("All done!")
+        
+        Only use set_current() for special cases like checkpoint restoration.
     """
     
     def __init__(self, total: float, color: Optional[str] = None, 
@@ -151,7 +161,10 @@ class _ProgressBar:
     
     def update(self, increment: float, message: str = "") -> None:
         """
-        Update progress by the given increment.
+        Update progress by the given increment (RECOMMENDED for normal progress tracking).
+        
+        This is the preferred method for natural progress updates as it uses atomic
+        incrementation, making it thread-safe and preventing race conditions.
         
         Args:
             increment: Amount to add to current progress
@@ -159,6 +172,13 @@ class _ProgressBar:
             
         Raises:
             RuntimeError: If progress bar has been released
+            
+        Example:
+            >>> progress = _ProgressBar(total=100)
+            >>> progress.display()
+            >>> progress.update(25, "Loading configuration...")  # 0 → 25
+            >>> progress.update(30, "Processing data...")        # 25 → 55
+            >>> progress.update(45, "Finalizing...")             # 55 → 100
         """
         self._check_released()
         
@@ -192,14 +212,30 @@ class _ProgressBar:
     
     def set_current(self, value: float, message: str = "") -> None:
         """
-        Set current progress to a specific value.
+        Set current progress to a specific value (NOT RECOMMENDED for natural progression).
+        
+        This method directly sets the progress value and should only be used for special
+        cases like checkpoint restoration, syncing with external systems, or testing.
+        For normal progress tracking, use update() instead as it provides atomic
+        incrementation and better thread safety.
         
         Args:
-            value: New current value
+            value: New current value (will be clamped to 0-total range)
             message: Optional message to display
             
         Raises:
             RuntimeError: If progress bar has been released
+            
+        Warning:
+            Avoid using this for natural progress updates. Use update() instead.
+            
+        Example (Valid use cases):
+            >>> # Resuming from checkpoint
+            >>> progress.set_current(saved_progress, "Resumed from checkpoint")
+            >>> 
+            >>> # Syncing with external progress system
+            >>> external_pct = get_external_progress() * 100
+            >>> progress.set_current(external_pct, "Synced with external system")
         """
         self._check_released()
         
