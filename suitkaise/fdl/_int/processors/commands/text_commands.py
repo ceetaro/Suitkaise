@@ -120,9 +120,15 @@ class _TextCommandProcessor(_CommandProcessor):
     @classmethod
     def _process_single_command(cls, command: str, format_state: _FormatState) -> _FormatState:
         """Process a single command (no commas)."""
+        # In debug mode, ignore all text formatting commands except reset
+        if format_state.debug_mode and command not in ['reset', 'end all']:
+            # Debug mode strips all formatting from regular text
+            return format_state
+        
         # Reset all formatting
         if command == 'reset':
             format_state.reset_formatting()
+            format_state.debug_mode = False  # Reset also exits debug mode
             cls._add_ansi_code(format_state, '\033[0m')  # ANSI reset code
         
         # Text formatting
@@ -196,6 +202,7 @@ class _TextCommandProcessor(_CommandProcessor):
         # Special case: end all formatting
         elif target_lower in ['all', 'everything']:
             format_state.reset_formatting()
+            format_state.debug_mode = False  # End all also exits debug mode
             cls._add_ansi_code(format_state, '\033[0m')  # ANSI reset code
     
     @classmethod

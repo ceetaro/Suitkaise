@@ -10,12 +10,14 @@ from .text_commands import _TextCommandProcessor
 from .time_commands import _TimeCommandProcessor  
 from .box_commands import _BoxCommandProcessor
 from .layout_commands import _LayoutCommandProcessor
-# from .fmt_commands import _FormatCommandProcessor      # When implemented
-# from .debug_commands import _DebugCommandProcessor     # When implemented
+from .debug_commands import _DebugCommandProcessor
+from .fmt_commands import _FormatCommandProcessor
 
 __all__ = [
     '_TextCommandProcessor',
     '_TimeCommandProcessor', 
     '_BoxCommandProcessor',
     '_LayoutCommandProcessor',
+    '_DebugCommandProcessor',
+    '_FormatCommandProcessor',
 ]

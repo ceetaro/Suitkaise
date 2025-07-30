@@ -92,6 +92,14 @@ class _CommandRegistry:
     _sorted = False
     _lock = threading.RLock()
     
+    def __init__(self):
+        """Initialize command registry instance (uses class-level processors)."""
+        pass  # All functionality is at class level
+    
+    def process_command(self, command: str, format_state: _FormatState) -> _FormatState:
+        """Instance method that delegates to class method."""
+        return _CommandRegistry.process_command(command, format_state)
+    
     @classmethod
     def register(cls, processor_class: Type[_CommandProcessor]) -> None:
         """
@@ -161,7 +169,7 @@ class _CommandRegistry:
             _FormatState: Updated format state
             
         Raises:
-            _UnknownCommandError: If no processor can handle the command
+            UnknownCommandError: If no processor can handle the command
         """
         cls._ensure_sorted()
         
@@ -175,7 +183,7 @@ class _CommandRegistry:
                 return processor_class.process(command, format_state)
         
         # No processor could handle the command
-        raise _UnknownCommandError(f"Unknown command: '{command}'")
+        raise UnknownCommandError(f"Unknown command: '{command}'")
     
     @classmethod
     def get_registered_processors(cls) -> List[Type[_CommandProcessor]]:
@@ -272,10 +280,8 @@ def _command_processor(priority: int = 100):
         if _CommandRegistry.is_registered(processor_class.__name__):
             raise ValueError(f"Processor already registered: {processor_class}")
 
-        # Set priority if not already set
-        if not hasattr(processor_class, 'get_priority'):
-            processor_class._priority = priority
-            processor_class.get_priority = classmethod(lambda cls: cls._priority)
+        # Set priority 
+        processor_class._priority = priority
         
         # Register the processor
         _CommandRegistry.register(processor_class)

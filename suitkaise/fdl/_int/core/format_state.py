@@ -9,7 +9,7 @@ This is internal to the FDL engine and not exposed to users.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Set, TYPE_CHECKING
+from typing import List, Optional, Tuple, Set, Dict, Any, TYPE_CHECKING
 
 # Import terminal detection
 try:
@@ -66,10 +66,15 @@ class _FormatState:
     # Layout settings
     justify: Optional[str] = None  # 'left', 'right', 'center'
     
+    # Debug mode settings
+    debug_mode: bool = False
+    
+    # Active format tracking
+    active_formats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    
     # Variable handling
     values: Tuple = ()
     value_index: int = 0
-    debug_mode: bool = False
     
     # Terminal information
     terminal_width: int = 60
