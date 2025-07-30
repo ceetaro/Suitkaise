@@ -127,7 +127,7 @@ class _ProgressBar:
         
         # Simplified state
         self._pending_increment = 0.0  # Atomic accumulator
-        self._lock = threading.Lock()  # Simple lock
+        self._lock = threading.RLock()  # Reentrant lock
         self._last_display_time = 0.0
         self._is_displayed = False
         self._is_stopped = False
@@ -318,7 +318,7 @@ class _ProgressBarManager:
     """Global manager for progress bar state integration with FDL system."""
     
     _active_bar: Optional[_ProgressBar] = None
-    _lock = threading.Lock()
+    _lock = threading.RLock()
     
     @classmethod
     def set_active_bar(cls, bar: _ProgressBar) -> None:

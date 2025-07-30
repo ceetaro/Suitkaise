@@ -204,7 +204,7 @@ class _ActiveSpinner:
         self._frame_index = 0
         self._last_update = 0.0
         self._is_running = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         
         # Display state
         self._last_output_length = 0

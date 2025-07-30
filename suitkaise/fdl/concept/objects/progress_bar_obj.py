@@ -130,7 +130,7 @@ class _ProgressBar:
         
         # Simplified state
         self._pending_increment = 0.0  # Atomic accumulator
-        self._lock = threading.Lock()  # Simple lock
+        self._lock = threading.RLock()  # Reentrant lock
         self._last_display_time = 0.0
         self._is_displayed = False
         self._is_stopped = False
