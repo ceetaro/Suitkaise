@@ -161,7 +161,7 @@ class _CommandRegistry:
             _FormatState: Updated format state
             
         Raises:
-            _UnknownCommandError: If no processor can handle the command
+            UnknownCommandError: If no processor can handle the command
         """
         cls._ensure_sorted()
         
@@ -175,7 +175,7 @@ class _CommandRegistry:
                 return processor_class.process(command, format_state)
         
         # No processor could handle the command
-        raise _UnknownCommandError(f"Unknown command: '{command}'")
+        raise UnknownCommandError(f"Unknown command: '{command}'")
     
     @classmethod
     def get_registered_processors(cls) -> List[Type[_CommandProcessor]]:

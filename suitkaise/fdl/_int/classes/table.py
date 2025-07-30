@@ -13,6 +13,10 @@ from ..setup.table_generator import _TableGenerator
 from ..setup.text_wrapping import _TextWrapper
 from ..setup.unicode import _get_unicode_support
 from ..setup.terminal import _get_terminal
+from ..core.format_state import _FormatState
+from ..core.command_registry import _CommandRegistry, UnknownCommandError
+# Import processors to ensure registration
+from ..processors import commands
 
 
 class _Table:
@@ -45,11 +49,14 @@ class _Table:
         self._headers: List[str] = []
         self._data: List[List[Union[str, Tuple[str, str]]]] = []
         
-        # Formatting
-        self._header_format: Optional[str] = None
-        self._column_formats: Dict[str, str] = {}
-        self._row_formats: Dict[int, str] = {}  # 1-based row numbers
-        self._cell_formats: Dict[Tuple[str, int], str] = {}  # (header, row)
+        # Formatting (using format states)
+        self._header_format: Optional[_FormatState] = None
+        self._column_formats: Dict[str, _FormatState] = {}
+        self._row_formats: Dict[int, _FormatState] = {}  # 1-based row numbers
+        self._cell_formats: Dict[Tuple[str, int], _FormatState] = {}  # (header, row)
+        
+        # Command registry for processing format strings
+        self._command_registry = _CommandRegistry()
         
         # Warning tracking
         self._format_warnings_shown = False
@@ -321,28 +328,68 @@ class _Table:
     # ==================== FORMATTING ====================
     
     def format_headers(self, format_string: str) -> None:
-        """Set formatting for all headers."""
-        self._header_format = format_string
+        """
+        Set formatting for all headers.
+        
+        Args:
+            format_string: FDL format string like "</bold, underline>"
+            
+        Raises:
+            ValueError: If format string is invalid
+        """
+        self._check_released()
+        self._header_format = self._process_format_string(format_string)
     
     def format_column(self, header: str, format_string: str) -> None:
-        """Set formatting for an entire column."""
+        """
+        Set formatting for an entire column.
+        
+        Args:
+            header: Column header name
+            format_string: FDL format string like "</red, italic>"
+            
+        Raises:
+            ValueError: If header doesn't exist or format string is invalid
+        """
+        self._check_released()
         if header not in self._headers:
             raise ValueError(f"Header '{header}' does not exist")
-        self._column_formats[header] = format_string
+        self._column_formats[header] = self._process_format_string(format_string)
     
     def format_row(self, row: int, format_string: str) -> None:
-        """Set formatting for an entire row."""
+        """
+        Set formatting for an entire row.
+        
+        Args:
+            row: Row number (1-based)
+            format_string: FDL format string like "</yellow>"
+            
+        Raises:
+            ValueError: If row is out of range or format string is invalid
+        """
+        self._check_released()
         if row < 1 or row > len(self._data):
             raise ValueError(f"Row {row} is out of range (1-{len(self._data)})")
-        self._row_formats[row] = format_string
+        self._row_formats[row] = self._process_format_string(format_string)
     
     def format_cell(self, header: str, row: int, format_string: str) -> None:
-        """Set formatting for a specific cell."""
+        """
+        Set formatting for a specific cell.
+        
+        Args:
+            header: Column header name
+            row: Row number (1-based)
+            format_string: FDL format string like "</bold, green>"
+            
+        Raises:
+            ValueError: If header/row doesn't exist or format string is invalid
+        """
+        self._check_released()
         if header not in self._headers:
             raise ValueError(f"Header '{header}' does not exist")
         if row < 1 or row > len(self._data):
             raise ValueError(f"Row {row} is out of range (1-{len(self._data)})")
-        self._cell_formats[(header, row)] = format_string
+        self._cell_formats[(header, row)] = self._process_format_string(format_string)
     
     # Reset formatting methods
     def reset_formatting(self) -> None:
@@ -485,6 +532,46 @@ class _Table:
         """Check if table has been released and raise error if so."""
         if self._released:
             raise RuntimeError("Table has been released and cannot be used")
+    
+    def _process_format_string(self, format_string: str) -> _FormatState:
+        """
+        Process a format string into a format state using command processors.
+        
+        Args:
+            format_string: FDL format string like "</red, bold>"
+            
+        Returns:
+            _FormatState: Processed format state
+            
+        Raises:
+            ValueError: If format string is invalid
+        """
+        if not format_string.strip():
+            return _FormatState()
+        
+        # Create a new format state for processing
+        format_state = _FormatState()
+        
+        # Remove leading/trailing whitespace and angle brackets
+        clean_format = format_string.strip()
+        if clean_format.startswith('</') and clean_format.endswith('>'):
+            clean_format = clean_format[2:-1]  # Remove </ and >
+        elif clean_format.startswith('<') and clean_format.endswith('>'):
+            clean_format = clean_format[1:-1]   # Remove < and >
+        
+        # Split commands by comma and process each
+        commands = [cmd.strip() for cmd in clean_format.split(',')]
+        
+        for command in commands:
+            if command:  # Skip empty commands
+                try:
+                    format_state = self._command_registry.process_command(command, format_state)
+                except UnknownCommandError as e:
+                    raise ValueError(f"Invalid format command '{command}': {e}")
+                except Exception as e:
+                    raise ValueError(f"Error processing format command '{command}': {e}")
+        
+        return format_state
     
     # ==================== DISPLAY METHODS ====================
     

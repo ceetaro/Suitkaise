@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from .text_wrapping import _TextWrapper
 from .unicode import _get_unicode_support
 from .terminal import _get_terminal
+from ..core.format_state import _FormatState
+from ..core.command_registry import _CommandRegistry, UnknownCommandError
+# Import processors to ensure registration
+from ..processors import commands
 
 
 @dataclass
@@ -78,6 +82,7 @@ class _TableGenerator:
         self._text_wrapper = _TextWrapper()
         self._unicode_support = _get_unicode_support()
         self._terminal = _get_terminal()
+        self._command_registry = _CommandRegistry()
         
         # Cell sizing constants
         self.MAX_CELL_WIDTH = 30  # Maximum width from left edge to right edge
@@ -86,10 +91,10 @@ class _TableGenerator:
     
     def generate_table(self, headers: List[str], data: List[List[Union[str, Tuple[str, str]]]], 
                       style: str = "rounded", start_row: int = 1, end_row: Optional[int] = None,
-                      header_format: Optional[str] = None,
-                      column_formats: Dict[str, str] = None,
-                      row_formats: Dict[int, str] = None,
-                      cell_formats: Dict[Tuple[str, int], str] = None) -> Dict[str, str]:
+                      header_format: Optional[_FormatState] = None,
+                      column_formats: Dict[str, _FormatState] = None,
+                      row_formats: Dict[int, _FormatState] = None,
+                      cell_formats: Dict[Tuple[str, int], _FormatState] = None) -> Dict[str, str]:
         """
         Generate a formatted table in multiple output formats.
         
@@ -138,9 +143,9 @@ class _TableGenerator:
         }
     
     def _create_pseudo_matrix(self, headers: List[str], data: List[List[Union[str, Tuple[str, str]]]], 
-                             start_row: int, header_format: Optional[str],
-                             column_formats: Dict[str, str], row_formats: Dict[int, str],
-                             cell_formats: Dict[Tuple[str, int], str]) -> List[List[_CellInfo]]:
+                             start_row: int, header_format: Optional[_FormatState],
+                             column_formats: Dict[str, _FormatState], row_formats: Dict[int, _FormatState],
+                             cell_formats: Dict[Tuple[str, int], _FormatState]) -> List[List[_CellInfo]]:
         """Create a pseudo matrix with detailed cell information."""
         matrix = []
         
@@ -186,8 +191,8 @@ class _TableGenerator:
         return matrix
     
     def _process_cell(self, content: Union[str, Tuple[str, str]], row: int, col: int, header: str,
-                     header_format: Optional[str], column_formats: Dict[str, str],
-                     row_formats: Dict[int, str], cell_formats: Dict[Tuple[str, int], str],
+                     header_format: Optional[_FormatState], column_formats: Dict[str, _FormatState],
+                     row_formats: Dict[int, _FormatState], cell_formats: Dict[Tuple[str, int], _FormatState],
                      actual_row_num: int) -> _CellInfo:
         """Process a single cell and create cell info."""
         # Extract content and tuple formatting
@@ -197,8 +202,8 @@ class _TableGenerator:
             original_content = str(content)
             tuple_format = None
         
-        # Combine formatting (priority: tuple > cell > column > row)
-        combined_format = self._combine_formatting(
+        # Combine formatting (priority: tuple > cell > column > row > header)
+        combined_format_state = self._combine_format_states(
             tuple_format=tuple_format,
             cell_format=cell_formats.get((header, actual_row_num)),
             column_format=column_formats.get(header),
@@ -207,7 +212,7 @@ class _TableGenerator:
         )
         
         # Apply formatting to content
-        formatted_content = self._apply_formatting(original_content, combined_format)
+        formatted_content = self._apply_format_state(original_content, combined_format_state)
         
         # Wrap text to fit cell width
         wrapped_lines = self._wrap_cell_content(formatted_content)
@@ -225,28 +230,210 @@ class _TableGenerator:
             header=header,
             original_content=original_content,
             original_format=tuple_format,
-            combined_format=combined_format,
+            combined_format=str(combined_format_state) if combined_format_state else None,
             wrapped_lines=wrapped_lines,
             visual_width=visual_width,
             height=height
         )
     
-    def _combine_formatting(self, tuple_format: Optional[str], cell_format: Optional[str],
-                           column_format: Optional[str], row_format: Optional[str],
-                           header_format: Optional[str]) -> Optional[str]:
-        """Combine formatting from different sources with proper priority."""
-        # Priority: tuple > cell > column > row > header
-        return (tuple_format or cell_format or column_format or 
-                row_format or header_format)
+    def _combine_format_states(self, tuple_format: Optional[str], cell_format: Optional[_FormatState],
+                              column_format: Optional[_FormatState], row_format: Optional[_FormatState],
+                              header_format: Optional[_FormatState]) -> Optional[_FormatState]:
+        """
+        Combine format states with proper priority system.
+        
+        Priority order: tuple > cell > column > row > header
+        Higher priority formatting overrides lower priority formatting.
+        """
+        # Start with a base format state
+        final_format = _FormatState()
+        
+        # Apply formatting in reverse priority order (lowest to highest)
+        # This way higher priority will override lower priority
+        
+        # 1. Header format (lowest priority)
+        if header_format:
+            final_format = self._merge_format_states(final_format, header_format)
+        
+        # 2. Row format
+        if row_format:
+            final_format = self._merge_format_states(final_format, row_format)
+        
+        # 3. Column format
+        if column_format:
+            final_format = self._merge_format_states(final_format, column_format)
+        
+        # 4. Cell format
+        if cell_format:
+            final_format = self._merge_format_states(final_format, cell_format)
+        
+        # 5. Tuple format (highest priority)
+        if tuple_format:
+            tuple_format_state = self._process_tuple_format(tuple_format)
+            if tuple_format_state:
+                final_format = self._merge_format_states(final_format, tuple_format_state)
+        
+        # Return None if no formatting was applied
+        if self._is_empty_format_state(final_format):
+            return None
+        
+        return final_format
     
-    def _apply_formatting(self, content: str, format_string: Optional[str]) -> str:
-        """Apply FDL formatting to content."""
-        if not format_string:
+    def _merge_format_states(self, base: _FormatState, override: _FormatState) -> _FormatState:
+        """
+        Merge two format states, with override taking precedence.
+        
+        Args:
+            base: Base format state
+            override: Override format state (takes precedence)
+            
+        Returns:
+            New format state with merged formatting
+        """
+        # Create a copy of the base format state
+        merged = _FormatState(
+            text_color=base.text_color,
+            background_color=base.background_color,
+            bold=base.bold,
+            italic=base.italic,
+            underline=base.underline,
+            strikethrough=base.strikethrough,
+            twelve_hour_time=base.twelve_hour_time,
+            timezone=base.timezone,
+            use_seconds=base.use_seconds,
+            use_minutes=base.use_minutes,
+            use_hours=base.use_hours,
+            decimal_places=base.decimal_places,
+            round_seconds=base.round_seconds,
+            smart_time=base.smart_time,
+            in_box=base.in_box,
+            box_style=base.box_style,
+            box_title=base.box_title,
+            box_color=base.box_color,
+            box_background=base.box_background,
+            box_content=base.box_content.copy(),
+            box_width=base.box_width,
+            justify=base.justify,
+            debug_mode=base.debug_mode,
+            active_formats=base.active_formats.copy(),
+            values=base.values,
+            value_index=base.value_index
+        )
+        
+        # Apply overrides (only if they're set in the override state)
+        if override.text_color is not None:
+            merged.text_color = override.text_color
+        if override.background_color is not None:
+            merged.background_color = override.background_color
+        if override.bold:
+            merged.bold = override.bold
+        if override.italic:
+            merged.italic = override.italic
+        if override.underline:
+            merged.underline = override.underline
+        if override.strikethrough:
+            merged.strikethrough = override.strikethrough
+        if override.justify is not None:
+            merged.justify = override.justify
+        
+        return merged
+    
+    def _process_tuple_format(self, tuple_format: str) -> Optional[_FormatState]:
+        """Process tuple format string into format state."""
+        if not tuple_format.strip():
+            return None
+        
+        # Create a new format state for processing
+        format_state = _FormatState()
+        
+        # Remove leading/trailing whitespace and angle brackets
+        clean_format = tuple_format.strip()
+        if clean_format.startswith('</') and clean_format.endswith('>'):
+            clean_format = clean_format[2:-1]  # Remove </ and >
+        elif clean_format.startswith('<') and clean_format.endswith('>'):
+            clean_format = clean_format[1:-1]   # Remove < and >
+        
+        # Split commands by comma and process each
+        commands = [cmd.strip() for cmd in clean_format.split(',')]
+        
+        for command in commands:
+            if command:  # Skip empty commands
+                try:
+                    format_state = self._command_registry.process_command(command, format_state)
+                except (UnknownCommandError, Exception):
+                    # If command processing fails, return None
+                    return None
+        
+        return format_state
+    
+    def _is_empty_format_state(self, format_state: _FormatState) -> bool:
+        """Check if format state has any formatting applied."""
+        return (format_state.text_color is None and
+                format_state.background_color is None and
+                not format_state.bold and
+                not format_state.italic and
+                not format_state.underline and
+                not format_state.strikethrough)
+    
+    def _apply_format_state(self, content: str, format_state: Optional[_FormatState]) -> str:
+        """Apply format state to content, generating ANSI codes."""
+        if not format_state:
             return content
         
-        # For now, return content with format applied
-        # This would integrate with the FDL processor in full implementation
-        return content  # TODO: Integrate with FDL string processing
+        # Build ANSI codes from format state
+        ansi_codes = []
+        
+        # Text color
+        if format_state.text_color:
+            color_code = self._get_color_code(format_state.text_color)
+            if color_code:
+                ansi_codes.append(color_code)
+        
+        # Background color
+        if format_state.background_color:
+            bg_color_code = self._get_background_color_code(format_state.background_color)
+            if bg_color_code:
+                ansi_codes.append(bg_color_code)
+        
+        # Text styles
+        if format_state.bold:
+            ansi_codes.append('1')
+        if format_state.italic:
+            ansi_codes.append('3')
+        if format_state.underline:
+            ansi_codes.append('4')
+        if format_state.strikethrough:
+            ansi_codes.append('9')
+        
+        # Apply formatting
+        if ansi_codes:
+            ansi_start = f"\x1b[{';'.join(ansi_codes)}m"
+            ansi_end = "\x1b[0m"
+            return f"{ansi_start}{content}{ansi_end}"
+        
+        return content
+    
+    def _get_color_code(self, color: str) -> Optional[str]:
+        """Get ANSI color code for text color."""
+        color_map = {
+            'black': '30', 'red': '31', 'green': '32', 'yellow': '33',
+            'blue': '34', 'magenta': '35', 'cyan': '36', 'white': '37',
+            'bright_black': '90', 'bright_red': '91', 'bright_green': '92',
+            'bright_yellow': '93', 'bright_blue': '94', 'bright_magenta': '95',
+            'bright_cyan': '96', 'bright_white': '97'
+        }
+        return color_map.get(color)
+    
+    def _get_background_color_code(self, color: str) -> Optional[str]:
+        """Get ANSI background color code."""
+        bg_color_map = {
+            'black': '40', 'red': '41', 'green': '42', 'yellow': '43',
+            'blue': '44', 'magenta': '45', 'cyan': '46', 'white': '47',
+            'bright_black': '100', 'bright_red': '101', 'bright_green': '102',
+            'bright_yellow': '103', 'bright_blue': '104', 'bright_magenta': '105',
+            'bright_cyan': '106', 'bright_white': '107'
+        }
+        return bg_color_map.get(color)
     
     def _wrap_cell_content(self, content: str) -> List[str]:
         """Wrap content to fit within cell width."""

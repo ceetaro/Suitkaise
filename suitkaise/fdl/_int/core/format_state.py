@@ -75,7 +75,6 @@ class _FormatState:
     # Variable handling
     values: Tuple = ()
     value_index: int = 0
-    debug_mode: bool = False
     
     # Terminal information
     terminal_width: int = 60
