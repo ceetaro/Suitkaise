@@ -7,6 +7,7 @@ stored command strings. This processor should run BEFORE other processors
 to expand format references.
 """
 
+from typing import Dict, Any
 from ...core.command_registry import _CommandProcessor, _command_processor
 from ...core.format_state import _FormatState
 from ...core.format_registry import get_format_registry
@@ -34,26 +35,24 @@ class _FormatCommandProcessor(_CommandProcessor):
             command: Command string to check
             
         Returns:
-            bool: True if this is a fmt command
+            bool: True if this is a fmt command or end format command
         """
         command = command.strip().lower()
         
         # Handle comma-separated commands
         if ',' in command:
-            # Check if any part starts with 'fmt '
+            # Check if any part starts with 'fmt ' or 'end '
             parts = [part.strip() for part in command.split(',')]
-            return any(part.startswith('fmt ') for part in parts)
+            return any(part.startswith('fmt ') or part.startswith('end ') for part in parts)
         else:
-            return command.startswith('fmt ')
+            return command.startswith('fmt ') or command.startswith('end ')
     
     @classmethod
     def process(cls, command: str, format_state: _FormatState) -> _FormatState:
         """
-        Process a format substitution command.
+        Process a format command (fmt or end).
         
-        This method expands fmt commands by substituting them with their
-        registered format strings, then processes the resulting commands
-        through other processors.
+        This method handles both format substitution and format ending.
         
         Args:
             command: Command to process (may be comma-separated)
@@ -65,28 +64,226 @@ class _FormatCommandProcessor(_CommandProcessor):
         command = command.strip()
         command_lower = command.lower()
         
-        # Expand fmt commands in the command string
-        expanded_command = cls._expand_fmt_commands(command_lower)
+        # Handle comma-separated commands
+        if ',' in command_lower:
+            parts = [part.strip() for part in command_lower.split(',')]
+            processed_parts = []
+            
+            for part in parts:
+                if part.startswith('fmt '):
+                    # Handle fmt command
+                    format_state = cls._process_fmt_command(part, format_state)
+                elif part.startswith('end '):
+                    # Handle end format command
+                    format_state = cls._process_end_command(part, format_state)
+                else:
+                    # Keep non-fmt/end commands for other processors
+                    processed_parts.append(part)
+            
+            # Process remaining commands through other processors
+            if processed_parts:
+                remaining_command = ', '.join(processed_parts)
+                format_state = cls._process_through_other_processors(remaining_command, format_state)
         
-        # If no expansion occurred, this shouldn't have been processed by us
-        if expanded_command == command_lower:
+        else:
+            # Single command
+            if command_lower.startswith('fmt '):
+                format_state = cls._process_fmt_command(command_lower, format_state)
+            elif command_lower.startswith('end '):
+                format_state = cls._process_end_command(command_lower, format_state)
+        
+        return format_state
+    
+    @classmethod
+    def _process_fmt_command(cls, command: str, format_state: _FormatState) -> _FormatState:
+        """
+        Process a single fmt command and track the format.
+        
+        Args:
+            command: fmt command (e.g., 'fmt myformat')
+            format_state: Current format state
+            
+        Returns:
+            _FormatState: Updated format state
+        """
+        format_name = command[4:].strip()  # Remove 'fmt '
+        registry = get_format_registry()
+        format_obj = registry.get_format(format_name)
+        
+        if not format_obj:
+            # Format not found - do nothing
             return format_state
         
-        # Process the expanded commands through the appropriate processors
+        # Capture current formatting state before applying format
+        current_state = cls._capture_current_formatting(format_state)
+        
+        # Expand and process the format commands
+        expanded_command = cls._expand_fmt_commands(format_obj.format.strip())
+        if expanded_command.startswith('</') and expanded_command.endswith('>'):
+            expanded_command = expanded_command[2:-1]
+        
+        # Process the expanded commands
+        format_state = cls._process_through_other_processors(expanded_command, format_state)
+        
+        # Track what formatting this format contributed
+        new_state = cls._capture_current_formatting(format_state)
+        format_contribution = cls._calculate_format_contribution(current_state, new_state)
+        
+        # Store the format as active with its contributions
+        format_state.active_formats[format_name] = format_contribution
+        
+        return format_state
+    
+    @classmethod
+    def _process_end_command(cls, command: str, format_state: _FormatState) -> _FormatState:
+        """
+        Process an end format command.
+        
+        Args:
+            command: end command (e.g., 'end myformat')
+            format_state: Current format state
+            
+        Returns:
+            _FormatState: Updated format state
+        """
+        format_name = command[4:].strip()  # Remove 'end '
+        
+        if format_name not in format_state.active_formats:
+            # Format not active - do nothing
+            return format_state
+        
+        # Get the format's contributions
+        format_contribution = format_state.active_formats[format_name]
+        
+        # End only the formatting that came from this format
+        cls._end_format_contributions(format_state, format_contribution)
+        
+        # Remove from active formats
+        del format_state.active_formats[format_name]
+        
+        return format_state
+    
+    @classmethod
+    def _process_through_other_processors(cls, command: str, format_state: _FormatState) -> _FormatState:
+        """
+        Process a command through other processors.
+        
+        Args:
+            command: Command to process
+            format_state: Current format state
+            
+        Returns:
+            _FormatState: Updated format state
+        """
         from ...core.command_registry import _CommandRegistry
         
-        # Process the expanded command through other processors
-        # We need to find processors that can handle the expanded commands
+        # Process through other processors
         for processor_class in _CommandRegistry.get_registered_processors():
             # Skip ourselves to avoid infinite recursion
             if processor_class == cls:
                 continue
                 
-            if processor_class.can_process(expanded_command):
-                format_state = processor_class.process(expanded_command, format_state)
+            if processor_class.can_process(command):
+                format_state = processor_class.process(command, format_state)
                 break
         
         return format_state
+    
+    @classmethod
+    def _capture_current_formatting(cls, format_state: _FormatState) -> Dict[str, Any]:
+        """
+        Capture the current formatting state.
+        
+        Args:
+            format_state: Current format state
+            
+        Returns:
+            Dict[str, Any]: Current formatting settings
+        """
+        return {
+            'text_color': format_state.text_color,
+            'background_color': format_state.background_color,
+            'bold': format_state.bold,
+            'italic': format_state.italic,
+            'underline': format_state.underline,
+            'strikethrough': format_state.strikethrough,
+        }
+    
+    @classmethod
+    def _calculate_format_contribution(cls, before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate what formatting a format contributed.
+        
+        Args:
+            before: Formatting state before format
+            after: Formatting state after format
+            
+        Returns:
+            Dict[str, Any]: What the format contributed
+        """
+        contribution = {}
+        
+        # Track what changed
+        for key in before:
+            if before[key] != after[key]:
+                contribution[key] = {
+                    'before': before[key],
+                    'after': after[key]
+                }
+        
+        return contribution
+    
+    @classmethod
+    def _end_format_contributions(cls, format_state: _FormatState, contribution: Dict[str, Any]) -> None:
+        """
+        End the formatting contributions of a format.
+        
+        Args:
+            format_state: Current format state
+            contribution: What the format contributed
+        """
+        # Revert formatting that was contributed by this format
+        # Only revert if the current value matches what the format set
+        for key, change in contribution.items():
+            current_value = getattr(format_state, key)
+            if current_value == change['after']:
+                # The format's value is still active, revert it
+                setattr(format_state, key, change['before'])
+                
+                # Add ANSI code to reset this specific formatting
+                cls._add_end_ansi_for_attribute(format_state, key, change['before'])
+    
+    @classmethod
+    def _add_end_ansi_for_attribute(cls, format_state: _FormatState, attr: str, value: Any) -> None:
+        """
+        Add ANSI code to end a specific formatting attribute.
+        
+        Args:
+            format_state: Current format state
+            attr: Attribute name
+            value: Value to revert to
+        """
+        # Import the text commands processor to use its ANSI generation
+        from .text_commands import _TextCommandProcessor
+        
+        if attr == 'text_color':
+            if value is None:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[39m')  # Reset foreground
+        elif attr == 'background_color':
+            if value is None:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[49m')  # Reset background
+        elif attr == 'bold':
+            if not value:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[22m')  # Reset bold
+        elif attr == 'italic':
+            if not value:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[23m')  # Reset italic
+        elif attr == 'underline':
+            if not value:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[24m')  # Reset underline
+        elif attr == 'strikethrough':
+            if not value:
+                _TextCommandProcessor._add_ansi_code(format_state, '\033[29m')  # Reset strikethrough
     
     @classmethod
     def _expand_fmt_commands(cls, command: str) -> str:
