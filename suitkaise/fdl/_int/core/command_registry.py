@@ -92,6 +92,14 @@ class _CommandRegistry:
     _sorted = False
     _lock = threading.RLock()
     
+    def __init__(self):
+        """Initialize command registry instance (uses class-level processors)."""
+        pass  # All functionality is at class level
+    
+    def process_command(self, command: str, format_state: _FormatState) -> _FormatState:
+        """Instance method that delegates to class method."""
+        return _CommandRegistry.process_command(command, format_state)
+    
     @classmethod
     def register(cls, processor_class: Type[_CommandProcessor]) -> None:
         """
