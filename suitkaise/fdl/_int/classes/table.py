@@ -419,6 +419,7 @@ class _Table:
     
     def copy(self) -> '_Table':
         """Create a deep copy of this table."""
+        self._check_released()
         new_table = _Table(style=self.style, max_columns=self.max_columns, max_rows=self.max_rows)
         new_table._headers = self._headers.copy()
         new_table._data = deepcopy(self._data)

@@ -40,7 +40,8 @@ class _DebugCommandProcessor(_CommandProcessor):
         Returns:
             bool: True if this processor can handle the command
         """
-        command = command.strip().lower()
+        # Normalize whitespace: strip and replace multiple spaces with single space
+        command = ' '.join(command.strip().lower().split())
         
         if command == 'debug':
             return True
@@ -62,7 +63,8 @@ class _DebugCommandProcessor(_CommandProcessor):
         Returns:
             _FormatState: Updated format state
         """
-        command = command.strip().lower()
+        # Normalize whitespace: strip and replace multiple spaces with single space
+        command = ' '.join(command.strip().lower().split())
         
         if command == 'debug':
             # Enter debug mode
