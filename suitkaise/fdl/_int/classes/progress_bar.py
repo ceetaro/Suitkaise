@@ -487,11 +487,26 @@ class _ProgressBar:
         if not self._displayed or self._released:
             return
         
-        # Get terminal output
-        terminal_output = self.get_output('terminal')
+        # Get terminal output without acquiring lock (we already have it)
+        terminal_output = self._get_output_unlocked('terminal')
         
         # Clear current line and display
         print(f"\r{terminal_output}", end="", flush=True)
+    
+    def _get_output_unlocked(self, format_type: str) -> str:
+        """Get output without acquiring lock (internal use only)."""
+        output = self._progress_bar_generator.generate_progress_bar(
+            current=self._current,
+            total=self.total,
+            width=self.width,
+            format_state=self._format_state,
+            message=self._message,
+            show_percentage=self.show_percentage,
+            show_numbers=self.show_numbers,
+            show_rate=self.show_rate,
+            elapsed_time=self.elapsed_time
+        )
+        return output[format_type]
     
     # ==================== UTILITY METHODS ====================
     
