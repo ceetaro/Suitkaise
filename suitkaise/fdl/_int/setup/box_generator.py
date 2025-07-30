@@ -238,9 +238,17 @@ class _BoxGenerator:
         else:
             box_lines.append(self._generate_simple_border(box_width, True))
         
+        # Add vertical padding if there's a title (1 line before and after content)
+        if self.title:
+            box_lines.append(self._generate_content_line("", box_width))
+        
         # Add content lines with side borders
         for line in content_lines:
             box_lines.append(self._generate_content_line(line, box_width))
+        
+        # Add vertical padding if there's a title (1 line before and after content)
+        if self.title:
+            box_lines.append(self._generate_content_line("", box_width))
         
         # Add bottom border
         box_lines.append(self._generate_simple_border(box_width, False))

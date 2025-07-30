@@ -7,7 +7,7 @@ allowing new command types to be added without modifying core code.
 This is internal to the FDL engine and not exposed to users.
 """
 
-from typing import List, Type, Union
+from typing import List, Type, Union, Optional, Dict
 import threading
 from abc import ABC, abstractmethod
 from .format_state import _FormatState
@@ -88,8 +88,8 @@ class _CommandRegistry:
     appropriate processor based on can_process() checks.
     """
     
-    _processors: List[Type[_CommandProcessor]] = []
-    _sorted = False
+    _processors: Dict[Type[_CommandProcessor], int] = {}  # processor -> priority
+    _priority_order: List[Type[_CommandProcessor]] = []   # ordered by priority
     _lock = threading.RLock()
     
     def __init__(self):
@@ -101,21 +101,49 @@ class _CommandRegistry:
         return _CommandRegistry.process_command(command, format_state)
     
     @classmethod
-    def register(cls, processor_class: Type[_CommandProcessor]) -> None:
+    def register(cls, processor_class: Type[_CommandProcessor], priority: int = 100) -> None:
         """
-        Register a command processor.
+        Register a command processor with priority.
         
         Args:
             processor_class: Command processor class to register
+            priority: Priority value (lower = higher priority)
             
         Raises:
             TypeError: If processor doesn't inherit from _CommandProcessor
+            ValueError: If processor is already registered
         """
         with cls._lock:
             if not issubclass(processor_class, _CommandProcessor):
                 raise TypeError(f"Processor must inherit from _CommandProcessor: {processor_class}")
             
-            cls._processors.append(processor_class)
+            if processor_class in cls._processors:
+                raise ValueError(f"Processor already registered: {processor_class}")
+            
+            cls._processors[processor_class] = priority
+            cls._update_priority_order()
+    
+    @classmethod
+    def _update_priority_order(cls) -> None:
+        """Update the priority order list."""
+        cls._priority_order = sorted(cls._processors.keys(), 
+                                   key=lambda p: cls._processors[p])
+    
+    @classmethod
+    def find_processor(cls, command: str) -> Optional[Type[_CommandProcessor]]:
+        """
+        Find a processor that can handle the given command.
+        
+        Args:
+            command: Command to find processor for
+            
+        Returns:
+            Type[_CommandProcessor] or None: Processor that can handle the command
+        """
+        for processor_class in cls._priority_order:
+            if processor_class.can_process(command):
+                return processor_class
+        return None
 
     @classmethod
     def is_registered(cls, processor_class: Union[Type[_CommandProcessor], str]) -> bool:
@@ -129,12 +157,15 @@ class _CommandRegistry:
             bool: True if the processor is registered
         """
         with cls._lock:
-            if not isinstance(processor_class, str):
-                processor_class = processor_class.__name__
-
-            for proc in cls._processors:
-                if proc.__name__ == processor_class:
-                    return True
+            if isinstance(processor_class, str):
+                # Check by name
+                for proc in cls._processors:
+                    if proc.__name__ == processor_class:
+                        return True
+                return False
+            else:
+                # Check by class
+                return processor_class in cls._processors
     
     @classmethod
     def unregister(cls, processor_class: Type[_CommandProcessor]) -> None:
@@ -146,15 +177,14 @@ class _CommandRegistry:
         """
         with cls._lock:
             if processor_class in cls._processors:
-                cls._processors.remove(processor_class)
+                del cls._processors[processor_class]
+                cls._update_priority_order()
     
     @classmethod
     def _ensure_sorted(cls) -> None:
         """Ensure processors are sorted by priority."""
-        with cls._lock:
-            if not cls._sorted:
-                cls._processors.sort(key=lambda p: p.get_priority())
-                cls._sorted = True
+        # No longer needed - priority order is maintained automatically
+        pass
     
     @classmethod
     def process_command(cls, command: str, format_state: _FormatState) -> _FormatState:
@@ -171,14 +201,12 @@ class _CommandRegistry:
         Raises:
             UnknownCommandError: If no processor can handle the command
         """
-        cls._ensure_sorted()
-        
         command = command.strip()
         if not command:
             return format_state
         
         # Try each processor in priority order
-        for processor_class in cls._processors:
+        for processor_class in cls._priority_order:
             if processor_class.can_process(command):
                 return processor_class.process(command, format_state)
         
@@ -193,15 +221,14 @@ class _CommandRegistry:
         Returns:
             List[Type[_CommandProcessor]]: List of registered processor classes
         """
-        cls._ensure_sorted()
-        return cls._processors.copy()
+        return list(cls._processors.keys())
     
     @classmethod
     def clear_registry(cls) -> None:
         """Clear all registered processors (useful for testing)."""
         with cls._lock:
             cls._processors.clear()
-            cls._sorted = False
+            cls._priority_order.clear()
     
     @classmethod
     def get_command_info(cls, command: str) -> dict:
@@ -214,13 +241,11 @@ class _CommandRegistry:
         Returns:
             dict: Information about the command processor
         """
-        cls._ensure_sorted()
-        
-        for processor_class in cls._processors:
+        for processor_class in cls._priority_order:
             if processor_class.can_process(command):
                 return {
                     'processor': processor_class.__name__,
-                    'priority': processor_class.get_priority(),
+                    'priority': cls._processors[processor_class],
                     'can_process': True
                 }
         

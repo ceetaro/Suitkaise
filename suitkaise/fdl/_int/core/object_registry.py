@@ -160,6 +160,19 @@ class _ObjectRegistry:
         return obj_type in cls._type_to_processor
     
     @classmethod
+    def is_supported(cls, obj_type: str) -> bool:
+        """
+        Alias for is_supported_type for backward compatibility.
+        
+        Args:
+            obj_type: Object type to check
+            
+        Returns:
+            bool: True if the object type is supported
+        """
+        return cls.is_supported_type(obj_type)
+    
+    @classmethod
     def process_object(cls, obj_type: str, variable: Optional[str], 
                       format_state: _FormatState) -> str:
         """
@@ -246,6 +259,21 @@ class _ObjectRegistry:
                 'supported_types': [],
                 'is_supported': False
             }
+    
+    @classmethod
+    def get_registry_info(cls) -> dict:
+        """
+        Get information about the entire registry.
+        
+        Returns:
+            dict: Information about all registered processors and types
+        """
+        return {
+            'total_processors': len(set(cls._type_to_processor.values())),
+            'total_types': len(cls._type_to_processor),
+            'supported_types': list(cls._type_to_processor.keys()),
+            'processors': {name: proc.__name__ for name, proc in cls._type_to_processor.items()}
+        }
 
 
 def _register_object_processor(processor_class: Type[_ObjectProcessor]) -> None:

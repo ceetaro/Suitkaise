@@ -39,6 +39,12 @@ class _ObjectElement(_ElementProcessor):
         self.obj_type = obj_type.strip()
         self.variable = variable.strip() if variable else None
         
+        # Create content string for backward compatibility
+        if self.variable:
+            self.content = f"{self.obj_type}:{self.variable}"
+        else:
+            self.content = f"{self.obj_type}:"
+        
         # Validate object type is supported through registry
         if not _ObjectRegistry.is_supported_type(self.obj_type):
             raise UnsupportedObjectError(f"Unsupported object type: '{self.obj_type}'")
@@ -166,10 +172,26 @@ def _is_valid_object_pattern(content: str) -> bool:
     Returns:
         bool: True if valid and supported object pattern
     """
+    if not content or ':' not in content:
+        return False
+    
+    # Check for spaces or dashes in variable part (not allowed)
+    parts = content.split(':', 1)
+    if len(parts) != 2:
+        return False
+    
+    obj_type, variable = parts
+    if not obj_type.strip():
+        return False
+    
+    # Check if variable contains spaces or dashes (not allowed)
+    if variable and (' ' in variable or '-' in variable):
+        return False
+    
+    # Check if object type is supported
     try:
-        obj_type, _ = _parse_object_content(content)
-        return _ObjectRegistry.is_supported_type(obj_type)
-    except (ValueError, _UnsupportedObjectError):
+        return _ObjectRegistry.is_supported_type(obj_type.strip())
+    except:
         return False
 
 

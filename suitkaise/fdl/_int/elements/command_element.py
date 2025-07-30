@@ -36,6 +36,7 @@ class _CommandElement(_ElementProcessor):
                           Examples: "bold, red", "12hr, tz pst", "box rounded"
         """
         self.command_string = command_string.strip()
+        self.command = self.command_string  # Alias for backward compatibility
         self.commands = self._parse_commands(command_string)
     
     def process(self, format_state: _FormatState) -> _FormatState:

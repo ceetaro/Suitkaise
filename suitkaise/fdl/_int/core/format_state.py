@@ -9,7 +9,7 @@ This is internal to the FDL engine and not exposed to users.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Set, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Tuple, Set, Dict, Any, TYPE_CHECKING, Union
 
 # Import terminal detection
 try:
@@ -64,7 +64,7 @@ class _FormatState:
     box_width: int = 0
     
     # Layout settings
-    justify: Optional[str] = None  # 'left', 'right', 'center'
+    justify: str = 'left'  # 'left', 'right', 'center'
     
     # Debug mode settings
     debug_mode: bool = False
@@ -73,7 +73,7 @@ class _FormatState:
     active_formats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     
     # Variable handling
-    values: Tuple = ()
+    values: List = field(default_factory=list)
     value_index: int = 0
     
     # Terminal information
@@ -99,6 +99,10 @@ class _FormatState:
         """Initialize calculated values after object creation."""
         # Ensure minimum terminal width of 60
         self.terminal_width = max(60, self.terminal_width)
+        
+        # Convert values tuple to list if needed
+        if isinstance(self.values, tuple):
+            self.values = list(self.values)
         
         # Calculate maximum box width
         self.box_width = self._calculate_max_box_width()
@@ -352,12 +356,12 @@ class _FormatState:
         }
 
 
-def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = None) -> _FormatState:
+def _create_format_state(values: Union[Tuple, List] = (), terminal_width: Optional[int] = None) -> _FormatState:
     """
     Private factory function to create a _FormatState with proper initialization.
     
     Args:
-        values: Tuple of values for variable substitution
+        values: Tuple or list of values for variable substitution
         terminal_width: Override terminal width (uses detected width if None)
         
     Returns:
@@ -365,6 +369,12 @@ def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = Non
     """
     if terminal_width is None:
         terminal_width = max(60, _terminal.width)
+    
+    # Convert values to list if it's a tuple
+    if isinstance(values, tuple):
+        values = list(values)
+    elif values is None:
+        values = []
     
     return _FormatState(
         values=values,
