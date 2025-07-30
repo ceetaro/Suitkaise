@@ -119,14 +119,14 @@ def test_complex_types():
     """Test complex and custom types."""
     print("🧪 Testing complex types...")
     
-    format_state = _FormatState()
-    
     # Test tuple
-    result = _TypeObjectProcessor.process_object('type', (1, 2, 3), format_state)
+    format_state = _FormatState(values=[(1, 2, 3)])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'tuple' in result
     
     # Test set
-    result = _TypeObjectProcessor.process_object('type', {1, 2, 3}, format_state)
+    format_state = _FormatState(values=[{1, 2, 3}])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'set' in result
     
     # Test custom class
@@ -134,14 +134,16 @@ def test_complex_types():
         pass
     
     custom_obj = CustomClass()
-    result = _TypeObjectProcessor.process_object('type', custom_obj, format_state)
+    format_state = _FormatState(values=[custom_obj])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'CustomClass' in result
     
     # Test function
     def test_function():
         pass
     
-    result = _TypeObjectProcessor.process_object('type', test_function, format_state)
+    format_state = _FormatState(values=[test_function])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'function' in result
     
     print("✅ Complex types tests passed")
@@ -151,16 +153,16 @@ def test_nested_types():
     """Test nested container types."""
     print("🧪 Testing nested types...")
     
-    format_state = _FormatState()
-    
     # Test list of lists
     nested_list = [[1, 2], [3, 4]]
-    result = _TypeObjectProcessor.process_object('type', nested_list, format_state)
+    format_state = _FormatState(values=[nested_list])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'list' in result
     
     # Test dict with mixed values
     nested_dict = {'numbers': [1, 2, 3], 'text': 'hello'}
-    result = _TypeObjectProcessor.process_object('type', nested_dict, format_state)
+    format_state = _FormatState(values=[nested_dict])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'dict' in result
     
     print("✅ Nested types tests passed")
@@ -170,18 +172,19 @@ def test_builtin_types():
     """Test various builtin types."""
     print("🧪 Testing builtin types...")
     
-    format_state = _FormatState()
-    
     # Test range
-    result = _TypeObjectProcessor.process_object('type', range(10), format_state)
+    format_state = _FormatState(values=[range(10)])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'range' in result
     
     # Test bytes
-    result = _TypeObjectProcessor.process_object('type', b'hello', format_state)
+    format_state = _FormatState(values=[b'hello'])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'bytes' in result
     
     # Test complex number
-    result = _TypeObjectProcessor.process_object('type', 3+4j, format_state)
+    format_state = _FormatState(values=[3+4j])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'complex' in result
     
     print("✅ Builtin types tests passed")
@@ -224,27 +227,31 @@ def test_edge_cases():
     """Test edge cases and special scenarios."""
     print("🧪 Testing edge cases...")
     
-    format_state = _FormatState()
-    
     # Test empty containers
-    result = _TypeObjectProcessor.process_object('type', [], format_state)
+    format_state = _FormatState(values=[[]])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'list' in result
     
-    result = _TypeObjectProcessor.process_object('type', {}, format_state)
+    format_state = _FormatState(values=[{}])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'dict' in result
     
-    result = _TypeObjectProcessor.process_object('type', set(), format_state)
+    format_state = _FormatState(values=[set()])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'set' in result
     
     # Test empty string
-    result = _TypeObjectProcessor.process_object('type', "", format_state)
+    format_state = _FormatState(values=[""])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'str' in result
     
     # Test zero values
-    result = _TypeObjectProcessor.process_object('type', 0, format_state)
+    format_state = _FormatState(values=[0])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'int' in result
     
-    result = _TypeObjectProcessor.process_object('type', 0.0, format_state)
+    format_state = _FormatState(values=[0.0])
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     assert 'float' in result
     
     print("✅ Edge cases tests passed")
@@ -258,7 +265,8 @@ def test_format_state_preservation():
     format_state = _FormatState(
         text_color='red',
         bold=True,
-        debug_mode=False
+        debug_mode=False,
+        values=[42]
     )
     
     original_color = format_state.text_color
@@ -266,7 +274,7 @@ def test_format_state_preservation():
     original_debug = format_state.debug_mode
     
     # Process type object
-    result = _TypeObjectProcessor.process_object('type', 42, format_state)
+    result = _TypeObjectProcessor.process_object('type', 'test_var', format_state)
     
     # Format state should be unchanged
     assert format_state.text_color == original_color

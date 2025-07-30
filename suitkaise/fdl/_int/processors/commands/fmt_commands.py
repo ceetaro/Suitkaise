@@ -37,7 +37,8 @@ class _FormatCommandProcessor(_CommandProcessor):
         Returns:
             bool: True if this is a fmt command or end format command
         """
-        command = command.strip().lower()
+        # Normalize whitespace: strip and replace multiple spaces with single space
+        command = ' '.join(command.strip().lower().split())
         
         # Handle comma-separated commands
         if ',' in command:
@@ -61,7 +62,8 @@ class _FormatCommandProcessor(_CommandProcessor):
         Returns:
             _FormatState: Updated format state
         """
-        command = command.strip()
+        # Normalize whitespace: strip and replace multiple spaces with single space
+        command = ' '.join(command.strip().split())
         command_lower = command.lower()
         
         # Handle comma-separated commands
@@ -118,9 +120,12 @@ class _FormatCommandProcessor(_CommandProcessor):
         current_state = cls._capture_current_formatting(format_state)
         
         # Expand and process the format commands
-        expanded_command = cls._expand_fmt_commands(format_obj.format.strip())
-        if expanded_command.startswith('</') and expanded_command.endswith('>'):
-            expanded_command = expanded_command[2:-1]
+        format_commands = format_obj.format.strip()
+        # Remove leading </> if present before expansion
+        if format_commands.startswith('</') and format_commands.endswith('>'):
+            format_commands = format_commands[2:-1]
+        
+        expanded_command = cls._expand_fmt_commands(format_commands)
         
         # Process the expanded commands
         format_state = cls._process_through_other_processors(expanded_command, format_state)

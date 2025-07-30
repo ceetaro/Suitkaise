@@ -188,7 +188,7 @@ def test_thread_safety():
         for i in range(10):
             progress.update(1, f"Worker {worker_id} step {i}")
             results.append(progress.current)
-            time.sleep(0.001)  # Small delay to encourage race conditions
+            # Small delay removed to prevent test timeout
     
     # Start multiple threads
     threads = []

@@ -280,10 +280,8 @@ def _command_processor(priority: int = 100):
         if _CommandRegistry.is_registered(processor_class.__name__):
             raise ValueError(f"Processor already registered: {processor_class}")
 
-        # Set priority if not already set
-        if not hasattr(processor_class, 'get_priority'):
-            processor_class._priority = priority
-            processor_class.get_priority = classmethod(lambda cls: cls._priority)
+        # Set priority 
+        processor_class._priority = priority
         
         # Register the processor
         _CommandRegistry.register(processor_class)
