@@ -9,7 +9,7 @@ API-driven data population and tuple-based formatting.
 import re
 from typing import List, Tuple, Union, Optional, Dict, Any
 from copy import deepcopy
-from ..setup.box_generator import _BoxGenerator
+from ..setup.table_generator import _TableGenerator
 from ..setup.text_wrapping import _TextWrapper
 from ..setup.unicode import _get_unicode_support
 from ..setup.terminal import _get_terminal
@@ -55,10 +55,13 @@ class _Table:
         self._format_warnings_shown = False
         
         # Setup components
-        self._box_generator = _BoxGenerator()
+        self._table_generator = _TableGenerator()
         self._text_wrapper = _TextWrapper()
         self._unicode_support = _get_unicode_support()
         self._terminal = _get_terminal()
+        
+        # Memory management
+        self._released = False
     
     # ==================== PROPERTIES ====================
     
@@ -89,6 +92,8 @@ class _Table:
         Raises:
             ValueError: If max_columns would be exceeded
         """
+        self._check_released()
+        
         if self.max_columns and len(self._headers) >= self.max_columns:
             raise ValueError(f"Cannot add header: max_columns ({self.max_columns}) would be exceeded")
         
@@ -159,6 +164,8 @@ class _Table:
         Raises:
             ValueError: If no headers defined or row length mismatch
         """
+        self._check_released()
+        
         if not self._headers:
             raise ValueError("Must define headers before adding data")
         
@@ -456,6 +463,29 @@ class _Table:
         if warnings_found:
             self._format_warnings_shown = True
     
+    # ==================== MEMORY MANAGEMENT ====================
+    
+    def release(self) -> None:
+        """Release the table from memory."""
+        if self._released:
+            return
+        
+        # Clear all data structures
+        self._headers.clear()
+        self._data.clear()
+        self._column_formats.clear()
+        self._row_formats.clear()
+        self._cell_formats.clear()
+        self._header_format = None
+        
+        # Mark as released
+        self._released = True
+    
+    def _check_released(self) -> None:
+        """Check if table has been released and raise error if so."""
+        if self._released:
+            raise RuntimeError("Table has been released and cannot be used")
+    
     # ==================== DISPLAY METHODS ====================
     
     def display(self, start_row: int = 1, end_row: Optional[int] = 10) -> None:
@@ -466,18 +496,58 @@ class _Table:
             start_row: Starting row number (1-based)
             end_row: Ending row number (1-based), None for default of 10
         """
+        self._check_released()
+        
         if end_row is None:
             end_row = 10
         
         self._validate_format_strings()
-        # TODO: Implement actual table rendering
-        print(f"Table display: rows {start_row}-{min(end_row, self.row_count)} of {self.row_count}")
+        
+        # Generate table output using table generator
+        output = self._table_generator.generate_table(
+            headers=self._headers,
+            data=self._data,
+            style=self.style,
+            start_row=start_row,
+            end_row=end_row,
+            header_format=self._header_format,
+            column_formats=self._column_formats,
+            row_formats=self._row_formats,
+            cell_formats=self._cell_formats
+        )
+        
+        # Display terminal output
+        print(output['terminal'])
+        
+        # Show row count info
+        actual_end = min(end_row, self.row_count)
+        if self.row_count > actual_end:
+            print(f"Showing rows {start_row}-{actual_end} of {self.row_count} total rows")
     
     def display_all_rows(self) -> None:
         """Display all rows in the table."""
+        self._check_released()
+        
         self._validate_format_strings()
-        # TODO: Implement actual table rendering
-        print(f"Table display: all {self.row_count} rows")
+        
+        # Generate table output for all rows
+        output = self._table_generator.generate_table(
+            headers=self._headers,
+            data=self._data,
+            style=self.style,
+            start_row=1,
+            end_row=None,
+            header_format=self._header_format,
+            column_formats=self._column_formats,
+            row_formats=self._row_formats,
+            cell_formats=self._cell_formats
+        )
+        
+        # Display terminal output
+        print(output['terminal'])
+        
+        if self.row_count > 0:
+            print(f"Showing all {self.row_count} rows")
     
     def print(self, start_row: int = 1, end_row: Optional[int] = 10) -> None:
         """Alias for display()."""
@@ -486,3 +556,33 @@ class _Table:
     def print_all_rows(self) -> None:
         """Alias for display_all_rows()."""
         self.display_all_rows()
+    
+    def get_output(self, start_row: int = 1, end_row: Optional[int] = 10) -> Dict[str, str]:
+        """
+        Get table output in all formats without displaying.
+        
+        Args:
+            start_row: Starting row number (1-based)
+            end_row: Ending row number (1-based), None for default of 10
+            
+        Returns:
+            Dict with keys: 'terminal', 'plain', 'markdown', 'html'
+        """
+        self._check_released()
+        
+        if end_row is None:
+            end_row = 10
+        
+        self._validate_format_strings()
+        
+        return self._table_generator.generate_table(
+            headers=self._headers,
+            data=self._data,
+            style=self.style,
+            start_row=start_row,
+            end_row=end_row,
+            header_format=self._header_format,
+            column_formats=self._column_formats,
+            row_formats=self._row_formats,
+            cell_formats=self._cell_formats
+        )
