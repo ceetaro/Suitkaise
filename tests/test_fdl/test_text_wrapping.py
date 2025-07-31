@@ -335,6 +335,126 @@ class TestTextWrappingEdgeCases:
         # Leading/trailing whitespace
         result = wrapper.wrap_text("  text  ")
         # Should preserve meaningful whitespace
+    
+    def test_east_asian_characters(self):
+        """Test wrapping with East Asian characters (full-width)."""
+        wrapper = _TextWrapper(20)
+        
+        # Test Chinese characters (full-width)
+        chinese_text = "你好世界这是一个测试"
+        result = wrapper.wrap_text(chinese_text)
+        
+        # Each Chinese character should count as 2 visual width
+        assert len(result) > 1  # Should wrap due to full-width characters
+        for line in result:
+            if line.strip():
+                visual_width = wrapper._get_visual_width(line)
+                assert visual_width <= 20
+                # Verify that Chinese characters are counted correctly
+                assert visual_width % 2 == 0  # Should be even for full-width chars
+        
+        # Test mixed Chinese and English
+        mixed_text = "Hello你好World世界"
+        result = wrapper.wrap_text(mixed_text)
+        assert len(result) > 1
+        for line in result:
+            if line.strip():
+                assert wrapper._get_visual_width(line) <= 20
+    
+    def test_emoji_handling(self):
+        """Test wrapping with emojis and Unicode symbols."""
+        wrapper = _TextWrapper(15)
+        
+        # Test emojis (should count as 2 visual width each)
+        emoji_text = "Hello 😀 World 🌍 Test 🚀"
+        result = wrapper.wrap_text(emoji_text)
+        
+        assert len(result) > 1  # Should wrap due to emojis
+        for line in result:
+            if line.strip():
+                visual_width = wrapper._get_visual_width(line)
+                assert visual_width <= 15
+        
+        # Test complex emojis (combining characters)
+        complex_emoji = "👨‍👩‍👧‍👦"  # Family emoji
+        result = wrapper.wrap_text(complex_emoji)
+        # Should handle complex emojis without breaking them
+        assert len(result) == 1  # Should not break complex emoji
+        
+        # Test emoji with text
+        emoji_with_text = "Test👨‍👩‍👧‍👦Test"
+        result = wrapper.wrap_text(emoji_with_text)
+        for line in result:
+            if line.strip():
+                assert wrapper._get_visual_width(line) <= 15
+    
+    def test_file_path_wrapping(self):
+        """Test wrapping of long file paths with slashes."""
+        wrapper = _TextWrapper(30)
+        
+        # Test Unix-style paths
+        unix_path = "/very/long/path/to/some/file/with/many/directories/and/subdirectories"
+        result = wrapper.wrap_text(unix_path)
+        
+        assert len(result) > 1  # Should wrap
+        for line in result:
+            if line.strip():
+                assert wrapper._get_visual_width(line) <= 30
+        
+        # Verify that paths are broken at slashes when possible
+        for i, line in enumerate(result):
+            if i > 0 and line.strip():  # Not first line and not empty
+                # Should start with a slash or be a continuation
+                assert line.startswith('/') or not line.startswith('/')
+        
+        # Test Windows-style paths
+        windows_path = "C:\\very\\long\\path\\to\\some\\file\\with\\many\\directories"
+        result = wrapper.wrap_text(windows_path)
+        
+        assert len(result) > 1  # Should wrap
+        for line in result:
+            if line.strip():
+                assert wrapper._get_visual_width(line) <= 30
+        
+        # Test mixed path with spaces
+        mixed_path = "/home/user/My Documents/very long filename with spaces.txt"
+        result = wrapper.wrap_text(mixed_path)
+        
+        assert len(result) > 1  # Should wrap
+        for line in result:
+            if line.strip():
+                assert wrapper._get_visual_width(line) <= 30
+    
+    def test_ansi_colored_text_wrapping(self):
+        """Test wrapping of text with ANSI color codes."""
+        wrapper = _TextWrapper(25)
+        
+        # Test text with ANSI color codes
+        colored_text = "\033[31mRed text\033[0m and \033[32mGreen text\033[0m with \033[1mBold text\033[0m"
+        result = wrapper.wrap_text(colored_text)
+        
+        assert len(result) > 1  # Should wrap
+        for line in result:
+            if line.strip():
+                # Visual width should exclude ANSI codes
+                visual_width = wrapper._get_visual_width(line)
+                assert visual_width <= 25
+        
+        # Test that ANSI codes are preserved
+        full_result = ''.join(result)
+        assert '\033[31m' in full_result  # Red code preserved
+        assert '\033[32m' in full_result  # Green code preserved
+        assert '\033[1m' in full_result   # Bold code preserved
+        assert '\033[0m' in full_result   # Reset code preserved
+        
+        # Test complex formatting
+        complex_colored = "\033[1;31;42mBold Red on Green\033[0m \033[3;34mItalic Blue\033[0m"
+        result = wrapper.wrap_text(complex_colored)
+        
+        for line in result:
+            if line.strip():
+                visual_width = wrapper._get_visual_width(line)
+                assert visual_width <= 25
 
 
 def run_tests():

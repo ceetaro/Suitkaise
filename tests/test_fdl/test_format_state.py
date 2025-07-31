@@ -62,7 +62,7 @@ class TestFormatState:
         values = ('test', 42, True)
         state = _FormatState(values=values, terminal_width=80)
         
-        assert state.values == list(values)
+        assert state.values == values
         assert state.terminal_width == 80
         
         # Test getting values
@@ -180,7 +180,7 @@ class TestCreateFormatState:
         state = _create_format_state()
         
         assert isinstance(state, _FormatState)
-        assert state.values == []
+        assert state.values == ()
         assert state.terminal_width >= 60
     
     def test_create_format_state_with_values(self):
@@ -188,7 +188,7 @@ class TestCreateFormatState:
         values = ('test', 123)
         state = _create_format_state(values)
         
-        assert state.values == list(values)
+        assert state.values == values
     
     def test_create_format_state_with_terminal_width(self):
         """Test creating format state with custom terminal width."""

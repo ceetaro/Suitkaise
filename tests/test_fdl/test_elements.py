@@ -149,7 +149,7 @@ class TestCommandElement:
     def test_command_element_creation(self):
         """Test creating a command element."""
         element = _CommandElement("red")
-        assert element.command == "red"
+        assert element.command_string == "red"
     
     def test_command_element_process(self):
         """Test processing a command element."""
@@ -297,8 +297,9 @@ class TestElementEdgeCases:
         
         result = element.process(format_state)
         
-        # Should handle special characters
-        assert special_text in result.terminal_output[0]
+        # Should handle special characters (check joined output since text contains newlines)
+        terminal_output = ''.join(result.terminal_output)
+        assert special_text in terminal_output
     
     def test_variable_element_with_complex_types(self):
         """Test variable element with complex value types."""

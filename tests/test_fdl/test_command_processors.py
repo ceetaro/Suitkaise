@@ -17,6 +17,8 @@ from suitkaise.fdl._int.processors.commands.text_commands import _TextCommandPro
 from suitkaise.fdl._int.processors.commands.layout_commands import _LayoutCommandProcessor
 from suitkaise.fdl._int.processors.commands.box_commands import _BoxCommandProcessor
 from suitkaise.fdl._int.processors.commands.time_commands import _TimeCommandProcessor
+from suitkaise.fdl._int.processors.commands.debug_commands import _DebugCommandProcessor
+from suitkaise.fdl._int.processors.commands.fmt_commands import _FormatCommandProcessor
 from suitkaise.fdl._int.core.format_state import _FormatState
 
 
@@ -442,6 +444,139 @@ class TestCommandProcessorEdgeCases:
         # Test box commands
         assert _BoxCommandProcessor.can_process('BOX ROUNDED') is True
         assert _BoxCommandProcessor.can_process('Box Square') is True
+
+
+class TestDebugCommandProcessor:
+    """Test the _DebugCommandProcessor class."""
+    
+    def test_can_process_debug_commands(self):
+        """Test recognition of debug commands."""
+        processor = _DebugCommandProcessor
+        
+        # Should recognize debug commands
+        assert processor.can_process('debug') is True
+        assert processor.can_process('debug on') is True
+        assert processor.can_process('debug off') is True
+        
+        # Should not recognize invalid debug commands
+        assert processor.can_process('debug invalid') is False
+    
+    def test_process_debug_commands(self):
+        """Test processing debug commands."""
+        processor = _DebugCommandProcessor
+        format_state = _FormatState()
+        
+        # Test debug on
+        result = processor.process('debug on', format_state)
+        assert result.debug_mode is True
+        
+        # Test debug off
+        result = processor.process('debug off', result)
+        assert result.debug_mode is False
+        
+        # Test simple debug
+        result = processor.process('debug', result)
+        assert result.debug_mode is True
+    
+    def test_debug_mode_affects_text_formatting(self):
+        """Test that debug mode affects text formatting."""
+        format_state = _FormatState()
+        
+        # Enable debug mode
+        format_state = _DebugCommandProcessor.process('debug on', format_state)
+        assert format_state.debug_mode is True
+        
+        # Try to apply text formatting in debug mode
+        result = _TextCommandProcessor.process('bold', format_state)
+        assert result.bold is False  # Should not apply formatting in debug mode
+        
+        # Reset should still work
+        result = _TextCommandProcessor.process('reset', result)
+        assert result.debug_mode is False  # Reset should exit debug mode
+    
+    def test_debug_visual_examples(self):
+        """Test debug commands with visual examples."""
+        processor = _DebugCommandProcessor
+        format_state = _FormatState()
+        
+        # Test debug on - should show debug mode enabled
+        result = processor.process('debug on', format_state)
+        assert result.debug_mode is True
+        
+        # Test debug off - should show debug mode disabled
+        result = processor.process('debug off', result)
+        assert result.debug_mode is False
+        
+        # Test debug toggle - should enable debug mode
+        result = processor.process('debug', result)
+        assert result.debug_mode is True
+
+
+class TestFormatCommandProcessor:
+    """Test the _FormatCommandProcessor class."""
+    
+    def test_can_process_format_commands(self):
+        """Test recognition of format commands."""
+        processor = _FormatCommandProcessor
+        
+        # Should recognize format commands
+        assert processor.can_process('fmt') is True
+        assert processor.can_process('fmt red') is True
+        assert processor.can_process('fmt bold, red') is True
+        assert processor.can_process('fmt #FF0000') is True
+        assert processor.can_process('fmt rgb(255, 0, 0)') is True
+        
+        # Should not recognize invalid format commands
+        assert processor.can_process('fmt invalid') is False
+    
+    def test_process_format_commands(self):
+        """Test processing format commands."""
+        processor = _FormatCommandProcessor
+        format_state = _FormatState()
+        
+        # Test simple format
+        result = processor.process('fmt red', format_state)
+        assert result.text_color == 'red'
+        
+        # Test multiple formats
+        result = processor.process('fmt bold, red', result)
+        assert result.bold is True
+        assert result.text_color == 'red'
+        
+        # Test hex color
+        result = processor.process('fmt #00FF00', result)
+        assert result.text_color == '#00FF00'
+        
+        # Test RGB color
+        result = processor.process('fmt rgb(0, 0, 255)', result)
+        assert result.text_color == 'rgb(0, 0, 255)'
+    
+    def test_format_visual_examples(self):
+        """Test format commands with visual examples."""
+        processor = _FormatCommandProcessor
+        format_state = _FormatState()
+        
+        # Test single color format
+        result = processor.process('fmt blue', format_state)
+        assert result.text_color == 'blue'
+        assert '\033[34m' in result.terminal_output  # ANSI blue code
+        
+        # Test multiple format attributes
+        result = processor.process('fmt bold, italic, green', result)
+        assert result.bold is True
+        assert result.italic is True
+        assert result.text_color == 'green'
+        assert '\033[1m' in result.terminal_output  # ANSI bold code
+        assert '\033[3m' in result.terminal_output  # ANSI italic code
+        assert '\033[32m' in result.terminal_output  # ANSI green code
+        
+        # Test hex color format
+        result = processor.process('fmt #FF0000', result)
+        assert result.text_color == '#FF0000'
+        
+        # Test RGB color format
+        result = processor.process('fmt rgb(255, 255, 0)', result)
+        assert result.text_color == 'rgb(255, 255, 0)'
 
 
 if __name__ == '__main__':

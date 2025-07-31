@@ -167,7 +167,7 @@ class _ProgressBarGenerator:
             bar_content = self._apply_format_state(bar_content, format_state)
         
         # Build the complete progress bar
-        parts = [f"[{bar_content}]"]
+        parts = [bar_content]
         
         # Add percentage
         if show_percentage:
@@ -203,7 +203,7 @@ class _ProgressBarGenerator:
         bar_content = '#' * filled_chars + '-' * (bar_width - filled_chars)
         
         # Build the complete progress bar
-        parts = [f"[{bar_content}]"]
+        parts = [bar_content]
         
         # Add percentage
         if show_percentage:

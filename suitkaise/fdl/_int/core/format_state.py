@@ -9,7 +9,7 @@ This is internal to the FDL engine and not exposed to users.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Set, Dict, Any, TYPE_CHECKING
+from typing import List, Optional, Tuple, Set, Dict, Any, TYPE_CHECKING, Union
 
 # Import terminal detection
 try:
@@ -64,7 +64,7 @@ class _FormatState:
     box_width: int = 0
     
     # Layout settings
-    justify: Optional[str] = None  # 'left', 'right', 'center'
+    justify: str = 'left'  # 'left', 'right', 'center'
     
     # Debug mode settings
     debug_mode: bool = False
@@ -357,7 +357,7 @@ def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = Non
     Private factory function to create a _FormatState with proper initialization.
     
     Args:
-        values: Tuple of values for variable substitution
+        values: Tuple or list of values for variable substitution
         terminal_width: Override terminal width (uses detected width if None)
         
     Returns:
@@ -365,6 +365,10 @@ def _create_format_state(values: Tuple = (), terminal_width: Optional[int] = Non
     """
     if terminal_width is None:
         terminal_width = max(60, _terminal.width)
+    
+    # Convert values to list if it's a tuple
+    if isinstance(values, tuple):
+        values = list(values)
     
     return _FormatState(
         values=values,

@@ -21,11 +21,8 @@ class _TextElement(_ElementProcessor):
     
     def process(self, format_state: _FormatState) -> _FormatState:
         """Process text element."""
-        if not self.content:
-            return format_state
-        
         if format_state.in_box:
-            # Inside box - add to box content
+            # Inside box - add to box content (even if empty)
             format_state.box_content.append(self.content)
         else:
             # Outside box - use base element's automatic wrapping

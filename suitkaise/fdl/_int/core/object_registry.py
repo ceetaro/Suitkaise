@@ -246,6 +246,21 @@ class _ObjectRegistry:
                 'supported_types': [],
                 'is_supported': False
             }
+    
+    @classmethod
+    def get_registry_info(cls) -> dict:
+        """
+        Get information about the entire registry.
+        
+        Returns:
+            dict: Information about all registered processors and types
+        """
+        return {
+            'total_processors': len(set(cls._type_to_processor.values())),
+            'total_types': len(cls._type_to_processor),
+            'supported_types': list(cls._type_to_processor.keys()),
+            'processors': {name: proc.__name__ for name, proc in cls._type_to_processor.items()}
+        }
 
 
 def _register_object_processor(processor_class: Type[_ObjectProcessor]) -> None:

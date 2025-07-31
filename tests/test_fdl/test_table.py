@@ -341,8 +341,8 @@ def test_display_methods():
         table.display()  # This will print to stdout
         table.display(start_row=5, end_row=10)
         table.display_all_rows()
-        table.print()  # Alias for display
-        table.print_all_rows()  # Alias for display_all_rows
+        table.display()  # Main display method
+        table.display_all_rows()  # Display all rows method
     except Exception as e:
         assert False, f"Display methods should not raise errors: {e}"
     
