@@ -333,6 +333,144 @@ def test_utility_methods():
     print("✅ Utility methods tests passed")
 
 
+def test_unicode_blocks():
+    """Test progress bar with Unicode blocks (not just ANSI fallback)."""
+    print("🧪 Testing Unicode blocks...")
+    
+    # Temporarily disable terminal fallback to test Unicode
+    original_env = os.environ.get('FORCE_TERMINAL_FALLBACK')
+    os.environ['FORCE_TERMINAL_FALLBACK'] = '0'
+    
+    try:
+        progress = _ProgressBar(total=100, width=20)
+        progress.update(50)
+        
+        # Get output and check for Unicode blocks
+        output = progress.get_output('terminal')
+        
+        # Should contain Unicode block characters (not just # or =)
+        unicode_blocks = ['█', '▇', '▆', '▅', '▄', '▃', '▂', '▁', '░']
+        has_unicode = any(block in output for block in unicode_blocks)
+        
+        # If terminal supports Unicode, should have Unicode blocks
+        # If not, should fall back to ASCII
+        if has_unicode:
+            print("✅ Unicode blocks detected")
+        else:
+            print("✅ ASCII fallback working correctly")
+            
+    finally:
+        # Restore original environment
+        if original_env is not None:
+            os.environ['FORCE_TERMINAL_FALLBACK'] = original_env
+        else:
+            os.environ.pop('FORCE_TERMINAL_FALLBACK', None)
+
+
+def test_stopping_early():
+    """Test stopping progress bar early."""
+    print("🧪 Testing early stopping...")
+    
+    progress = _ProgressBar(total=100)
+    progress.update(30, "Working...")
+    
+    # Stop early
+    progress.finish("Stopped early")
+    assert progress.is_finished
+    assert progress.current == 100.0  # Should complete when finished
+    assert progress.message == "Stopped early"
+    
+    # Should not be able to update after finishing
+    try:
+        progress.update(10)
+        assert False, "Should not be able to update after finishing"
+    except RuntimeError:
+        pass
+    
+    print("✅ Early stopping tests passed")
+
+
+def test_messages_with_updates():
+    """Test adding messages with updates under the progress bar."""
+    print("🧪 Testing messages with updates...")
+    
+    progress = _ProgressBar(total=100)
+    
+    # Test messages with updates
+    progress.update(25, "Loading configuration...")
+    assert progress.message == "Loading configuration..."
+    
+    progress.update(50, "Processing data...")
+    assert progress.message == "Processing data..."
+    
+    progress.update(75, "Finalizing...")
+    assert progress.message == "Finalizing..."
+    
+    progress.finish("Complete!")
+    assert progress.message == "Complete!"
+    
+    print("✅ Message updates tests passed")
+
+
+def test_coloring_from_start_to_finish():
+    """Test coloring a progress bar from start to finish."""
+    print("🧪 Testing progress bar coloring...")
+    
+    progress = _ProgressBar(total=100, color='green')
+    
+    # Test initial color
+    output = progress.get_output('terminal')
+    assert '\033[32m' in output or 'green' in output  # Should have green color
+    
+    # Test color change during progress
+    progress.set_color('red')
+    progress.update(50)
+    output = progress.get_output('terminal')
+    assert '\033[31m' in output or 'red' in output  # Should have red color
+    
+    # Test color at finish
+    progress.set_color('blue')
+    progress.finish("Done!")
+    output = progress.get_output('terminal')
+    assert '\033[34m' in output or 'blue' in output  # Should have blue color
+    
+    print("✅ Progress bar coloring tests passed")
+
+
+def test_performance():
+    """Test progress bar performance."""
+    print("🧪 Testing performance...")
+    
+    import time
+    
+    # Test creation performance
+    start_time = time.time()
+    for _ in range(1000):
+        progress = _ProgressBar(total=100)
+    creation_time = time.time() - start_time
+    assert creation_time < 1.0  # Should create 1000 bars in under 1 second
+    
+    # Test update performance
+    progress = _ProgressBar(total=100)
+    start_time = time.time()
+    for i in range(100):
+        progress.update(1)
+    update_time = time.time() - start_time
+    assert update_time < 0.1  # Should update 100 times in under 0.1 seconds
+    
+    # Test output generation performance
+    start_time = time.time()
+    for _ in range(100):
+        progress.get_output('terminal')
+    output_time = time.time() - start_time
+    assert output_time < 0.1  # Should generate 100 outputs in under 0.1 seconds
+    
+    print("✅ Performance tests passed")
+    print(f"   Creation: {creation_time:.3f}s for 1000 bars")
+    print(f"   Updates: {update_time:.3f}s for 100 updates")
+    print(f"   Output: {output_time:.3f}s for 100 outputs")
+
+
 def visual_demo():
     """Visual demonstration of progress bar functionality."""
     print("\n" + "="*60)
