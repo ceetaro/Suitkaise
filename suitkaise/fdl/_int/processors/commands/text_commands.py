@@ -1,7 +1,7 @@
 # processors/commands/_text_commands.py
 from ...core.command_registry import _CommandProcessor, _command_processor
 from ...core.format_state import _FormatState
-from ...setup.color_conversion import _get_named_colors, _is_valid_color, _ColorConverter
+from ...setup.color_conversion import _get_named_colors, _ColorConverter
 
 @_command_processor(priority=10)
 class _TextCommandProcessor(_CommandProcessor):
@@ -45,11 +45,22 @@ class _TextCommandProcessor(_CommandProcessor):
         """
         command = command.strip().lower()
         
-        # Handle comma-separated commands
+        # Handle comma-separated commands (but not inside parentheses)
         if ',' in command:
-            # Split by comma and check each part
-            parts = [part.strip() for part in command.split(',')]
-            return all(cls._can_process_single_command(part) for part in parts)
+            # Check if comma is inside parentheses (like in rgb(255, 0, 0))
+            paren_count = 0
+            for char in command:
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                elif char == ',' and paren_count == 0:
+                    # Comma is outside parentheses, so it's a separator
+                    parts = [part.strip() for part in command.split(',')]
+                    return all(cls._can_process_single_command(part) for part in parts)
+            
+            # If we get here, all commas are inside parentheses
+            return cls._can_process_single_command(command)
         else:
             return cls._can_process_single_command(command)
     
@@ -68,16 +79,16 @@ class _TextCommandProcessor(_CommandProcessor):
         
         # Hex colors
         if command.startswith('#'):
-            return _is_valid_color(command)
+            return cls._color_converter.is_valid_color(command)
         
         # RGB colors
         if command.startswith('rgb(') and command.endswith(')'):
-            return _is_valid_color(command)
+            return cls._color_converter.is_valid_color(command)
         
         # Background colors
         if command.startswith('bkg '):
             bg_color = command[4:].strip()
-            return _is_valid_color(bg_color)
+            return cls._color_converter.is_valid_color(bg_color)
         
         # End commands
         if command.startswith('end '):
@@ -107,13 +118,24 @@ class _TextCommandProcessor(_CommandProcessor):
         command = command.strip()
         command_lower = command.lower()
         
-        # Handle comma-separated commands
+        # Handle comma-separated commands (but not inside parentheses)
         if ',' in command_lower:
-            # Process each command part separately
-            parts = [part.strip() for part in command_lower.split(',')]
-            for part in parts:
-                format_state = cls._process_single_command(part, format_state)
-            return format_state
+            # Check if comma is inside parentheses (like in rgb(255, 0, 0))
+            paren_count = 0
+            for char in command_lower:
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                elif char == ',' and paren_count == 0:
+                    # Comma is outside parentheses, so it's a separator
+                    parts = [part.strip() for part in command_lower.split(',')]
+                    for part in parts:
+                        format_state = cls._process_single_command(part, format_state)
+                    return format_state
+            
+            # If we get here, all commas are inside parentheses
+            return cls._process_single_command(command_lower, format_state)
         else:
             return cls._process_single_command(command_lower, format_state)
     
@@ -145,13 +167,13 @@ class _TextCommandProcessor(_CommandProcessor):
             cls._add_ansi_code(format_state, ansi_code)
         
         # Hex colors
-        elif command.startswith('#') and _is_valid_color(command):
+        elif command.startswith('#') and cls._color_converter.is_valid_color(command):
             format_state.text_color = command
             ansi_code = cls._color_converter.to_ansi_fg(command)
             cls._add_ansi_code(format_state, ansi_code)
         
         # RGB colors
-        elif command.startswith('rgb(') and _is_valid_color(command):
+        elif command.startswith('rgb(') and cls._color_converter.is_valid_color(command):
             format_state.text_color = command
             ansi_code = cls._color_converter.to_ansi_fg(command)
             cls._add_ansi_code(format_state, ansi_code)
@@ -159,7 +181,7 @@ class _TextCommandProcessor(_CommandProcessor):
         # Background colors
         elif command.startswith('bkg '):
             bg_color = command[4:].strip()
-            if _is_valid_color(bg_color):
+            if cls._color_converter.is_valid_color(bg_color):
                 format_state.background_color = bg_color
                 ansi_code = cls._color_converter.to_ansi_bg(bg_color)
                 cls._add_ansi_code(format_state, ansi_code)
