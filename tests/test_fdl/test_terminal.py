@@ -1,472 +1,585 @@
-# tests/test_fdl/test_setup/test_terminal.py
+"""
+Comprehensive tests for FDL Terminal Detection System.
+
+Tests the internal terminal detection system that provides width, height,
+color support, TTY detection, and encoding detection with fallbacks.
+"""
+
 import pytest
-import os
 import sys
-from unittest.mock import patch, Mock, MagicMock
-from io import StringIO
+import os
+import warnings
+from unittest.mock import Mock, patch, MagicMock
+from contextlib import contextmanager
 
-# Import test setup
-from setup_fdl_tests import FDL_INT_PATH
-sys.path.insert(0, str(FDL_INT_PATH))
+# Add the suitkaise package to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from setup.terminal import _TerminalInfo, _terminal, _refresh_terminal_info, TerminalWidthError
+from suitkaise.fdl._int.setup.terminal import (
+    _TerminalInfo, TerminalWidthError, _get_terminal, _refresh_terminal_info
+)
 
 
 class TestTerminalInfo:
-    """Test the internal _TerminalInfo class."""
+    """Test suite for the terminal information detection system."""
     
-    def test_initialization_normal_conditions(self):
-        """Test _TerminalInfo initialization under normal conditions."""
-        # Create a fresh instance
-        terminal = _TerminalInfo()
-        
-        # Should have detected basic properties
-        assert terminal.width >= 60
-        assert terminal.height >= 1  # Should have some height
-        assert isinstance(terminal.supports_color, bool)
-        assert isinstance(terminal.is_tty, bool)
-        assert isinstance(terminal.encoding, str)
-        assert len(terminal.encoding) > 0  # Should have some encoding
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Clear any existing environment variables that might interfere
+        self.original_env = {}
+        env_vars = ['FORCE_TERMINAL_FALLBACK', 'COLUMNS', 'LINES', 'TERM', 'COLORTERM', 'NO_COLOR']
+        for var in env_vars:
+            if var in os.environ:
+                self.original_env[var] = os.environ[var]
+                del os.environ[var]
     
-    def test_width_property_critical_requirement(self):
-        """Test that width property returns valid integer and is critical."""
-        terminal = _TerminalInfo()
-        
-        # Width must be accessible and reasonable
-        width = terminal.width
-        assert isinstance(width, int)
-        assert width >= 60  # Hard minimum
-        assert width <= 1000  # Reasonable maximum
+    def teardown_method(self):
+        """Clean up after tests."""
+        # Restore original environment
+        for var, value in self.original_env.items():
+            os.environ[var] = value
     
-    def test_height_property_graceful_fallback(self):
-        """Test that height property falls back gracefully."""
-        terminal = _TerminalInfo()
-        
-        # Height should always be accessible
-        height = terminal.height
-        assert isinstance(height, int)
-        assert height >= 1  # At least 1 line
-        # If detection fails, should fallback to 24
+    @contextmanager
+    def mock_terminal_methods(self, width=80, height=24, tty=True, color=True):
+        """Context manager to mock terminal detection methods."""
+        with patch('os.get_terminal_size') as mock_os_size, \
+             patch('shutil.get_terminal_size') as mock_shutil_size, \
+             patch('sys.stdout.isatty') as mock_isatty:
+            
+            # Configure mocks
+            mock_os_size.return_value = Mock(columns=width, lines=height)
+            mock_shutil_size.return_value = Mock(columns=width, lines=height)
+            mock_isatty.return_value = tty
+            
+            # Set up environment for color detection
+            if color:
+                os.environ['TERM'] = 'xterm-256color'
+            
+            yield {
+                'os_size': mock_os_size,
+                'shutil_size': mock_shutil_size,
+                'isatty': mock_isatty
+            }
     
-    def test_color_support_detection(self):
-        """Test color support detection."""
-        terminal = _TerminalInfo()
-        
-        # Should return boolean
-        color_support = terminal.supports_color
-        assert isinstance(color_support, bool)
-        
-        # Test with NO_COLOR environment variable
-        with patch.dict(os.environ, {'NO_COLOR': '1'}):
-            # Create new instance to test NO_COLOR
-            terminal_no_color = _TerminalInfo()
-            # Should be False due to NO_COLOR
-            assert terminal_no_color.supports_color is False
+    def test_terminal_info_initialization_success(self):
+        """Test successful terminal initialization."""
+        with self.mock_terminal_methods(width=100, height=30, tty=True, color=True):
+            terminal = _TerminalInfo()
+            
+            assert terminal.width == 100
+            assert terminal.height == 30
+            assert terminal.is_tty is True
+            assert terminal.supports_color is True
+            assert isinstance(terminal.encoding, str)
     
-    def test_tty_detection(self):
-        """Test TTY detection."""
-        terminal = _TerminalInfo()
-        
-        # Should return boolean
-        is_tty = terminal.is_tty
-        assert isinstance(is_tty, bool)
+    def test_terminal_info_minimum_width_enforcement(self):
+        """Test that minimum width of 60 is enforced."""
+        with self.mock_terminal_methods(width=40, height=24):  # Below minimum
+            terminal = _TerminalInfo()
+            
+            # Should enforce minimum width of 60
+            assert terminal.width == 60
+            assert terminal.height == 24
     
-    def test_encoding_detection(self):
-        """Test encoding detection with fallback."""
-        terminal = _TerminalInfo()
-        
-        # Should always have some encoding
-        encoding = terminal.encoding
-        assert isinstance(encoding, str)
-        assert encoding in ['utf-8', 'ascii', 'cp1252', 'latin1'] or encoding.startswith('utf') or encoding.startswith('cp')
-    
-    def test_refresh_functionality(self):
-        """Test that refresh method works without errors."""
-        terminal = _TerminalInfo()
-        
-        # Store original values
-        original_width = terminal.width
-        original_height = terminal.height
-        
-        # Refresh should not raise errors
-        terminal.refresh()
-        
-        # Properties should still be accessible
-        assert isinstance(terminal.width, int)
-        assert isinstance(terminal.height, int)
-    
-    @patch('os.get_terminal_size')
-    @patch('shutil.get_terminal_size')
-    def test_size_detection_failure_raises_error(self, mock_shutil_size, mock_os_size):
-        """Test that size detection failure raises TerminalWidthError."""
-        # Mock both size detection methods to fail
-        mock_os_size.side_effect = OSError("No terminal")
-        mock_shutil_size.side_effect = OSError("No terminal")
-        
-        # Also mock environment variables to not exist
-        with patch.dict(os.environ, {}, clear=True):
+    def test_terminal_width_detection_failure(self):
+        """Test behavior when width detection fails completely."""
+        with patch('os.get_terminal_size', side_effect=OSError("No terminal")), \
+             patch('shutil.get_terminal_size', side_effect=OSError("No terminal")):
+            
+            # Should raise TerminalWidthError when width cannot be detected
             with pytest.raises(TerminalWidthError):
                 _TerminalInfo()
     
-    @patch('os.get_terminal_size')
-    def test_size_detection_with_valid_os_size(self, mock_os_size):
-        """Test successful size detection using os.get_terminal_size."""
-        # Mock successful size detection
-        mock_size = Mock()
-        mock_size.columns = 120
-        mock_size.lines = 30
-        mock_os_size.return_value = mock_size
+    def test_terminal_width_property_with_none(self):
+        """Test width property when _width is None."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._width = None
         
-        terminal = _TerminalInfo()
-        
-        assert terminal.width == 120
-        assert terminal.height == 30
+        with pytest.raises(TerminalWidthError):
+            _ = terminal.width
     
-    @patch('os.get_terminal_size')
-    @patch('shutil.get_terminal_size')
-    def test_size_detection_fallback_to_shutil(self, mock_shutil_size, mock_os_size):
-        """Test fallback to shutil.get_terminal_size when os method fails."""
-        # Mock os method to fail, shutil to succeed
-        mock_os_size.side_effect = OSError("os method failed")
+    def test_terminal_height_fallback(self):
+        """Test height property fallback behavior."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._height = None
         
-        mock_size = Mock()
-        mock_size.columns = 100
-        mock_size.lines = 25
-        mock_shutil_size.return_value = mock_size
+        # Should return 24 as fallback
+        assert terminal.height == 24
         
-        terminal = _TerminalInfo()
-        
-        assert terminal.width == 100
-        assert terminal.height == 25
+        # Should return actual value when available
+        terminal._height = 50
+        assert terminal.height == 50
     
-    @patch('os.get_terminal_size')
-    @patch('shutil.get_terminal_size')
-    def test_size_detection_fallback_to_environment(self, mock_shutil_size, mock_os_size):
-        """Test fallback to environment variables when both size methods fail."""
-        # Mock both methods to fail
-        mock_os_size.side_effect = OSError("os failed")
-        mock_shutil_size.side_effect = OSError("shutil failed")
+    def test_terminal_color_support_fallback(self):
+        """Test color support property fallback behavior."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._supports_color = None
         
-        # Mock environment variables
-        with patch.dict(os.environ, {'COLUMNS': '90', 'LINES': '20'}):
+        # Should return False as fallback
+        assert terminal.supports_color is False
+        
+        # Should return actual value when available
+        terminal._supports_color = True
+        assert terminal.supports_color is True
+    
+    def test_terminal_tty_fallback(self):
+        """Test TTY property fallback behavior."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._is_tty = None
+        
+        # Should return False as fallback
+        assert terminal.is_tty is False
+        
+        # Should return actual value when available
+        terminal._is_tty = True
+        assert terminal.is_tty is True
+    
+    def test_terminal_encoding_fallback(self):
+        """Test encoding property fallback behavior."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._encoding = None
+        
+        # Should return 'ascii' as fallback
+        assert terminal.encoding == 'ascii'
+        
+        # Should return actual value when available
+        terminal._encoding = 'utf-8'
+        assert terminal.encoding == 'utf-8'
+    
+    def test_testing_mode_activation(self):
+        """Test testing mode activation via environment variable."""
+        test_values = ['1', 'true', 'yes', 'TRUE', 'YES']
+        
+        for value in test_values:
+            os.environ['FORCE_TERMINAL_FALLBACK'] = value
+            
             terminal = _TerminalInfo()
+            
+            # Should use testing mode defaults
+            assert terminal.width == 60
+            assert terminal.height == 24
+            assert terminal.is_tty is False
+            assert terminal.supports_color is False
+            
+            # Clean up
+            del os.environ['FORCE_TERMINAL_FALLBACK']
+    
+    def test_size_detection_methods_priority(self):
+        """Test that size detection methods are tried in correct priority order."""
+        with patch('os.get_terminal_size', side_effect=OSError("Method 1 failed")) as mock_os, \
+             patch('shutil.get_terminal_size') as mock_shutil:
+            
+            mock_shutil.return_value = Mock(columns=90, lines=25)
+            
+            terminal = _TerminalInfo()
+            
+            # Should have tried os.get_terminal_size first, then shutil
+            mock_os.assert_called_once()
+            mock_shutil.assert_called_once()
             
             assert terminal.width == 90
-            assert terminal.height == 20
+            assert terminal.height == 25
     
-    def test_testing_mode_fallback(self):
-        """Test that testing mode forces fallback values."""
-        with patch.dict(os.environ, {'FORCE_TERMINAL_FALLBACK': '1'}):
+    def test_size_detection_environment_variables(self):
+        """Test size detection from environment variables."""
+        os.environ['COLUMNS'] = '120'
+        os.environ['LINES'] = '40'
+        
+        with patch('os.get_terminal_size', side_effect=OSError("No terminal")), \
+             patch('shutil.get_terminal_size', side_effect=OSError("No terminal")):
+            
             terminal = _TerminalInfo()
             
-            # Should use fallback values
+            assert terminal.width == 120
+            assert terminal.height == 40
+    
+    def test_size_detection_environment_variables_minimum_width(self):
+        """Test that environment variables still respect minimum width."""
+        os.environ['COLUMNS'] = '30'  # Below minimum
+        os.environ['LINES'] = '40'
+        
+        with patch('os.get_terminal_size', side_effect=OSError("No terminal")), \
+             patch('shutil.get_terminal_size', side_effect=OSError("No terminal")):
+            
+            terminal = _TerminalInfo()
+            
+            assert terminal.width == 60  # Enforced minimum
+            assert terminal.height == 40
+    
+    def test_tty_detection_success(self):
+        """Test successful TTY detection."""
+        with patch('sys.stdout.isatty', return_value=True):
+            terminal = _TerminalInfo()
+            assert terminal.is_tty is True
+        
+        with patch('sys.stdout.isatty', return_value=False):
+            terminal = _TerminalInfo()
+            assert terminal.is_tty is False
+    
+    def test_tty_detection_failure(self):
+        """Test TTY detection failure handling."""
+        with patch('sys.stdout.isatty', side_effect=OSError("TTY detection failed")):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                terminal = _TerminalInfo()
+                
+                # Should default to False and issue warning
+                assert terminal.is_tty is False
+                assert len(w) > 0
+                assert "TTY detection failed" in str(w[-1].message)
+    
+    def test_color_support_no_color_environment(self):
+        """Test that NO_COLOR environment variable disables colors."""
+        os.environ['NO_COLOR'] = '1'
+        os.environ['TERM'] = 'xterm-256color'  # Would normally support colors
+        
+        with patch('sys.stdout.isatty', return_value=True):
+            terminal = _TerminalInfo()
+            assert terminal.supports_color is False
+    
+    def test_color_support_term_detection(self):
+        """Test color support detection based on TERM variable."""
+        color_terms = ['xterm', 'xterm-256color', 'screen', 'tmux', 'vt100', 'color', 'ansi', 'cygwin']
+        
+        with patch('sys.stdout.isatty', return_value=True):
+            for term in color_terms:
+                os.environ['TERM'] = term
+                terminal = _TerminalInfo()
+                assert terminal.supports_color is True, f"Term {term} should support colors"
+                del os.environ['TERM']
+    
+    def test_color_support_colorterm_detection(self):
+        """Test color support detection based on COLORTERM variable."""
+        color_terms = ['truecolor', '24bit', 'yes']
+        
+        with patch('sys.stdout.isatty', return_value=True):
+            for colorterm in color_terms:
+                os.environ['COLORTERM'] = colorterm
+                terminal = _TerminalInfo()
+                assert terminal.supports_color is True, f"COLORTERM {colorterm} should support colors"
+                del os.environ['COLORTERM']
+    
+    def test_color_support_no_tty(self):
+        """Test that color support is disabled when not a TTY."""
+        os.environ['TERM'] = 'xterm-256color'
+        
+        with patch('sys.stdout.isatty', return_value=False):
+            terminal = _TerminalInfo()
+            assert terminal.supports_color is False
+    
+    def test_encoding_detection_stdout(self):
+        """Test encoding detection from stdout."""
+        with patch('sys.stdout.encoding', 'UTF-8'):
+            terminal = _TerminalInfo()
+            assert terminal.encoding == 'utf-8'  # Should be lowercase
+    
+    def test_encoding_detection_system_default(self):
+        """Test encoding detection from system default."""
+        with patch('sys.stdout.encoding', None), \
+             patch('sys.getdefaultencoding', return_value='CP1252'):
+            terminal = _TerminalInfo()
+            assert terminal.encoding == 'cp1252'  # Should be lowercase
+    
+    def test_encoding_detection_fallback(self):
+        """Test encoding detection fallback to ascii."""
+        with patch('sys.stdout.encoding', None), \
+             patch('sys.getdefaultencoding', side_effect=AttributeError("No default encoding")):
+            terminal = _TerminalInfo()
+            assert terminal.encoding == 'ascii'
+    
+    def test_refresh_method(self):
+        """Test the refresh method re-detects properties."""
+        with self.mock_terminal_methods(width=80, height=24) as mocks:
+            terminal = _TerminalInfo()
+            
+            # Initial values
+            assert terminal.width == 80
+            assert terminal.height == 24
+            
+            # Change mock return values
+            mocks['os_size'].return_value = Mock(columns=120, lines=40)
+            
+            # Refresh should re-detect
+            terminal.refresh()
+            
+            assert terminal.width == 120
+            assert terminal.height == 40
+    
+    def test_fallback_width_in_testing_mode(self):
+        """Test fallback width behavior in testing mode."""
+        os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+        
+        terminal = _TerminalInfo()
+        fallback_width = terminal._get_fallback_width()
+        
+        assert fallback_width == 60
+    
+    def test_fallback_width_normal_mode(self):
+        """Test fallback width behavior in normal mode."""
+        terminal = _TerminalInfo.__new__(_TerminalInfo)  # Create without __init__
+        terminal._testing_mode = False
+        
+        fallback_width = terminal._get_fallback_width()
+        
+        # Should return one of the standard fallback widths
+        assert fallback_width in [60, 80, 120, 100]
+        assert fallback_width >= 60
+
+
+class TestTerminalGlobalFunctions:
+    """Test suite for global terminal functions."""
+    
+    def test_get_terminal_function(self):
+        """Test _get_terminal function returns terminal instance."""
+        terminal = _get_terminal()
+        
+        assert terminal is not None
+        assert hasattr(terminal, 'width')
+        assert hasattr(terminal, 'height')
+        assert hasattr(terminal, 'supports_color')
+        assert hasattr(terminal, 'is_tty')
+        assert hasattr(terminal, 'encoding')
+    
+    def test_get_terminal_fallback_creation(self):
+        """Test _get_terminal creates fallback when needed."""
+        # Import the module-level _terminal and temporarily set it to None
+        from suitkaise.fdl._int.setup import terminal as terminal_module
+        original_terminal = terminal_module._terminal
+        terminal_module._terminal = None
+        
+        try:
+            terminal = _get_terminal()
+            
+            # Should create fallback terminal
             assert terminal.width == 60
             assert terminal.height == 24
             assert terminal.supports_color is False
             assert terminal.is_tty is False
+            assert terminal.encoding == 'ascii'
+            
+        finally:
+            # Restore original terminal
+            terminal_module._terminal = original_terminal
     
-    @patch('sys.stdout')
-    def test_tty_detection_with_isatty(self, mock_stdout):
-        """Test TTY detection using stdout.isatty()."""
-        # Mock isatty to return True
-        mock_stdout.isatty.return_value = True
-        
-        terminal = _TerminalInfo()
-        
-        # Should detect as TTY (assuming no testing mode override)
-        if not os.environ.get('FORCE_TERMINAL_FALLBACK'):
-            assert terminal.is_tty is True
-    
-    def test_color_support_term_environment(self):
-        """Test color support detection based on TERM environment variable."""
-        # Test with color-supporting terminal
-        with patch.dict(os.environ, {'TERM': 'xterm-256color'}):
-            with patch('sys.stdout') as mock_stdout:
-                mock_stdout.isatty.return_value = True
-                terminal = _TerminalInfo()
-                
-                if not os.environ.get('FORCE_TERMINAL_FALLBACK'):
-                    assert terminal.supports_color is True
-        
-        # Test with non-color terminal
-        with patch.dict(os.environ, {'TERM': 'dumb'}):
-            terminal = _TerminalInfo()
-            # Should not support color for dumb terminal
-    
-    def test_encoding_detection_methods(self):
-        """Test different encoding detection methods."""
-        terminal = _TerminalInfo()
-        
-        # Should never be empty
-        assert terminal.encoding != ""
-        
-        # Should be a valid encoding name
-        valid_encodings = [
-            'utf-8', 'ascii', 'cp1252', 'latin1', 'iso-8859-1',
-            'utf-16', 'utf-32', 'cp1251', 'cp850'
-        ]
-        
-        # Check if it's a known encoding or starts with common prefixes
-        is_valid = (
-            terminal.encoding in valid_encodings or
-            terminal.encoding.startswith('utf') or
-            terminal.encoding.startswith('cp') or
-            terminal.encoding.startswith('iso') or
-            terminal.encoding.startswith('latin')
-        )
-        
-        assert is_valid, f"Unexpected encoding: {terminal.encoding}"
-
-
-class TestGlobalTerminalInstance:
-    """Test the global _terminal instance and related functions."""
-    
-    def test_global_terminal_accessible(self):
-        """Test that global _terminal instance is accessible."""
-        # Should be importable and have expected properties
-        assert hasattr(_terminal, 'width')
-        assert hasattr(_terminal, 'height')
-        assert hasattr(_terminal, 'supports_color')
-        assert hasattr(_terminal, 'is_tty')
-        assert hasattr(_terminal, 'encoding')
-    
-    def test_global_terminal_properties(self):
-        """Test that global terminal has valid properties."""
-        # Width is critical
-        assert isinstance(_terminal.width, int)
-        assert _terminal.width >= 60
-        
-        # Other properties should be accessible
-        assert isinstance(_terminal.height, int)
-        assert isinstance(_terminal.supports_color, bool)
-        assert isinstance(_terminal.is_tty, bool)
-        assert isinstance(_terminal.encoding, str)
-    
-    def test_refresh_global_terminal_function(self):
-        """Test the global refresh function."""
-        # Should not raise errors
+    def test_refresh_terminal_info_function(self):
+        """Test _refresh_terminal_info function."""
+        # This should not raise an exception
         _refresh_terminal_info()
         
-        # Properties should still be valid after refresh
-        assert isinstance(_terminal.width, int)
-        assert _terminal.width >= 60
+        # Should work even with fallback terminal
+        from suitkaise.fdl._int.setup import terminal as terminal_module
+        original_terminal = terminal_module._terminal
+        
+        # Create a mock terminal without refresh method
+        mock_terminal = Mock()
+        del mock_terminal.refresh  # Remove refresh method
+        terminal_module._terminal = mock_terminal
+        
+        try:
+            # Should not raise exception even without refresh method
+            _refresh_terminal_info()
+        finally:
+            terminal_module._terminal = original_terminal
 
 
 class TestTerminalErrorHandling:
-    """Test error handling and edge cases."""
+    """Test suite for terminal error handling and edge cases."""
     
     def test_terminal_width_error_exception(self):
         """Test TerminalWidthError exception."""
-        # Should be a proper exception
-        error = TerminalWidthError("Test error")
+        error = TerminalWidthError("Test error message")
+        assert str(error) == "Test error message"
         assert isinstance(error, Exception)
-        assert str(error) == "Test error"
     
-    @patch('warnings.warn')
-    def test_warning_on_height_detection_failure(self, mock_warn):
-        """Test that warnings are issued for height detection failure."""
-        # This is harder to test directly, but we can check that warnings module is used
-        # in the actual code when height detection fails but width succeeds
-        pass  # Implementation would depend on specific mocking scenario
-    
-    def test_minimum_width_enforcement(self):
-        """Test that minimum width of 60 is enforced."""
-        # Even if detection returns smaller value, should be at least 60
-        terminal = _TerminalInfo()
-        assert terminal.width >= 60
-    
-    @patch('os.get_terminal_size')
-    def test_invalid_size_values_handling(self, mock_os_size):
-        """Test handling of invalid size values from detection."""
-        # Mock size with invalid values
-        mock_size = Mock()
-        mock_size.columns = 0  # Invalid
-        mock_size.lines = -1   # Invalid
-        mock_os_size.return_value = mock_size
-        
-        # Should either handle gracefully or fall back to other methods
-        try:
-            terminal = _TerminalInfo()
-            # If it succeeds, width should still be reasonable
-            assert terminal.width >= 60
-        except TerminalWidthError:
-            # This is also acceptable if no fallback works
-            pass
-
-
-def run_tests():
-    """Run all terminal tests with visual system information."""
-    import traceback
-    import os
-    import sys
-    
-    test_classes = [
-        TestTerminalInfo,
-        TestGlobalTerminalInstance,
-        TestTerminalErrorHandling
-    ]
-    
-    total_tests = 0
-    passed_tests = 0
-    failed_tests = []
-    
-    print("🧪 Running Terminal Detection Test Suite...")
-    print("=" * 60)
-    
-    # Show visual examples first
-    print("\n🖥️  DETECTED TERMINAL INFORMATION")
-    print("-" * 50)
-    
-    # Current terminal detection
-    print("📏 Terminal Dimensions:")
-    print(f"  Width:  {_terminal.width} characters")
-    print(f"  Height: {_terminal.height} characters")
-    
-    print(f"\n🎨 Terminal Capabilities:")
-    print(f"  Color Support:  {_terminal.supports_color}")
-    print(f"  Is TTY:         {_terminal.is_tty}")
-    print(f"  Encoding:       {_terminal.encoding}")
-    
-    # Environment information
-    print(f"\n🌍 Environment Variables:")
-    env_vars = ['TERM', 'COLORTERM', 'COLUMNS', 'LINES', 'NO_COLOR', 'FORCE_TERMINAL_FALLBACK']
-    for var in env_vars:
-        value = os.environ.get(var, '(not set)')
-        print(f"  {var:20}: {value}")
-    
-    # Detection method testing
-    print(f"\n🔍 Detection Methods:")
-    
-    # Test os.get_terminal_size()
-    try:
-        os_size = os.get_terminal_size()
-        print(f"  os.get_terminal_size(): {os_size.columns}x{os_size.lines}")
-    except Exception as e:
-        print(f"  os.get_terminal_size(): ❌ {e}")
-    
-    # Test shutil.get_terminal_size()
-    try:
-        import shutil
-        shutil_size = shutil.get_terminal_size()
-        print(f"  shutil.get_terminal_size(): {shutil_size.columns}x{shutil_size.lines}")
-    except Exception as e:
-        print(f"  shutil.get_terminal_size(): ❌ {e}")
-    
-    # Test stdout.isatty()
-    try:
-        is_tty = sys.stdout.isatty()
-        print(f"  sys.stdout.isatty(): {is_tty}")
-    except Exception as e:
-        print(f"  sys.stdout.isatty(): ❌ {e}")
-    
-    # Color support analysis
-    print(f"\n🎨 Color Support Analysis:")
-    print(f"  NO_COLOR env var: {'Set' if os.environ.get('NO_COLOR') else 'Not set'}")
-    print(f"  TERM contains color indicators: {any(term in os.environ.get('TERM', '').lower() for term in ['color', 'xterm', '256'])}")
-    print(f"  COLORTERM set: {'Yes' if os.environ.get('COLORTERM') else 'No'}")
-    
-    # Show color test if supported
-    if _terminal.supports_color:
-        print(f"\n🌈 Color Test (if supported):")
-        colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']
-        test_output = "  "
-        for color in colors:
-            if color == 'red':
-                test_output += f"\033[31m{color}\033[0m "
-            elif color == 'green':
-                test_output += f"\033[32m{color}\033[0m "
-            elif color == 'yellow':
-                test_output += f"\033[33m{color}\033[0m "
-            elif color == 'blue':
-                test_output += f"\033[34m{color}\033[0m "
-            elif color == 'magenta':
-                test_output += f"\033[35m{color}\033[0m "
-            elif color == 'cyan':
-                test_output += f"\033[36m{color}\033[0m "
-        print(test_output)
-    else:
-        print(f"\n🚫 Color Test: Colors not supported or disabled")
-    
-    # Unicode test
-    print(f"\n🔤 Encoding Test:")
-    test_chars = [
-        ('ASCII', 'Hello World'),
-        ('Latin-1', 'café naïve'),
-        ('UTF-8 Basic', 'Hello 世界'),
-        ('UTF-8 Emoji', 'Hello 😀 World'),
-        ('Box Drawing', '┌─┐│ │└─┘'),
-    ]
-    
-    for desc, test_text in test_chars:
-        try:
-            test_text.encode(_terminal.encoding)
-            encoded_ok = "✅"
-        except (UnicodeEncodeError, LookupError):
-            encoded_ok = "❌"
-        
-        print(f"  {desc:15}: {encoded_ok} {test_text}")
-    
-    # Terminal size demonstration
-    print(f"\n📐 Width Demonstration:")
-    # Create ruler starting from 1 instead of 0 for clarity
-    ruler = "".join(str((i % 10) if i > 0 else " ") for i in range(1, _terminal.width + 1))
-    print(ruler)
-    print('└' + '─' * (_terminal.width - 2) + '┘')
-    print(f"Terminal width: {_terminal.width} characters (counting from 1)")
-    
-    # Multiple instance test
-    print(f"\n🔄 Multiple Instance Test:")
-    terminal1 = _TerminalInfo()
-    terminal2 = _TerminalInfo()
-    
-    print(f"  Instance 1: {terminal1.width}x{terminal1.height} color={terminal1.supports_color}")
-    print(f"  Instance 2: {terminal2.width}x{terminal2.height} color={terminal2.supports_color}")
-    print(f"  Global:     {_terminal.width}x{_terminal.height} color={_terminal.supports_color}")
-    print(f"  Consistent: {terminal1.width == terminal2.width == _terminal.width}")
-    
-    print("\n" + "=" * 60)
-    print("🧪 RUNNING UNIT TESTS")
-    
-    for test_class in test_classes:
-        print(f"\n📋 {test_class.__name__}")
-        print("-" * 40)
-        
-        # Get all test methods
-        test_methods = [method for method in dir(test_class) if method.startswith('test_')]
-        
-        for method_name in test_methods:
-            total_tests += 1
-            try:
-                # Create instance and run test
-                test_instance = test_class()
-                test_method = getattr(test_instance, method_name)
-                test_method()
+    def test_complete_detection_failure_with_warnings(self):
+        """Test behavior when all detection methods fail."""
+        with patch('os.get_terminal_size', side_effect=OSError("Method 1 failed")), \
+             patch('shutil.get_terminal_size', side_effect=OSError("Method 2 failed")), \
+             patch.dict(os.environ, {}, clear=True):  # Clear environment variables
+            
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
                 
-                print(f"  ✅ {method_name}")
-                passed_tests += 1
+                with pytest.raises(TerminalWidthError):
+                    _TerminalInfo()
+                
+                # Should have issued warnings
+                assert len(w) > 0
+    
+    def test_partial_detection_failure_with_fallbacks(self):
+        """Test behavior when some detection methods fail but fallbacks work."""
+        with patch('os.get_terminal_size', side_effect=OSError("Primary method failed")), \
+             patch('shutil.get_terminal_size') as mock_shutil, \
+             patch('sys.stdout.isatty', side_effect=OSError("TTY detection failed")):
+            
+            mock_shutil.return_value = Mock(columns=100, lines=30)
+            
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                
+                terminal = _TerminalInfo()
+                
+                # Should succeed with fallbacks
+                assert terminal.width == 100
+                assert terminal.height == 30
+                assert terminal.is_tty is False  # Fallback value
+                
+                # Should have issued warnings for failed detections
+                warning_messages = [str(warning.message) for warning in w]
+                assert any("TTY detection failed" in msg for msg in warning_messages)
+    
+    def test_invalid_environment_variables(self):
+        """Test handling of invalid environment variable values."""
+        os.environ['COLUMNS'] = 'not_a_number'
+        os.environ['LINES'] = 'also_not_a_number'
+        
+        with patch('os.get_terminal_size', side_effect=OSError("No terminal")), \
+             patch('shutil.get_terminal_size', side_effect=OSError("No terminal")):
+            
+            # Should handle invalid values gracefully and raise TerminalWidthError
+            with pytest.raises(TerminalWidthError):
+                _TerminalInfo()
+    
+    def test_missing_stdout_attributes(self):
+        """Test handling when stdout lacks expected attributes."""
+        # Mock stdout without isatty method
+        mock_stdout = Mock()
+        del mock_stdout.isatty
+        
+        with patch('sys.stdout', mock_stdout):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                
+                terminal = _TerminalInfo()
+                
+                # Should handle gracefully
+                assert terminal.is_tty is False
+    
+    def test_zero_or_negative_terminal_size(self):
+        """Test handling of zero or negative terminal sizes."""
+        with patch('os.get_terminal_size') as mock_size:
+            mock_size.return_value = Mock(columns=0, lines=0)
+            
+            with patch('shutil.get_terminal_size', side_effect=OSError("Backup failed")):
+                # Should fail because width is 0
+                with pytest.raises(TerminalWidthError):
+                    _TerminalInfo()
+
+
+class TestTerminalVisualDemonstration:
+    """Visual demonstration tests for terminal detection (no actual visual output)."""
+    
+    def test_terminal_detection_demonstration(self):
+        """Demonstrate terminal detection capabilities."""
+        print("\n" + "="*60)
+        print("TERMINAL DETECTION - CAPABILITY DEMONSTRATION")
+        print("="*60)
+        
+        try:
+            terminal = _get_terminal()
+            
+            print(f"\nTerminal Properties:")
+            print(f"  Width: {terminal.width} characters")
+            print(f"  Height: {terminal.height} characters")
+            print(f"  Is TTY: {terminal.is_tty}")
+            print(f"  Supports Color: {terminal.supports_color}")
+            print(f"  Encoding: {terminal.encoding}")
+            
+            # Test color support visually if available
+            if terminal.supports_color:
+                print(f"\nColor Test:")
+                print(f"  \033[31mRed Text\033[0m")
+                print(f"  \033[32mGreen Text\033[0m")
+                print(f"  \033[34mBlue Text\033[0m")
+            else:
+                print(f"\nColor support disabled - no color test")
+            
+            # Test width by drawing a line
+            print(f"\nWidth Demonstration:")
+            print("  " + "─" * min(terminal.width - 4, 50))
+            
+        except Exception as e:
+            print(f"\nTerminal detection failed: {e}")
+    
+    def test_terminal_fallback_demonstration(self):
+        """Demonstrate terminal fallback behavior."""
+        print("\n" + "="*60)
+        print("TERMINAL DETECTION - FALLBACK DEMONSTRATION")
+        print("="*60)
+        
+        # Test with forced fallback mode
+        original_env = os.environ.get('FORCE_TERMINAL_FALLBACK')
+        
+        try:
+            os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+            
+            terminal = _TerminalInfo()
+            
+            print(f"\nFallback Mode Properties:")
+            print(f"  Width: {terminal.width} characters (fallback)")
+            print(f"  Height: {terminal.height} characters (fallback)")
+            print(f"  Is TTY: {terminal.is_tty} (fallback)")
+            print(f"  Supports Color: {terminal.supports_color} (fallback)")
+            print(f"  Encoding: {terminal.encoding} (fallback)")
+            
+        finally:
+            # Restore original environment
+            if original_env is not None:
+                os.environ['FORCE_TERMINAL_FALLBACK'] = original_env
+            else:
+                os.environ.pop('FORCE_TERMINAL_FALLBACK', None)
+    
+    def test_terminal_environment_variable_demonstration(self):
+        """Demonstrate environment variable effects on terminal detection."""
+        print("\n" + "="*60)
+        print("TERMINAL DETECTION - ENVIRONMENT VARIABLE EFFECTS")
+        print("="*60)
+        
+        env_tests = [
+            ("NO_COLOR", "1", "Disables color support"),
+            ("TERM", "xterm-256color", "Enables color support"),
+            ("COLORTERM", "truecolor", "Enables color support"),
+            ("COLUMNS", "100", "Sets terminal width"),
+            ("LINES", "50", "Sets terminal height"),
+        ]
+        
+        for env_var, value, description in env_tests:
+            print(f"\nTesting {env_var}={value} ({description}):")
+            
+            # Store original value
+            original_value = os.environ.get(env_var)
+            
+            try:
+                os.environ[env_var] = value
+                
+                # Force testing mode to avoid actual terminal detection conflicts
+                os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+                
+                terminal = _TerminalInfo()
+                
+                print(f"  Width: {terminal.width}")
+                print(f"  Height: {terminal.height}")
+                print(f"  Supports Color: {terminal.supports_color}")
                 
             except Exception as e:
-                print(f"  ❌ {method_name}: {str(e)}")
-                failed_tests.append(f"{test_class.__name__}.{method_name}: {str(e)}")
-                
-                # Print traceback for debugging
-                if "--verbose" in sys.argv:
-                    print("    " + "\n    ".join(traceback.format_exc().split('\n')))
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print(f"📊 Test Results: {passed_tests}/{total_tests} passed")
-    
-    if failed_tests:
-        print(f"\n❌ Failed Tests ({len(failed_tests)}):")
-        for failure in failed_tests:
-            print(f"  • {failure}")
-        return False
-    else:
-        print("🎉 All tests passed!")
-        return True
+                print(f"  Error: {e}")
+            
+            finally:
+                # Restore original environment
+                if original_value is not None:
+                    os.environ[env_var] = original_value
+                else:
+                    os.environ.pop(env_var, None)
+                os.environ.pop('FORCE_TERMINAL_FALLBACK', None)
 
 
 if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)
+    # Run visual demonstrations
+    demo = TestTerminalVisualDemonstration()
+    demo.test_terminal_detection_demonstration()
+    demo.test_terminal_fallback_demonstration()
+    demo.test_terminal_environment_variable_demonstration()
+    
+    print("\n" + "="*60)
+    print("✅ TERMINAL DETECTION TESTS COMPLETE")
+    print("="*60)
