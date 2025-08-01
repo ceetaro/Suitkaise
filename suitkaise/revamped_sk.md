@@ -198,7 +198,7 @@ It also uses an internal system and (maybe?) Queue() to sync local storages to t
 
 How the main storage syncs.
 
-Sending to main storage: when a global is added in a certain process, it gets added to a local (and internal) storage, with the process name and id. This data allows the data to get added to the correct process once it makes it to the main global storage.
+Sending to main storage: when a global is added in a certain process, it gets added to a local (and internal) storage for that process, with the process name and id. This data allows the data to be tracked to its original location correctly once it makes it to the main global storage.
 
 Data is organized first by path to store at, then process id.
 
@@ -208,7 +208,16 @@ The global variable must have this data/metadata:
 - process id
 - serializable value (some custom handlers for non-serializables will be added)
 
-The top level storage checks each process's local storage (users cannot access values here, it functions internally), and syncs all of the globals waiting in there to its own storage, organizing them according to their path and their original process. The local storage then removes the variables on successful transfer, holding on to any that failed to transfer due to not having the correct data or not being serializable. It goes process by process, checking local storages and syncing. We do need a way to report if a process local storage actually needs to sync, to save time checking empty ones.
+The main storage checks each process's local storage (users cannot access values here, it functions internally), and syncs all of the globals waiting in there to its own storage, organizing them according to their path and their original process. The local storage then removes the variables on successful transfer, holding on to any that failed to transfer due to not having the correct data or not being serializable. It goes process by process, checking local storages and syncing. We do need a way to report if a process local storage actually needs to sync, to save time checking empty ones.
+
+Without SKGlobal, global variables only exist in their original process.
+
+To use globals locally (don't send them to global storage), use `add_to_local_globals()` and `get_local_global()`. This will add the globals to Python's standard globals. You can also add them directly to Python's globals.
+
+Local: uses standard python globals
+
+Cross Process: uses SKGlobal
+
 
 Receiving a global variable from main storage: since some globals might have the same name (key), and because it is slow to search through possibly thousands of global variables, we need some ways to retrieve globals from the storage quickly, cheaply, and error free.
 
