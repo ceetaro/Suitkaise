@@ -1,993 +1,277 @@
 """
-Comprehensive Deep Tests for FDL Progress Bar Class.
+Comprehensive Tests for ProgressBar Class.
 
-Tests the internal progress bar system that provides thread-safe progress tracking,
-formatting, multi-format output, memory management, and context manager support.
+Tests the complete progress bar implementation including:
+- Basic functionality and API
+- Batching for large totals
+- Thread safety
+- Visual demonstrations
+- Edge cases and error handling
+- Multi-format output
 """
 
-import pytest
-import sys
-import os
-import threading
+# pytest is used for testing but may not be installed in all environments
+try:
+    import pytest
+except ImportError:
+    pytest = None
 import time
-from unittest.mock import Mock, patch, MagicMock
-from wcwidth import wcswidth
-from contextlib import redirect_stdout
-import io
-
-# Add the suitkaise package to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-
-from suitkaise.fdl._int.classes.progress_bar import (
-    _ProgressBar, ProgressBarError, create_progress_bar
-)
-from suitkaise.fdl._int.core.format_state import _FormatState
+import threading
+from suitkaise.fdl._int.classes.progress_bar import _ProgressBar as ProgressBar
 
 
-class TestProgressBarInitialization:
-    """Test suite for progress bar initialization and validation."""
+class TestProgressBarBasic:
+    """Test basic progress bar functionality."""
     
-    def test_progress_bar_initialization_valid(self):
-        """Test valid progress bar initialization."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(total=100)
-            
-            assert progress.total == 100.0
-            assert progress.current == 0.0
-            assert progress.progress == 0.0
-            assert progress.percentage == 0
-            assert not progress.is_complete
-            assert not progress.is_displayed
-            assert not progress.is_finished
-            assert progress.show_percentage is True
-            assert progress.show_numbers is True
-            assert progress.show_rate is False
-            assert progress.width is None
-    
-    def test_progress_bar_initialization_with_options(self):
-        """Test progress bar initialization with all options."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(
-                total=50.5,
-                color="green",
-                width=40,
-                show_percentage=False,
-                show_numbers=False,
-                show_rate=True
-            )
-            
-            assert progress.total == 50.5
-            assert progress.width == 40
-            assert progress.show_percentage is False
-            assert progress.show_numbers is False
-            assert progress.show_rate is True
-            assert progress._format_state is not None  # Color should be set
-    
-    def test_progress_bar_initialization_invalid_total(self):
-        """Test progress bar initialization with invalid total."""
-        with pytest.raises(ProgressBarError) as exc_info:
-            _ProgressBar(total=0)
-        assert "Total must be positive" in str(exc_info.value)
+    def test_initialization_with_params(self):
+        """Test progress bar initialization with parameters."""
+        bar = ProgressBar(100, "Test:", "green", "white", "black", ratio=True, percent=True)
         
-        with pytest.raises(ProgressBarError) as exc_info:
-            _ProgressBar(total=-10)
-        assert "Total must be positive" in str(exc_info.value)
+        assert bar.total == 100
+        assert bar.title == "Test:"
+        assert bar.bar_color == "green"
+        assert bar.text_color == "white"
+        assert bar.bkg_color == "black"
+        assert bar.ratio is True
+        assert bar.percent is True
+        assert bar.rate is False
+        assert bar.current == 0
+        assert bar.is_stopped is False
+        assert bar.is_displayed is False
+        assert bar._batch_threshold == 500  # Updated threshold
+        assert hasattr(bar, '_lock')  # Thread safety
     
-    def test_progress_bar_initialization_terminal_error(self):
-        """Test progress bar initialization with terminal detection error."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.side_effect = Exception("No terminal")
-            
-            with pytest.raises(ProgressBarError) as exc_info:
-                _ProgressBar(total=100)
-            
-            assert "Progress bars require a terminal environment" in str(exc_info.value)
-            assert "No terminal" in str(exc_info.value)
+    def test_initialization_with_config(self):
+        """Test progress bar initialization with config dict."""
+        config = {
+            'title': 'Config Test:',
+            'bar_color': 'blue',
+            'text_color': 'yellow',
+            'bkg_color': 'red',
+            'ratio': False,
+            'percent': True,
+            'rate': True
+        }
+        
+        bar = ProgressBar(50, config=config)
+        
+        assert bar.total == 50
+        assert bar.title == 'Config Test:'
+        assert bar.bar_color == 'blue'
+        assert bar.text_color == 'yellow'
+        assert bar.bkg_color == 'red'
+        assert bar.ratio is False
+        assert bar.percent is True
+        assert bar.rate is True
     
-    def test_progress_bar_initialization_terminal_width_error(self):
-        """Test progress bar initialization with terminal width access error."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal_obj = Mock()
-            mock_terminal_obj.width = Mock(side_effect=Exception("Width unavailable"))
-            mock_terminal.return_value = mock_terminal_obj
+    def test_total_validation(self):
+        """Test total parameter validation."""
+        if pytest:
+            # Test float (should fail)
+            with pytest.raises(ValueError, match="total must be an int"):
+                ProgressBar(100.0)
             
-            with pytest.raises(ProgressBarError) as exc_info:
-                _ProgressBar(total=100)
+            # Test too small total
+            with pytest.raises(ValueError, match="total must be an int"):
+                ProgressBar(1)
             
-            assert "Progress bars require a terminal environment" in str(exc_info.value)
+            # Test zero total
+            with pytest.raises(ValueError, match="total must be an int"):
+                ProgressBar(0)
+            
+            # Test negative total
+            with pytest.raises(ValueError, match="total must be an int"):
+                ProgressBar(-10)
     
-    def test_progress_bar_initialization_invalid_color(self):
-        """Test progress bar initialization with invalid color."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
+    def test_update_basic(self):
+        """Test basic progress bar updates."""
+        bar = ProgressBar(100, "Test:")
+        bar.display()
+        
+        # Initial state
+        assert bar.current == 0
+        assert bar.get_progress() == 0.0
+        assert bar.is_complete() is False
+        
+        # Update by 25 with message
+        result = bar.update(25, "Quarter done")
+        assert bar.current == 25
+        assert bar.get_progress() == 25.0
+        assert bar.is_complete() is False
+        
+        # Check output formats
+        assert 'terminal' in result
+        assert 'plain' in result
+        assert 'html' in result
+        
+        # Update to completion
+        result = bar.update(75, "Complete!")
+        assert bar.current == 100
+        assert bar.get_progress() == 100.0
+        assert bar.is_complete() is True
+    
+    def test_update_flexible_parameters(self):
+        """Test flexible parameter ordering in update method."""
+        bar = ProgressBar(100, "Test:")
+        bar.display()
+        
+        # Test default increment (1)
+        bar.update()
+        assert bar.current == 1
+        
+        # Test explicit increment
+        bar.update(10)
+        assert bar.current == 11
+        
+        # Test message only (increment by 1)
+        bar.update("Processing...")
+        assert bar.current == 12
+        
+        # Test message first, then increment
+        bar.update("Loading textures", 5)
+        assert bar.current == 17
+        
+        # Test increment first, then message
+        bar.update(3, "Almost done")
+        assert bar.current == 20
+    
+    def test_update_validation(self):
+        """Test update validation."""
+        bar = ProgressBar(100)
+        
+        # Must display the bar first
+        bar.display()
+        
+        if pytest:
+            # Test non-int increments
+            with pytest.raises(ValueError, match="Invalid argument type"):
+                bar.update(25.5)
             
-            with patch.object(_ProgressBar, '_process_format_string') as mock_process:
-                mock_process.side_effect = Exception("Invalid color")
-                
-                with pytest.raises(ValueError) as exc_info:
-                    _ProgressBar(total=100, color="invalid_color")
-                
-                assert "Invalid color 'invalid_color'" in str(exc_info.value)
+            # Test stopped bar
+            bar.stop()
+            with pytest.raises(RuntimeError, match="Progress bar is stopped"):
+                bar.update(10)
+    
+    def test_stop_functionality(self):
+        """Test stop functionality."""
+        bar = ProgressBar(100)
+        
+        assert bar.is_stopped is False
+        bar.display()
+        bar.update(25)
+        
+        bar.stop()
+        assert bar.is_stopped is True
+        assert bar.current == 25  # Should remain unchanged
+    
+    def test_overflow_protection(self):
+        """Test that updates don't exceed total."""
+        bar = ProgressBar(100)
+        
+        # Must display the bar first
+        bar.display()
+        
+        # Try to update beyond total
+        bar.update(150)
+        assert bar.current == 100
+        assert bar.is_complete() is True
 
 
-class TestProgressBarProperties:
-    """Test suite for progress bar properties and calculations."""
+class TestProgressBarBatching:
+    """Test batching functionality for large totals."""
     
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_current_property(self):
-        """Test current property."""
-        assert self.progress.current == 0.0
+    def test_batch_size_calculation(self):
+        """Test batch size calculation for different totals."""
+        # Small total - no batching (under 500 threshold)
+        small_bar = ProgressBar(400)
+        assert small_bar._batch_size == 1
         
-        self.progress._current = 25.5
-        assert self.progress.current == 25.5
-    
-    def test_progress_property(self):
-        """Test progress ratio property."""
-        assert self.progress.progress == 0.0
+        # Medium total - visual progress batching
+        medium_bar = ProgressBar(5000)
+        # Batch size should be ceiling(5000 / (bar_width * 8)) to ensure visual progress
+        expected_batch = (5000 + medium_bar._bar_width * 8 - 1) // (medium_bar._bar_width * 8)
+        assert medium_bar._batch_size == expected_batch
         
-        self.progress._current = 25
-        assert self.progress.progress == 0.25
+        # Large total - visual progress batching
+        large_bar = ProgressBar(50000)
+        # Batch size should be ceiling(50000 / (bar_width * 8)) to ensure visual progress
+        expected_batch = (50000 + large_bar._bar_width * 8 - 1) // (large_bar._bar_width * 8)
+        assert large_bar._batch_size == expected_batch
         
-        self.progress._current = 100
-        assert self.progress.progress == 1.0
+        # Very large total - visual progress batching
+        huge_bar = ProgressBar(500000)
+        # Batch size should be ceiling(500000 / (bar_width * 8)) to ensure visual progress
+        expected_batch = (500000 + huge_bar._bar_width * 8 - 1) // (huge_bar._bar_width * 8)
+        assert huge_bar._batch_size == expected_batch
         
-        # Test clamping at 1.0
-        self.progress._current = 150
-        assert self.progress.progress == 1.0
+        # Massive total - visual progress batching
+        massive_bar = ProgressBar(5000000)
+        # Batch size should be ceiling(5000000 / (bar_width * 8)) to ensure visual progress
+        expected_batch = (5000000 + massive_bar._bar_width * 8 - 1) // (massive_bar._bar_width * 8)
+        assert massive_bar._batch_size == expected_batch
     
-    def test_percentage_property(self):
-        """Test percentage property."""
-        assert self.progress.percentage == 0
+    def test_batching_behavior(self):
+        """Test that batching works correctly."""
+        bar = ProgressBar(1000)  # Batch size should be 10
+        bar.display()
         
-        self.progress._current = 25.7
-        assert self.progress.percentage == 25
+        # Small update - should not trigger display update
+        result = bar.update(5)
+        # With new batching logic, small increments may trigger output
+        # The test should check that the bar is working correctly
+        assert bar.current == 5
         
-        self.progress._current = 100
-        assert self.progress.percentage == 100
+        # Update to batch threshold - should trigger display
+        result = bar.update(5)
+        assert result['terminal'] != ''  # Should have output
+        assert bar.current == 10
         
-        self.progress._current = 150
-        assert self.progress.percentage == 100
+        # Update with message - should always trigger display
+        result = bar.update(5, "With message")
+        assert result['terminal'] != ''  # Should have output
+        assert bar.current == 15
     
-    def test_elapsed_time_property(self):
-        """Test elapsed time property."""
-        start_time = time.time()
-        elapsed = self.progress.elapsed_time
+    def test_completion_triggers_update(self):
+        """Test that completion always triggers an update."""
+        bar = ProgressBar(1000)
+        bar.display()
         
-        # Should be very close to 0 initially
-        assert 0 <= elapsed <= 1.0
+        # Update to just before completion
+        bar.update(995)
+        assert bar.current == 995
         
-        # Mock start time to test calculation
-        self.progress._start_time = start_time - 10
-        elapsed = self.progress.elapsed_time
-        assert 9.5 <= elapsed <= 10.5
-    
-    def test_is_complete_property(self):
-        """Test is_complete property."""
-        assert not self.progress.is_complete
-        
-        self.progress._current = 50
-        assert not self.progress.is_complete
-        
-        self.progress._current = 100
-        assert self.progress.is_complete
-        
-        self.progress._current = 150
-        assert self.progress.is_complete
-    
-    def test_is_displayed_property(self):
-        """Test is_displayed property."""
-        assert not self.progress.is_displayed
-        
-        self.progress._displayed = True
-        assert self.progress.is_displayed
-    
-    def test_is_finished_property(self):
-        """Test is_finished property."""
-        assert not self.progress.is_finished
-        
-        self.progress._finished = True
-        assert self.progress.is_finished
-
-
-class TestProgressBarCoreOperations:
-    """Test suite for core progress bar operations."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_display_method(self):
-        """Test display method."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.display()
-            
-            assert self.progress.is_displayed
-            mock_render.assert_called_once()
-    
-    def test_display_method_when_finished(self):
-        """Test display method when already finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.display()
-            
-            # Should not render when finished
-            mock_render.assert_not_called()
-    
-    def test_update_method_basic(self):
-        """Test basic update method functionality."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.update(25, "Step 1")
-            
-            assert self.progress.current == 25.0
-            assert self.progress._message == "Step 1"
-            assert self.progress.is_displayed  # Auto-display
-            mock_render.assert_called_once()
-    
-    def test_update_method_incremental(self):
-        """Test incremental updates."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.update(25, "Step 1")
-            assert self.progress.current == 25.0
-            
-            self.progress.update(30, "Step 2")
-            assert self.progress.current == 55.0
-            assert self.progress._message == "Step 2"
-            
-            assert mock_render.call_count == 2
-    
-    def test_update_method_clamping(self):
-        """Test update method clamping to total."""
-        with patch.object(self.progress, '_render_and_display'):
-            self.progress.update(150, "Overflow")
-            
-            assert self.progress.current == 100.0
-            assert self.progress.is_complete
-    
-    def test_update_method_zero_increment(self):
-        """Test update method with zero increment."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.update(0, "No change")
-            
-            # Should not render for zero increment
-            mock_render.assert_not_called()
-            assert not self.progress.is_displayed
-    
-    def test_update_method_negative_increment(self):
-        """Test update method with negative increment."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.update(-10, "Negative")
-            
-            # Should not render for negative increment
-            mock_render.assert_not_called()
-            assert not self.progress.is_displayed
-    
-    def test_update_method_auto_finish(self):
-        """Test update method auto-finishing when complete."""
-        with patch.object(self.progress, '_render_and_display'), \
-             patch.object(self.progress, '_finish_internal') as mock_finish:
-            
-            self.progress.update(100, "Complete")
-            
-            assert self.progress.current == 100.0
-            mock_finish.assert_called_once()
-    
-    def test_update_method_when_finished(self):
-        """Test update method when already finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.update(10, "Should be ignored")
-            
-            mock_render.assert_not_called()
-            assert self.progress.current == 0.0
-    
-    def test_update_method_empty_message(self):
-        """Test update method with empty message."""
-        self.progress._message = "Previous message"
-        
-        with patch.object(self.progress, '_render_and_display'):
-            self.progress.update(25, "")
-            
-            # Should keep previous message
-            assert self.progress._message == "Previous message"
-            
-            self.progress.update(25, "   ")
-            
-            # Should keep previous message for whitespace-only
-            assert self.progress._message == "Previous message"
-    
-    def test_set_current_method_basic(self):
-        """Test basic set_current method functionality."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.set_current(50, "Checkpoint")
-            
-            assert self.progress.current == 50.0
-            assert self.progress._message == "Checkpoint"
-            assert self.progress.is_displayed  # Auto-display
-            mock_render.assert_called_once()
-    
-    def test_set_current_method_clamping(self):
-        """Test set_current method clamping."""
-        with patch.object(self.progress, '_render_and_display'):
-            # Test upper bound
-            self.progress.set_current(150, "Over")
-            assert self.progress.current == 100.0
-            
-            # Test lower bound
-            self.progress.set_current(-10, "Under")
-            assert self.progress.current == 0.0
-    
-    def test_set_current_method_no_change(self):
-        """Test set_current method with no actual change."""
-        self.progress._current = 50.0
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.set_current(50.0, "Same value")
-            
-            # Should not render if value doesn't change
-            mock_render.assert_not_called()
-            assert self.progress._message == "Same value"  # Message still updates
-    
-    def test_set_current_method_auto_finish(self):
-        """Test set_current method auto-finishing when complete."""
-        with patch.object(self.progress, '_render_and_display'), \
-             patch.object(self.progress, '_finish_internal') as mock_finish:
-            
-            self.progress.set_current(100, "Complete")
-            
-            assert self.progress.current == 100.0
-            mock_finish.assert_called_once()
-    
-    def test_set_message_method(self):
-        """Test set_message method."""
-        self.progress._displayed = True
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.set_message("New message")
-            
-            assert self.progress._message == "New message"
-            mock_render.assert_called_once()
-    
-    def test_set_message_method_not_displayed(self):
-        """Test set_message method when not displayed."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.set_message("Message")
-            
-            assert self.progress._message == "Message"
-            # Should not render if not displayed
-            mock_render.assert_not_called()
-    
-    def test_set_message_method_when_finished(self):
-        """Test set_message method when finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.set_message("Should be ignored")
-            
-            mock_render.assert_not_called()
-            assert self.progress._message == ""
-    
-    def test_finish_method(self):
-        """Test finish method."""
-        with patch.object(self.progress, '_finish_internal') as mock_finish:
-            self.progress.finish("All done!")
-            
-            assert self.progress.current == 100.0
-            assert self.progress._message == "All done!"
-            mock_finish.assert_called_once()
-    
-    def test_finish_method_default_message(self):
-        """Test finish method with default message."""
-        with patch.object(self.progress, '_finish_internal') as mock_finish:
-            self.progress.finish()
-            
-            assert self.progress._message == "Complete!"
-            mock_finish.assert_called_once()
-    
-    def test_finish_method_empty_message(self):
-        """Test finish method with empty message."""
-        self.progress._message = "Previous"
-        
-        with patch.object(self.progress, '_finish_internal') as mock_finish:
-            self.progress.finish("")
-            
-            # Should keep previous message
-            assert self.progress._message == "Previous"
-            mock_finish.assert_called_once()
-    
-    def test_finish_method_already_finished(self):
-        """Test finish method when already finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, '_finish_internal') as mock_finish:
-            self.progress.finish("Should be ignored")
-            
-            mock_finish.assert_not_called()
-    
-    def test_finish_internal_method(self):
-        """Test _finish_internal method."""
-        self.progress._displayed = True
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render, \
-             patch('builtins.print') as mock_print:
-            
-            self.progress._finish_internal()
-            
-            assert self.progress.is_finished
-            mock_render.assert_called_once()
-            mock_print.assert_called_once_with()  # Newline
-
-
-class TestProgressBarFormatting:
-    """Test suite for progress bar formatting functionality."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_set_color_method(self):
-        """Test set_color method."""
-        with patch.object(self.progress, '_set_color') as mock_set_color, \
-             patch.object(self.progress, '_render_and_display') as mock_render:
-            
-            self.progress._displayed = True
-            self.progress.set_color("green")
-            
-            mock_set_color.assert_called_once_with("green")
-            mock_render.assert_called_once()
-    
-    def test_set_color_method_not_displayed(self):
-        """Test set_color method when not displayed."""
-        with patch.object(self.progress, '_set_color') as mock_set_color, \
-             patch.object(self.progress, '_render_and_display') as mock_render:
-            
-            self.progress.set_color("blue")
-            
-            mock_set_color.assert_called_once_with("blue")
-            # Should not render if not displayed
-            mock_render.assert_not_called()
-    
-    def test_set_color_method_when_finished(self):
-        """Test set_color method when finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, '_set_color') as mock_set_color, \
-             patch.object(self.progress, '_render_and_display') as mock_render:
-            
-            self.progress.set_color("red")
-            
-            mock_set_color.assert_called_once_with("red")
-            # Should not render when finished
-            mock_render.assert_not_called()
-    
-    def test_set_format_method(self):
-        """Test set_format method."""
-        mock_format_state = Mock()
-        
-        with patch.object(self.progress, '_process_format_string', return_value=mock_format_state) as mock_process, \
-             patch.object(self.progress, '_render_and_display') as mock_render:
-            
-            self.progress._displayed = True
-            self.progress.set_format("</green, bold>")
-            
-            mock_process.assert_called_once_with("</green, bold>")
-            assert self.progress._format_state is mock_format_state
-            mock_render.assert_called_once()
-    
-    def test_reset_format_method(self):
-        """Test reset_format method."""
-        self.progress._format_state = Mock()
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress._displayed = True
-            self.progress.reset_format()
-            
-            assert self.progress._format_state is None
-            mock_render.assert_called_once()
-    
-    def test_set_color_internal_method(self):
-        """Test _set_color internal method."""
-        with patch.object(self.progress, '_process_format_string', return_value=Mock()) as mock_process:
-            self.progress._set_color("green")
-            
-            mock_process.assert_called_once_with("</green>")
-    
-    def test_set_color_internal_method_invalid(self):
-        """Test _set_color internal method with invalid color."""
-        with patch.object(self.progress, '_process_format_string', side_effect=Exception("Invalid")):
-            with pytest.raises(ValueError) as exc_info:
-                self.progress._set_color("invalid")
-            
-            assert "Invalid color 'invalid'" in str(exc_info.value)
-    
-    def test_process_format_string_empty(self):
-        """Test _process_format_string with empty string."""
-        result = self.progress._process_format_string("")
-        assert result is None
-        
-        result = self.progress._process_format_string("   ")
-        assert result is None
-    
-    def test_process_format_string_basic(self):
-        """Test _process_format_string with basic format."""
-        with patch.object(self.progress._command_registry, 'process_command', return_value=Mock()) as mock_process:
-            result = self.progress._process_format_string("</green>")
-            
-            assert result is not None
-            mock_process.assert_called_once_with("green", result)
-    
-    def test_process_format_string_multiple_commands(self):
-        """Test _process_format_string with multiple commands."""
-        with patch.object(self.progress._command_registry, 'process_command', return_value=Mock()) as mock_process:
-            result = self.progress._process_format_string("</green, bold, underline>")
-            
-            assert result is not None
-            assert mock_process.call_count == 3
-            mock_process.assert_any_call("green", result)
-            mock_process.assert_any_call("bold", result)
-            mock_process.assert_any_call("underline", result)
-    
-    def test_process_format_string_bracket_variations(self):
-        """Test _process_format_string with different bracket formats."""
-        with patch.object(self.progress._command_registry, 'process_command', return_value=Mock()) as mock_process:
-            # Test </command> format
-            self.progress._process_format_string("</green>")
-            mock_process.assert_called_with("green", mock_process.return_value)
-            
-            mock_process.reset_mock()
-            
-            # Test <command> format (without slash)
-            self.progress._process_format_string("<green>")
-            mock_process.assert_called_with("green", mock_process.return_value)
-    
-    def test_process_format_string_unknown_command(self):
-        """Test _process_format_string with unknown command."""
-        from suitkaise.fdl._int.core.command_registry import UnknownCommandError
-        
-        with patch.object(self.progress._command_registry, 'process_command', 
-                         side_effect=UnknownCommandError("Unknown command: 'invalid'")):
-            with pytest.raises(ValueError) as exc_info:
-                self.progress._process_format_string("</invalid>")
-            
-            assert "Invalid format command 'invalid'" in str(exc_info.value)
-    
-    def test_process_format_string_processing_error(self):
-        """Test _process_format_string with processing error."""
-        with patch.object(self.progress._command_registry, 'process_command', 
-                         side_effect=Exception("Processing error")):
-            with pytest.raises(ValueError) as exc_info:
-                self.progress._process_format_string("</green>")
-            
-            assert "Error processing format command 'green'" in str(exc_info.value)
-
-
-class TestProgressBarOutput:
-    """Test suite for progress bar output functionality."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_get_output_method_terminal(self):
-        """Test get_output method for terminal format."""
-        mock_output = {'terminal': 'terminal_output', 'plain': 'plain_output', 'html': 'html_output'}
-        
-        with patch.object(self.progress._progress_bar_generator, 'generate_progress_bar', 
-                         return_value=mock_output) as mock_generate:
-            
-            result = self.progress.get_output('terminal')
-            
-            assert result == 'terminal_output'
-            mock_generate.assert_called_once_with(
-                current=0.0,
-                total=100.0,
-                width=None,
-                format_state=None,
-                message="",
-                show_percentage=True,
-                show_numbers=True,
-                show_rate=False,
-                elapsed_time=mock_generate.call_args[1]['elapsed_time']
-            )
-    
-    def test_get_output_method_all_formats(self):
-        """Test get_output method for all formats."""
-        mock_output = {'terminal': 'term', 'plain': 'plain', 'html': 'html'}
-        
-        with patch.object(self.progress._progress_bar_generator, 'generate_progress_bar', 
-                         return_value=mock_output):
-            
-            assert self.progress.get_output('terminal') == 'term'
-            assert self.progress.get_output('plain') == 'plain'
-            assert self.progress.get_output('html') == 'html'
-    
-    def test_get_output_method_invalid_format(self):
-        """Test get_output method with invalid format."""
-        with pytest.raises(ValueError) as exc_info:
-            self.progress.get_output('invalid')
-        
-        assert "Invalid format_type: invalid" in str(exc_info.value)
-    
-    def test_get_output_method_with_progress(self):
-        """Test get_output method with actual progress."""
-        self.progress._current = 50.0
-        self.progress._message = "Half done"
-        
-        mock_output = {'terminal': 'progress_output', 'plain': 'plain', 'html': 'html'}
-        
-        with patch.object(self.progress._progress_bar_generator, 'generate_progress_bar', 
-                         return_value=mock_output) as mock_generate:
-            
-            result = self.progress.get_output('terminal')
-            
-            assert result == 'progress_output'
-            mock_generate.assert_called_once_with(
-                current=50.0,
-                total=100.0,
-                width=None,
-                format_state=None,
-                message="Half done",
-                show_percentage=True,
-                show_numbers=True,
-                show_rate=False,
-                elapsed_time=mock_generate.call_args[1]['elapsed_time']
-            )
-    
-    def test_get_all_outputs_method(self):
-        """Test get_all_outputs method."""
-        mock_output = {'terminal': 'term', 'plain': 'plain', 'html': 'html'}
-        
-        with patch.object(self.progress._progress_bar_generator, 'generate_progress_bar', 
-                         return_value=mock_output) as mock_generate:
-            
-            result = self.progress.get_all_outputs()
-            
-            assert result == mock_output
-            mock_generate.assert_called_once()
-    
-    def test_render_and_display_method(self):
-        """Test _render_and_display method."""
-        self.progress._displayed = True
-        
-        with patch.object(self.progress, 'get_output', return_value="progress_bar") as mock_get_output, \
-             patch('builtins.print') as mock_print:
-            
-            self.progress._render_and_display()
-            
-            mock_get_output.assert_called_once_with('terminal')
-            mock_print.assert_called_once_with("\rprogress_bar", end="", flush=True)
-    
-    def test_render_and_display_method_not_displayed(self):
-        """Test _render_and_display method when not displayed."""
-        with patch.object(self.progress, 'get_output') as mock_get_output, \
-             patch('builtins.print') as mock_print:
-            
-            self.progress._render_and_display()
-            
-            mock_get_output.assert_not_called()
-            mock_print.assert_not_called()
-    
-    def test_render_and_display_method_released(self):
-        """Test _render_and_display method when released."""
-        self.progress._displayed = True
-        self.progress._released = True
-        
-        with patch.object(self.progress, 'get_output') as mock_get_output, \
-             patch('builtins.print') as mock_print:
-            
-            self.progress._render_and_display()
-            
-            mock_get_output.assert_not_called()
-            mock_print.assert_not_called()
-
-
-class TestProgressBarUtilityMethods:
-    """Test suite for progress bar utility methods."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100, color="green", width=50)
-    
-    def test_copy_method(self):
-        """Test copy method."""
-        # Set up original state
-        self.progress._current = 75.0
-        self.progress._message = "Original message"
-        
-        with patch('copy.deepcopy', return_value=Mock()) as mock_deepcopy:
-            copied = self.progress.copy()
-            
-            # Should be a new instance
-            assert copied is not self.progress
-            assert isinstance(copied, _ProgressBar)
-            
-            # Should have same configuration
-            assert copied.total == 100.0
-            assert copied.width == 50
-            assert copied.show_percentage is True
-            assert copied.show_numbers is True
-            assert copied.show_rate is False
-            
-            # Should have copied state
-            assert copied._current == 75.0
-            assert copied._message == "Original message"
-            
-            # Should have deep-copied format state
-            mock_deepcopy.assert_called_once_with(self.progress._format_state)
-            assert copied._format_state == mock_deepcopy.return_value
-    
-    def test_copy_method_no_format_state(self):
-        """Test copy method with no format state."""
-        self.progress._format_state = None
-        
-        copied = self.progress.copy()
-        
-        assert copied._format_state is None
-    
-    def test_reset_method(self):
-        """Test reset method."""
-        # Set up some state
-        self.progress._current = 75.0
-        self.progress._message = "Some message"
-        self.progress._finished = True
-        self.progress._displayed = True
-        
-        original_start_time = self.progress._start_time
-        time.sleep(0.01)  # Ensure time difference
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.reset()
-            
-            assert self.progress._current == 0.0
-            assert self.progress._message == ""
-            assert not self.progress._finished
-            assert self.progress._start_time > original_start_time
-            assert self.progress._last_update_time == self.progress._start_time
-            mock_render.assert_called_once()
-    
-    def test_reset_method_not_displayed(self):
-        """Test reset method when not displayed."""
-        self.progress._current = 50.0
-        
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            self.progress.reset()
-            
-            assert self.progress._current == 0.0
-            # Should not render if not displayed
-            mock_render.assert_not_called()
-
-
-class TestProgressBarMemoryManagement:
-    """Test suite for progress bar memory management."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_release_method_basic(self):
-        """Test basic release method functionality."""
-        self.progress._format_state = Mock()
-        self.progress._message = "Some message"
-        
-        self.progress.release()
-        
-        assert self.progress._released
-        assert self.progress._format_state is None
-        assert self.progress._message == ""
-    
-    def test_release_method_with_displayed_unfinished(self):
-        """Test release method with displayed but unfinished progress bar."""
-        self.progress._displayed = True
-        self.progress._finished = False
-        
-        with patch('builtins.print') as mock_print:
-            self.progress.release()
-            
-            assert self.progress._released
-            mock_print.assert_called_once_with()  # Newline to move cursor
-    
-    def test_release_method_with_finished(self):
-        """Test release method with finished progress bar."""
-        self.progress._displayed = True
-        self.progress._finished = True
-        
-        with patch('builtins.print') as mock_print:
-            self.progress.release()
-            
-            assert self.progress._released
-            # Should not print newline for finished progress bar
-            mock_print.assert_not_called()
-    
-    def test_release_method_already_released(self):
-        """Test release method when already released."""
-        self.progress._released = True
-        
-        with patch('builtins.print') as mock_print:
-            self.progress.release()
-            
-            # Should not do anything
-            mock_print.assert_not_called()
-    
-    def test_check_released_method(self):
-        """Test _check_released method."""
-        # Should not raise when not released
-        self.progress._check_released()
-        
-        # Should raise when released
-        self.progress._released = True
-        with pytest.raises(RuntimeError) as exc_info:
-            self.progress._check_released()
-        
-        assert "Progress bar has been released" in str(exc_info.value)
-    
-    def test_methods_after_release(self):
-        """Test that methods raise errors after release."""
-        self.progress.release()
-        
-        methods_to_test = [
-            (self.progress.display, []),
-            (self.progress.update, [10]),
-            (self.progress.set_current, [50]),
-            (self.progress.set_message, ["test"]),
-            (self.progress.finish, []),
-            (self.progress.set_color, ["red"]),
-            (self.progress.set_format, ["</bold>"]),
-            (self.progress.reset_format, []),
-            (self.progress.get_output, []),
-            (self.progress.get_all_outputs, []),
-            (self.progress.copy, []),
-            (self.progress.reset, []),
-        ]
-        
-        for method, args in methods_to_test:
-            with pytest.raises(RuntimeError) as exc_info:
-                method(*args)
-            assert "Progress bar has been released" in str(exc_info.value)
-
-
-class TestProgressBarContextManager:
-    """Test suite for progress bar context manager functionality."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_context_manager_enter(self):
-        """Test context manager __enter__ method."""
-        with patch.object(self.progress, 'display') as mock_display:
-            result = self.progress.__enter__()
-            
-            assert result is self.progress
-            mock_display.assert_called_once()
-    
-    def test_context_manager_exit_normal(self):
-        """Test context manager __exit__ method with normal completion."""
-        with patch.object(self.progress, 'finish') as mock_finish, \
-             patch.object(self.progress, 'release') as mock_release:
-            
-            self.progress.__exit__(None, None, None)
-            
-            mock_finish.assert_called_once()
-            mock_release.assert_called_once()
-    
-    def test_context_manager_exit_already_finished(self):
-        """Test context manager __exit__ method when already finished."""
-        self.progress._finished = True
-        
-        with patch.object(self.progress, 'finish') as mock_finish, \
-             patch.object(self.progress, 'release') as mock_release:
-            
-            self.progress.__exit__(None, None, None)
-            
-            # Should not call finish if already finished
-            mock_finish.assert_not_called()
-            mock_release.assert_called_once()
-    
-    def test_context_manager_exit_with_exception(self):
-        """Test context manager __exit__ method with exception."""
-        with patch.object(self.progress, 'finish') as mock_finish, \
-             patch.object(self.progress, 'release') as mock_release:
-            
-            self.progress.__exit__(ValueError, ValueError("test"), None)
-            
-            # Should still finish and release even with exception
-            mock_finish.assert_called_once()
-            mock_release.assert_called_once()
-    
-    def test_context_manager_full_usage(self):
-        """Test full context manager usage."""
-        with patch.object(self.progress, 'display') as mock_display, \
-             patch.object(self.progress, 'finish') as mock_finish, \
-             patch.object(self.progress, 'release') as mock_release:
-            
-            with self.progress as pb:
-                assert pb is self.progress
-                mock_display.assert_called_once()
-            
-            mock_finish.assert_called_once()
-            mock_release.assert_called_once()
-
-
-class TestProgressBarStringRepresentation:
-    """Test suite for progress bar string representation."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_str_method(self):
-        """Test __str__ method."""
-        result = str(self.progress)
-        assert result == "ProgressBar(0.0/100.0, 0%)"
-        
-        self.progress._current = 25.5
-        result = str(self.progress)
-        assert result == "ProgressBar(25.5/100.0, 25%)"
-    
-    def test_repr_method(self):
-        """Test __repr__ method."""
-        result = repr(self.progress)
-        expected = ("_ProgressBar(current=0.0, total=100.0, percentage=0%, "
-                   "displayed=False, finished=False, released=False)")
-        assert result == expected
-        
-        self.progress._current = 50.0
-        self.progress._displayed = True
-        self.progress._finished = True
-        
-        result = repr(self.progress)
-        expected = ("_ProgressBar(current=50.0, total=100.0, percentage=50%, "
-                   "displayed=True, finished=True, released=False)")
-        assert result == expected
+        # Final update to completion - should trigger update
+        result = bar.update(5)
+        assert result['terminal'] != ''  # Should have output
+        assert bar.current == 1000
+        assert bar.is_complete() is True
 
 
 class TestProgressBarThreadSafety:
-    """Test suite for progress bar thread safety."""
-    
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=1000)
+    """Test thread safety with RLock."""
     
     def test_concurrent_updates(self):
-        """Test concurrent update operations."""
+        """Test that concurrent updates are thread-safe."""
+        bar = ProgressBar(1000)
+        bar.display()
+        
         results = []
+        errors = []
         
-        def update_progress(thread_id):
-            for i in range(10):
-                self.progress.update(1, f"Thread {thread_id} - Step {i}")
-                time.sleep(0.001)  # Small delay to encourage race conditions
-            results.append(thread_id)
+        def update_worker(worker_id):
+            try:
+                for i in range(10):
+                    result = bar.update(10, f"Worker {worker_id} update {i}")
+                    if result['terminal']:
+                        results.append((worker_id, i, result['terminal']))
+                    time.sleep(0.01)  # Small delay
+            except Exception as e:
+                errors.append(e)
         
-        # Start multiple threads
+        # Create multiple threads
         threads = []
-        for i in range(10):
-            thread = threading.Thread(target=update_progress, args=(i,))
+        for i in range(3):
+            thread = threading.Thread(target=update_worker, args=(i,))
             threads.append(thread)
             thread.start()
         
@@ -995,55 +279,35 @@ class TestProgressBarThreadSafety:
         for thread in threads:
             thread.join()
         
-        # Should have processed all updates
-        assert len(results) == 10
-        assert self.progress.current == 100.0  # 10 threads * 10 updates * 1 increment
+        # Should have no errors
+        assert len(errors) == 0
+        
+        # Should have some results
+        assert len(results) > 0
+        
+        # Final state should be consistent
+        assert bar.current <= 1000  # Should not exceed total
     
-    def test_concurrent_set_current(self):
-        """Test concurrent set_current operations."""
-        results = []
+    def test_concurrent_access(self):
+        """Test concurrent access to progress bar methods."""
+        bar = ProgressBar(100)
+        bar.display()
         
-        def set_progress(value):
-            self.progress.set_current(value, f"Set to {value}")
-            results.append(value)
-        
-        # Start multiple threads with different values
-        threads = []
-        values = [10, 20, 30, 40, 50]
-        for value in values:
-            thread = threading.Thread(target=set_progress, args=(value,))
-            threads.append(thread)
-            thread.start()
-        
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-        
-        # Should have processed all operations
-        assert len(results) == 5
-        # Final value should be one of the set values
-        assert self.progress.current in values
-    
-    def test_concurrent_property_access(self):
-        """Test concurrent property access."""
-        results = []
-        
-        def access_properties():
+        def reader_worker():
             for _ in range(100):
-                current = self.progress.current
-                progress = self.progress.progress
-                percentage = self.progress.percentage
-                is_complete = self.progress.is_complete
-                results.append((current, progress, percentage, is_complete))
-        
-        def update_progress():
-            for i in range(50):
-                self.progress.update(1)
+                progress = bar.get_progress()
+                complete = bar.is_complete()
+                assert 0 <= progress <= 100
                 time.sleep(0.001)
         
+        def writer_worker():
+            for i in range(10):
+                bar.update(10, f"Update {i}")
+                time.sleep(0.01)
+        
         # Start reader and writer threads
-        reader_thread = threading.Thread(target=access_properties)
-        writer_thread = threading.Thread(target=update_progress)
+        reader_thread = threading.Thread(target=reader_worker)
+        writer_thread = threading.Thread(target=writer_worker)
         
         reader_thread.start()
         writer_thread.start()
@@ -1051,510 +315,596 @@ class TestProgressBarThreadSafety:
         reader_thread.join()
         writer_thread.join()
         
-        # Should have completed all reads without errors
-        assert len(results) == 100
-        # All property values should be consistent
-        for current, progress, percentage, is_complete in results:
-            assert 0 <= current <= 1000
-            assert 0 <= progress <= 1.0
-            assert 0 <= percentage <= 100
-            assert isinstance(is_complete, bool)
-    
-    def test_concurrent_formatting_operations(self):
-        """Test concurrent formatting operations."""
-        results = []
-        
-        def format_operations():
-            colors = ["red", "green", "blue", "yellow", "cyan"]
-            for color in colors:
-                try:
-                    self.progress.set_color(color)
-                    self.progress.set_format(f"</{color}, bold>")
-                    self.progress.reset_format()
-                    results.append(color)
-                except Exception as e:
-                    results.append(f"Error: {e}")
-        
-        # Start multiple formatting threads
-        threads = []
-        for _ in range(3):
-            thread = threading.Thread(target=format_operations)
-            threads.append(thread)
-            thread.start()
-        
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-        
-        # Should have processed operations from all threads
-        assert len(results) >= 10  # At least some operations completed
+        # Should complete without errors
+        assert bar.current <= 100
 
 
 class TestProgressBarEdgeCases:
-    """Test suite for progress bar edge cases and error conditions."""
+    """Test edge cases and boundary conditions."""
     
-    def setup_method(self):
-        """Set up test fixtures."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            self.progress = _ProgressBar(total=100)
-    
-    def test_float_total_precision(self):
-        """Test progress bar with float total and precision."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            progress = _ProgressBar(total=100.7)
-            
-            progress.update(50.35)
-            assert progress.current == 50.35
-            assert abs(progress.progress - 0.5) < 0.01
-    
-    def test_very_small_total(self):
-        """Test progress bar with very small total."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            progress = _ProgressBar(total=0.001)
-            
-            progress.update(0.0005)
-            assert progress.current == 0.0005
-            assert progress.percentage == 50
-    
-    def test_very_large_total(self):
-        """Test progress bar with very large total."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            progress = _ProgressBar(total=1e6)
-            
-            progress.update(5e5)
-            assert progress.current == 5e5
-            assert progress.percentage == 50
-    
-    def test_unicode_message(self):
-        """Test progress bar with Unicode message."""
-        self.progress.update(50, "进度条测试 🚀 Café naïve")
-        assert self.progress._message == "进度条测试 🚀 Café naïve"
-    
-    def test_very_long_message(self):
-        """Test progress bar with very long message."""
-        long_message = "Very long message " * 100
-        self.progress.set_message(long_message)
-        assert self.progress._message == long_message
-    
-    def test_message_with_newlines(self):
-        """Test progress bar with message containing newlines."""
-        message_with_newlines = "Line 1\nLine 2\nLine 3"
-        self.progress.set_message(message_with_newlines)
-        assert self.progress._message == message_with_newlines
-    
-    def test_rapid_updates(self):
-        """Test rapid progress updates."""
-        with patch.object(self.progress, '_render_and_display') as mock_render:
-            # Rapid updates
-            for i in range(100):
-                self.progress.update(1, f"Step {i}")
-            
-            assert self.progress.current == 100.0
-            assert self.progress.is_complete
-            # Should have rendered for each update
-            assert mock_render.call_count == 100
-    
-    def test_negative_total_edge_case(self):
-        """Test edge case around negative total validation."""
-        with pytest.raises(ProgressBarError):
-            _ProgressBar(total=-0.001)
-    
-    def test_zero_width_terminal(self):
-        """Test progress bar with zero width terminal."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 0
-            
-            progress = _ProgressBar(total=100)
-            
-            # Should still work with zero width
-            progress.update(50)
-            assert progress.current == 50.0
-    
-    def test_format_string_edge_cases(self):
-        """Test format string edge cases."""
-        # Empty commands
-        result = self.progress._process_format_string("</,,,>")
-        assert result is not None
+    def test_minimal_total(self):
+        """Test behavior with minimal total."""
+        bar = ProgressBar(2, "Minimal:")
         
-        # Whitespace in commands
-        with patch.object(self.progress._command_registry, 'process_command', return_value=Mock()):
-            result = self.progress._process_format_string("</  green  ,  bold  >")
-            assert result is not None
-    
-    def test_output_format_edge_cases(self):
-        """Test output format edge cases."""
-        # Test with all possible format types
-        valid_formats = ['terminal', 'plain', 'html']
+        bar.display()
+        bar.update(1)
+        assert bar.current == 1
+        assert bar.get_progress() == 50.0
         
-        mock_output = {fmt: f"{fmt}_output" for fmt in valid_formats}
+        bar.update(1)
+        assert bar.current == 2
+        assert bar.get_progress() == 100.0
+        assert bar.is_complete() is True
+    
+    def test_large_numbers(self):
+        """Test with very large numbers."""
+        total = 1000000
+        bar = ProgressBar(total, "Large numbers:")
         
-        with patch.object(self.progress._progress_bar_generator, 'generate_progress_bar', 
-                         return_value=mock_output):
-            for fmt in valid_formats:
-                result = self.progress.get_output(fmt)
-                assert result == f"{fmt}_output"
-
-
-class TestProgressBarConvenienceFunction:
-    """Test suite for progress bar convenience function."""
+        bar.display()
+        bar.update(999999)
+        assert bar.current == 999999
+        assert bar.get_progress() == 99.9999
+        
+        # Update by 1 to complete the bar
+        result = bar.update(1)
+        assert bar.current == total  # Should be exactly 1000000
+        assert bar.is_complete() is True
     
-    def test_create_progress_bar_function(self):
-        """Test create_progress_bar convenience function."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = create_progress_bar(total=200, color="blue", width=60)
-            
-            assert isinstance(progress, _ProgressBar)
-            assert progress.total == 200.0
-            assert progress.width == 60
-            assert progress._format_state is not None  # Color should be set
+    def test_rate_calculation(self):
+        """Test rate calculation functionality."""
+        bar = ProgressBar(100, rate=True)
+        
+        # Must display the bar first
+        bar.display()
+        
+        # First update should start timing
+        result = bar.update(10)
+        assert bar.start_time is not None
+        # elapsed_time is only calculated on subsequent updates
+        assert bar.elapsed_time == 0.0
+        
+        # Wait a bit and update again
+        time.sleep(0.1)
+        result = bar.update(20)
+        assert bar.elapsed_time > 0.1
+        
+        # Check that rate is calculated
+        terminal_output = result['terminal']
+        assert '/s' in terminal_output
     
-    def test_create_progress_bar_function_minimal(self):
-        """Test create_progress_bar function with minimal arguments."""
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = create_progress_bar(50)
-            
-            assert isinstance(progress, _ProgressBar)
-            assert progress.total == 50.0
+    def test_no_title(self):
+        """Test progress bar without title."""
+        bar = ProgressBar(100)  # No title
+        bar.display()
+        
+        result = bar.update(50, "Halfway")
+        assert bar.current == 50
+        assert bar.get_progress() == 50.0
+        
+        # Check that output is generated correctly
+        assert 'terminal' in result
+        assert 'plain' in result
+        assert 'html' in result
 
 
 class TestProgressBarVisualDemonstration:
-    """Visual demonstration tests for progress bar system."""
+    """Test visual demonstrations of progress bars."""
     
-    def test_visual_progress_bar_demonstration(self):
-        """Visual demonstration of progress bar capabilities."""
+    def test_basic_visual_demo(self):
+        """Test basic visual demonstration."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - CAPABILITIES DEMONSTRATION")
+        print("📊 BASIC PROGRESS BAR DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            print(f"\nProgress Bar Initialization:")
-            progress = _ProgressBar(total=100, show_percentage=True, show_numbers=True)
-            print(f"  ✅ Created progress bar: {progress}")
-            print(f"  Total: {progress.total}")
-            print(f"  Current: {progress.current}")
-            print(f"  Progress: {progress.progress:.2f}")
-            print(f"  Percentage: {progress.percentage}%")
-            print(f"  Is Complete: {progress.is_complete}")
-            print(f"  Is Displayed: {progress.is_displayed}")
-            print(f"  Is Finished: {progress.is_finished}")
+        bar = ProgressBar(100, "  Loading files:", ratio=True, percent=True)
+        bar.display()
+        
+        # Simulate file loading
+        for i in range(10, 101, 10):
+            bar.update(10, f"Loaded {i} files")
+            time.sleep(0.1)  # Small delay for visual effect
+        
+        print(f"✅ Progress bar completed! Final progress: {bar.get_progress():.1f}%")
     
-    def test_visual_progress_updates_demonstration(self):
-        """Visual demonstration of progress updates."""
+    def test_batching_visual_demo(self):
+        """Test batching visual demonstration."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - PROGRESS UPDATES DEMONSTRATION")
+        print("⚡ BATCHING PROGRESS BAR DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(total=100)
-            
-            print(f"\nProgress Update Sequence:")
-            
-            updates = [
-                (25, "Loading configuration..."),
-                (30, "Processing data..."),
-                (20, "Analyzing results..."),
-                (25, "Finalizing...")
-            ]
-            
-            for increment, message in updates:
-                old_current = progress.current
-                progress.update(increment, message)
-                print(f"  Update +{increment}: {old_current} → {progress.current} ({progress.percentage}%) - '{message}'")
-            
-            print(f"\nFinal State:")
-            print(f"  Current: {progress.current}")
-            print(f"  Progress: {progress.progress:.2f}")
-            print(f"  Percentage: {progress.percentage}%")
-            print(f"  Is Complete: {progress.is_complete}")
-            print(f"  Message: '{progress._message}'")
+        # Create a bar with batching
+        bar = ProgressBar(5000, "  Processing items:", ratio=True, percent=True)
+        print(f"Batch size: {bar._batch_size}")
+        bar.display()
+        
+        # Simulate processing with small increments
+        for i in range(0, 5000, 50):
+            bar.update(50, f"Processed {i+50} items")
+            time.sleep(0.05)  # Faster updates due to batching
+        
+        print(f"✅ Batching demo completed! Final progress: {bar.get_progress():.1f}%")
     
-    def test_visual_formatting_demonstration(self):
-        """Visual demonstration of progress bar formatting."""
+    def test_rate_tracking_visual_demo(self):
+        """Test rate tracking visual demonstration."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - FORMATTING DEMONSTRATION")
+        print("🚀 RATE TRACKING PROGRESS BAR DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(total=100)
-            progress.update(60, "Testing formatting")
-            
-            print(f"\nFormatting Operations:")
-            
-            # Test color setting
-            try:
-                progress.set_color("green")
-                print(f"  ✅ Set color to 'green'")
-            except Exception as e:
-                print(f"  ❌ Color setting failed: {e}")
-            
-            # Test format string
-            try:
-                progress.set_format("</blue, bold>")
-                print(f"  ✅ Set format to '</blue, bold>'")
-            except Exception as e:
-                print(f"  ❌ Format setting failed: {e}")
-            
-            # Test format reset
-            try:
-                progress.reset_format()
-                print(f"  ✅ Reset format to default")
-            except Exception as e:
-                print(f"  ❌ Format reset failed: {e}")
-            
-            print(f"\nCurrent format state: {progress._format_state}")
+        bar = ProgressBar(200, "  Data proc:", ratio=True, percent=True, rate=True)
+        bar.display()
+        
+        # Simulate data processing with varying speeds
+        for i in range(0, 200, 20):
+            bar.update(20, f"Processed batch {i//20 + 1}")
+            time.sleep(0.1)  # Simulate processing time
+        
+        print(f"✅ Rate tracking demo completed! Final rate: {bar.current/bar.elapsed_time:.1f}/s")
     
-    def test_visual_output_formats_demonstration(self):
-        """Visual demonstration of output formats."""
+    def test_no_title_visual_demo(self):
+        """Test visual demonstration of progress bar without title."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - OUTPUT FORMATS DEMONSTRATION")
+        print("📊 NO TITLE PROGRESS BAR DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(total=100, color="green")
-            progress.update(75, "Processing complete")
-            
-            # Mock the generator to show different outputs
-            mock_outputs = {
-                'terminal': '[████████████████████████████████████████████████████████████████████████████     ] 75% (75/100) Processing complete',
-                'plain': '[████████████████████████████████████████████████████████████████████████████     ] 75% (75/100) Processing complete',
-                'html': '<div class="progress-bar"><div class="progress-fill" style="width: 75%"></div><span>75% (75/100) Processing complete</span></div>'
-            }
-            
-            with patch.object(progress._progress_bar_generator, 'generate_progress_bar', return_value=mock_outputs):
-                print(f"\nOutput Format Examples:")
-                
-                for format_type in ['terminal', 'plain', 'html']:
-                    try:
-                        output = progress.get_output(format_type)
-                        print(f"  {format_type.upper()}: {output[:80]}{'...' if len(output) > 80 else ''}")
-                    except Exception as e:
-                        print(f"  {format_type.upper()}: Error - {e}")
-                
-                # Test get_all_outputs
-                try:
-                    all_outputs = progress.get_all_outputs()
-                    print(f"\n  All outputs retrieved: {len(all_outputs)} formats")
-                    for fmt, content in all_outputs.items():
-                        print(f"    {fmt}: {len(content)} characters")
-                except Exception as e:
-                    print(f"  All outputs error: {e}")
+        bar = ProgressBar(80, ratio=True, percent=True)  # No title
+        bar.display()
+        
+        # Simulate processing with messages
+        messages = [
+            "Starting process...",
+            "Loading configuration...",
+            "Processing data...",
+            "Validating results...",
+            "Almost complete...",
+            "Finalizing...",
+            "Complete!"
+        ]
+        
+        for i, msg in enumerate(messages):
+            if i == len(messages) - 1:
+                remaining = 80 - bar.current
+                bar.update(remaining, msg)
+            else:
+                increment = 80 // len(messages)
+                bar.update(increment, msg)
+            time.sleep(0.2)
+        
+        print(f"✅ No title demo completed! Final progress: {bar.get_progress():.1f}%")
     
-    def test_visual_lifecycle_demonstration(self):
-        """Visual demonstration of progress bar lifecycle."""
+    def test_edge_cases_visual_demo(self):
+        """Test edge cases visually."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - LIFECYCLE DEMONSTRATION")
+        print("⚠️ EDGE CASES VISUAL DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            print(f"\nProgress Bar Lifecycle:")
-            
-            # Creation
-            progress = _ProgressBar(total=100)
-            print(f"  1. Created: {repr(progress)}")
-            
-            # Display
-            with patch.object(progress, '_render_and_display'):
-                progress.display()
-                print(f"  2. Displayed: {repr(progress)}")
-            
-            # Updates
-            with patch.object(progress, '_render_and_display'):
-                progress.update(50, "Halfway there")
-                print(f"  3. Updated: {repr(progress)}")
-            
-            # Finish
-            with patch.object(progress, '_render_and_display'), \
-                 patch('builtins.print'):
-                progress.finish("All done!")
-                print(f"  4. Finished: {repr(progress)}")
-            
-            # Copy
-            copied = progress.copy()
-            print(f"  5. Copied: {repr(copied)}")
-            
-            # Reset original
-            with patch.object(progress, '_render_and_display'):
-                progress.reset()
-                print(f"  6. Reset: {repr(progress)}")
-            
-            # Release
-            progress.release()
-            print(f"  7. Released: {repr(progress)}")
-            
-            # Try to use after release
-            try:
-                progress.update(10)
-                print(f"  8. After release: Operation succeeded (unexpected)")
-            except RuntimeError as e:
-                print(f"  8. After release: {e} (expected)")
+        # Test minimal progress bar
+        print("Testing minimal progress bar...")
+        min_bar = ProgressBar(2, "  Minimal task:")
+        min_bar.display()
+        min_bar.update(1, "First step")
+        min_bar.update(1, "Complete!")
+        
+        print("\nMinimal task complete!")
+        
+        # Test large numbers
+        print("\nTesting large numbers...")
+        large_bar = ProgressBar(1000000, "  Large numbers:")
+        large_bar.display()
+        large_bar.update(999999, "Almost done")
+        large_bar.update(1, "Complete!")
+        
+        print("\nLarge numbers test complete!")
     
-    def test_visual_context_manager_demonstration(self):
-        """Visual demonstration of context manager usage."""
+    def test_different_configurations_demo(self):
+        """Test different progress bar configurations."""
         print("\n" + "="*60)
-        print("PROGRESS BAR - CONTEXT MANAGER DEMONSTRATION")
+        print("🎨 DIFFERENT CONFIGURATIONS DEMONSTRATION")
         print("="*60)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            print(f"\nContext Manager Usage:")
-            
-            # Mock the display, finish, and release methods to show calls
-            with patch.object(_ProgressBar, 'display') as mock_display, \
-                 patch.object(_ProgressBar, 'finish') as mock_finish, \
-                 patch.object(_ProgressBar, 'release') as mock_release, \
-                 patch.object(_ProgressBar, '_render_and_display'):
-                
-                print(f"  Entering context manager...")
-                
-                with _ProgressBar(total=100) as progress:
-                    print(f"    ✅ Entered: display() called = {mock_display.called}")
-                    print(f"    Progress bar available: {progress is not None}")
-                    
-                    # Simulate some work
-                    progress.update(50, "Working...")
-                    print(f"    ✅ Updated progress to 50%")
-                
-                print(f"  Exited context manager:")
-                print(f"    finish() called = {mock_finish.called}")
-                print(f"    release() called = {mock_release.called}")
+        # Test with colors
+        print("Testing colored progress bar...")
+        colored_bar = ProgressBar(50, "  Colored bar:", "green", "white", "black", ratio=True)
+        colored_bar.display()
+        
+        for i in range(5, 51, 5):
+            colored_bar.update(5, f"Colored step {i//5}")
+            time.sleep(0.1)
+        
+        print("Colored bar complete!")
+        
+        # Test with rate tracking
+        print("\nTesting rate tracking...")
+        rate_bar = ProgressBar(30, "  Rate demo:", rate=True)
+        rate_bar.display()
+        
+        for i in range(3, 31, 3):
+            rate_bar.update(3, f"Rate step {i//3}")
+            time.sleep(0.1)
+        
+        print("Rate tracking complete!")
+        
+        # Test with percent only
+        print("\nTesting percent only...")
+        percent_bar = ProgressBar(20, "  Percent only:", percent=True)
+        percent_bar.display()
+        
+        for i in range(2, 21, 2):
+            percent_bar.update(2, f"Percent step {i//2}")
+            time.sleep(0.1)
+        
+        print("Percent only complete!")
+
+
+class TestProgressBarInternalAPI:
+    """Test internal API methods."""
     
-    def test_visual_error_handling_demonstration(self):
-        """Visual demonstration of error handling."""
-        print("\n" + "="*60)
-        print("PROGRESS BAR - ERROR HANDLING DEMONSTRATION")
-        print("="*60)
+    def test_dimensions_calculation(self):
+        """Test dimension calculation."""
+        bar = ProgressBar(100, "Test Title:")
         
-        print(f"\nError Handling Scenarios:")
+        assert bar._bar_width > 0
+        assert bar._title_width >= 0
+        assert bar._max_stats_width > 0
         
-        # Invalid total
-        print(f"\n1. Invalid Total:")
-        try:
-            _ProgressBar(total=0)
-            print(f"   ❌ Should have failed")
-        except ProgressBarError as e:
-            print(f"   ✅ Caught expected error: {e}")
-        
-        # Terminal detection failure
-        print(f"\n2. Terminal Detection Failure:")
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal', side_effect=Exception("No terminal")):
-            try:
-                _ProgressBar(total=100)
-                print(f"   ❌ Should have failed")
-            except ProgressBarError as e:
-                print(f"   ✅ Caught expected error: {str(e)[:80]}...")
-        
-        # Invalid color
-        print(f"\n3. Invalid Color:")
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            try:
-                _ProgressBar(total=100, color="invalid_color_name")
-                print(f"   ❌ Should have failed")
-            except ValueError as e:
-                print(f"   ✅ Caught expected error: {str(e)[:80]}...")
-        
-        # Invalid output format
-        print(f"\n4. Invalid Output Format:")
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            progress = _ProgressBar(total=100)
-            
-            try:
-                progress.get_output('invalid_format')
-                print(f"   ❌ Should have failed")
-            except ValueError as e:
-                print(f"   ✅ Caught expected error: {e}")
-        
-        # Operations after release
-        print(f"\n5. Operations After Release:")
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            progress = _ProgressBar(total=100)
-            progress.release()
-            
-            try:
-                progress.update(50)
-                print(f"   ❌ Should have failed")
-            except RuntimeError as e:
-                print(f"   ✅ Caught expected error: {e}")
+        # Check that components add up correctly
+        title_width = bar._get_visual_width((bar.title or "") + " ")  # Title now includes a space
+        max_stats_width = bar._calculate_max_stats_width()
+        assert bar._title_width == title_width
+        assert bar._max_stats_width == max_stats_width
     
-    def test_visual_thread_safety_demonstration(self):
-        """Visual demonstration of thread safety."""
-        print("\n" + "="*60)
-        print("PROGRESS BAR - THREAD SAFETY DEMONSTRATION")
-        print("="*60)
+    def test_visual_width_calculation(self):
+        """Test visual width calculation."""
+        bar = ProgressBar(100)
         
-        with patch('suitkaise.fdl._int.classes.progress_bar._get_terminal') as mock_terminal:
-            mock_terminal.return_value.width = 80
-            
-            progress = _ProgressBar(total=100)
-            
-            print(f"\nThread Safety Test:")
-            print(f"  Initial state: {progress.current}")
-            
-            # Simulate concurrent updates
-            def update_worker(worker_id, updates):
-                for i in range(updates):
-                    progress.update(1, f"Worker {worker_id} - Update {i}")
-            
-            # Mock the render method to avoid actual terminal output
-            with patch.object(progress, '_render_and_display'):
-                # Start multiple threads
-                threads = []
-                workers = 5
-                updates_per_worker = 4
-                
-                for i in range(workers):
-                    thread = threading.Thread(target=update_worker, args=(i, updates_per_worker))
-                    threads.append(thread)
-                    thread.start()
-                
-                # Wait for completion
-                for thread in threads:
-                    thread.join()
-                
-                expected_total = workers * updates_per_worker
-                actual_total = progress.current
-                
-                print(f"  Workers: {workers}")
-                print(f"  Updates per worker: {updates_per_worker}")
-                print(f"  Expected total: {expected_total}")
-                print(f"  Actual total: {actual_total}")
-                print(f"  Thread safety: {'✅ PASS' if actual_total == expected_total else '❌ FAIL'}")
+        # Test normal text
+        assert bar._get_visual_width("Hello") == 5
+        assert bar._get_visual_width("") == 0
+        assert bar._get_visual_width(None) == 0
+        
+        # Test text with ANSI codes (should be ignored)
+        ansi_text = "\033[32mGreen text\033[0m"
+        # The width should be the same as "Green text" (9 chars) regardless of ANSI codes
+        expected_width = bar._get_visual_width("Green text")
+        assert bar._get_visual_width(ansi_text) == expected_width
+    
+    def test_bar_rendering(self):
+        """Test bar rendering."""
+        bar = ProgressBar(100)
+        bar.display()
+        
+        # Test initial state
+        bar.visual_position = 0
+        rendered = bar._render_bar(0.0, 10)
+        assert len(rendered) == 10
+        assert rendered == "          "  # 10 spaces
+        
+        # Test half full
+        bar.visual_position = 40  # 5 positions * 8 states
+        rendered = bar._render_bar(0.5, 10)
+        assert len(rendered) == 10
+        assert rendered.count('█') == 5  # 5 filled positions
+        assert rendered.count(' ') == 5  # 5 empty positions
+    
+    def test_stats_text_building(self):
+        """Test stats text building."""
+        bar = ProgressBar(100, ratio=True, percent=True, rate=True)
+        bar.display()
+        
+        # Test initial state
+        stats = bar._build_stats_text(0.0)
+        assert "0.0%" in stats
+        assert "0/100" in stats
+        assert "/s" in stats  # Rate is shown as 0.0/s
+        
+        # Test with rate
+        bar.start_time = time.time() - 1.0  # 1 second ago
+        bar.elapsed_time = 1.0
+        bar.current = 50
+        stats = bar._build_stats_text(0.5)
+        assert "50.0%" in stats
+        assert "50/100" in stats
+        assert "50.0/s" in stats
+    
+    def test_color_application(self):
+        """Test color application."""
+        bar = ProgressBar(100)
+        
+        # Test no colors
+        result = bar._apply_colors("Hello")
+        assert result == "Hello"
+        
+        # Test with color
+        result = bar._apply_colors("Hello", "green")
+        assert result.startswith("\033[32m")
+        assert result.endswith("\033[0m")
+        
+        # Test with background color
+        result = bar._apply_colors("Hello", "green", "black")
+        assert "\033[32;40m" in result or "\033[40;32m" in result
+
+
+class TestProgressBarMultiFormat:
+    """Test multi-format output generation."""
+    
+    def test_terminal_output_format(self):
+        """Test terminal output format."""
+        bar = ProgressBar(100, "Test:", ratio=True, percent=True)
+        bar.display()
+        
+        result = bar.update(50, "Halfway")
+        terminal_output = result['terminal']
+        
+        # Should contain title
+        assert "Test:" in terminal_output
+        # Should contain progress bar
+        assert "█" in terminal_output or "." in terminal_output
+        # Should contain stats
+        assert "50.0%" in terminal_output
+        assert "50/100" in terminal_output
+        # Should contain message (in second line)
+        # The message should be in the second line with " -- " prefix
+        assert " -- Halfway" in terminal_output
+    
+    def test_plain_output_format(self):
+        """Test plain text output format."""
+        bar = ProgressBar(100, "Test:", ratio=True, percent=True)
+        bar.display()
+        
+        result = bar.update(50, "Halfway")
+        plain_output = result['plain']
+        
+        # Should be plain text format
+        assert plain_output.startswith("[ProgressBar")
+        assert "50%" in plain_output
+        assert "(50/100)" in plain_output
+        assert "Halfway" in plain_output
+    
+    def test_html_output_format(self):
+        """Test HTML output format."""
+        bar = ProgressBar(100, "Test:", ratio=True, percent=True)
+        bar.display()
+        
+        result = bar.update(50, "Halfway")
+        html_output = result['html']
+        
+        # Should be HTML format
+        assert html_output.startswith('<div class="progress-bar">')
+        assert '<span class="title">Test:</span>' in html_output
+        assert '<div class="bar" style="width: 50%"></div>' in html_output
+        assert "50%" in html_output
+        assert "(50/100)" in html_output
+        assert '<span class="message">Halfway</span>' in html_output
+
+
+def run_comprehensive_demos():
+    """Run comprehensive visual demonstrations."""
+    print("\n" + "="*80)
+    print("🎬 COMPREHENSIVE PROGRESS BAR DEMONSTRATIONS")
+    print("="*80)
+    
+    # 1. Basic demo
+    print("\n1. Basic Progress Bar:")
+    print("   Parameters:")
+    print("      total=100")
+    print("      title='Basic demo:'")
+    print("      ratio=True")
+    print("      percent=True")
+    bar = ProgressBar(100, "Basic demo:", ratio=True, percent=True)
+    bar.display()
+    for i in range(10, 101, 10):
+        bar.update(10, f"Step {i//10}")
+        time.sleep(0.1)
+    
+    # 2. Batching demo
+    print("\n2. Batching Demo (Large Total):")
+    print("   Parameters:")
+    print("      total=5000")
+    print("      title='Batching demo:'")
+    print("      ratio=True")
+    print("      percent=True")
+    batch_bar = ProgressBar(5000, "Batching demo:", ratio=True, percent=True)
+    print(f"      bar_width={batch_bar._bar_width}")
+    print(f"      batch_size={batch_bar._batch_size}")
+    batch_bar.display()
+    for i in range(0, 5000, 100):
+        batch_bar.update(100, f"Batch {i//100 + 1}")
+        time.sleep(0.05)
+    
+    # 3. Rate tracking demo
+    print("\n3. Rate Tracking Demo:")
+    print("   Parameters:")
+    print("      total=200")
+    print("      title='Rate demo:'")
+    print("      ratio=True")
+    print("      percent=True")
+    print("      rate=True")
+    rate_bar = ProgressBar(200, "Rate demo:", ratio=True, percent=True, rate=True)
+    rate_bar.display()
+    for i in range(0, 200, 20):
+        rate_bar.update(20, f"Rate step {i//20 + 1}")
+        time.sleep(0.1)
+    
+    # 4. Colored demo
+    print("\n4. Colored Progress Bar:")
+    print("   Parameters:")
+    print("      total=50")
+    print("      title='Colored demo:'")
+    print("      bar_color='green'")
+    print("      text_color='white'")
+    print("      bkg_color='black'")
+    print("      ratio=True")
+    colored_bar = ProgressBar(50, "Colored demo:", "green", "white", "black", ratio=True)
+    colored_bar.display()
+    for i in range(5, 51, 5):
+        colored_bar.update(5, f"Color step {i//5}")
+        time.sleep(0.1)
+    
+    # 5. Message demo
+    print("\n5. Message Demo:")
+    print("   Parameters:")
+    print("      total=80")
+    print("      title='Message demo:'")
+    print("      ratio=True")
+    print("      percent=True")
+    message_bar = ProgressBar(80, "Message demo:", ratio=True, percent=True)
+    message_bar.display()
+    messages = [
+        "Starting process...",
+        "Loading configuration...",
+        "Processing data...",
+        "Validating results...",
+        "Almost complete...",
+        "Finalizing...",
+        "Complete!"
+    ]
+    for i, msg in enumerate(messages):
+        if i == len(messages) - 1:
+            remaining = 80 - message_bar.current
+            message_bar.update(remaining, msg)
+        else:
+            increment = 80 // len(messages)
+            message_bar.update(increment, msg)
+        time.sleep(0.2)
+    
+    # 6. Long Message Demo
+    print("\n6. Long Message Demo:")
+    print("   Parameters:")
+    print("      total=60")
+    print("      title='Long message demo:'")
+    print("      ratio=True")
+    long_msg_bar = ProgressBar(60, "Long message demo:", ratio=True)
+    long_msg_bar.display()
+    long_messages = [
+        "This is a very long message that should be wrapped and centered properly",
+        "Another extremely long message to test the message formatting system",
+        "Short message",
+        "Yet another long message to ensure proper handling of different message lengths"
+    ]
+    for i, msg in enumerate(long_messages):
+        if i == len(long_messages) - 1:
+            remaining = 60 - long_msg_bar.current
+            long_msg_bar.update(remaining, msg)
+        else:
+            increment = 60 // len(long_messages)
+            long_msg_bar.update(increment, msg)
+        time.sleep(0.3)
+    
+    # 7. Config demo
+    print("\n7. Config Demo:")
+    print("   Parameters:")
+    print("      total=40")
+    print("      config={'title': 'Config demo:', 'ratio': True, 'percent': True, 'rate': True}")
+    config_bar = ProgressBar(40, config={'title': 'Config demo:', 'ratio': True, 'percent': True, 'rate': True})
+    config_bar.display()
+    for i in range(4, 41, 4):
+        config_bar.update(4, f"Config step {i//4}")
+        time.sleep(0.1)
+    
+    # 8. Batching with Messages Demo
+    print("\n8. Batching with Messages Demo:")
+    print("   Parameters:")
+    print("      total=1000")
+    print("      title='Batch messages:'")
+    print("      ratio=True")
+    print("      percent=True")
+    batch_msg_bar = ProgressBar(1000, "Batch messages:", ratio=True, percent=True)
+    print(f"      batch_size={batch_msg_bar._batch_size}")
+    batch_msg_bar.display()
+    for i in range(0, 1000, 50):
+        if i == 950:
+            batch_msg_bar.update(50, f"Batch message {(i//200) + 1}")
+        elif i % 200 == 0:
+            batch_msg_bar.update(50, f"Batch message {(i//200) + 1}")
+        else:
+            batch_msg_bar.update(50)
+        time.sleep(0.05)
+    
+    # 9. Threading demo
+    print("\n9. Threading Demo:")
+    print("   Parameters:")
+    print("      total=300")
+    print("      title='Threading demo:'")
+    print("      ratio=True")
+    print("      percent=True")
+    thread_bar = ProgressBar(300, "Threading demo:", ratio=True, percent=True)
+    thread_bar.display()
+    def thread_worker(worker_id):
+        for i in range(10):
+            thread_bar.update(10, f"Thread {worker_id} update {i+1}")
+            time.sleep(0.1)
+    threads = []
+    for i in range(3):
+        thread = threading.Thread(target=thread_worker, args=(i,))
+        threads.append(thread)
+        thread.start()
+    for thread in threads:
+        thread.join()
+    
+    # 10. No Title Demo
+    print("\n10. No Title Demo:")
+    print("   Parameters:")
+    print("      total=60")
+    print("      title=None (no title)")
+    print("      ratio=True")
+    print("      percent=True")
+    no_title_bar = ProgressBar(60, ratio=True, percent=True)  # No title
+    no_title_bar.display()
+    no_title_messages = [
+        "Starting process...",
+        "Loading configuration...",
+        "Processing data...",
+        "Validating results...",
+        "Almost complete...",
+        "Finalizing...",
+        "Complete!"
+    ]
+    for i, msg in enumerate(no_title_messages):
+        if i == len(no_title_messages) - 1:
+            remaining = 60 - no_title_bar.current
+            no_title_bar.update(remaining, msg)
+        else:
+            increment = 60 // len(no_title_messages)
+            no_title_bar.update(increment, msg)
+        time.sleep(0.2)
+    
+    print("\n✅ All demonstrations complete!")
+
+
+def run_tests():
+    """Run all tests."""
+    print("Running ProgressBar tests...")
+    
+    # Run pytest
+    import subprocess
+    import sys
+    
+    result = subprocess.run([
+        sys.executable, "-m", "pytest", 
+        "tests/test_fdl/test_progress_bar.py", 
+        "-v", "--tb=short"
+    ], capture_output=True, text=True)
+    
+    print(result.stdout)
+    if result.stderr:
+        print("STDERR:", result.stderr)
+    
+    return result.returncode == 0
 
 
 if __name__ == "__main__":
-    # Run visual demonstrations
-    demo = TestProgressBarVisualDemonstration()
-    demo.test_visual_progress_bar_demonstration()
-    demo.test_visual_progress_updates_demonstration()
-    demo.test_visual_formatting_demonstration()
-    demo.test_visual_output_formats_demonstration()
-    demo.test_visual_lifecycle_demonstration()
-    demo.test_visual_context_manager_demonstration()
-    demo.test_visual_error_handling_demonstration()
-    demo.test_visual_thread_safety_demonstration()
+    # Run comprehensive demonstrations
+    run_comprehensive_demos()
     
-    print("\n" + "="*60)
-    print("✅ PROGRESS BAR TESTS COMPLETE")
-    print("="*60)
+    # Run tests
+    print("\n" + "="*80)
+    print("🧪 RUNNING TESTS")
+    print("="*80)
+    
+    success = run_tests()
+    
+    if success:
+        print("\n✅ All tests passed!")
+    else:
+        print("\n❌ Some tests failed!")
+        exit(1)

@@ -119,9 +119,35 @@ class _Table:
         
         Args:
             headers: List of header names
+            
+        Raises:
+            ValueError: If any header already exists or if there are duplicates in the list
         """
+        self._check_released()
+        
+        # Check for duplicates within the provided list
+        seen_headers = set()
         for header in headers:
-            self.add_header(header)
+            if header in seen_headers:
+                raise ValueError(f"Duplicate header '{header}' in the provided list")
+            seen_headers.add(header)
+        
+        # Check for conflicts with existing headers
+        for header in headers:
+            if header in self._headers:
+                raise ValueError(f"Header '{header}' already exists in the table")
+        
+        # Check max_columns constraint
+        if self.max_columns and len(self._headers) + len(headers) > self.max_columns:
+            raise ValueError(f"Cannot add headers: max_columns ({self.max_columns}) would be exceeded")
+        
+        # Add all headers
+        for header in headers:
+            self._headers.append(header)
+            
+            # Add empty cell to all existing rows
+            for row in self._data:
+                row.append("")
     
     def remove_header(self, header: str) -> None:
         """
@@ -273,26 +299,137 @@ class _Table:
         return self._data[row - 1][header_index]
     
     def update_cell(self, current_cell_content: str, 
-                   new_cell_content: Union[str, Tuple[str, str]]) -> bool:
+                   new_cell_content: Union[str, Tuple[str, str]],
+                   headers: Optional[Union[str, List[str], Tuple[str, ...]]] = None,
+                   rows: Optional[Union[int, List[int], range]] = None) -> bool:
         """
-        Update cell by finding current content (matches plain strings only).
+        Update cell by finding current content with optional filtering.
+        
+        Args:
+            current_cell_content: Content to find
+            new_cell_content: New content to set
+            headers: Optional header(s) to search in. Can be:
+                - str: Single header name
+                - List[str]: List of header names
+                - Tuple[str, ...]: Tuple of header names
+                - None: Search all headers (default)
+            rows: Optional row(s) to search in. Can be:
+                - int: Single row number (1-based)
+                - List[int]: List of row numbers (1-based)
+                - range: Range of row numbers (1-based)
+                - None: Search all rows (default)
+            
+        Returns:
+            bool: True if at least one cell was found and updated, False otherwise
+        """
+        self._check_released()
+        
+        # Convert headers to list for easier processing
+        if headers is None:
+            target_headers = self._headers
+        elif isinstance(headers, str):
+            target_headers = [headers]
+        elif isinstance(headers, (list, tuple)):
+            target_headers = list(headers)
+        else:
+            raise ValueError("headers must be str, list, tuple, or None")
+        
+        # Validate headers
+        for header in target_headers:
+            if header not in self._headers:
+                raise ValueError(f"Header '{header}' does not exist")
+        
+        # Convert rows to list for easier processing
+        if rows is None:
+            target_rows = list(range(1, len(self._data) + 1))
+        elif isinstance(rows, int):
+            if rows < 1 or rows > len(self._data):
+                raise ValueError(f"Row {rows} is out of range (1-{len(self._data)})")
+            target_rows = [rows]
+        elif isinstance(rows, list):
+            target_rows = rows
+            for row in target_rows:
+                if row < 1 or row > len(self._data):
+                    raise ValueError(f"Row {row} is out of range (1-{len(self._data)})")
+        elif isinstance(rows, range):
+            target_rows = list(rows)
+            for row in target_rows:
+                if row < 1 or row > len(self._data):
+                    raise ValueError(f"Row {row} is out of range (1-{len(self._data)})")
+        else:
+            raise ValueError("rows must be int, list, range, or None")
+        
+        # Get header indices
+        header_indices = [self._headers.index(header) for header in target_headers]
+        
+        # Search and update
+        updated = False
+        for row_num in target_rows:
+            row_idx = row_num - 1  # Convert to 0-based
+            row = self._data[row_idx]
+            
+            for col_idx in header_indices:
+                cell = row[col_idx]
+                cell_content = cell[0] if isinstance(cell, tuple) else str(cell)
+                
+                if cell_content == current_cell_content:
+                    self._data[row_idx][col_idx] = new_cell_content
+                    updated = True
+        
+        return updated
+    
+    def update_all_cells_with(self, current_cell_content: str, 
+                            new_cell_content: Union[str, Tuple[str, str]]) -> int:
+        """
+        Update all cells containing the specified content.
         
         Args:
             current_cell_content: Content to find
             new_cell_content: New content to set
             
         Returns:
-            bool: True if cell was found and updated, False otherwise
+            int: Number of cells updated
         """
+        self._check_released()
+        
+        updated_count = 0
+        
         for row_idx, row in enumerate(self._data):
             for col_idx, cell in enumerate(row):
                 cell_content = cell[0] if isinstance(cell, tuple) else str(cell)
                 
                 if cell_content == current_cell_content:
                     self._data[row_idx][col_idx] = new_cell_content
-                    return True
+                    updated_count += 1
         
-        return False
+        return updated_count
+    
+    def format_all_cells_with(self, content: str, format_string: str) -> int:
+        """
+        Apply formatting to all cells containing the specified content.
+        
+        Args:
+            content: Content to match
+            format_string: Format to apply
+            
+        Returns:
+            int: Number of cells formatted
+        """
+        self._check_released()
+        
+        formatted_count = 0
+        
+        for row_idx, row in enumerate(self._data):
+            for col_idx, cell in enumerate(row):
+                cell_content = cell[0] if isinstance(cell, tuple) else str(cell)
+                
+                if cell_content == content:
+                    header = self._headers[col_idx]
+                    row_num = row_idx + 1  # Convert to 1-based
+                    self.format_cell(header, row_num, format_string)
+                    formatted_count += 1
+        
+        return formatted_count
     
     def get_row(self, row: int) -> List[Union[str, Tuple[str, str]]]:
         """
@@ -429,7 +566,7 @@ class _Table:
         new_table._cell_formats = self._cell_formats.copy()
         return new_table
     
-    def find_rows(self, header: str, content: str) -> List[int]:
+    def find_rows_with(self, header: str, content: str) -> List[int]:
         """
         Find rows where a specific column contains specific content.
         
@@ -455,6 +592,72 @@ class _Table:
         
         return matching_rows
     
+    def find_headers_with(self, content: str) -> List[str]:
+        """
+        Find headers that contain specific content in any row.
+        
+        Args:
+            content: Content to find (matches plain strings)
+            
+        Returns:
+            List of header names that contain the content
+        """
+        self._check_released()
+        
+        matching_headers = []
+        
+        for header_idx, header in enumerate(self._headers):
+            for row in self._data:
+                cell = row[header_idx]
+                cell_content = cell[0] if isinstance(cell, tuple) else str(cell)
+                
+                if cell_content == content:
+                    matching_headers.append(header)
+                    break  # Found in this header, move to next header
+        
+        return matching_headers
+    
+    def find_columns_with(self, content: str) -> List[str]:
+        """
+        Alias for find_headers_with - find columns that contain specific content.
+        
+        Args:
+            content: Content to find (matches plain strings)
+            
+        Returns:
+            List of column names that contain the content
+        """
+        return self.find_headers_with(content)
+    
+    def find_all_occurrences(self, content: str) -> Dict[str, List[int]]:
+        """
+        Find all occurrences of content across all columns.
+        
+        Args:
+            content: Content to find (matches plain strings)
+            
+        Returns:
+            Dict with header names as keys and lists of row numbers (1-based) as values
+        """
+        self._check_released()
+        
+        results = {}
+        
+        for header_idx, header in enumerate(self._headers):
+            matching_rows = []
+            
+            for row_idx, row in enumerate(self._data):
+                cell = row[header_idx]
+                cell_content = cell[0] if isinstance(cell, tuple) else str(cell)
+                
+                if cell_content == content:
+                    matching_rows.append(row_idx + 1)  # 1-based
+            
+            if matching_rows:  # Only include headers that have matches
+                results[header] = matching_rows
+        
+        return results
+    
     def format_matching_cells(self, header: str, content: str, format_string: str) -> int:
         """
         Apply formatting to all cells in a column that match specific content.
@@ -467,7 +670,7 @@ class _Table:
         Returns:
             Number of cells formatted
         """
-        matching_rows = self.find_rows(header, content)
+        matching_rows = self.find_rows_with(header, content)
         
         for row in matching_rows:
             self.format_cell(header, row, format_string)

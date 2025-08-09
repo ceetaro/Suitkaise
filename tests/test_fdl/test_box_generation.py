@@ -659,10 +659,11 @@ class TestColorBleedingPrevention:
         
         terminal_output = result['terminal']
         
-        # Should have color codes for borders
-        assert '\033[31m' in terminal_output  # Red foreground
+        # Should have color codes for borders (check both 8-color and 24-bit RGB formats)
+        assert ('\033[31m' in terminal_output or '\x1b[31m' in terminal_output or 
+                '\x1b[38;2;255;0;0m' in terminal_output)  # Red foreground
         # Should have reset codes to prevent bleeding
-        assert '\033[0m' in terminal_output   # Reset
+        assert '\033[0m' in terminal_output or '\x1b[0m' in terminal_output   # Reset
         # Content should be present
         assert 'Plain content' in terminal_output
         
@@ -670,8 +671,8 @@ class TestColorBleedingPrevention:
         lines = terminal_output.split('\n')
         for line in lines:
             if '┌' in line or '└' in line or '│' in line or '+' in line or '|' in line:
-                # Border lines should end with reset code
-                assert line.endswith('\033[0m'), f"Border line missing reset: '{line}'"
+                # Border lines should end with reset code (handle both formats)
+                assert line.endswith('\033[0m') or line.endswith('\x1b[0m'), f"Border line missing reset: '{line}'"
     
     def test_background_color_blue(self):
         """Test box with blue background color."""
@@ -689,8 +690,8 @@ class TestColorBleedingPrevention:
         
         # Should contain ANSI color codes for border only
         terminal_output = result['terminal']
-        assert '\033[' in terminal_output  # Has ANSI codes
-        assert '\033[0m' in terminal_output  # Has reset codes
+        assert '\033[' in terminal_output or '\x1b[' in terminal_output  # Has ANSI codes
+        assert '\033[0m' in terminal_output or '\x1b[0m' in terminal_output  # Has reset codes
     
     def test_colored_content_with_colored_borders(self):
         """Test colored content inside colored borders - ensure no interference."""
@@ -722,7 +723,7 @@ class TestColorBleedingPrevention:
         assert 'Bold yellow content' in terminal_output
         
         # Should have multiple reset codes (border resets + content resets)
-        reset_count = terminal_output.count('\033[0m')
+        reset_count = terminal_output.count('\033[0m') + terminal_output.count('\x1b[0m')
         assert reset_count >= 4, f"Should have multiple reset codes, got {reset_count}"
         
         # Verify each border line ends with reset
@@ -731,7 +732,7 @@ class TestColorBleedingPrevention:
                                                   '+' in line or '|' in line)]
         for line in border_lines:
             if line.strip():  # Skip empty lines
-                assert line.endswith('\033[0m'), f"Border line should end with reset: '{line}'"
+                assert line.endswith('\033[0m') or line.endswith('\x1b[0m'), f"Border line should end with reset: '{line}'"
     
     def test_no_color_bleeding_after_box(self):
         """Test that colors don't bleed to content after the box."""

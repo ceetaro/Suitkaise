@@ -1,610 +1,780 @@
-# classes/progress_bar.py
 """
-Standalone Progress Bar Class for FDL.
+Progress Bar Implementation.
 
-Provides a comprehensive API for creating, managing, and displaying progress bars
-with formatting, threading support, and multi-format output.
+A simple progress bar that works with FDL but is not part of FDL strings.
 """
 
-import threading
+import sys
+import os
 import time
-from typing import Dict, Optional, Union, Any
-from copy import deepcopy
-from ..setup.progress_bar_generator import _ProgressBarGenerator
-from ..setup.unicode import _get_unicode_support
-from ..setup.terminal import _get_terminal
-from ..core.format_state import _FormatState
-from ..core.command_registry import _CommandRegistry, UnknownCommandError
-# Import processors to ensure registration
-from ..processors import commands
+import threading
+from typing import Dict, Any, Optional
+from dataclasses import dataclass
 
 
-class ProgressBarError(Exception):
-    """Raised when progress bar operations fail."""
-    pass
+
+
+
+class _ProgressBarManager:
+    """
+    Global progress bar management with thread-safe operations.
+    
+    Ensures only one progress bar is active at a time and provides
+    efficient progress tracking and output blocking.
+    """
+    
+    def __init__(self):
+        """Initialize progress bar manager."""
+        self._lock = threading.RLock()
+        self._active_progress_bar: Optional['_ProgressBar'] = None
+    
+    def get_active_progress_bar(self) -> Optional['_ProgressBar']:
+        """Get the currently active progress bar."""
+        with self._lock:
+            return self._active_progress_bar
+    
+    def set_active_progress_bar(self, progress_bar: Optional['_ProgressBar']) -> None:
+        """Set the currently active progress bar."""
+        with self._lock:
+            self._active_progress_bar = progress_bar
+    
+    def has_active_bar(self) -> bool:
+        """Check if any progress bar is currently active."""
+        return self._active_progress_bar is not None
+    
+    def deactivate_current(self) -> None:
+        """Deactivate the currently active progress bar."""
+        with self._lock:
+            self._active_progress_bar = None
+
+
+# Global progress bar manager instance
+_progress_bar_manager = _ProgressBarManager()
 
 
 class _ProgressBar:
     """
-    Standalone progress bar class with comprehensive API.
+    Simple progress bar implementation.
     
     Features:
-    - Thread-safe operations
-    - Format state integration with FDL command processing
+    - Unicode block characters for smooth progress visualization
+    - ASCII fallback for compatibility
+    - Automatic line width calculation based on title
     - Multi-format output (terminal, plain, HTML)
-    - Smooth Unicode rendering with ASCII fallback
-    - Rate calculation and timing
-    - Message display
-    - Memory management
-    
-    Recommended Usage:
-        Use update() for normal progress tracking (atomic incrementation):
-        >>> progress = _ProgressBar(total=100, color="green")
-        >>> progress.display()
-        >>> progress.update(25, "Step 1 complete")  # Preferred method
-        >>> progress.update(30, "Step 2 complete")  # Thread-safe increments
-        >>> progress.finish("All done!")
-        
-        Only use set_current() for special cases like checkpoint restoration.
+    - Proper width constraints and overflow handling
     """
     
-    def __init__(self, total: float, color: Optional[str] = None, 
-                 width: Optional[int] = None, show_percentage: bool = True,
-                 show_numbers: bool = True, show_rate: bool = False):
+    # Unicode blocks for smooth progress (8 levels of precision)
+    UNICODE_BLOCKS = ['▏', '▎', '▍', '▌', '▋', '▊', '▉', '█']
+    ASCII_BLOCKS = ['.', ':', 'i', 'l', 'I', 'H', '$', '#']
+    
+    def __init__(self, total: int, title: Optional[str] = None, 
+                 bar_color: Optional[str] = None, text_color: Optional[str] = None, 
+                 bkg_color: Optional[str] = None, ratio: bool = True, 
+                 percent: bool = False, rate: bool = False, 
+                 config: Optional[Dict[str, Any]] = None):
         """
-        Initialize a new progress bar.
+        Initialize progress bar.
         
         Args:
-            total: Total/maximum value for the progress bar
-            color: Color for the progress bar (FDL color name)
-            width: Fixed width for the bar (None for auto-sizing)
-            show_percentage: Whether to show percentage
-            show_numbers: Whether to show current/total numbers
-            show_rate: Whether to show rate information
-            
-        Raises:
-            ProgressBarError: If total is not positive
+            total: Total increments to completion (must be int of 2 or higher)
+            title: Leading text before bar (bar will be on separate line if too long)
+            bar_color: Color of progress bar
+            text_color: Color of statistic text and "--" before update messages
+            bkg_color: Background color of bar and message lines
+            ratio: Whether to display N/total completed
+            percent: Whether to display percent completion
+            rate: Whether to display rate per second
+            config: Dict setup of params (overrides individual params)
         """
-        if total <= 0:
-            raise ProgressBarError("Total must be positive")
+        # Validate total
+        if not isinstance(total, int) or total < 2:
+            raise ValueError("total must be an int of 2 or higher")
         
-        self.total = float(total)
-        self.width = width
-        self.show_percentage = show_percentage
-        self.show_numbers = show_numbers
-        self.show_rate = show_rate
+        # Apply config if provided
+        if config:
+            title = config.get('title', title)
+            bar_color = config.get('bar_color', bar_color)
+            text_color = config.get('text_color', config.get('message_color', text_color))
+            bkg_color = config.get('bkg_color', bkg_color)
+            ratio = config.get('ratio', ratio)
+            percent = config.get('percent', percent)
+            rate = config.get('rate', rate)
+        
+        # Store parameters
+        self.total = total
+        self.title = title
+        self.bar_color = bar_color
+        self.text_color = text_color
+        self.bkg_color = bkg_color
+        self.ratio = ratio
+        self.percent = percent
+        self.rate = rate
+        
+        # Unicode support detection
+        try:
+            from ..setup.unicode import _supports_progress_blocks
+            self._supports_unicode = _supports_progress_blocks()
+        except (ImportError, AttributeError):
+            self._supports_unicode = False  # Fallback to ASCII
+        
+        self.blocks = self.UNICODE_BLOCKS if self._supports_unicode else self.ASCII_BLOCKS
         
         # Progress tracking
-        self._current = 0.0
-        self._message = ""
-        self._start_time = time.time()
-        self._last_update_time = self._start_time
+        self.current = 0
+        self.elapsed_time = 0.0
+        self.start_time = None
+        self.is_stopped = False
+        self.is_displayed = False
         
         # Thread safety
         self._lock = threading.RLock()
         
-        # State management
-        self._displayed = False
-        self._finished = False
-        self._released = False
+        # Batching for large totals (will be calculated after bar width)
+        self._batch_threshold = 500  # New threshold
+        self._pending_updates = []  # List of increments waiting to be applied
+        self._pending_message = None  # Message to display when batch is applied
         
-        # Setup components (must be before formatting)
-        self._progress_bar_generator = _ProgressBarGenerator()
-        self._unicode_support = _get_unicode_support()
+        # Calculate and store constant dimensions once
+        self._terminal_width = self._get_terminal_width()
         
-        # Early terminal check with helpful error (terminal-only feature)
+        # Wrap title first, then calculate its width (ignoring ANSI codes)
+        wrapped_title_lines = self._wrap_text(self.title) if self.title else [""]
+        self._wrapped_title = (wrapped_title_lines[0] + " ") if wrapped_title_lines and wrapped_title_lines[0] else " "
+        self._title_width = self._get_visual_width(self._wrapped_title)
+        
+        self._max_stats_width = self._calculate_max_stats_width()
+        
+        # Calculate bar width using the clear formula: terminal_width - title_width - max_stats_width
+        # Subtract 1 to ensure we don't exceed terminal width and cause wrapping
+        self._bar_width = self._terminal_width - self._title_width - self._max_stats_width - 1
+        
+        # Ensure bar width is not negative and has a reasonable minimum
+        if self._bar_width < 0:
+            self._bar_width = 0
+        
+        # Now calculate batch size after bar width is available
+        self._batch_size = self._calculate_batch_size()
+        
+        # Check if bar width would be less than 40% of terminal width
+        min_bar_width = int(self._terminal_width * 0.4)
+        
+        if self._bar_width < min_bar_width:
+            # Calculate max allowed title width to help user
+            max_title_width = self._terminal_width - self._max_stats_width - min_bar_width
+            raise ValueError(
+                f"Title too long for terminal width. "
+                f"Current title width: {self._title_width}, "
+                f"Max allowed: {max_title_width}. "
+                f"Please use a shorter title."
+            )
+        
+        # Ensure bar width is not negative
+        if self._bar_width < 0:
+            raise ValueError(
+                f"Title and stats too wide for terminal. "
+                f"Terminal width: {self._terminal_width}, "
+                f"Title width: {self._title_width}, "
+                f"Stats width: {self._max_stats_width}, "
+                f"Required space: {self._title_width + self._max_stats_width}. "
+                f"Please use a shorter title."
+            )
+        
+        # Visual progress tracking
+        self.visual_total = self._bar_width * 8  # 8 states per position
+        self.visual_position = 0
+        
+        # Output tracking
+        self._last_output_lines = 0
+        self._last_output_length = 0
+    
+    def _calculate_batch_size(self) -> int:
+        """
+        Calculate batch size to ensure each batch shows visual progress.
+        
+        Each batch should represent at least 1 visual unit (1/8th of a bar position).
+        Formula: batch_size = ceiling(total / (bar_width * 8))
+        """
+        if self.total < 500:  # New threshold
+            return 1  # No batching for small totals
+        
+        # Calculate batch size to ensure visual progress
+        visual_units = self._bar_width * 8  # Each bar position has 8 visual states
+        batch_size = (self.total + visual_units - 1) // visual_units  # Ceiling division
+        
+        return max(1, batch_size)
+    
+    def _get_terminal_width(self) -> int:
+        """Get terminal width using the setup terminal module."""
         try:
-            self._terminal = _get_terminal()
-            # Test that we can actually get terminal width
-            _ = self._terminal.width
-        except Exception as e:
-            raise ProgressBarError(
-                "Progress bars require a terminal environment. "
-                "This error typically occurs when running in automated environments, "
-                "CI/CD pipelines, or redirected output. "
-                f"Terminal detection failed: {e}"
-            ) from e
+            from ..setup.terminal import _get_terminal
+            terminal = _get_terminal()
+            return terminal.width
+        except (ImportError, AttributeError):
+            # Fallback to shutil if setup module not available
+            try:
+                import shutil
+                return shutil.get_terminal_size().columns
+            except (AttributeError, OSError):
+                return 80
+    
+    def _get_visual_width(self, text: Optional[str]) -> int:
+        """Calculate visual width of text using the setup text_wrapping module."""
+        if not text:
+            return 0
         
-        self._command_registry = _CommandRegistry()
+        try:
+            from ..setup.text_wrapping import _get_visual_width
+            return _get_visual_width(text)
+        except (ImportError, AttributeError):
+            # Fallback to simple implementation
+            import re
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            clean_text = ansi_escape.sub('', text)
+            return len(clean_text)
+    
+    def _wrap_text(self, text: str) -> list[str]:
+        """Wrap text and return list of lines using the setup text_wrapping module."""
+        if not text:
+            return [""]
         
-        # Formatting (after command registry is initialized)
-        self._format_state: Optional[_FormatState] = None
-        if color:
-            self._set_color(color)
+        try:
+            from suitkaise.fdl._int.setup.text_wrapping import _wrap_text
+            wrapped_lines = _wrap_text(text, preserve_newlines=True)
+            return wrapped_lines if wrapped_lines else [""]
+        except (ImportError, AttributeError):
+            # Fallback to simple implementation
+            lines = text.split('\n')
+            return lines if lines else [""]
     
-    # ==================== PROPERTIES ====================
+    def _truncate_message_with_dots(self, message: str) -> str:
+        """
+        Truncate message by replacing trailing non-whitespace characters with dots.
+        
+        Replaces the last 4 visual width characters with dots:
+        - 1-wide characters are replaced with 1 dot
+        - 2-wide Unicode characters are replaced with 2 dots
+        """
+        if not message:
+            return message
+        
+        # Calculate visual width of the message
+        message_width = self._get_visual_width(message)
+        max_width = self._terminal_width - 4  # Leave space for " -- " prefix
+        
+        if message_width <= max_width:
+            return message
+        
+        # Need to truncate - find where to cut
+        dots_needed = 4
+        dots_placed = 0
+        truncated_chars = 0
+        
+        # Work backwards from the end, replacing non-whitespace characters
+        for i in range(len(message) - 1, -1, -1):
+            char = message[i]
+            
+            # Skip whitespace characters
+            if char.isspace():
+                continue
+            
+            char_width = self._get_visual_width(char)
+            
+            # Replace this character with dots
+            if char_width == 1:
+                dots_placed += 1
+            elif char_width == 2:
+                dots_placed += 2
+            
+            truncated_chars += 1
+            
+            # Check if we've placed enough dots
+            if dots_placed >= dots_needed:
+                break
+        
+        # Return the truncated message
+        return message[:-truncated_chars] + ("." * dots_needed)
     
-    @property
-    def current(self) -> float:
-        """Get current progress value."""
-        with self._lock:
-            return self._current
+
     
-    @property
-    def progress(self) -> float:
-        """Get progress as a ratio (0.0 to 1.0)."""
-        with self._lock:
-            return min(1.0, self._current / self.total)
+    def _calculate_max_stats_width(self) -> int:
+        """Calculate maximum possible stats width."""
+        # Choose divider based on Unicode support
+        divider = '│' if self._supports_unicode else '|'
+        
+        # Build the max stats text with fixed-width formatting
+        stats_parts = []
+        
+        # Add percent if requested (fixed width: 6 characters)
+        if self.percent:
+            stats_parts.append("100.0%")
+        
+        # Add ratio if requested (fixed width: 7 characters)
+        if self.ratio:
+            # Use max possible current value (the total itself)
+            max_current = self.total
+            stats_parts.append(f'{max_current:3d}/{self.total}')
+        
+        # Add rate if requested (fixed width: 7 characters)
+        if self.rate:
+            # Rate is capped at total in _build_stats_text, so use the same cap here
+            max_rate = self.total
+            stats_parts.append(f'{max_rate:6.1f}/s')
+        
+        # If no stats, return 0
+        if not stats_parts:
+            return 0
+        
+        # Add dividers between stats
+        result_parts = []
+        result_parts.append(" ")  # Initial space
+        for i, part in enumerate(stats_parts):
+            result_parts.append(part)
+            if i < len(stats_parts) - 1:
+                # Add divider after this part (except the last part)
+                result_parts.append(f" {divider} ")
+        
+        # Add 2 spaces of padding at the end
+        result_parts.append("  ")
+        
+        return self._get_visual_width("".join(result_parts))
     
-    @property
-    def percentage(self) -> int:
-        """Get progress as a percentage (0 to 100)."""
-        return int(self.progress * 100)
+    @classmethod
+    def is_any_active(cls) -> bool:
+        """Check if any progress bar is currently active."""
+        return _progress_bar_manager.is_any_active()
     
-    @property
-    def elapsed_time(self) -> float:
-        """Get elapsed time since creation."""
-        return time.time() - self._start_time
+    def _activate_progress_bar(self) -> None:
+        """Activate this progress bar (deactivates any existing one)."""
+        # Deactivate any existing progress bar
+        current_active = _progress_bar_manager.get_active_progress_bar()
+        if current_active is not None and current_active is not self:
+            current_active._deactivate_progress_bar()
+        
+        # Activate this one
+        _progress_bar_manager.set_active_progress_bar(self)
     
-    @property
-    def is_complete(self) -> bool:
-        """Check if progress bar is complete."""
-        with self._lock:
-            return self._current >= self.total
+    def _deactivate_progress_bar(self) -> None:
+        """Deactivate this progress bar."""
+        current_active = _progress_bar_manager.get_active_progress_bar()
+        if current_active is self:
+            _progress_bar_manager.deactivate_current()
     
-    @property
-    def is_displayed(self) -> bool:
-        """Check if progress bar is currently displayed."""
-        with self._lock:
-            return self._displayed
+    def _render_bar(self, progress: float, bar_width: int) -> str:
+        """Render the visual progress bar."""
+        if bar_width <= 0:
+            return ""
+        
+        # Calculate filled positions (each position can be 0-8 states)
+        filled_positions = self.visual_position // 8
+        
+        # Calculate partial state for the next position (0-7)
+        partial_state = self.visual_position % 8
+        
+        # Build the bar
+        bar_parts = []
+        
+        # Add filled positions with full blocks
+        bar_parts.append(self.blocks[-1] * filled_positions)  # Use full block (█)
+        
+        # Add partial character if needed
+        if partial_state > 0 and filled_positions < bar_width:
+            bar_parts.append(self.blocks[partial_state - 1])  # Use partial block
+        
+        # Add empty characters
+        empty_chars = bar_width - filled_positions - (1 if partial_state > 0 and filled_positions < bar_width else 0)
+        if empty_chars > 0:
+            bar_parts.append(' ' * empty_chars)
+        
+        return "".join(bar_parts)
     
-    @property
-    def is_finished(self) -> bool:
-        """Check if progress bar has been finished."""
-        with self._lock:
-            return self._finished
+    def _build_stats_text(self, progress: float) -> str:
+        """Build the stats text with consistent divider positioning."""
+        # Choose divider based on Unicode support
+        divider = '│' if self._supports_unicode else '|'
+        
+        # Build the stats text with fixed-width formatting
+        stats_parts = []
+        
+        # Add percent if requested (fixed width: 6 characters)
+        if self.percent:
+            percentage = progress * 100
+            stats_parts.append(f"{percentage:6.1f}%")
+        
+        # Add ratio if requested (fixed width: 7 characters)
+        if self.ratio:
+            stats_parts.append(f"{int(self.current):3d}/{self.total}")
+        
+        # Add rate if requested (fixed width: 7 characters)
+        if self.rate:
+            if self.elapsed_time > 0:
+                rate = min(self.current / self.elapsed_time, self.total)  # Cap rate at total
+                stats_parts.append(f"{rate:6.1f}/s")
+            else:
+                stats_parts.append("  0.0/s")
+        
+        # If no stats, return empty string
+        if not stats_parts:
+            return ""
+        
+        # Add dividers between stats
+        result_parts = []
+        result_parts.append(" ")  # Initial space
+        for i, part in enumerate(stats_parts):
+            result_parts.append(part)
+            if i < len(stats_parts) - 1:
+                # Add divider after this part (except the last part)
+                result_parts.append(f" {divider} ")
+        
+        # Add one space of padding at the end
+        result_parts.append("  ")
+        
+        return "".join(result_parts)
     
-    # ==================== CORE METHODS ====================
+    def _apply_colors(self, text: str, color: Optional[str] = None, bkg_color: Optional[str] = None) -> str:
+        """Apply colors to text (simplified implementation)."""
+        if not color and not bkg_color:
+            return text
+        
+        # Simple color mapping - in practice you'd use a proper color system
+        color_codes = {
+            'black': '30', 'red': '31', 'green': '32', 'yellow': '33',
+            'blue': '34', 'magenta': '35', 'cyan': '36', 'white': '37',
+            'gray': '90'
+        }
+        
+        codes = []
+        if color and color in color_codes:
+            codes.append(color_codes[color])
+        if bkg_color and bkg_color in color_codes:
+            codes.append(str(int(color_codes[bkg_color]) + 10))
+        
+        if codes:
+            return f"\033[{';'.join(codes)}m{text}\033[0m"
+        return text
+    
+    def _generate_terminal_output(self, progress: float, message: Optional[str] = None) -> tuple[str, str, str]:
+        """Generate terminal output as two lines."""
+        # First line: title + bar + stats
+        first_line_parts = []
+        
+        # Add title if provided (use pre-wrapped title)
+        if self._wrapped_title:
+            title_text_colored = self._apply_colors(self._wrapped_title, self.text_color)
+            first_line_parts.append(title_text_colored)
+        
+        # Generate the visual bar
+        bar_content = self._render_bar(progress, self._bar_width)
+        bar_text = self._apply_colors(bar_content, self.bar_color)
+        first_line_parts.append(bar_text)
+        
+        # Add stats text
+        stats_text = self._build_stats_text(progress)
+        stats_text_colored = self._apply_colors(stats_text, self.text_color)
+        first_line_parts.append(stats_text_colored)
+        
+        first_line = "".join(first_line_parts)
+        
+        # Second line: blank line for spacing
+        second_line = " " * self._terminal_width
+        
+        # Third line: message or whitespace
+        if message:
+            # Check for newlines in raw message
+            if '\n' in message:
+                self._deactivate_progress_bar()
+                raise ValueError("Progress bar messages cannot contain newlines. Please use a single line message.")
+            
+            # Format message: truncate if needed, add ' -- ' prefix, wrap, take first line, center it
+            truncated_message = self._truncate_message_with_dots(message)
+            formatted_message = f" -- {truncated_message}"
+            wrapped_lines = self._wrap_text(formatted_message)
+            first_wrapped_line = wrapped_lines[0] if wrapped_lines else " -- "
+            
+            # Position message to start at the same position as the progress bar
+            # Calculate the position where the bar starts (after title or minimum offset)
+            bar_start_position = self._title_width
+            
+            # Pad the message to align with the bar start
+            padded_message = (' ' * bar_start_position) + first_wrapped_line
+            
+            # Pad to terminal width
+            current_width = self._get_visual_width(padded_message)
+            padding_needed = self._terminal_width - current_width
+            if padding_needed > 0:
+                padded_message += ' ' * padding_needed
+            
+            third_line = self._apply_colors(padded_message, self.text_color)
+        else:
+            # Empty line filled with spaces to ensure consistent width
+            third_line = " " * self._terminal_width
+        
+        # Ensure the first line doesn't exceed terminal width and pad it
+        first_line_width = self._get_visual_width(first_line)
+        
+        if first_line_width > self._terminal_width:
+            # Debug information for overflows
+            title_part = first_line_parts[0] if first_line_parts else ""
+            bar_part = first_line_parts[1] if len(first_line_parts) > 1 else ""
+            stats_part = first_line_parts[2] if len(first_line_parts) > 2 else ""
+            
+            title_width = self._get_visual_width(title_part)
+            bar_width = self._get_visual_width(bar_part)
+            stats_width = self._get_visual_width(stats_part)
+            
+            raise RuntimeError(
+                f"Progress bar first line exceeds terminal width. "
+                f"Expected: {self._terminal_width}, Actual: {first_line_width}. "
+                f"Title width: {title_width}, Bar width: {bar_width}, Stats width: {stats_width}. "
+                f"Title: '{title_part}', Bar: '{bar_part}', Stats: '{stats_part}'. "
+                f"This indicates a calculation error."
+            )
+        
+        # Pad the first line to full terminal width to ensure complete clearing
+        padding_needed = self._terminal_width - first_line_width
+        if padding_needed > 0:
+            first_line += ' ' * padding_needed
+        
+        return first_line, second_line, third_line
+    
+    def _generate_plain_output(self, progress: float, message: Optional[str] = None) -> str:
+        """Generate plain text output."""
+        parts = ["[ProgressBar"]
+        
+        # Add percentage
+        if self.percent:
+            percentage = int(progress * 100)
+            parts.append(f" - {percentage}%")
+        
+        # Add numbers
+        if self.ratio:
+            parts.append(f", ({self.current}/{self.total})")
+        
+        # Add rate
+        if self.rate and self.elapsed_time > 0:
+            rate = self.current / self.elapsed_time
+            parts.append(f", {rate:.1f}/s")
+        
+        parts.append("]")
+        
+        # Add message
+        if message:
+            parts.append(f" - {message}")
+        
+        return "".join(parts)
+    
+    def _generate_html_output(self, progress: float, message: Optional[str] = None) -> str:
+        """Generate HTML output."""
+        html_parts = ['<div class="progress-bar">']
+        
+        # Add title if provided
+        if self.title:
+            html_parts.append(f'<span class="title">{self.title}</span>')
+        
+        # Add progress bar
+        percentage = int(progress * 100)
+        html_parts.append(f'<div class="bar" style="width: {percentage}%"></div>')
+        
+        # Add stats
+        stats_parts = []
+        if self.percent:
+            stats_parts.append(f"{percentage}%")
+        if self.ratio:
+            stats_parts.append(f"({self.current}/{self.total})")
+        if self.rate and self.elapsed_time > 0:
+            rate = self.current / self.elapsed_time
+            stats_parts.append(f"{rate:.1f}/s")
+        
+        if stats_parts:
+            html_parts.append(f'<span class="stats">{" ".join(stats_parts)}</span>')
+        
+        # Add message
+        if message:
+            html_parts.append(f'<span class="message">{message}</span>')
+        
+        html_parts.append('</div>')
+        return "".join(html_parts)
+    
+    def _create_snapshot(self, progress: float, message: Optional[str] = None) -> tuple[str, str, str]:
+        """
+        Create a snapshot of the current progress bar state.
+        
+        Args:
+            progress: Current progress ratio (0.0 to 1.0)
+            message: Optional message to display
+            
+        Returns:
+            tuple[str, str]: (first_line, second_line) for terminal output
+        """
+        # Calculate visual position based on progress
+        self.visual_position = round(progress * self.visual_total)
+        
+        # Generate terminal output
+        return self._generate_terminal_output(progress, message)
     
     def display(self) -> None:
         """
-        Display the progress bar initially.
-        
-        Raises:
-            RuntimeError: If progress bar has been released
+        Display the progress bar for the first time.
+        This method should be called to initially show the bar.
         """
-        self._check_released()
-        
         with self._lock:
-            if self._finished:
-                return
+            if self.is_displayed:
+                raise RuntimeError("Progress bar is already displayed. Use update() to modify it.")
             
-            self._displayed = True
-            self._render_and_display()
+            # Activate this progress bar (deactivates any existing one)
+            self._activate_progress_bar()
+            
+            # Create initial snapshot and display
+            progress = self.current / self.total if self.total > 0 else 0.0
+            first_line, second_line, third_line = self._create_snapshot(progress, None)
+            output = first_line + "\n" + second_line + "\n" + third_line
+            print(output, end='', flush=True)
+            self.is_displayed = True
+            self._last_output_lines = 3  # Track number of lines printed
     
-    def update(self, increment: float, message: str = "") -> None:
+    def update(self, *args) -> Dict[str, str]:
         """
-        Update progress by the given increment (RECOMMENDED for normal progress tracking).
+        Update progress bar with flexible parameter ordering.
         
-        This is the preferred method for natural progress updates as it uses atomic
-        incrementation, making it thread-safe and preventing race conditions.
-        
+        Usage examples:
+            bar.update()                    # increment by 1 with no message
+            bar.update(1)                   # increment by 1 with no message  
+            bar.update("textures loaded.")  # increment by 1 with a message
+            bar.update(f"Loading {component_name}", 12)  # increment by 12 with a message
+            bar.update(12)                  # increment by 12 with no message
+            
         Args:
-            increment: Amount to add to current progress
-            message: Optional message to display
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-            
-        Example:
-            >>> progress = _ProgressBar(total=100)
-            >>> progress.display()
-            >>> progress.update(25, "Loading configuration...")  # 0 → 25
-            >>> progress.update(30, "Processing data...")        # 25 → 55
-            >>> progress.update(45, "Finalizing...")             # 55 → 100
-        """
-        self._check_released()
-        
-        if increment <= 0:
-            return
-        
-        with self._lock:
-            if self._finished:
-                return
-            
-            # Update progress
-            old_current = self._current
-            self._current = min(self.total, self._current + increment)
-            self._last_update_time = time.time()
-            
-            # Update message if provided
-            if message.strip():
-                self._message = message.strip()
-            
-            # Auto-display if not already displayed
-            if not self._displayed:
-                self._displayed = True
-            
-            # Render if there was actual progress
-            if self._current > old_current:
-                self._render_and_display()
-            
-            # Auto-finish if complete
-            if self._current >= self.total and not self._finished:
-                self._finish_internal()
-    
-    def set_current(self, value: float, message: str = "") -> None:
-        """
-        Set current progress to a specific value (NOT RECOMMENDED for natural progression).
-        
-        This method directly sets the progress value and should only be used for special
-        cases like checkpoint restoration, syncing with external systems, or testing.
-        For normal progress tracking, use update() instead as it provides atomic
-        incrementation and better thread safety.
-        
-        Args:
-            value: New current value (will be clamped to 0-total range)
-            message: Optional message to display
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-            
-        Warning:
-            Avoid using this for natural progress updates. Use update() instead.
-            
-        Example (Valid use cases):
-            >>> # Resuming from checkpoint
-            >>> progress.set_current(saved_progress, "Resumed from checkpoint")
-            >>> 
-            >>> # Syncing with external progress system
-            >>> external_pct = get_external_progress() * 100
-            >>> progress.set_current(external_pct, "Synced with external system")
-        """
-        self._check_released()
-        
-        with self._lock:
-            if self._finished:
-                return
-            
-            old_current = self._current
-            self._current = max(0.0, min(self.total, float(value)))
-            self._last_update_time = time.time()
-            
-            # Update message if provided
-            if message.strip():
-                self._message = message.strip()
-            
-            # Auto-display if not already displayed
-            if not self._displayed:
-                self._displayed = True
-            
-            # Render if there was a change
-            if self._current != old_current:
-                self._render_and_display()
-            
-            # Auto-finish if complete
-            if self._current >= self.total and not self._finished:
-                self._finish_internal()
-    
-    def set_message(self, message: str) -> None:
-        """
-        Set the message without updating progress.
-        
-        Args:
-            message: Message to display
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
-        with self._lock:
-            if self._finished:
-                return
-            
-            self._message = message.strip()
-            
-            if self._displayed:
-                self._render_and_display()
-    
-    def finish(self, message: str = "Complete!") -> None:
-        """
-        Finish the progress bar and optionally set final message.
-        
-        Args:
-            message: Final message to display
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
-        with self._lock:
-            if self._finished:
-                return
-            
-            # Set to complete
-            self._current = self.total
-            if message.strip():
-                self._message = message.strip()
-            
-            self._finish_internal()
-    
-    def _finish_internal(self) -> None:
-        """Internal finish method (assumes lock is held)."""
-        self._finished = True
-        
-        if self._displayed:
-            # Final render
-            self._render_and_display()
-            # Add newline to move cursor past the progress bar
-            print()
-    
-    # ==================== FORMATTING METHODS ====================
-    
-    def set_color(self, color: str) -> None:
-        """
-        Set the color of the progress bar.
-        
-        Args:
-            color: FDL color name (e.g., 'green', 'red', 'blue')
-            
-        Raises:
-            ValueError: If color format is invalid
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
-        with self._lock:
-            self._set_color(color)
-            
-            if self._displayed and not self._finished:
-                self._render_and_display()
-    
-    def set_format(self, format_string: str) -> None:
-        """
-        Set formatting for the progress bar using FDL format string.
-        
-        Args:
-            format_string: FDL format string like "</green, bold>"
-            
-        Raises:
-            ValueError: If format string is invalid
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
-        with self._lock:
-            self._format_state = self._process_format_string(format_string)
-            
-            if self._displayed and not self._finished:
-                self._render_and_display()
-    
-    def reset_format(self) -> None:
-        """
-        Reset all formatting to default.
-        
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
-        with self._lock:
-            self._format_state = None
-            
-            if self._displayed and not self._finished:
-                self._render_and_display()
-    
-    def _set_color(self, color: str) -> None:
-        """Internal method to set color (assumes lock is held)."""
-        try:
-            self._format_state = self._process_format_string(f"</{color}>")
-        except Exception as e:
-            raise ValueError(f"Invalid color '{color}': {e}")
-    
-    def _process_format_string(self, format_string: str) -> Optional[_FormatState]:
-        """Process format string into format state using command processors."""
-        if not format_string.strip():
-            return None
-        
-        # Create a new format state for processing
-        format_state = _FormatState()
-        
-        # Remove leading/trailing whitespace and angle brackets
-        clean_format = format_string.strip()
-        if clean_format.startswith('</') and clean_format.endswith('>'):
-            clean_format = clean_format[2:-1]  # Remove </ and >
-        elif clean_format.startswith('<') and clean_format.endswith('>'):
-            clean_format = clean_format[1:-1]   # Remove < and >
-        
-        # Split commands by comma and process each
-        commands = [cmd.strip() for cmd in clean_format.split(',')]
-        
-        for command in commands:
-            if command:  # Skip empty commands
-                try:
-                    format_state = self._command_registry.process_command(command, format_state)
-                except UnknownCommandError as e:
-                    raise ValueError(f"Invalid format command '{command}': {e}")
-                except Exception as e:
-                    raise ValueError(f"Error processing format command '{command}': {e}")
-        
-        return format_state
-    
-    # ==================== OUTPUT METHODS ====================
-    
-    def get_output(self, format_type: str = 'terminal') -> str:
-        """
-        Get progress bar output in specified format without displaying.
-        
-        Args:
-            format_type: Output format ('terminal', 'plain', 'html')
+            *args: Flexible arguments - can be (increments, message) or (message, increments) or just increments or just message
             
         Returns:
-            Formatted progress bar string
-            
-        Raises:
-            ValueError: If format_type is invalid
-            RuntimeError: If progress bar has been released
+            Dict[str, str]: Progress bar in all output formats
         """
-        self._check_released()
-        
-        if format_type not in ('terminal', 'plain', 'html'):
-            raise ValueError(f"Invalid format_type: {format_type}")
-        
         with self._lock:
-            output = self._progress_bar_generator.generate_progress_bar(
-                current=self._current,
-                total=self.total,
-                width=self.width,
-                format_state=self._format_state,
-                message=self._message,
-                show_percentage=self.show_percentage,
-                show_numbers=self.show_numbers,
-                show_rate=self.show_rate,
-                elapsed_time=self.elapsed_time
+            if self.is_stopped:
+                raise RuntimeError("Progress bar is stopped and cannot be updated")
+            
+            if not self.is_displayed:
+                raise RuntimeError("Progress bar must be displayed first. Call display() before update().")
+            
+            # Parse arguments
+            increments = 1  # Default increment
+            message = None
+            
+            for arg in args:
+                if isinstance(arg, int):
+                    increments = arg
+                elif isinstance(arg, str):
+                    message = arg
+                else:
+                    raise ValueError(f"Invalid argument type: {type(arg)}. Expected int or str.")
+            
+            if not isinstance(increments, int):
+                raise ValueError("increments must be an int")
+            
+                    # Add to pending updates for batching
+            self._pending_updates.append(increments)
+            
+            # Store message if provided (overrides any previous message in this batch)
+            if message is not None:
+                self._pending_message = message
+            
+                    # Check if we should update the display (batching logic)
+            # Count total increments in pending updates
+            total_pending_increments = sum(self._pending_updates)
+            would_complete = (self.current + total_pending_increments) >= self.total
+            should_update = (
+                total_pending_increments >= self._batch_size or  # Batch threshold reached (increments)
+                message is not None or                           # Message provided (always update)
+                would_complete                                   # Would complete the bar (always update)
             )
             
-            return output[format_type]
+            if should_update:
+                # Apply all pending updates to current progress
+                total_increment = sum(self._pending_updates)
+                self.current = min(self.current + total_increment, self.total)
+                
+                # Get the stored message (if any) and clear pending data
+                stored_message = self._pending_message
+                self._pending_updates = []
+                
+                # Update stored message if a new one is provided
+                if message is not None:
+                    self._pending_message = message
+                    stored_message = message  # Use the new message
+                # (If message is None, keep the last stored message)
+                
+                # Update elapsed time if tracking rate
+                if self.rate and self.start_time is None:
+                    self.start_time = time.time()
+                elif self.rate and self.start_time:
+                    self.elapsed_time = time.time() - self.start_time
+                
+                # Calculate progress percentage for display
+                progress = self.current / self.total if self.total > 0 else 0.0
+                
+                # Create snapshot of current state (use stored message if no immediate message)
+                display_message = stored_message
+                first_line, second_line, third_line = self._create_snapshot(progress, display_message)
+                terminal_output = first_line + "\n" + second_line + "\n" + third_line
+                plain_output = self._generate_plain_output(progress, message)
+                html_output = self._generate_html_output(progress, message)
+                
+                # Optimized cursor movement: move up 3 lines, clear them, and position cursor
+                print('\033[3A\033[K\033[1A\033[K\033[1A\033[K\033[3B\r', end='', flush=True)
+                
+                # Print the new output
+                print(terminal_output, end='', flush=True)
+                
+                # Check if bar is complete and auto-deactivate
+                if self.current >= self.total:
+                    self._deactivate_progress_bar()  # Allow other output again
+                
+                return {
+                    'terminal': terminal_output,
+                    'plain': plain_output,
+                    'html': html_output
+                }
+            else:
+                # Return empty output when not updating (batching)
+                return {
+                    'terminal': '',
+                    'plain': '',
+                    'html': ''
+                }
     
-    def get_all_outputs(self) -> Dict[str, str]:
-        """
-        Get progress bar output in all formats.
-        
-        Returns:
-            Dict with keys: 'terminal', 'plain', 'html'
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
+    def stop(self):
+        """Stop the progress bar (stays in output but does not complete)."""
         with self._lock:
-            return self._progress_bar_generator.generate_progress_bar(
-                current=self._current,
-                total=self.total,
-                width=self.width,
-                format_state=self._format_state,
-                message=self._message,
-                show_percentage=self.show_percentage,
-                show_numbers=self.show_numbers,
-                show_rate=self.show_rate,
-                elapsed_time=self.elapsed_time
-            )
+            self.is_stopped = True
+            self._deactivate_progress_bar()  # Allow other output again
     
-    def _render_and_display(self) -> None:
-        """Internal method to render and display (assumes lock is held)."""
-        if not self._displayed or self._released:
-            return
-        
-        # Get terminal output (RLock allows reentrant access)
-        terminal_output = self.get_output('terminal')
-        
-        # Clear current line and display
-        print(f"\r{terminal_output}", end="", flush=True)
-    
-    # ==================== UTILITY METHODS ====================
-    
-    def copy(self) -> '_ProgressBar':
-        """
-        Create a copy of this progress bar.
-        
-        Returns:
-            New progress bar with same configuration
-            
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
+    def is_complete(self) -> bool:
+        """Check if progress bar is complete."""
         with self._lock:
-            new_bar = _ProgressBar(
-                total=self.total,
-                width=self.width,
-                show_percentage=self.show_percentage,
-                show_numbers=self.show_numbers,
-                show_rate=self.show_rate
-            )
-            
-            # Copy current state
-            new_bar._current = self._current
-            new_bar._message = self._message
-            new_bar._format_state = deepcopy(self._format_state) if self._format_state else None
-            
-            return new_bar
+            return self.current >= self.total
     
-    def reset(self) -> None:
-        """
-        Reset progress bar to initial state.
-        
-        Raises:
-            RuntimeError: If progress bar has been released
-        """
-        self._check_released()
-        
+    def get_progress(self) -> float:
+        """Get current progress as a percentage."""
         with self._lock:
-            self._current = 0.0
-            self._message = ""
-            self._start_time = time.time()
-            self._last_update_time = self._start_time
-            self._finished = False
-            
-            if self._displayed:
-                self._render_and_display()
-    
-    # ==================== MEMORY MANAGEMENT ====================
-    
-    def release(self) -> None:
-        """Release the progress bar from memory."""
-        if self._released:
-            return
-        
-        with self._lock:
-            # Finish if not already finished
-            if not self._finished and self._displayed:
-                print()  # Move cursor past progress bar
-            
-            # Clear references
-            self._format_state = None
-            self._message = ""
-            
-            # Mark as released
-            self._released = True
-    
-    def _check_released(self) -> None:
-        """Check if progress bar has been released and raise error if so."""
-        if self._released:
-            raise RuntimeError("Progress bar has been released and cannot be used")
-    
-    # ==================== CONTEXT MANAGER ====================
-    
-    def __enter__(self) -> '_ProgressBar':
-        """Enter context manager."""
-        self.display()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit context manager."""
-        if not self._finished:
-            self.finish()
-        self.release()
-    
-    # ==================== STRING REPRESENTATION ====================
-    
-    def __str__(self) -> str:
-        """Get string representation."""
-        with self._lock:
-            return f"ProgressBar({self._current}/{self.total}, {self.percentage}%)"
-    
-    def __repr__(self) -> str:
-        """Get detailed representation."""
-        with self._lock:
-            return (f"_ProgressBar(current={self._current}, total={self.total}, "
-                   f"percentage={self.percentage}%, displayed={self._displayed}, "
-                   f"finished={self._finished}, released={self._released})")
+            return (self.current / self.total) * 100 if self.total > 0 else 0.0
 
 
-# ==================== CONVENIENCE FUNCTIONS ====================
+# Module-level functions for global progress bar management
+def _get_progress_bar_manager() -> _ProgressBarManager:
+    """Get the global progress bar manager."""
+    return _progress_bar_manager
 
-def create_progress_bar(total: float, **kwargs) -> _ProgressBar:
-    """
-    Create a new progress bar with optional configuration.
-    
-    Args:
-        total: Total/maximum value
-        **kwargs: Additional arguments for _ProgressBar
-        
-    Returns:
-        New progress bar instance
-    """
-    return _ProgressBar(total, **kwargs)
+
+def _get_active_progress_bar() -> Optional['_ProgressBar']:
+    """Get the currently active progress bar."""
+    return _progress_bar_manager.get_active_progress_bar()
+
+
+def _is_progress_bar_active() -> bool:
+    """Check if any progress bar is currently active."""
+    return _progress_bar_manager.is_any_active()
+
+
+def _deactivate_current_progress_bar() -> None:
+    """Deactivate the currently active progress bar."""
+    _progress_bar_manager.deactivate_current()

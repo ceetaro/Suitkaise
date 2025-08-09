@@ -25,40 +25,40 @@ class _ColorConverter:
     Supports named colors, hex colors (#RGB, #RRGGBB), and rgb() colors.
     """
     
-    # Named colors with their ANSI foreground codes
+    # Named colors with their ANSI foreground codes (using true RGB values)
     NAMED_COLORS_FG = {
-        'red': '\033[31m',
-        'green': '\033[32m', 
-        'yellow': '\033[33m',
-        'blue': '\033[34m',
-        'magenta': '\033[35m',
-        'purple': '\033[35m',  # alias for magenta
-        'cyan': '\033[36m',
-        'white': '\033[97m',   # bright white
-        'black': '\033[30m',
-        'gray': '\033[37m',    # light gray
-        'orange': '\033[38;5;208m',  # 256-color orange
-        'pink': '\033[38;5;205m',    # 256-color pink
-        'brown': '\033[38;5;94m',    # 256-color brown
-        'tan': '\033[38;5;180m',     # 256-color tan
+        'red': '\033[38;2;255;0;0m',      # #FF0000
+        'green': '\033[38;2;0;255;0m',    # #00FF00
+        'yellow': '\033[38;2;255;255;0m', # #FFFF00
+        'blue': '\033[38;2;0;0;255m',     # #0000FF
+        'magenta': '\033[38;2;255;0;255m', # #FF00FF
+        'purple': '\033[38;2;128;0;128m', # #800080 (standard purple)
+        'cyan': '\033[38;2;0;255;255m',   # #00FFFF
+        'white': '\033[38;2;255;255;255m', # #FFFFFF
+        'black': '\033[38;2;0;0;0m',      # #000000
+        'gray': '\033[38;2;128;128;128m', # #808080
+        'orange': '\033[38;2;255;165;0m', # #FFA500 (standard orange)
+        'pink': '\033[38;2;255;192;203m', # #FFC0CB (standard pink)
+        'brown': '\033[38;2;165;42;42m',  # #A52A2A (standard brown)
+        'tan': '\033[38;2;210;180;140m',  # #D2B48C (standard tan)
     }
     
-    # Named colors with their ANSI background codes
+    # Named colors with their ANSI background codes (using true RGB values)
     NAMED_COLORS_BG = {
-        'red': '\033[41m',
-        'green': '\033[42m',
-        'yellow': '\033[43m', 
-        'blue': '\033[44m',
-        'magenta': '\033[45m',
-        'purple': '\033[45m',  # alias for magenta
-        'cyan': '\033[46m',
-        'white': '\033[107m',  # bright white background
-        'black': '\033[40m',
-        'gray': '\033[47m',    # light gray background
-        'orange': '\033[48;5;208m',  # 256-color orange background
-        'pink': '\033[48;5;205m',    # 256-color pink background
-        'brown': '\033[48;5;94m',    # 256-color brown background
-        'tan': '\033[48;5;180m',     # 256-color tan background
+        'red': '\033[48;2;255;0;0m',      # #FF0000
+        'green': '\033[48;2;0;255;0m',    # #00FF00
+        'yellow': '\033[48;2;255;255;0m', # #FFFF00
+        'blue': '\033[48;2;0;0;255m',     # #0000FF
+        'magenta': '\033[48;2;255;0;255m', # #FF00FF
+        'purple': '\033[48;2;128;0;128m', # #800080 (standard purple)
+        'cyan': '\033[48;2;0;255;255m',   # #00FFFF
+        'white': '\033[48;2;255;255;255m', # #FFFFFF
+        'black': '\033[48;2;0;0;0m',      # #000000
+        'gray': '\033[48;2;128;128;128m', # #808080
+        'orange': '\033[48;2;255;165;0m', # #FFA500 (standard orange)
+        'pink': '\033[48;2;255;192;203m', # #FFC0CB (standard pink)
+        'brown': '\033[48;2;165;42;42m',  # #A52A2A (standard brown)
+        'tan': '\033[48;2;210;180;140m',  # #D2B48C (standard tan)
     }
     
     # HTML/CSS color names (subset that matches our named colors)

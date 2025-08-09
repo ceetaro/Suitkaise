@@ -100,7 +100,7 @@ time_fmt = TimeFormat(time_config)
 fmt = '<fdl.time> - <fdl.name> - <fdl.msgtype> - <fdl.message>'
 
 # log format, fdl configs
-lsetup.set_format(fmt, (time_fmt,))
+lsetup.set_format(fmt, time_fmt)
 
 # set what loggers you want to listen to
 # listens to all loggers by default, but you can stop listening to certain ones
@@ -144,7 +144,7 @@ config = {
 }
 rptr_time_fmt = TimeFormat(config)
 rptr_fmt = '<fdl.time> - <fdl.name> - <fdl.msgtype> - <fdl.message>'
-rptr.set_format(rptr_fmt, (rptr_time_fmt,))
+rptr.set_format(rptr_fmt, rptr_time_fmt)
 ```
 
 ## Basic logging functions
@@ -156,34 +156,34 @@ rptr = fdl.log.from_current_file()
 
 # standard logging
 rptr.info("value1: <value1>, value2: <value2>", (value1, value2))
-rptr.debug("Debug message", (debug_value,))
-rptr.warning("Warning message", (warning_data,))
-rptr.error("Error occurred", (error_info,))
-rptr.critical("Critical issue", (critical_data,))
+rptr.debug("Debug message", debug_value)
+rptr.warning("Warning message", warning_data)
+rptr.error("Error occurred", error_info)
+rptr.critical("Critical issue", critical_data)
 
 # success or fail
-rptr.success("Operation completed", (result,))
-rptr.fail("Operation failed", (error,))
+rptr.success("Operation completed", result)
+rptr.fail("Operation failed", error)
 
 # quick state messages
-rptr.setToNone("Variable <var_name> set to None", (var_name,))
-rptr.setToTrue("Flag <flag_name> enabled", (flag_name,))
-rptr.setToFalse("Flag <flag_name> disabled", (flag_name,))
+rptr.setToNone("Variable <var_name> set to None", var_name)
+rptr.setToTrue("Flag <flag_name> enabled", flag_name)
+rptr.setToFalse("Flag <flag_name> disabled", flag_name)
 
 # save and load
-rptr.savedObject("Object saved", (object_info,))
-rptr.savedFile("File saved to <path>", (file_path,))
-rptr.loadedObject("Object loaded", (object_info,))
-rptr.loadedFile("File loaded from <path>", (file_path,))
-rptr.importedObject("Imported <obj_name>", (obj_name,))
-rptr.importedModule("Imported module <module>", (module_name,))
+rptr.savedObject("Object saved", object_info)
+rptr.savedFile("File saved to <path>", file_path)
+rptr.loadedObject("Object loaded", object_info)
+rptr.loadedFile("File loaded from <path>", file_path)
+rptr.importedObject("Imported <obj_name>", obj_name)
+rptr.importedModule("Imported module <module>", module_name)
 
 # general status (will add more)
-rptr.scanning("Scanning <directory>", (directory,))
-rptr.scanned("Scanned <count> files", (file_count,))
-rptr.queued("Task queued", (task_info,))
-rptr.leftQueue("Task dequeued", (task_info,))
-rptr.leftQueueEarly("Task removed early", (task_info,))
+rptr.scanning("Scanning <directory>", directory)
+rptr.scanned("Scanned <count> files", file_count)
+rptr.queued("Task queued", task_info)
+rptr.leftQueue("Task dequeued", task_info)
+rptr.leftQueueEarly("Task removed early", task_info)
 
 # custom message type
 rptr.custom(
@@ -292,12 +292,12 @@ from_64_sec_ago = time.time() - 64
 fdl.print("<time:>")
 
 # print a given timestamp in default timestamp format
-fdl.print("<time:from_64_sec_ago>", (from_64_sec_ago,))
+fdl.print("<time:from_64_sec_ago>", from_64_sec_ago)
 
 # print current time in default date form (dd/mm/yy hh:mm:ss)
 fdl.print("<date:>")
 # print a given timestamp in date form
-fdl.print("<date:from_64_sec_ago>", (from_64_sec_ago,))
+fdl.print("<date:from_64_sec_ago>", from_64_sec_ago)
 
 # print a given timestamp in a different format
 # July 4, 2025
@@ -306,39 +306,36 @@ fdl.print("<datelong:>")
 # print the day of the week
 # resutls in day of the week
 fdl.print("<day:>")
-fdl.print("<day:from_64_sec_ago>", (from_64_sec_ago,))
+fdl.print("<day:from_64_sec_ago>", from_64_sec_ago)
 
 # using a command
-# 16:30 -> 4:30 PM (accounts for daylight savings)
-fdl.print("</12hr, no sec><time:>")
+# 16:30 -> 4:30 PM (accounts for daylight savings if timezone has daylight savings adjustments)
+fdl.print("</12hr><time:>")
 
 # timezones account for daylight savings
-fdl.print("</tz pst><time:from_64_sec_ago>", (from_64_sec_ago,))
+fdl.print("</tz pst><time:from_64_sec_ago>", from_64_sec_ago)
 
-# print elapsed time from a timestamp to now in smart format
-# automatically shows appropriate units: days, hours, minutes, seconds
-# only shows non-zero units for clean output
-# ex. timestamp from 2 hours 17 minutes ago -> "2h 17m 54.123456s"
-# ex. timestamp from 1 day 5 hours ago -> "1d 5h 23m 12.654321s"  
-# ex. timestamp from 30 seconds ago -> "30.123456s"
+# using 24-hour format explicitly
+fdl.print("</24hr><time:>")
+
+# using smart time formatting for elapsed times
+fdl.print("</smart time 3><elapsed:execution_started_at>", execution_started_at)
 
 self.login_time = time.time() - 8274.743462
 # "Login was (some time) ago"
-fdl.print("Login was <time_ago:self.login_time>", (self.login_time,))
+fdl.print("Login was <time_ago:self.login_time>", self.login_time)
 
 next_meeting = time.time() + 8274.743462
 # "(some time) until"
-fdl.print("<time_until:self.login_time> next meeting", (next_meeting,))
+fdl.print("<time_until:self.login_time> next meeting", next_meeting)
 
 # "Time to complete: (some time)"
 # elapsed finds absolute value of difference between given time float and current time
 execution_started_at = time.time() - 68
-fdl.print("Time to complete: <elapsed:execution_started_at>", (execution_started_at,))
+fdl.print("Time to complete: <elapsed:execution_started_at>", execution_started_at)
 
 # use commands to modify elapsed display
-fdl.print("Logged in at</no sec><time_ago:self.login_time>", (self.login_time,))
-
-# <elapsed:>, <time_until:>, and <time_ago:> are NOT supported
+fdl.print("Logged in </smart time 2><time_ago:self.login_time>", self.login_time)
 
 # printing time and values. VALUE ORDER MATTERS!
 import os
@@ -382,27 +379,74 @@ fdl.print(
 - Automatically chooses appropriate units (days, hours, minutes, seconds)
 
 #### Time Commands:
-- `</12hr>` - Use 12-hour format with AM/PM (removes leading zeros: "4:00 PM" not "04:00 PM")
-- `</tz pst>` - Convert to timezone (supports daylight savings)
-- `</no secs>` - Hide seconds from time display, unless timestamp is less than 60 seconds
-- `</round>` - round to nearest second
-- `</round N>` - round to nearest Nth of a second (round 2 = round to hundredths place)
-- `</no mins>` - Hide minutes and seconds from time display if greater than 1 hour
-- `</no hrs>` - Hide hrs, mins, secs from time display if greater than 1 day
-- `</no days>` - Hide days from time display and just display more than 24 hours (ex. 38 hours). gets overridden by /no hrs
-- `</smart time 1>` - only display the largest unit of measurement (ex. display hours if >60 min and <1 day)
-- `</smart time 2` - display the 2 largest units of measurement for that timestamp
+- `</12hr>` - Use 12-hour format with AM/PM (removes leading zeros: "2:03:46.1234 AM" not "02:03:46.1234 AM")
+- `</24hr>` - Use 24-hour format explicitly (opposite of </12hr>): "02:03:46.1234"
+- `</tz timezone>` - Convert to specified timezone (supports daylight savings)
+  - Examples: `</tz pst>`, `</tz est>`, `</tz utc>`, `</tz cet>`
+- `</seconds>` - Display seconds and decimal places in timestamps (False by default)
+  - When disabled: "2:03 AM" or "02:03" (clean HH:MM format)
+  - When enabled: "2:03:46.1234 AM" or "02:03:46.1234" (full precision)
+- `</decimals N>` - Control decimal places for timestamp seconds (0-10)
+  - Only applies when `</seconds>` is enabled
+  - Can be set even when seconds are disabled (takes effect when re-enabled)
+  - Default is 4: "2:03:46.1234 AM" or "02:03:46.1234"  
+  - `</decimals 0>` - No decimals: "2:03:46 AM" or "02:03:46"
+  - `</decimals 2>` - Two decimal places: "2:03:46.12 AM" or "02:03:46.12"
+  - `</decimals 6>` - Six decimal places: "2:03:46.123456 AM" or "02:03:46.123456"
+- `</smart time N>` - Intelligent elapsed time formatting with N units
+  - Shows the N most relevant time units automatically
+  - Default is 3 units: `</smart time 3>`
+  - Debug mode uses 10 units for maximum detail
+  - Examples:
+    - `</smart time 1>` - Shows only largest unit: "2d" or "13h" or "45m" or "30s"
+    - `</smart time 2>` - Shows 2 units: "2h 15m" or "45m 30s"
+    - `</smart time 3>` - Shows 3 units: "2h 15m 30s" (default)
+    - `</smart time 5>` - Shows up to 5 units: "1d 2h 15m 30.0s"
+
+  - Works like this: days = 1, hours = 1, minutes = 1, seconds = 1, and every decimal place = 1.
+  - So if we have 12 smart units, it could look like this: 12d 11h 10m 9.87654321s
+
+#### Timestamp Philosophy:
+**FDL and Suitkaise in general use pure float-based Unix timestamps for everything.** No datetime objects, ISO formats, or complex time libraries. All timestamps are Unix floats (seconds since epoch), and formatting is done manually for finer control and cleaner output. This gives precise decimal control, simpler timezone logic, and consistent behavior across all time operations.
+
+#### End Commands:
+- `</end 12hr>` - Reset to 24-hour format (sets twelve_hour_time = False)
+- `</end 24hr>` - Reset to 12-hour format (sets twelve_hour_time = True)  
+- `</end tz>` - Reset timezone to None (removes timezone conversion)
+- `</end seconds>` - Disable seconds display (sets use_seconds_in_timestamp = False)
+- `</end smart time>` - Reset smart time to default (3 units)
+- `</end decimals>` - Reset decimal places to default (4 places)
 
 #### Usage Examples:
 ```python
-# Absolute time formatting
+# Clean time format (default - no seconds)
 login_time = # a login time
-fdl.print("User logged in at </12hr, tz est><time:login_time>", (login_time,))
-# Result: "User logged in at 3:30:45 PM"
+fdl.print("User logged in at </12hr, tz est><time:login_time>", login_time)
+# Result: "User logged in at 3:30 PM"
 
-# Relative time formatting  
-fdl.print("User logged in <time_ago:login_time>", (login_time,))
-# Result: "User logged in 1h 23m 45.123456s ago"
+# Full precision time format
+fdl.print("Server started at </24hr, tz utc, seconds><time:start_time>", start_time)
+# Result: "Server started at 03:30:45.1234"
+
+# Custom decimal precision
+fdl.print("Event timestamp: </seconds, decimals 2><time:event_time>", event_time)
+# Result: "Event timestamp: 02:25:33.12"
+
+# Disable seconds for clean display
+fdl.print("</end seconds>Meeting at <time:meeting_time>", meeting_time)
+# Result: "Meeting at 2:30 PM"
+
+# Relative time formatting with smart time
+fdl.print("User logged in </smart time 2><time_ago:login_time>", login_time)
+# Result: "User logged in 2h 15m ago"
+
+# Detailed elapsed time
+fdl.print("Process running for </smart time 4><elapsed:process_start>", process_start)
+# Result: "Process running for 1d 5h 23m 45s"
+
+# Simple elapsed time
+fdl.print("Last seen </smart time 1><time_ago:last_activity>", last_activity)
+# Result: "Last seen 3h ago"
 ```
 
 ## Creating Format objects
@@ -498,14 +542,33 @@ from suitkaise import fdl
 value1 = 32
 
 # use direct function
-fdl.dprint("value1 was set to <value1>.", (value1,))
+fdl.dprint("value1 was set to <value1>.", value1)
 
 # use formatting
-fdl.print("</debug>value1 was set to <value1>.", (value1,))
+fdl.print("</debug>value1 was set to <value1>.", value1)
 
 # get type annotation individually
-fdl.print("value1 was set to <type:value1>.", (value1,))
+fdl.print("value1 was set to <type:value1>.", value1)
 ```
+Looks like: 
+
+original: `"value1 was set to <value1>."`
+
+In debug mode, all `<values>`, when substituted, are bolded, italicized, and color coded according to their type. They also have a dimmed type hint in parentheses after the value.
+
+int: value1 was set to ***(cyan)32*** (int).
+
+True: value1 was set to ***(green)True*** (bool).
+
+False: value1 was set to ***(red)False*** (bool).
+
+None: value1 was set to ***(blue)None*** (None).
+
+float: value1 was set to ***(cyan)3.14159*** (float).
+
+debug mode handles strings differently. usually, if you insert a string as a variable into an fdl string, the result will be formatted if there are commands or ansi codes. however, debug mode prints as is.
+
+string: value1 was set to ***(green)"***</bold>Hello, World!***(green)"*** (str).
 
 ## Printing code blocks and markdown files
 
@@ -577,7 +640,7 @@ my_nested_collection = { # level 1
     ) # level 2
 } # level 1
 
-fdl.print("<nested_collection>", (my_nested_collection,))
+fdl.print("<nested_collection>", my_nested_collection)
 ```
 
 ## Using decorators to set formats for functions
@@ -593,14 +656,14 @@ def fibonacci(n):
     else: 
         n = fibonacci(n-1) + fibonacci(n-2)
     # auto applies format
-    fdl.print("Result: <n>", (n,))
+    fdl.print("Result: <n>", n)
     # disable autoformat
-    fdl.print("</end autofmt>Result: <n>", (n,))
+    fdl.print("</end autofmt>Result: <n>", n)
     return n
 
 # ❌ does not auto apply format to return value ❌
 # (still applies format to print statements inside)
-fdl.print("<result>", (fibonacci(8),))
+fdl.print("<result>", fibonacci(8))
 
 # applies format to print statements inside function!
 fibonacci(9)
@@ -614,9 +677,9 @@ def fibonacci(n):
     else: 
         n = fibonacci(n-1) + fibonacci(n-2)
     # auto applies debug mode
-    fdl.print("Result: <n>", (n,))
+    fdl.print("Result: <n>", n)
     # disable autodebug
-    fdl.print("</end autodebug>Result: <n>", (n,))
+    fdl.print("</end autodebug>Result: <n>", n)
     return n
 ```
 
@@ -627,23 +690,56 @@ Progress bars can be created, and when they do, you cannot print anything new to
 ```python
 from suitkaise.fdl import ProgressBar
 
-# number of increments before progress bar completes
-bar = ProgressBar(100)
-bar.display_bar(color="green")
+# can either create it with params or config, params override config
+bar = ProgressBar(total=100, title=None, bar_color=None, text_color=None, bkg_color=None, ratio=True, percent=False, rate=False, config)
+# total: total increments to completion
+#  - must be an int of 2 or higher
+#  - can only be incremented using ints, no decimal increments
+# title: leading text before bar
+#  - bar will be on separate line if title is too long.
+# bar_color: color of progress bar
+# text_color: color of statistic text and "--" before update messages, and default message and title color
+#  - default text color can be overridden by formatting
+# bkg_color: background color of bar and message lines
+# ratio: whether to display N/total completed
+# percent: whether to display percent completion
+# rate: whether to display rate per second
+# config: dict setup of params
+
+
+# create with params
+bar = ProgressBar(100, "  Loading data:", "green", "black", "gray", ratio=False, rate=True)
+
+# create with config
+config = {
+    "bar_color": "cyan",
+    "message_color": "cyan",
+    "ratio": True,
+    "percent": False,
+    "rate": True,
+}
+bar = ProgressBar(self._num_to_load, "  Loading Data:", config=config)
+
+# add fdl formatting to a title (text formatting and text color only)
+bar = ProgressBar(self._num_to_load, "  </bold, italic, green>Loading Data:", config=config)
+
+# display the bar 
+bar.display()
 
 # updating progress bar N number of increments
 # Uses batched updates for smooth performance in threading
-# Still animates bar progression smoothly
 # message goes under the bar, and line with message gets replaced when another message comes in.
 bar.update(7, "message")
+
+# add formatting to messages
+bar.update(7, "</bold, cyan>Batch</blue> <self.batch_count></end blue, bold> loaded successfully.", self.batch_count)
 
 # if this bar reaches 100, text can be outputted again.
 
 # blocking bar from updating further (stays in output, but does not complete.)
-# allows text to be outputted again.
+# allows text to be outputted again on a new line under the message line.
 bar.stop()
 ```
-
 ## Creating spinners and boxes
 
 **Spinners**
@@ -708,78 +804,418 @@ fdl.print("</justify center>a message justified centered")
 
 ## Creating tables
 
+# Complete Table Concept v6 - Enhanced Implementation
+
+## Core Design Principles
+
+- **API-driven data management** - No direct data manipulation
+- **Headers-first approach** - Must define structure before adding data
+- **Clean content matching** with tuple formatting
+- **Background color text-only** - No cell/border backgrounds
+- **Smart display methods** with clear naming
+- **Standalone feature** - Not integrated with fdl.print(), uses own display methods
+- **Enhanced duplicate handling** - Powerful search, update, and formatting for duplicate data
+- **Data integrity protection** - Prevents duplicate headers and enforces constraints
+
+## Table Creation & Header Setup
+
 ```python
 from suitkaise import fdl
 
-table1 = fdl.Table(box="rounded")
-# add a single column (max: 3)
-table1.add_column("UI Process")
-# add multiple (takes a list or tuple)
-table1.add_columns(["Parser Process", "Event Hub Process"])
+# Create table with style and optional constraints
+table = fdl.Table(style="rounded")  # rounded, square, double, simple
+table = fdl.Table(style="rounded", max_columns=5, max_rows=10)
 
-# add rows the same way (max: 10)
-table1.add_row("Memory Usage")
-table1.add_rows(["Num Threads", "Time Created", "Time Ended"])
+# MUST set up headers first (defines table structure)
+table.add_header("Component")
+table.add_headers(["Status", "Usage", "Temperature"])
 
-# populate cells using int coords (1-based)
-table1.populate(1, 1, "str or str(value)")
-# populate cells using row and column names (order doesn't matter as long as rows and columns have unique names)
-table1.populate("Parser Process", "Memory Usage", "str or str(value)")
-
-# or a mix of both:
-table1.populate("Event Hub Process", 3, "str or str(value)")
-
-# set formatting for rows, columns, or cells
-table1.set_cell_format(format=fdl.Format)
-table1.set_row_format(format=fdl.Format)
-table1.set_column_format(format=fdl.Format)
-
-# column only table
-table2 = fdl.ColumnTable()
-# can only add columns, and a max of 10 rows down are available
-table2.add_column("Component")
-# or...
-table2.add_columns("Component", "Status")
-
-# populate cells by adding them to columns
-# add a value to column 1 (adds to lowest y coordinate empty cell)
-table2.populate_first_column(1, "CPU") # add to column 1, "row" 1 (1, 1)
-# then, if you were to...
-table2.populate_first_column(1, "GPU") # added to 1, 2 automatically
-
-# adding to other columns requires you to add via (column 1 value, other column name)
-table2.populate("CPU", "Status", "Very Busy")
-# or...
-table2.populate("CPU", 2, "Very Busy")
-
-# row only table
-table2 = fdl.RowTable()
-# can only add rows, and a max of 3 columns over are available
-table2.add_row("Component")
-# or...
-table2.add_rows("Component", "Status")
-
-# populate cells by adding them to rows
-# add a value to row 1 (adds to lowest x coordinate empty cell)
-table2.populate_first_row(1, "CPU") # add to row 1, "column" 1 (1, 1)
-# then, if you were to...
-table2.populate_first_row(1, "GPU") # added to 2, 1 automatically
-
-# adding to other rows requires you to add via (row 1 value, other row name)
-table2.populate("CPU", "Status", "Very Busy")
-# or...
-table2.populate("CPU", 2, "Very Busy")
-
-# depopulating and repopulating cells (does not update in real time)
-table.depopulate(1, 3)
-# cells CANNOT be overridden unless repopulate is used
-table.repopulate(2, "Status", "Not Busy")
-
-# printing table
-fdl.print("<table1>", (table1,))
-# or...
-table1.display_table()
+# Or all at once
+server_table = fdl.Table(style="rounded")
+server_table.add_headers(["Server", "Status", "CPU", "Memory", "Uptime"])
 ```
+
+## Enhanced Header Management
+
+```python
+# Add new header (adds empty column to all existing rows)
+table.add_header("Location")  # All existing rows get empty "" in this column
+
+# Remove header (removes entire column and all its data)
+table.remove_header("Temperature")  # Deletes column and all temperature data
+
+# Get current headers
+headers = table.get_headers()  # Returns copy of headers list
+
+# Duplicate header validation (prevents data integrity issues)
+table.add_headers(["Name", "Age", "City"])
+table.add_header("Name")  # ❌ Raises: "Header 'Name' already exists"
+
+# Internal duplicate validation
+table.add_headers(["Country", "Age", "Phone"])  # ❌ Raises: "Header 'Age' already exists in the table"
+
+# Duplicate within list validation
+table.add_headers(["Country", "Country", "Phone"])  # ❌ Raises: "Duplicate header 'Country' in the provided list"
+
+# Max columns constraint
+table = fdl.Table(max_columns=3)
+table.add_headers(["A", "B"])
+table.add_headers(["C", "D"])  # ❌ Raises: "Cannot add headers: max_columns (3) would be exceeded"
+```
+
+## API-Based Data Population
+
+```python
+# Add single row
+table.add_row_data(["CPU", ("Critical", "</red, bold>"), "85%", "72°C"])
+
+# Add multiple rows
+table.add_row_data([
+    ["GPU", "Normal", ("12%", "</green>"), "65°C"],
+    ["RAM", ("Warning", "</yellow>"), "67%", "45°C"],
+    ["SSD", ("Failed", "</red, blink>"), "0%", "N/A"]
+])
+
+# Remove rows by content matching (matches plain strings only)
+table.remove_row_data(["CPU", "Critical", "85%", "72°C"])  # Matches plain text only
+
+# Or remove multiple rows
+table.remove_row_data([
+    ["GPU", "Normal", "12%", "65°C"],
+    ["RAM", "Warning", "67%", "45°C"]
+])
+```
+
+## Enhanced Cell Updates & Content Matching
+
+```python
+# Update by header + row position (1-based indexing)
+table.set_cell(header="Status", row=3, value=("Critical", "</red, bold>"))
+
+# Enhanced update by finding current content with optional filters
+table.update_cell(
+    current_cell_content="GPU",  # Finds "GPU" in any cell
+    new_cell_content=("Graphics Card", "</italic>")
+)
+
+# Update with header filter only
+table.update_cell("Laptop", "Premium Laptop", headers="Product")
+
+# Update with row filter only  
+table.update_cell("In Stock", "Available", rows=range(1, 4))
+
+# Update with both filters
+table.update_cell("Mouse", "Wireless Mouse", headers="Product", rows=[2, 7])
+
+# Update all cells with matching content
+updated_count = table.update_all_cells_with("$25", "$30")  # Returns number of cells updated
+
+# Content matching works on tuple text only
+# ("GPU", "</bold>") matches search for "GPU"
+# "</red>GPU</reset>" in plain string triggers format warning
+```
+
+## Enhanced Search Operations
+
+```python
+# Find rows in specific column
+critical_rows = table.find_rows(header="Status", content="Critical")
+# Returns list of row numbers where Status content = "Critical"
+
+# Enhanced search across all columns
+laptop_occurrences = table.find_all_occurrences("Laptop")
+# Returns: {'Product': [1, 3, 5]} - dict with headers as keys and row numbers as values
+
+# Find all occurrences of specific content
+status_occurrences = table.find_all_occurrences("In Stock")
+# Returns: {'Status': [1, 2, 5, 7]}
+
+# Find price occurrences
+price_occurrences = table.find_all_occurrences("$25")
+# Returns: {'Price': [2]}
+```
+
+## Enhanced Formatting Operations
+
+```python
+# Format all cells with matching content
+formatted_count = table.format_all_cells_with("Electronics", "</bold>")
+formatted_count = table.format_all_cells_with("Available", "</green>")
+formatted_count = table.format_all_cells_with("Premium Laptop", "</red, bold>")
+
+# Traditional formatting methods
+table.format_column("Status", "</green, bold>")
+table.format_row(3, "</italic>")
+table.format_cell(header="Temperature", row=2, format="</yellow>")
+table.format_headers("</underline, bold>")
+
+# Format matching cells in specific column
+table.format_matching_cells(
+    header="Status", 
+    content="Critical", 
+    format="</red, bold, blink>"
+)
+
+# Reset methods
+table.reset_formatting()                           # Everything
+table.reset_column_formatting("Status")            # Specific column
+table.reset_row_formatting(5)                      # Specific row
+table.reset_cell_formatting(header="Usage", row=3) # Specific cell
+table.reset_header_formatting()                    # Just headers
+```
+
+## Tuple-Based Formatting
+
+```python
+# Clean separation of data and formatting
+table.data = [
+    ["Component", "Status", "Usage"],
+    ["CPU", ("Critical", "</red, bold>"), "85%"],      # Formatted cell
+    ["GPU", "Normal", ("12%", "</green>")],            # Formatted cell
+    ["RAM", "Warning", "67%"]                          # Plain cell
+]
+
+# Or apply formatting after data creation
+table.format_cell(header="Status", row=1, format="</red, bold>")
+```
+
+## Background Color Restriction
+
+```python
+# ✅ CORRECT - Background colors apply only to text content
+table.add_row_data([
+    ["CPU", ("Critical", "</red, bkg yellow>"), "85%"]  # Yellow background on "Critical" text only
+])
+
+table.format_column("Status", "</green, bkg blue>")  # Blue background on text in Status column
+
+# The table cell whitespace and borders remain unchanged
+# Only the actual text content gets the background color
+```
+
+## Display Methods
+
+```python
+# Default: shows rows 1-10
+table.display()
+
+# Custom range
+table.display(start_row=1, end_row=20)    # Rows 1-20
+table.display(start_row=25, end_row=35)   # Rows 25-35
+
+# Show all rows (clear method name)
+table.display_all_rows()  # Instead of end_row=None
+
+# Alternative display method
+table.print()  # Same as display()
+table.print_all_rows()  # Same as display_all_rows()
+
+# Get output in different formats
+output = table.get_output(start_row=1, end_row=10)
+terminal_output = output['terminal']  # ANSI formatted
+plain_output = output['plain']        # Clean text
+markdown_output = output['markdown']  # Markdown format
+html_output = output['html']          # HTML table
+```
+
+## Format Validation & Warnings
+
+```python
+# ⚠️ INVALID - FDL commands in content
+table.add_row_data([
+    ["CPU", "</red>Critical</reset>", "85%"]  # ❌ Wrong!
+])
+
+# When table.display() is called (once per display session):
+# Warning: FDL commands detected in cell content "</red>Critical</reset>". 
+# Use tuple format: ("Critical", "</red>") instead.
+
+# ✅ CORRECT - Tuple format
+table.add_row_data([
+    ["CPU", ("Critical", "</red>"), "85%"]  # ✅ Right!
+])
+```
+
+## Formatting Priority System
+
+```python
+# Priority order (highest to lowest):
+# 1. Tuple formatting
+table.data[1][1] = ("Critical", "</red, bold>")
+
+# 2. Cell formatting  
+table.format_cell(header="Status", row=1, format="</green>")
+
+# 3. Column formatting
+table.format_column("Status", "</blue>")
+
+# 4. Row formatting (lowest)
+table.format_row(1, "</italic>")
+
+# Result: "Critical" displays as red/bold (tuple wins)
+```
+
+## Properties
+
+```python
+# Property methods (not function calls)
+total_rows = table.row_count        # Number of data rows
+total_cols = table.column_count     # Number of columns
+headers = table.header_count        # Alias for column_count
+```
+
+## Advanced API Methods
+
+```python
+# Table information
+headers = table.get_headers()         # Returns ["Server", "Status", ...]
+
+# Cell access
+table.get_cell(header="Status", row=2)  # Get specific cell
+table.get_row(3)                        # Get entire row
+table.get_column("Status")              # Get entire column
+
+# Clear operations
+table.clear_all_data()        # Removes all rows, keeps headers
+table.clear_formatting()      # Removes all formatting, keeps data
+table.clear_headers()         # Removes headers and all data (reset table)
+
+# Copy operations
+copied_table = table.copy()   # Creates independent copy
+
+# Memory management
+table.release()               # Releases table from memory (new requirement)
+```
+
+## Table Generation System
+
+### Cell Dimension Rules
+- **30 character limit** per cell (left edge to right edge)
+- **1 space padding** on each side (26 usable characters)
+- **Text wrapping** at 26 characters using text wrapper
+- **Visual width calculation** using wcwidth for Unicode/emojis
+- **Row height** determined by tallest cell in that row
+- **Column width** determined by widest cell in that column
+
+### Pseudo Matrix System
+Each cell contains:
+- Cell dimensions (width, height)
+- Original plain string content
+- Original formatting string (from tuple)
+- Format state for the cell (combined from tuple + column + row + cell formatting)
+- Formatted and wrapped string output
+- Visual width calculations
+
+### Format State Integration
+- **Column format states** - Store column-wide formatting
+- **Row format states** - Store row-wide formatting  
+- **Cell format states** - Combined formatting from all sources
+- **Priority system** - Tuple > Cell > Column > Row
+
+### Multi-Format Output
+All display methods generate 4 output streams:
+- **Terminal**: ANSI formatted table with proper box borders
+- **Plain**: Clean text table without formatting
+- **Markdown**: `| Header | Header |` table format
+- **HTML**: `<table><tr><td>` with CSS classes
+
+## Complete Working Example
+
+```python
+from suitkaise import fdl
+
+# Create server monitoring table
+server_table = fdl.Table(style="rounded", max_columns=6, max_rows=20)
+
+# Define structure first
+server_table.add_headers(["Server", "Status", "CPU", "Memory", "Uptime"])
+
+# Add data rows with duplicate content
+server_table.add_row_data([
+    ["Web-01", "Running", "45%", "2.1GB", "15 days"],
+    ["Web-02", ("Critical", "</red, bold>"), ("89%", "</yellow, bkg red>"), "3.8GB", "2 days"],
+    ["DB-01", "Running", "78%", "15.2GB", "45 days"],
+    ["DB-02", ("Maintenance", "</orange, italic>"), "5%", "1.2GB", "0 days"],
+    ["Cache-01", ("Stopped", "</red>"), "0%", "512MB", "0 days"]
+])
+
+# Add more servers one by one
+server_table.add_row_data(["Load-01", ("Online", "</green>"), ("12%", "</cyan>"), "8GB", "30 days"])
+
+# Enhanced search operations
+laptop_occurrences = server_table.find_all_occurrences("Running")
+print(f"Running servers: {laptop_occurrences}")  # {'Status': [1, 3]}
+
+# Enhanced update operations
+updated_count = server_table.update_all_cells_with("Running", "Active")
+print(f"Updated {updated_count} cells")
+
+# Update with filters
+server_table.update_cell("Web-02", "Web-Primary", headers="Server")
+server_table.update_cell("Critical", "Recovered", rows=range(1, 3))
+
+# Enhanced formatting operations
+formatted_count = server_table.format_all_cells_with("Active", "</green>")
+print(f"Formatted {formatted_count} cells")
+
+# Apply traditional formatting
+server_table.format_headers("</bold, underline>")
+server_table.format_column("CPU", "</cyan>")
+server_table.format_column("Memory", "</blue>")
+
+# Display first 5 rows
+server_table.display(start_row=1, end_row=5)
+
+# Get output in different formats
+output = server_table.get_output(start_row=1, end_row=3)
+print("Terminal output length:", len(output['terminal']))
+print("Markdown output length:", len(output['markdown']))
+
+# Clean up memory when done
+server_table.release()
+```
+
+## Enhanced Features Summary
+
+### Duplicate Data Handling
+- **`find_all_occurrences()`** - Search across all columns with structured results
+- **`update_all_cells_with()`** - Update all cells with matching content
+- **Enhanced `update_cell()`** - Flexible filtering with headers and rows
+- **`format_all_cells_with()`** - Format all cells with matching content
+- **Range support** - Use `range(1, 4)` for row filtering
+- **Multiple selection** - Target multiple headers or rows simultaneously
+
+### Data Integrity Protection
+- **Duplicate header validation** - Prevents adding existing headers
+- **Internal duplicate detection** - Prevents duplicates within `add_headers()` calls
+- **Max constraints enforcement** - Respects `max_columns` and `max_rows` limits
+- **Clear error messages** - Descriptive feedback for all validation failures
+
+### Advanced Filtering
+- **Header filters**: `str`, `List[str]`, `Tuple[str, ...]`, or `None`
+- **Row filters**: `int`, `List[int]`, `range`, or `None`
+- **Combined filters**: Use both headers and rows for precise targeting
+- **Range operations**: `range(1, 4)` for row ranges
+
+## Key Benefits
+
+✅ **Error Prevention** - API prevents malformed data structures  
+✅ **Headers-First Design** - Clear table structure before data  
+✅ **Safe Content Matching** - Match on content, preserve formatting  
+✅ **Flexible Views** - Copy and modify tables for different audiences  
+✅ **Clear Display Options** - Explicit methods for different ranges  
+✅ **Text-Only Backgrounds** - Proper background color handling  
+✅ **Format Validation** - Helps users adopt correct tuple format  
+✅ **Smart Cell Sizing** - Automatic width/height calculation with wrapping  
+✅ **Visual Width Aware** - Proper Unicode and emoji support  
+✅ **Multi-Format Output** - Terminal, plain, markdown, HTML support  
+✅ **Memory Management** - Explicit resource cleanup with release()  
+✅ **Standalone System** - Independent of fdl.print() for dedicated table display  
+✅ **Enhanced Duplicate Handling** - Powerful search, update, and formatting for duplicate data  
+✅ **Data Integrity Protection** - Prevents duplicate headers and enforces constraints  
+✅ **Advanced Filtering** - Flexible header and row-based filtering for precise operations  
+
+This API-driven approach eliminates user errors while providing maximum flexibility for table creation, management, and display with proper resource management, multi-format output support, and comprehensive duplicate data handling capabilities.
 
 ## Performance Architecture Summary
 
@@ -845,14 +1281,12 @@ Time commands are now set independently from time objects.
 
 ### New Processing Flow Example
 
-Here would be the new flow:
-
-User does something like this (i have separated lines for clearer viewing, python will concatenate this string):
+Here is a full run-through of the flow.
 
 ```python
 if self._is_online:
     fdl.print(
-        '</cyan, bold>Time: </12hr, tz pst, no sec><time:></end cyan>'
+        '</cyan, bold>Time: </12hr, tz pst><time:></end cyan>'
         '</box rounded, color current, bkg gray, title <self.name>>'
         '</green, italic>Online</reset> since </cyan><time:self.time_connected_at>'
         '</end box></reset>'
@@ -863,54 +1297,121 @@ if self._is_online:
     )
 ```
 
-Since we aren't using defaults anymore, we can always just create a new blank formatting state for every print, and don't have to worry about things like resetting.
+Before starting, we will measure the initial terminal width. assuming a hard minimum width of 60.
 
-Before starting, we will measure the initial terminal width. assuming a hard minimum width of 80.
+First, we create a blank _FormatState object. This tracks everything that is needed in order to process and generate formatted output from fdl strings.
 
-First, we create a blank format state object. This tracks everything, including text formatting, text color and bkg color, values to append, if we are inside a box, box background color, time format settings, if we use days, hours, minutes, seconds, how many decimal points after seconds, and possibly more. we additionally have a ready to print variable, that tracks if encountered text pieces can be printed immediately, or if they are inside a box and have to wait. Then, we will store the tuple of variables given if variables were given.
+Next, we parse this message, now concatenated to:
 
-Next, the parser will take this message, now concatenated to: 
-
-`</cyan, bold>Time: </12hr, tz pst, no sec><time:></end cyan></box rounded, color current, bkg gray, title <self.name>></green, italic>Online</reset> since </cyan><time:self.time_connected_at></end box></reset></format warning></justify center>Warning: This is an example warning outside of the status box.`
+`"</cyan, bold>Time: </12hr, tz pst><time:></end cyan></box rounded, color current, bkg gray, title <self.name>></green, italic>Online</reset> since </cyan><time:self.time_connected_at></end box></reset></format warning></justify center>Warning: This is an example warning outside of the status box."`
 
 And split it like this:
 
-1. `</cyan, bold>`
-2. `'Time: '`
-3. `</12hr, tz pst, no sec>`
-4. `<time:>`
-5. `</end cyan>`
-6. `</box rounded, color current, bkg gray, title <self.name>>`
-7. `</green, italic>`
-8. `'Online'`
-9. `</reset>`
-10. `' since '`
-11. `</cyan>`
-12. `<time:self.time_connected_at>`
-13. `</end box>`
-14. `</reset>`
-15. `</format warning>`
-16. `</justify center>`
-17. `'Warning: This is an example warning outside of the status box.'`
+1. `</cyan, bold>` (text command)
+2. `'Time: '` (plain text string)
+3. `</12hr, tz pst>` (time command)
+4. `<time:>` (time object)
+5. `</end cyan>` (text command)
+6. `</box rounded, color current, title <self.name>>` (box command)
+7. `</green, italic>` (text command)
+8. `'Online'` (plain text string)
+9. `</reset>` (misc command)
+10. `' since '` (plain text string)
+11. `</cyan>` (misc command)
+12. `<time:self.time_connected_at>` (time object)
+13. `</end box>` (box command)
+14. `</reset>` (misc command)
+15. `</format warning>` (format command)
+16. `</justify center>` (layout command)
+17. `'Warning: This is an example warning outside of the status box.'` (plain text string)
 
 Next, we sequentially process each split piece, updating the format state.
 
-1. Updates text color to cyan and bold to true.
-2. Prints `(ansi code for cyan and bold text)Time: ` making sure to handle text wrapping if needed.
-3. Sets twelve_hour_time to true, timezone to 'pst', and use_secs to False.
-4. Prints the current time using the current formatting settings and our time format.
-5. Sets text color back to None.
-6. Sets in box to True, text color remains the same, box bkg color to gray (text bkg color remains what it was), box title to str(self._values[1]), removes first value from tuple, and sets ready to print to false.
-7. Sets text color to green and italic to true. stores ansi code string for current formatting in a box_text tracker.
-8. Adds 'Online' to box_text.
-9. Resets all text and background formatting other than box related vars. adds '(ansi reset code)' to box_text.
-10. Adds ' since ' to box_text.
-11. Sets text color to cyan. adds ansi code for cyan to box_text.
-12. Adds formatted timestamp of the second value, removes value from tuple in format state obj
-13. Generates box with smart text wrapping according to format state and box text string. resets all box vars.
-14. Resets all text and background formatting other than box related vars.
-15. Gets warning format ('</bkg yellow, black, bold>') and then processes it. this sets bkg color to yellow, sets text color to black, and bold to True.
-16. Sets justify to center. sets ready to print to false.
-17. Prints '(ansi code)Warning: This is an example warning outside of the status box.' after calculating justififcation and checking box status (currently not in a box). using terminal width to calculate text centering for each line. this is done by first applying text wrapping, then centering each line after.
+1. `</cyan, bold>`
+- Updates `text_color` to cyan and `bold` to True in _FormatState.
 
-No need to check what needs to be reset, as we can just release this object from memory and create a new one. if this is suboptimal performance wise, we can add hard reset logic to execute after all pieces have been processed, and use the same object. i think making new ones makes sense for multithreading purposes.
+2. `"Time: "`
+- Adds `(ansi code for cyan and bold text)Time: (reset code)` to raw outputs, according to _FormatState.
+
+3. `</12hr, tz pst>`
+- Sets `twelve_hour_time` to True and `timezone` to 'pst' in _FormatState.
+
+4. `<time:>`
+- Adds the current time to the raw outputs displayed as 12 hour time (vs standard 24 hour time), accounting for the Pacific time zone, and adding bold and cyan to the text. 
+- `(ansi code for cyan and bold text)(current timestamp formatted)(reset code)`
+
+5. `</end cyan>`
+- Sets `text_color` to None in _FormatState.
+
+6. `</box rounded, color current, title <self.name>>`
+To output:
+- we need to format and handle previous text before we start the box.
+- adds a \n.
+- combines list of strings into one string.
+- Wraps and justifies all raw output so far using _TextWrapper and _TextJustifier, and adds to the regular outputs.
+
+In _FormatState:
+- sets `in_box` to True, 
+- sets `box_style` to "rounded"
+- sets `box_color` to the current text color.
+- sets `box_title` to `self.name`, as long as the user provides self.name as a variable after the fdl string. removes the variable from the tuple.
+
+7. `</green, italic>`
+- Sets `text_color` to green and `italic` to True in _FormatState.
+
+8. `"Online"`
+- Adds 'Online' in green italics to `box_content` list. 
+- `(ansi code for green and italic text)Online(reset code)`
+
+9. `</reset>`
+- In _FormatState, resets all variables that have a direct impact on output except box related ones.
+
+10. `" since "`
+- Adds ' since ' to box_text, with no formatting because we just reset it. 
+- ` since (reset code)`
+
+11. `</cyan>`
+- Sets text color to cyan in _FormatState.
+
+12. `<time:self.time_connected_at>`
+- Adds the next value in the tuple as a formatted timestamp as long as it is a float. 
+- If it isnt a float, we display `</ERROR>`
+- Our format is still 12 hour time in the PST timezone from earlier.
+- `(ansi code for cyan)(formatted given timestamp)(reset code)`
+- Removes second value from tuple.
+
+
+
+17. `'Warning: This is an example warning outside of the status box.'`
+
+13. `</end box>`
+- This is when the entire box gets generated and added to outputs.
+- combine `box_content` list of strings. Wrap combined string across lines according to the _TextWrapper and center text using the _TextJustifier.
+- measure maximum width of wrapped text (a list of strings). the `actual_box_width` will be 6 more than that, to account for 2 spaces of padding on both sides and the borders.
+- generates and colors borders and title according to `box_style` and `box_title`, around our existing content, adding a newline at the end of the bottom right corner.
+- strip whitespace on both sides of box. combine list of box lines into one string.
+- reprocess box through text wrapper and justifier, justify box according to active text justification.
+- completed box gets directly added to finished output.
+- reset all box related variables to defaults.
+
+14. `</reset>`
+- In _FormatState, resets all variables that have a direct impact on output except box related ones.
+
+15. `</format warning>`
+- Gets warning format ('</bkg yellow, black, bold>') from the _FormatRegistry.
+- parses and splits string just like main flow (in this case, we just have one command type).
+- applies <> commands to _FormatState (adds yellow to `background_color`, black to `text_color`, and sets `bold` to True.)
+
+16. `</justify center>`
+- processes all text in raw outputs according to the current justification, processing it with the text wrapper and the text justifier.
+- Sets `justify` to center in _FormatState.
+
+17. `"Warning: This is an example warning outside of the status box."`
+- Adds the string in black, bold text, with a yellow background and centered.
+- `(ansi code)Warning: This is an example warning outside of the status box.(reset code)`
+
+Once we realize we have no more pieces to process:
+- we process the rest of the raw output through the text wrapper and justifier.
+- output the finished content to the output streams.
+
+No need to check what needs to be reset, as we can just release this object from memory and create a new one for the next fdl print!

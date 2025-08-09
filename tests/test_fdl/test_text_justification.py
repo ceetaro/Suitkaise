@@ -239,168 +239,547 @@ class TestGlobalTextJustifier:
         length = _get_visible_length(ansi_text)
         assert length == 5
 
+        # Wide characters
+        wide_text = "你好"
+        length = _get_visible_length(wide_text)
+        # Note: wcwidth might not be available, so we can't assume exact width
+        assert length >= 2  # At least 2 characters
+        
+        # Mixed content
+        mixed_text = "Hello 你好 😀"
+        length = _get_visible_length(mixed_text)
+        # Note: wcwidth might not be available, so we can't assume exact width
+        assert length >= 5  # At least the ASCII part
+
+
+class TestTextJustificationEdgeCases:
+    """Test edge cases and potential failure scenarios."""
+    
+    def test_invalid_justification_mode(self):
+        """Test handling of invalid justification modes."""
+        justifier = _TextJustifier(40)
+        text = "Hello world"
+        
+        # Invalid mode should fallback to left justification
+        result = justifier.justify_text(text, 'invalid_mode')
+        assert result == text  # Should return unchanged text
+        
+        # Test with None mode
+        result = justifier.justify_text(text, None)
+        assert result == text
+    
+    def test_text_longer_than_width(self):
+        """Test justification when text is longer than terminal width."""
+        justifier = _TextJustifier(10)  # Very narrow width
+        long_text = "This text is much longer than 10 characters"
+        
+        # Should still justify (text wrapping should be done separately)
+        for mode in ['left', 'center', 'right']:
+            result = justifier.justify_text(long_text, mode)
+            if mode == 'left':
+                assert result == long_text
+            else:
+                # Center/right should still attempt justification
+                assert len(result) >= len(long_text)
+    
+    def test_zero_width_terminal(self):
+        """Test behavior with zero or negative terminal width."""
+        # Zero width should use minimum width
+        justifier = _TextJustifier(0)
+        assert justifier.terminal_width >= 60
+        
+        # Negative width should use minimum width
+        justifier = _TextJustifier(-10)
+        assert justifier.terminal_width >= 60
+        
+        # Test that justification still works with minimum width
+        text = "Hello"
+        result = justifier.justify_text(text, 'center')
+        # The result should be at least as long as the minimum width
+        assert len(result) >= 60
+        assert "Hello" in result
+        
+        # Test with a different justifier instance
+        justifier2 = _TextJustifier(0)
+        result2 = justifier2.justify_text(text, 'right')
+        assert len(result2) >= 60
+        assert "Hello" in result2
+        
+        # Test that the actual terminal width is being used correctly
+        assert justifier.terminal_width == justifier2.terminal_width
+    
+    def test_very_large_width(self):
+        """Test justification with very large terminal width."""
+        justifier = _TextJustifier(1000)
+        text = "Short text"
+        
+        result = justifier.justify_text(text, 'center')
+        assert len(result) == 1000
+        assert text in result
+        
+        result = justifier.justify_text(text, 'right')
+        assert len(result) == 1000
+        assert text in result
+    
+    def test_unicode_normalization(self):
+        """Test handling of Unicode normalization issues."""
+        justifier = _TextJustifier(40)
+        
+        # Test with combining characters
+        combining_text = "e\u0301"  # e + combining acute accent
+        result = justifier.justify_text(combining_text, 'center')
+        assert combining_text in result
+        
+        # Test with zero-width characters
+        zero_width_text = "Hello\u200bWorld"  # Zero-width space
+        result = justifier.justify_text(zero_width_text, 'center')
+        assert zero_width_text in result
+    
+    def test_control_characters(self):
+        """Test handling of control characters."""
+        justifier = _TextJustifier(40)
+        
+        # Test with tabs
+        tab_text = "Hello\tWorld"
+        result = justifier.justify_text(tab_text, 'center')
+        assert tab_text in result
+        
+        # Test with newlines in text (should be handled by multiline logic)
+        newline_text = "Line1\nLine2"
+        result = justifier.justify_text(newline_text, 'center')
+        lines = result.split('\n')
+        assert len(lines) == 2
+    
+    def test_ansi_code_edge_cases(self):
+        """Test edge cases with ANSI codes."""
+        justifier = _TextJustifier(40)
+        
+        # Test with incomplete ANSI codes
+        incomplete_ansi = "\033[31mRed text without reset"
+        result = justifier.justify_text(incomplete_ansi, 'center')
+        assert "\033[31m" in result
+        assert "Red text without reset" in result
+        
+        # Test with nested ANSI codes
+        nested_ansi = "\033[1m\033[31mBold Red\033[0m"
+        result = justifier.justify_text(nested_ansi, 'right')
+        assert "\033[1m" in result
+        assert "\033[31m" in result
+        assert "Bold Red" in result
+        
+        # Test with complex ANSI sequences
+        complex_ansi = "\033[38;2;255;165;0mOrange\033[0m"
+        result = justifier.justify_text(complex_ansi, 'center')
+        assert complex_ansi in result
+    
+    def test_whitespace_preservation(self):
+        """Test that whitespace is properly preserved."""
+        justifier = _TextJustifier(40)
+        
+        # Leading/trailing whitespace
+        spaced_text = "  Hello  "
+        result = justifier.justify_text(spaced_text, 'center')
+        assert "  Hello  " in result
+        
+        # Multiple spaces
+        multi_space = "Hello    World"
+        result = justifier.justify_text(multi_space, 'right')
+        assert "Hello    World" in result
+    
+    def test_empty_and_null_inputs(self):
+        """Test handling of empty and null inputs."""
+        justifier = _TextJustifier(40)
+        
+        # Empty string
+        assert justifier.justify_text("", 'center') == ""
+        assert justifier.justify_text("", 'right') == ""
+        
+        # None input (should handle gracefully)
+        try:
+            result = justifier.justify_text(None, 'center')
+            # If it doesn't raise an exception, should return None or empty string
+            assert result is None or result == ""
+        except (TypeError, AttributeError):
+            # Expected behavior - should raise an exception for None
+            pass
+    
+    def test_very_short_widths(self):
+        """Test justification with very short terminal widths."""
+        justifier = _TextJustifier(5)  # Very short width
+        text = "Hi"
+        
+        result = justifier.justify_text(text, 'center')
+        assert len(result) == 5
+        assert "Hi" in result
+        
+        result = justifier.justify_text(text, 'right')
+        assert len(result) == 5
+        assert "Hi" in result
+    
+    def test_emoji_combinations(self):
+        """Test justification with complex emoji combinations."""
+        justifier = _TextJustifier(40)
+        
+        # Family emoji (multiple code points)
+        family_emoji = "👨‍👩‍👧‍👦"
+        result = justifier.justify_text(family_emoji, 'center')
+        assert family_emoji in result
+        
+        # Flag emoji (regional indicator pairs)
+        flag_emoji = "🇺🇸"
+        result = justifier.justify_text(flag_emoji, 'right')
+        assert flag_emoji in result
+        
+        # Skin tone modifier
+        skin_tone = "👍🏽"
+        result = justifier.justify_text(skin_tone, 'center')
+        assert skin_tone in result
+    
+    def test_mixed_width_character_combinations(self):
+        """Test justification with complex mixed-width character combinations."""
+        justifier = _TextJustifier(50)
+        
+        # Complex mixed content
+        complex_text = "Hello 你好 😀 World 🌍 世界"
+        result = justifier.justify_text(complex_text, 'center')
+        assert "Hello" in result
+        assert "你好" in result
+        assert "😀" in result
+        assert "World" in result
+        assert "🌍" in result
+        assert "世界" in result
+    
+    def test_justification_accuracy(self):
+        """Test that justification is mathematically accurate."""
+        justifier = _TextJustifier(20)
+        
+        # Test center justification accuracy
+        text = "Hi"
+        result = justifier.justify_text(text, 'center')
+        
+        # Should be exactly 20 characters
+        assert len(result) == 20
+        
+        # Text should be centered
+        text_pos = result.find("Hi")
+        expected_pos = (20 - 2) // 2  # 9
+        assert text_pos == expected_pos
+        
+        # Test right justification accuracy
+        result = justifier.justify_text(text, 'right')
+        assert len(result) == 20
+        
+        # Text should be at the end
+        text_pos = result.find("Hi")
+        expected_pos = 20 - 2  # 18
+        assert text_pos == expected_pos
+    
+    def test_multiline_edge_cases(self):
+        """Test edge cases with multiline text."""
+        justifier = _TextJustifier(30)
+        
+        # Empty lines in middle
+        text = "First\n\nThird"
+        result = justifier.justify_text(text, 'center')
+        lines = result.split('\n')
+        assert len(lines) == 3
+        assert lines[1] == ""  # Empty line preserved
+        
+        # Lines with only whitespace
+        text = "First\n   \nThird"
+        result = justifier.justify_text(text, 'right')
+        lines = result.split('\n')
+        assert len(lines) == 3
+        assert lines[1] == "   "  # Whitespace preserved
+        
+        # Single line with newline at end
+        text = "Hello\n"
+        result = justifier.justify_text(text, 'center')
+        lines = result.split('\n')
+        assert len(lines) == 2
+        assert lines[1] == ""  # Trailing newline preserved
+    
+    def test_performance_edge_cases(self):
+        """Test performance with large inputs."""
+        justifier = _TextJustifier(80)
+        
+        # Very long text (should handle without hanging)
+        long_text = "A" * 1000
+        result = justifier.justify_text(long_text, 'center')
+        assert len(result) >= len(long_text)
+        assert "A" * 1000 in result
+        
+        # Many lines
+        many_lines = "\n".join([f"Line {i}" for i in range(100)])
+        result = justifier.justify_text(many_lines, 'right')
+        lines = result.split('\n')
+        assert len(lines) == 100
+    
+    def test_ansi_code_stripping_accuracy(self):
+        """Test that ANSI code stripping is accurate."""
+        justifier = _TextJustifier(40)
+        
+        # Test various ANSI code patterns
+        test_cases = [
+            "\033[31mRed\033[0m",
+            "\033[1;31mBold Red\033[0m",
+            "\033[38;2;255;0;0mRGB Red\033[0m",
+            "\033[48;2;0;255;0mGreen Background\033[0m",
+            "\033[1;31;42mBold Red on Green\033[0m",
+        ]
+        
+        for ansi_text in test_cases:
+            # Strip ANSI codes manually for comparison
+            stripped = justifier._strip_ansi_codes(ansi_text)
+            
+            # Should not contain ANSI escape sequences
+            assert "\033[" not in stripped
+            
+            # Should contain the actual text content
+            assert any(char.isalnum() or char.isspace() for char in stripped)
+    
+    def test_visual_width_calculation_accuracy(self):
+        """Test that visual width calculation is accurate in the real workflow (wrap then justify)."""
+        justifier = _TextJustifier(40)
+        wrapper = _TextWrapper(40)
+        
+        # ASCII characters
+        assert justifier._get_visual_width("Hello") == 5
+        
+        # Wide characters - wcwidth might not be available
+        wide_width = justifier._get_visual_width("你好")
+        assert wide_width >= 2  # At least 2 characters
+        
+        # Emojis - wcwidth might not be available
+        emoji_width = justifier._get_visual_width("😀")
+        assert emoji_width >= 1  # At least 1 character
+        
+        # Mixed content - wcwidth might not be available
+        mixed_width = justifier._get_visual_width("Hello 你好 😀")
+        assert mixed_width >= 5  # At least the ASCII part
+        
+        # ANSI codes should be ignored
+        assert justifier._get_visual_width("\033[31mHello\033[0m") == 5
+        
+        # Tab characters - test real workflow (wrap then justify)
+        wrapped_lines = wrapper.wrap_text("Hello\tWorld")
+        wrapped_text = '\n'.join(wrapped_lines)
+        tab_width = justifier._get_visual_width(wrapped_text)
+        assert tab_width >= 13  # Should be expanded by wrapper
+        
+        # Zero-width characters should be ignored
+        zero_width = justifier._get_visual_width("Hello\u200bWorld")
+        assert zero_width >= 10  # At least the visible characters
+
 
 def run_visual_examples():
-    """Show clean visual examples of justification."""
-    print("\n🎨 Text Justification Visual Examples")
+    """Show comprehensive visual examples of text justification."""
+    print("🚀 START OF TEXT JUSTIFICATION TESTS 🚀")
+    print("🎨 COMPREHENSIVE TEXT JUSTIFICATION DEMONSTRATIONS")
+    print("=" * 80)
+    
+    # Reset any ANSI color codes that might be active
+    print("\033[0m", end="")
+    
+    # Test different terminal widths
+    test_widths = [20, 40, 60, 80]
+    
+    # Sample texts for different scenarios
+    sample_texts = {
+        "Short Text": "Hello",
+        "Medium Text": "This is a medium length text",
+        "Long Text": "This is a much longer piece of text that demonstrates justification",
+        "Wide Characters": "你好世界",
+        "Emojis": "Hello 😀 World 🌍",
+        "Mixed Content": "Hello 你好 😀 World",
+        "ANSI Colors": "\033[31mRed\033[0m \033[32mGreen\033[0m \033[34mBlue\033[0m",
+        "File Path": "/usr/local/bin/python3",
+        "URL": "https://github.com/username/project",
+        "Code Comment": "# This is a code comment",
+        "Empty Line": "",
+        "Whitespace": "   ",
+        "Single Character": "A",
+        "Punctuation": "Hello, world! How are you?",
+        "Numbers": "1234567890",
+        "Special Chars": "!@#$%^&*()",
+        "Very Long": "This is an extremely long piece of text that will definitely exceed the width limit and show how justification works with very long content",
+    }
+    
+    # Justification modes to test
+    justification_modes = ['left', 'center', 'right']
+    
+    # Run visual demonstrations for each width
+    for width in test_widths:
+        print(f"\n📏 TERMINAL WIDTH: {width} CHARACTERS")
+        print("─" * 60)
+        
+        justifier = _TextJustifier(width)
+        
+        for text_name, text_content in sample_texts.items():
+            print(f"\n🔤 {text_name}")
+            print(f"Text: '{text_content}'")
+            print(f"Visual length: {justifier.get_visible_length(text_content)} characters")
+            
+            # Show width indicator
+            print("─" * width)
+            
+            # Test each justification mode
+            for i, mode in enumerate(justification_modes):
+                # Always wrap text first (real-world workflow)
+                wrapper = _TextWrapper(width)
+                wrapped_lines = wrapper.wrap_text(text_content)
+                wrapped_text = '\n'.join(wrapped_lines)
+                # Then justify the wrapped text
+                result = justifier.justify_text(wrapped_text, mode)
+                print(result)
+                # Add newline after left and center justification
+                if mode in ['left', 'center']:  # After left and center justification
+                    print()
+            
+            # Add width indicator after right output
+            print("─" * width)
+            print()
+    
+    # Special demonstration: Text Wrapping + Justification workflow
+    print("\n🎯 TEXT WRAPPING + JUSTIFICATION WORKFLOW DEMONSTRATION")
     print("=" * 60)
     
-    # Get terminal width for realistic examples
-    try:
-        terminal_width = max(60, _text_justifier.terminal_width)
-    except:
-        terminal_width = 60
-    
-    justifier = _TextJustifier(terminal_width)
-    
-    # Simple examples
-    print(f"\nSimple Text Justification (width: {terminal_width})")
-    print("-" * 50)
-    
-    simple_texts = ["Short", "Medium length text", "你好世界", "Hello 😀"]
-    
-    for text in simple_texts:
-        if justifier.get_visible_length(text) < terminal_width - 5:
-            print(f"\nText: {text}")
-            
-            left = justifier.justify_text(text, 'left')
-            center = justifier.justify_text(text, 'center') 
-            right = justifier.justify_text(text, 'right')
-            
-            print(f"Left:")
-            print(left)
-            print(f"Center:")
-            print(center)
-            print(f"Right:")
-            print(right)
-    
-    # Narrow width examples
-    print(f"\nNarrow Width Examples (width: 40)")
-    print("-" * 40)
-    
-    narrow_justifier = _TextJustifier(40)
-    narrow_texts = ["Short", "Medium text", "你好", "Hi 😀"]
-    
-    for text in narrow_texts:
-        print(f"\nText: {text}")
+    workflow_texts = {
+        "Paragraph": (
+            "This is a longer paragraph that demonstrates the proper workflow: "
+            "first we use the text wrapping module to wrap the text, then we pass "
+            "the wrapped text to the justification module for alignment."
+        ),
         
-        left = narrow_justifier.justify_text(text, 'left')
-        center = narrow_justifier.justify_text(text, 'center') 
-        right = narrow_justifier.justify_text(text, 'right')
+        "Technical Documentation": (
+            "The FDL (Format Description Language) system provides advanced text formatting "
+            "capabilities including color support, terminal detection, and intelligent text "
+            "wrapping. It handles ANSI escape codes safely and preserves word boundaries."
+        ),
         
-        print(f"Left:")
-        print(left)
-        print(f"Center:")
-        print(center)
-        print(f"Right:")
-        print(right)
+        "Code Example": (
+            "# This is a very long comment that demonstrates how text wrapping works with "
+            "code-style content. It should break at appropriate points while preserving "
+            "the readability of the comment structure."
+        ),
+        
+        "Mixed Content": (
+            "Hello 你好 😀 This text contains multiple types of content: English text, "
+            "Chinese characters, and emojis. The justification system should handle all "
+            "of these correctly while maintaining proper alignment."
+        )
+    }
     
-    # Text Wrapping + Justification workflow example
-    print(f"\n📝 Text Wrapping + Justification Workflow")
-    print("-" * 50)
-    
-    wrapper = _TextWrapper(45)
-    workflow_justifier = _TextJustifier(45)
-    long_text = ("This is a longer piece of text that demonstrates the proper workflow: "
-                "first we use the text wrapping module to wrap the text, then we pass "
-                "the wrapped text to the justification module for alignment.")
-    
-    print(f"Original: {long_text}")
-    print(f"Width: 45 characters")
-    
-    # Step 1: Wrap with text wrapping module
-    print(f"\nStep 1 - Text Wrapping:")
-    wrapped_lines = wrapper.wrap_text(long_text)
-    wrapped_text = '\n'.join(wrapped_lines)
-    for i, line in enumerate(wrapped_lines):
+    for text_name, text_content in workflow_texts.items():
+        print(f"\n📝 {text_name}")
+        print(f"Original text length: {len(text_content)} characters")
+        
+        # Test at different widths
+        for width in [40, 60, 80]:
+            print(f"\nWidth: {width} characters")
+            print("─" * width)
+            
+            # Step 1: Wrap the text
+            wrapper = _TextWrapper(width)
+            wrapped_lines = wrapper.wrap_text(text_content)
+            wrapped_text = '\n'.join(wrapped_lines)
+            
+            print("Wrapped (left):")
+            for line in wrapped_lines:
         print(line)
     
-    # Step 2: Justify with justification module  
-    print(f"\nStep 2 - Center Justified:")
-    center_result = workflow_justifier.justify_text(wrapped_text, 'center')
-    for line in center_result.split('\n'):
-        print(line)
-    
-    print(f"\nStep 3 - Right Justified:")
-    right_result = workflow_justifier.justify_text(wrapped_text, 'right')
-    for line in right_result.split('\n'):
-        print(line)
-    
-    # Mixed content example
-    print(f"\n🌈 Mixed Content Example (width: {terminal_width})")
-    print("-" * 50)
-    
-    mixed = "\033[31m红色文字\033[0m normal 😀 text"
-    print(f"Mixed content: ANSI + Chinese + Emoji")
-    print(f"Text: {mixed}")
-    
-    center_mixed = justifier.justify_text(mixed, 'center')
-    print(f"Center:")
-    print(center_mixed)
-    
-    right_mixed = justifier.justify_text(mixed, 'right')
-    print(f"Right:")
-    print(right_mixed)
-    
-    # ANSI code preservation
-    print(f"\n🎨 ANSI Code Preservation (width: 40)")
-    print("-" * 40)
-    
-    ansi_justifier = _TextJustifier(40)
-    ansi_text = "\033[31mRed\033[0m \033[32mGreen\033[0m text"
-    print(f"Text: {ansi_text}")
-    
-    ansi_center = ansi_justifier.justify_text(ansi_text, 'center')
-    ansi_right = ansi_justifier.justify_text(ansi_text, 'right')
-    
-    print(f"Center:")
-    print(ansi_center)
-    print(f"Right:")
-    print(ansi_right)
-    
-    # Multiline example
-    print(f"\n📄 Multiline Input Example (width: 35)")
-    print("-" * 35)
-    
-    multiline_justifier = _TextJustifier(35)
-    multiline_text = "First line\nSecond line here\nThird line"
-    print(f"Original multiline text:")
-    for line in multiline_text.split('\n'):
-        print(line)
-    
+            # Step 2: Justify the wrapped text
+            justifier = _TextJustifier(width)
+            
     print(f"\nCenter justified:")
-    multiline_center = multiline_justifier.justify_text(multiline_text, 'center')
-    for line in multiline_center.split('\n'):
+            center_result = justifier.justify_text(wrapped_text, 'center')
+            for line in center_result.split('\n'):
         print(line)
     
     print(f"\nRight justified:")
-    multiline_right = multiline_justifier.justify_text(multiline_text, 'right')
-    for line in multiline_right.split('\n'):
+            right_result = justifier.justify_text(wrapped_text, 'right')
+            for line in right_result.split('\n'):
         print(line)
+            
+            print()
     
-    # Wide character handling
-    print(f"\n🌏 Wide Character Handling (width: 30)")
-    print("-" * 30)
+    # Edge cases demonstration
+    print("\n🔍 EDGE CASES DEMONSTRATION")
+    print("=" * 60)
     
-    wide_justifier = _TextJustifier(30)
-    chinese_text = "中文测试文本"
-    emoji_text = "Emoji test 🎉🚀✨"
+    edge_cases = {
+        "Empty String": "",
+        "Single Space": " ",
+        "Multiple Spaces": "   ",
+        "Single Character": "A",
+        "Very Long Word": "supercalifragilisticexpialidocious",
+        "Mixed Width": "A你好😀B",
+        "ANSI Codes": "Normal \033[31mRed\033[0m text",
+        "Tabs": "Tab\tseparated\ttext",
+        "Newlines": "Line1\nLine2\nLine3",
+        "Special Unicode": "café naïve résumé",
+    }
     
-    print(f"Chinese text: {chinese_text}")
-    chinese_center = wide_justifier.justify_text(chinese_text, 'center')
-    chinese_right = wide_justifier.justify_text(chinese_text, 'right')
-    print(f"Center:")
-    print(chinese_center)
-    print(f"Right:")
-    print(chinese_right)
+    edge_justifier = _TextJustifier(50)
     
-    print(f"\nEmoji text: {emoji_text}")
-    emoji_center = wide_justifier.justify_text(emoji_text, 'center')
-    emoji_right = wide_justifier.justify_text(emoji_text, 'right')
-    print(f"Center:")
-    print(emoji_center)
-    print(f"Right:")
-    print(emoji_right)
+    for case_name, text_content in edge_cases.items():
+        print(f"\n🔤 {case_name}")
+        print(f"Text: '{text_content}'")
+        print(f"Visual length: {edge_justifier.get_visible_length(text_content)} characters")
+        
+        print("─" * 50)
+        
+        for i, mode in enumerate(justification_modes):
+            # Always wrap text first (real-world workflow)
+            wrapper = _TextWrapper(50)
+            wrapped_lines = wrapper.wrap_text(text_content)
+            wrapped_text = '\n'.join(wrapped_lines)
+            # Then justify the wrapped text
+            result = edge_justifier.justify_text(wrapped_text, mode)
+            print(result)
+            # Add newline after left and center justification
+            if mode in ['left', 'center']:  # After left and center justification
+                print()
+        
+        # Add width indicator after right output
+        print("─" * 50)
+        print()
+    
+    # ANSI code preservation demonstration
+    print("\n🎨 ANSI CODE PRESERVATION DEMONSTRATION")
+    print("=" * 60)
+    
+    ansi_texts = {
+        "Simple Colors": "\033[31mRed\033[0m \033[32mGreen\033[0m \033[34mBlue\033[0m",
+        "Bold Text": "\033[1mBold\033[0m normal \033[1mBold Again\033[0m",
+        "Mixed Formatting": "\033[1;31;42mBold Red on Green\033[0m normal text",
+        "Complex Colors": "\033[38;2;255;165;0mOrange\033[0m \033[38;2;128;0;128mPurple\033[0m",
+    }
+    
+    ansi_justifier = _TextJustifier(60)
+    
+    for text_name, text_content in ansi_texts.items():
+        print(f"\n🔤 {text_name}")
+        print(f"Text: {text_content}")
+        print(f"Visual length: {ansi_justifier.get_visible_length(text_content)} characters")
+        
+        print("─" * 60)
+        
+        for i, mode in enumerate(justification_modes):
+            # Always wrap text first (real-world workflow)
+            wrapper = _TextWrapper(60)
+            wrapped_lines = wrapper.wrap_text(text_content)
+            wrapped_text = '\n'.join(wrapped_lines)
+            # Then justify the wrapped text
+            result = ansi_justifier.justify_text(wrapped_text, mode)
+            print(result)
+            # Add newline after left and center justification
+            if mode in ['left', 'center']:  # After left and center justification
+                print()
+        
+        # Add width indicator after right output
+        print("─" * 60)
+        print()
 
 
 def run_tests():
@@ -413,13 +792,14 @@ def run_tests():
     test_classes = [
         TestTextJustifier,
         TestGlobalTextJustifier,
+        TestTextJustificationEdgeCases,
     ]
     
     total_tests = 0
     passed_tests = 0
     failed_tests = []
     
-    print("\n" + "=" * 60)
+    print("=" * 60)
     print("🧪 Running Unit Tests")
     
     for test_class in test_classes:
@@ -442,6 +822,8 @@ def run_tests():
                 
             except Exception as e:
                 print(f"  ❌ {method_name}: {str(e)}")
+                import traceback
+                print(f"     Traceback: {traceback.format_exc()}")
                 failed_tests.append(f"{test_class.__name__}.{method_name}: {str(e)}")
                 
                 # Print traceback for debugging

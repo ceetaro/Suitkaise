@@ -10,7 +10,6 @@ import sys
 import os
 import warnings
 from unittest.mock import patch
-from wcwidth import wcswidth
 
 # Add the suitkaise package to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -802,6 +801,7 @@ class TestColorConversionVisualDemonstration:
 if __name__ == "__main__":
     # Run visual demonstrations
     demo = TestColorConversionVisualDemonstration()
+    demo.setup_method()  # Manually call setup since we're not using pytest
     demo.test_visual_named_colors_demonstration()
     demo.test_visual_hex_colors_demonstration()
     demo.test_visual_rgb_colors_demonstration()

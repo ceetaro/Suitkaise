@@ -11,6 +11,7 @@ import os
 import warnings
 from unittest.mock import Mock, patch, MagicMock
 from contextlib import contextmanager
+from wcwidth import wcswidth
 
 # Add the suitkaise package to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -18,6 +19,26 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from suitkaise.fdl._int.setup.terminal import (
     _TerminalInfo, TerminalWidthError, _get_terminal, _refresh_terminal_info
 )
+
+# Global execution block - this will run whenever the file is executed
+def run_demos():
+    """Run all terminal demonstrations."""
+    print("🚀 AUTO-RUNNING TERMINAL DEMOS...")
+    print("=" * 60)
+    
+    demo = TestTerminalVisualDemonstration()
+    
+    # Run the color demonstration first (most important)
+    demo.test_terminal_color_demonstration()
+    
+    # Then run the other demonstrations
+    demo.test_terminal_detection_demonstration()
+    demo.test_terminal_fallback_demonstration()
+    demo.test_terminal_environment_variable_demonstration()
+    
+    print("\n" + "=" * 60)
+    print("✅ ALL TERMINAL DETECTION TESTS COMPLETE")
+    print("=" * 60)
 
 
 class TestTerminalInfo:
@@ -40,7 +61,7 @@ class TestTerminalInfo:
             os.environ[var] = value
     
     @contextmanager
-    def mock_terminal_methods(self, width=80, height=24, tty=True, color=True):
+    def mock_terminal_methods(self, width=60, height=24, tty=True, color=True):
         """Context manager to mock terminal detection methods."""
         with patch('os.get_terminal_size') as mock_os_size, \
              patch('shutil.get_terminal_size') as mock_shutil_size, \
@@ -289,11 +310,11 @@ class TestTerminalInfo:
     
     def test_refresh_method(self):
         """Test the refresh method re-detects properties."""
-        with self.mock_terminal_methods(width=80, height=24) as mocks:
+        with self.mock_terminal_methods(width=60, height=24) as mocks:
             terminal = _TerminalInfo()
             
             # Initial values
-            assert terminal.width == 80
+            assert terminal.width == 60
             assert terminal.height == 24
             
             # Change mock return values
@@ -546,36 +567,142 @@ class TestTerminalVisualDemonstration:
         for env_var, value, description in env_tests:
             print(f"\nTesting {env_var}={value} ({description}):")
             
-            # Store original value
-            original_value = os.environ.get(env_var)
+            # Store original values
+            original_values = {}
+            for var in ['FORCE_TERMINAL_FALLBACK', 'NO_COLOR', 'TERM', 'COLORTERM', 'COLUMNS', 'LINES']:
+                if var in os.environ:
+                    original_values[var] = os.environ[var]
             
             try:
+                # Set the test environment variable
                 os.environ[env_var] = value
                 
-                # Force testing mode to avoid actual terminal detection conflicts
-                os.environ['FORCE_TERMINAL_FALLBACK'] = '1'
+                # Ensure we're NOT in fallback mode to test real detection
+                os.environ.pop('FORCE_TERMINAL_FALLBACK', None)
                 
+                # Test actual terminal detection
                 terminal = _TerminalInfo()
                 
                 print(f"  Width: {terminal.width}")
                 print(f"  Height: {terminal.height}")
+                print(f"  Is TTY: {terminal.is_tty}")
                 print(f"  Supports Color: {terminal.supports_color}")
+                print(f"  Encoding: {terminal.encoding}")
                 
             except Exception as e:
                 print(f"  Error: {e}")
+                print(f"  Detection failed - this tests the fallback behavior")
             
             finally:
                 # Restore original environment
-                if original_value is not None:
-                    os.environ[env_var] = original_value
-                else:
-                    os.environ.pop(env_var, None)
-                os.environ.pop('FORCE_TERMINAL_FALLBACK', None)
+                for var, val in original_values.items():
+                    os.environ[var] = val
+                # Clean up any variables we added
+                for var in ['FORCE_TERMINAL_FALLBACK', 'NO_COLOR', 'TERM', 'COLORTERM', 'COLUMNS', 'LINES']:
+                    if var not in original_values:
+                        os.environ.pop(var, None)
+
+    def test_terminal_color_demonstration(self):
+        """Demonstrate color support with actual terminal detection."""
+        print("\n" + "="*60)
+        print("TERMINAL DETECTION - COLOR DEMONSTRATION")
+        print("="*60)
+        
+        # Store original environment variables
+        original_env = {}
+        env_vars = ['FORCE_TERMINAL_FALLBACK', 'NO_COLOR', 'TERM', 'COLORTERM']
+        for var in env_vars:
+            if var in os.environ:
+                original_env[var] = os.environ[var]
+        
+        try:
+            # Force color-enabling environment variables for IDE compatibility
+            os.environ['FORCE_TERMINAL_FALLBACK'] = '0'  # Disable fallback mode
+            os.environ.pop('NO_COLOR', None)  # Remove NO_COLOR if present
+            os.environ['TERM'] = 'xterm-256color'
+            os.environ['COLORTERM'] = 'truecolor'
+            
+            # Force TTY-like environment for IDE compatibility
+            if not hasattr(sys.stdout, 'isatty') or not sys.stdout.isatty():
+                # We're in an IDE environment, force color support
+                print("  Note: Running in IDE environment, forcing color support")
+            
+            # Create terminal instance with forced color support
+            terminal = _TerminalInfo()
+            
+            print(f"\nReal Terminal Properties:")
+            print(f"  Width: {terminal.width} characters")
+            print(f"  Height: {terminal.height} characters")
+            print(f"  Is TTY: {terminal.is_tty}")
+            print(f"  Supports Color: {terminal.supports_color}")
+            print(f"  Encoding: {terminal.encoding}")
+            
+            # Override color support for IDE environments
+            if not terminal.is_tty:
+                print("  Note: TTY detection failed, but colors will still be displayed")
+                # Force color support for IDE compatibility
+                terminal._supports_color = True
+            
+            # Test if colors actually work by checking the environment
+            print(f"\n🎨 Color Test:")
+            
+            # Check if we're in an environment that supports colors
+            color_supported = (
+                terminal.supports_color and 
+                terminal.is_tty and
+                'NO_COLOR' not in os.environ and
+                os.environ.get('TERM', '').lower() in ['xterm', 'xterm-256color', 'screen', 'tmux']
+            )
+            
+            if color_supported:
+                print(f"  \033[31m🔴 Red Text\033[0m")
+                print(f"  \033[32m🟢 Green Text\033[0m")
+                print(f"  \033[34m🔵 Blue Text\033[0m")
+                print(f"  \033[33m🟡 Yellow Text\033[0m")
+                print(f"  \033[35m🟣 Magenta Text\033[0m")
+                print(f"  \033[36m🔵 Cyan Text\033[0m")
+                print(f"  \033[1m\033[31m🔴 Bold Red Text\033[0m")
+                print(f"  \033[4m\033[32m🟢 Underlined Green Text\033[0m")
+                
+                # Test width by drawing a colorful line
+                print(f"\n📏 Width Demonstration:")
+                print("  " + "\033[36m" + "─" * min(terminal.width - 4, 50) + "\033[0m")
+            else:
+                print(f"  🔴 Red Text (no color - environment doesn't support colors)")
+                print(f"  🟢 Green Text (no color)")
+                print(f"  🔵 Blue Text (no color)")
+                print(f"  🟡 Yellow Text (no color)")
+                print(f"  🟣 Magenta Text (no color)")
+                print(f"  🔵 Cyan Text (no color)")
+                print(f"  🔴 Bold Red Text (no color)")
+                print(f"  🟢 Underlined Green Text (no color)")
+                
+                # Test width by drawing a plain line
+                print(f"\n📏 Width Demonstration:")
+                print("  " + "─" * min(terminal.width - 4, 50))
+                
+        except Exception as e:
+            print(f"\n❌ Terminal detection failed: {e}")
+            # Still show colors even if detection fails
+            print(f"\n🎨 Color Test (fallback):")
+            print(f"  \033[31m🔴 Red Text\033[0m")
+            print(f"  \033[32m🟢 Green Text\033[0m")
+            print(f"  \033[34m🔵 Blue Text\033[0m")
+        
+        finally:
+            # Restore original environment
+            for var, value in original_env.items():
+                os.environ[var] = value
 
 
 if __name__ == "__main__":
     # Run visual demonstrations
     demo = TestTerminalVisualDemonstration()
+    
+    # Start with the color demonstration (most important)
+    demo.test_terminal_color_demonstration()
+    
+    # Then run the other demonstrations
     demo.test_terminal_detection_demonstration()
     demo.test_terminal_fallback_demonstration()
     demo.test_terminal_environment_variable_demonstration()

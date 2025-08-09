@@ -38,6 +38,7 @@ TERMINAL_PATH = SETUP_PATH / "terminal.py"
 TEXT_JUSTIFICATION_PATH = SETUP_PATH / "text_justification.py"
 TEXT_WRAPPING_PATH = SETUP_PATH / "text_wrapping.py"
 UNICODE_PATH = SETUP_PATH / "unicode.py"
+TABLE_GENERATOR_PATH = SETUP_PATH / "table_generator.py"
 
 # Verify all paths exist
 def verify_paths():
@@ -63,6 +64,7 @@ def verify_paths():
         ("Text Justification", TEXT_JUSTIFICATION_PATH),
         ("Text Wrapping", TEXT_WRAPPING_PATH),
         ("Unicode", UNICODE_PATH),
+        ("Table Generator", TABLE_GENERATOR_PATH),
     ]
     
     missing_paths = []

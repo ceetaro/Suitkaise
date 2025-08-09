@@ -1,184 +1,55 @@
-# FDL TODO
+# FDL Formatter - Remaining Tasks
 
-## ✅ **COMPLETED - Core Architecture**
-- [x] Registry-based command and object processing system
-- [x] Format state management with multi-format output streams
-- [x] Main processor with sequential element parsing
-- [x] Element processing system (text, variable, command, object elements)
-- [x] Complete setup system (color conversion, terminal detection, text wrapping, justification, box generation, unicode support)
+## **🚧 Core Integration Tasks**
 
-## ✅ **COMPLETED - Command Processors**
-- [x] Text command processor (colors, formatting, backgrounds, reset)
-- [x] Time command processor (timezone, 12hr, precision settings)
-- [x] Box command processor (box styles, titles, colors, justification)
-- [x] Layout command processor (text justification)
+### **1. Spinner Integration (Medium Priority)**
+- **File**: `suitkaise/fdl/_int/core/formatter.py` 
+- **Location**: `_execute_object()` method, spinner section
+- **Task**: Refactor old spinner implementation to work with new system.
+- **Note**: Spinner file recovered to `setup/` directory
 
-## ✅ **COMPLETED - Object Processors**
-- [x] Time objects processor (time, date, date_words, day, time_elapsed, time_ago, time_until)
-- [x] Progress bars processor (thread-safe, batched updates, terminal integration)
-- [x] Spinner objects processor (arrows, dots, letters with color support)
+### **2. Format Registry System (Low Priority)**
+- **File**: `suitkaise/fdl/_int/core/formatter.py`
+- **Location**: `_apply_format()` method
+- **Task**: Replace hardcoded "warning" example with proper registry lookup
+- **Requirements**:
+  - Implement format storage/retrieval system
+  - Support custom named formats like `</fmt error>`, `</fmt success>`
+  - Allow runtime format definition and lookup
+  - Add set of hardcoded formats for users to use, led by 'sk_' (ex. sk_error, sk_warning)
 
----
+### **3. Add nested collection support for debug mode**
+    Right now, we don't explicitly support collections in debug mode, as we haven't implemented nested collections yet.
 
-## 🔥 **CRITICAL - Testing & Integration (HIGHEST PRIORITY)**
+## **🔧 Polish Items**
 
-### Current Processor Testing & Validation
-- [ ] **CRITICAL**: Test main processor end-to-end with complex FDL strings
-- [ ] **CRITICAL**: Test registry system with all current processors
-- [ ] **CRITICAL**: Test format state management through complete processing cycles
-- [ ] **CRITICAL**: Test element parsing with edge cases and malformed input
-- [ ] **CRITICAL**: Validate sequential processing maintains correct state flow
+### **4. Box Justification Enhancement (Low Priority)**
+- **File**: `suitkaise/fdl/_int/core/formatter.py`
+- **Location**: `_end_box()` method around line 840
+- **Task**: Refactor box_generator.py to work with new system
 
-### Setup Integration & Refactoring
-- [ ] **CRITICAL**: Refactor text command processor to use setup/text_wrapping.py correctly
-- [ ] **CRITICAL**: Refactor text command processor to use setup/color_conversion.py fully
-- [ ] **CRITICAL**: Refactor box command processor to use setup/box_generator.py properly
-- [ ] **CRITICAL**: Refactor layout command processor to use setup/text_justification.py correctly
-- [ ] **CRITICAL**: Refactor all processors to use setup/unicode.py for unicode detection
-- [ ] **CRITICAL**: Refactor all processors to use setup/terminal.py for width detection
+### **5. Exception Class Definitions (Very Low Priority)**
+- **File**: `suitkaise/fdl/_int/core/formatter.py`
+- **Location**: Lines 36, 43, 50
+- **Task**: Add specific behavior to exception classes
+- **Current**: Just `pass` statements (functional but minimal)
+- **Enhancement**: Add helpful error messages and context
 
-### Multi-Format Output Integration
-- [ ] **CRITICAL**: Test and fix plain text output generation in base_element.py
-- [ ] **CRITICAL**: Test and fix markdown output generation in base_element.py
-- [ ] **CRITICAL**: Test and fix HTML output generation in base_element.py
-- [ ] **CRITICAL**: Ensure all processors generate consistent multi-format output
+## **✅ Completed Features**
 
-### Progress Bar & Spinner Integration Testing
-- [ ] **CRITICAL**: Test progress bar integration with format state and output streams
-- [ ] **CRITICAL**: Test spinner integration with terminal detection and unicode support
-- [ ] **CRITICAL**: Test thread safety of progress bars and spinners with concurrent processing
-- [ ] **CRITICAL**: Validate progress bar output queuing and terminal blocking behavior
+**Core FDL functionality is ~95% complete:**
+- ✅ All command processing (text, time, debug, box, end)
+- ✅ All basic object processing (time, type objects) 
+- ✅ Variable handling (Case 1: dynamic injection, Case 2: embedded FDL)
+- ✅ Debug mode (complete implementation)
+- ✅ State isolation for embedded FDL strings
+- ✅ Raw output processing (wrapping, justification)
+- ✅ Float-based timestamp system with decimal/seconds control
+- ✅ Group-oriented command structure
+- ✅ Setup file integration
 
-### Error Handling & Edge Cases
-- [ ] **CRITICAL**: Test processor error handling with invalid commands/objects
-- [ ] **CRITICAL**: Test format state error recovery and cleanup
-- [ ] **CRITICAL**: Test registry error handling with missing or broken processors
-- [ ] **CRITICAL**: Test element parsing with malformed brackets and syntax errors
-- [ ] **CRITICAL**: Add comprehensive error messages for debugging processor issues
+## **🚫 Explicitly Excluded**
 
----
-
-## 🔄 **MAJOR MISSING SYSTEMS (HIGH PRIORITY)**
-
-### Missing Command Processors
-- [ ] **HIGH PRIORITY**: Debug commands processor (`</debug>`, `<type:variable>`)
-- [ ] **HIGH PRIORITY**: Format commands processor (`</fmt format_name>`, `</end format_name>`)
-- [ ] **MEDIUM**: Code printing commands (`</syntax theme>`)
-- [ ] **LOW**: Markdown commands integration
-
-### Missing Object Processors  
-- [ ] **HIGH PRIORITY**: Table objects processor (`<table_name>` display)
-- [ ] **MEDIUM**: Type objects processor (`<type:variable>` type annotations)
-- [ ] **MEDIUM**: Nested collection objects (`<nested_collection>` with level-based coloring)
-- [ ] **LOW**: Code objects processor (syntax highlighted code blocks)
-
-### Logging System (Complete Implementation Required)
-- [ ] **CRITICAL**: `fdl.log.from_current_file()` reporter creation
-- [ ] **CRITICAL**: `fdl.log.from_file()` and `fdl.log.from_this_key()` reporters
-- [ ] **CRITICAL**: `fdl.log.Quickly()` context manager
-- [ ] **CRITICAL**: `fdl.log.get_setup()` global logging configuration
-- [ ] **HIGH**: All logging functions (info, debug, warning, error, critical, success, fail)
-- [ ] **HIGH**: Specialized logging functions (setToNone, setToTrue, savedObject, etc.)
-- [ ] **HIGH**: Custom message types and reporter-specific settings
-- [ ] **MEDIUM**: File and console output routing for logs
-- [ ] **MEDIUM**: TimeFormat, NameFormat, TypeFormat classes
-- [ ] **LOW**: Logger filtering and listening controls
-
-### Error Handling System
-- [ ] **HIGH PRIORITY**: Custom traceback display with boxed frames
-- [ ] **HIGH PRIORITY**: Local variables display with type annotations
-- [ ] **HIGH PRIORITY**: Clean file path display using SKPath integration
-- [ ] **MEDIUM**: Hybrid error handling (fdl internal vs user errors)
-- [ ] **MEDIUM**: Thread-safe error display
-- [ ] **LOW**: Debug mode error context
-
-### Advanced Internal Features
-- [ ] **HIGH PRIORITY**: `fdl.Format()` class implementation and caching
-- [ ] **HIGH PRIORITY**: `fdl.Table()`, `fdl.ColumnTable()`, `fdl.RowTable()` classes
-- [ ] **HIGH PRIORITY**: Internal `_ProgressBar()` class refinement
-- [ ] **MEDIUM**: `@fdl.autoformat()` and `@fdl.autodebug()` decorators
-- [ ] **MEDIUM**: Internal color name and formatting utilities
-- [ ] **LOW**: Custom format registration system
-
----
-
-## 🔧 **INTEGRATION & POLISH (MEDIUM PRIORITY)**
-
-### SKPath Integration
-- [ ] **HIGH PRIORITY**: Integrate SKPath for clean file paths in errors
-- [ ] **MEDIUM**: Integrate SKPath for relative path display in logging
-
-### Performance Optimization
-- [ ] **MEDIUM**: Review and optimize caching strategies
-- [ ] **MEDIUM**: Profile registry lookup performance
-- [ ] **MEDIUM**: Optimize format state memory usage
-- [ ] **LOW**: Benchmark against Rich library performance
-
-### Testing & Quality
-- [ ] **HIGH PRIORITY**: Unit tests for all processors
-- [ ] **HIGH PRIORITY**: Integration tests for complete FDL strings
-- [ ] **MEDIUM**: Performance benchmarks and regression tests
-- [ ] **MEDIUM**: Thread safety tests for progress bars and spinners
-- [ ] **LOW**: Memory usage profiling
-
-### Documentation
-- [ ] **MEDIUM**: Internal API documentation for processors
-- [ ] **MEDIUM**: Architecture documentation for registry system
-- [ ] **LOW**: Performance tuning guide
-- [ ] **LOW**: Processor development guide for extensions
-
----
-
-## 🎨 **PUBLIC API LAYER (LOWEST PRIORITY - DO LAST)**
-
-### Public Functions
-- [ ] **LOW**: Implement `fdl.print()` public function
-- [ ] **LOW**: Implement `fdl.dprint()` debug function  
-- [ ] **LOW**: Implement `fdl.codeprint()` code syntax highlighting
-- [ ] **LOW**: Implement `fdl.mdprint()` and `fdl.mdfileprint()` markdown printing
-- [ ] **LOW**: Implement `fdl.stop_spinner()` public function
-
-### Public Classes
-- [ ] **LOW**: Public `fdl.Format()` wrapper class
-- [ ] **LOW**: Public `fdl.Table()`, `fdl.ColumnTable()`, `fdl.RowTable()` wrapper classes
-- [ ] **LOW**: Public `fdl.ProgressBar()` wrapper class
-- [ ] **LOW**: Public utility functions (`fdl.get_default_color_names()`, etc.)
-
-### API Integration
-- [ ] **LOW**: Wire public API to internal engine
-- [ ] **LOW**: Add API error handling and validation
-- [ ] **LOW**: API documentation and examples
-
----
-
-## 📋 **IMPLEMENTATION NOTES**
-
-### Critical Path
-1. **TESTING & INTEGRATION** → **Missing Processors** → **Logging System** → **Error Handling** → **Advanced Features** → **Polish** → **Public API**
-2. **Complete internal engine must work perfectly before adding any public API**
-3. **Setup integration is critical - processors need to use all helper functions properly**
-4. **Multi-format output must be tested and working throughout**
-
-### Architecture Strengths
-- Registry system makes adding new processors trivial
-- Format state handles complex multi-format output cleanly  
-- Setup system provides solid foundation for all features
-- Element parsing is robust and extensible
-
-### Key Dependencies
-- **CRITICAL**: All processors must properly integrate with setup/ helpers
-- **CRITICAL**: Multi-format output must work throughout the engine
-- **CRITICAL**: Complete internal engine before any public API
-- SKPath integration needed for clean error display
-- Terminal detection and unicode support already solid
-- Color conversion and text processing systems complete
-
-### Testing Strategy
-- **Phase 1**: Test individual processors in isolation
-- **Phase 2**: Test processor integration with setup helpers
-- **Phase 3**: Test complete processing flow end-to-end
-- **Phase 4**: Test multi-format output consistency
-- **Phase 5**: Test edge cases and error handling
-- **Phase 6**: Complete missing processors and systems
-- **Phase 7**: Polish and optimize internal engine
-- **Phase 8**: Build public API layer (LAST)
+- **Box backgrounds**: Never implementing (user decision)
+- **Table objects**: Tables are separate `fdl.Table` class, not FDL objects
+- **Progress Bars**: Progress bars are separate `fdl.ProgressBar` class, not FDL objects

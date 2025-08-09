@@ -1,4 +1,6 @@
 """
+NOTE: THIS IS AN OLD FILE THAT NEEDS TO BE REFACTORED INTO NEW SYSTEM.
+
 Spinner Objects Processor for FDL.
 
 This module handles spinner-related object patterns like <spinner:type>message
@@ -9,6 +11,8 @@ normal FDL processing. Only one spinner can be active at a time.
 
 This is internal to the FDL engine and not exposed to users.
 """
+
+
 
 import threading
 import time

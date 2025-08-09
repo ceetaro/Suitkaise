@@ -108,7 +108,9 @@ class _TextWrapper:
         
         # Check if line fits without wrapping
         if self._get_visual_width(line) <= self.width:
-            return [self._ensure_ansi_reset(line)]
+            # Expand tabs in the output text
+            expanded_line = self._expand_tabs(line)
+            return [self._ensure_ansi_reset(expanded_line)]
         
         wrapped_lines = []
         remaining_text = line
@@ -117,7 +119,9 @@ class _TextWrapper:
             current_line, remaining_text = self._fit_line_with_priority_breaks(remaining_text)
             
             if current_line:
-                wrapped_lines.append(self._ensure_ansi_reset(current_line.rstrip()))
+                # Expand tabs in the output text
+                expanded_line = self._expand_tabs(current_line.rstrip())
+                wrapped_lines.append(self._ensure_ansi_reset(expanded_line))
         
         return wrapped_lines if wrapped_lines else ['']
     
@@ -256,6 +260,9 @@ class _TextWrapper:
         # Strip ANSI codes first
         clean_text = self._strip_ansi_codes(text)
         
+        # Expand tabs to spaces for proper width calculation
+        clean_text = self._expand_tabs(clean_text)
+        
         if wcwidth is None:
             # Fallback to simple len() if wcwidth not available
             return len(clean_text)
@@ -296,6 +303,37 @@ class _TextWrapper:
         
         # wcwidth returns None for control characters
         return width if width is not None else 0
+    
+    def _expand_tabs(self, text: str, tab_size: int = 8) -> str:
+        """
+        Expand tab characters to spaces for proper width calculation.
+        
+        Args:
+            text: Text that may contain tab characters
+            tab_size: Number of spaces per tab stop (default: 8)
+            
+        Returns:
+            str: Text with tabs expanded to spaces
+        """
+        if '\t' not in text:
+            return text
+        
+        result = []
+        column = 0
+        
+        for char in text:
+            if char == '\t':
+                # Calculate spaces needed to reach next tab stop
+                spaces_needed = tab_size - (column % tab_size)
+                result.append(' ' * spaces_needed)
+                column += spaces_needed
+            else:
+                result.append(char)
+                # For width calculation, assume most characters are 1 column
+                # wcwidth will handle wide characters properly
+                column += 1
+        
+        return ''.join(result)
     
     def _strip_ansi_codes(self, text: str) -> str:
         """

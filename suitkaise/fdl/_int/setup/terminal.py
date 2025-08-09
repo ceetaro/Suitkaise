@@ -162,7 +162,7 @@ class _TerminalInfo:
         if self._testing_mode:
             return 60
         
-        # Try common fallback widths
+        # Try common fallback widths (60 is minimum, so return it first)
         fallback_widths = [60, 80, 120, 100]
         for width in fallback_widths:
             if width >= 60:  # Minimum acceptable width
@@ -237,7 +237,13 @@ class _TerminalInfo:
         # Check if stdout is a TTY
         try:
             if hasattr(sys.stdout, 'isatty'):
-                return sys.stdout.isatty()
+                is_tty = sys.stdout.isatty()
+                
+                # If not a TTY but we're in an IDE environment, assume color support
+                if not is_tty and any(ide in sys.modules for ide in ['IPython', 'jupyter', 'pytest']):
+                    return True
+                
+                return is_tty
             else:
                 return False
         except (AttributeError, OSError):

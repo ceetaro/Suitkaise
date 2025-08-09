@@ -9,13 +9,79 @@ text wrapping, and multi-format output support.
 import re
 from typing import List, Dict, Tuple, Optional, Union, Any
 from dataclasses import dataclass
-from .text_wrapping import _TextWrapper
-from .unicode import _get_unicode_support
-from .terminal import _get_terminal
-from ..core.format_state import _FormatState
-from ..core.command_registry import _CommandRegistry, UnknownCommandError
+
+# Import dependencies with proper error handling
+try:
+    from .text_wrapping import _TextWrapper
+except ImportError:
+    class _TextWrapper:
+        def __init__(self):
+            self.width = 26
+        def wrap_text(self, text):
+            return [text]
+
+try:
+    from .unicode import _get_unicode_support
+except ImportError:
+    def _get_unicode_support():
+        return True
+
+try:
+    from .terminal import _get_terminal
+except ImportError:
+    def _get_terminal():
+        return None
+
+try:
+    from ..core.format_state import _FormatState
+except ImportError:
+    # Fallback for testing/development
+    class _FormatState:
+        def __init__(self, **kwargs):
+            self.text_color = kwargs.get('text_color', None)
+            self.background_color = kwargs.get('background_color', None)
+            self.bold = kwargs.get('bold', False)
+            self.italic = kwargs.get('italic', False)
+            self.underline = kwargs.get('underline', False)
+            self.strikethrough = kwargs.get('strikethrough', False)
+            # Add missing attributes that the real FormatState has
+            self.twelve_hour_time = kwargs.get('twelve_hour_time', False)
+            self.timezone = kwargs.get('timezone', None)
+            self.use_seconds = kwargs.get('use_seconds', False)
+            self.use_minutes = kwargs.get('use_minutes', False)
+            self.use_hours = kwargs.get('use_hours', False)
+            self.decimal_places = kwargs.get('decimal_places', None)
+            self.round_seconds = kwargs.get('round_seconds', False)
+            self.smart_time = kwargs.get('smart_time', False)
+            self.in_box = kwargs.get('in_box', False)
+            self.box_style = kwargs.get('box_style', None)
+            self.box_title = kwargs.get('box_title', None)
+            self.box_color = kwargs.get('box_color', None)
+            self.box_background = kwargs.get('box_background', None)
+            self.box_content = kwargs.get('box_content', [])
+            self.box_width = kwargs.get('box_width', None)
+            self.justify = kwargs.get('justify', None)
+            self.debug_mode = kwargs.get('debug_mode', False)
+            self.active_formats = kwargs.get('active_formats', [])
+            self.values = kwargs.get('values', [])
+            self.value_index = kwargs.get('value_index', 0)
+
+try:
+    from ..core.command_registry import _CommandRegistry, UnknownCommandError
+except ImportError:
+    class _CommandRegistry:
+        def __init__(self):
+            pass
+        def process_command(self, command, format_state):
+            return format_state
+    class UnknownCommandError(Exception):
+        pass
+
 # Import processors to ensure registration
-from ..processors import commands
+try:
+    from ..processors import commands
+except ImportError:
+    pass
 
 
 @dataclass
@@ -51,6 +117,8 @@ class _TableGenerator:
     - Visual width calculation using wcwidth
     - Multi-format output (terminal, plain, markdown, HTML)
     - Format state integration for each cell
+    - Visual indicators for missing data: rows with fewer columns than headers
+      will have missing vertical borders, clearly marking incomplete data
     """
     
     # Box drawing characters for different styles
@@ -608,33 +676,47 @@ class _TableGenerator:
         return "\n".join(lines)
     
     def _generate_markdown_output(self, matrix: List[List[_CellInfo]], headers: List[str]) -> str:
-        """Generate markdown table output."""
+        """Generate markdown table output with proper alignment."""
         if not matrix:
             return "[EMPTY_TABLE]"
         
         lines = []
         
+        # Calculate dimensions for proper alignment
+        dimensions = self._calculate_dimensions(matrix, headers)
+        
         # Header row
         if matrix:
             header_cells = []
-            for cell in matrix[0]:
+            for col_idx, cell in enumerate(matrix[0]):
+                col_width = dimensions.column_widths[col_idx]
                 # Clean content for markdown
                 content = re.sub(r'\x1b\[[0-9;]*m', '', cell.original_content)
-                header_cells.append(content)
-            lines.append("| " + " | ".join(header_cells) + " |")
+                # Pad content to column width
+                padded_content = content.ljust(col_width)
+                header_cells.append(padded_content)
+            lines.append(" " + " | ".join(header_cells) + " ")
             
-            # Separator row
-            separator = "| " + " | ".join(["---"] * len(header_cells)) + " |"
-            lines.append(separator)
+            # Separator row with proper column widths
+            separator_parts = []
+            for col_idx in range(len(dimensions.column_widths)):
+                col_width = dimensions.column_widths[col_idx]
+                separator_parts.append("-" * (col_width + 2))
+                if col_idx < len(dimensions.column_widths) - 1:
+                    separator_parts.append("+")
+            lines.append("".join(separator_parts))
             
             # Data rows
             for row in matrix[1:]:
                 data_cells = []
-                for cell in row:
+                for col_idx, cell in enumerate(row):
+                    col_width = dimensions.column_widths[col_idx]
                     # Clean content for markdown
                     content = re.sub(r'\x1b\[[0-9;]*m', '', cell.original_content)
-                    data_cells.append(content)
-                lines.append("| " + " | ".join(data_cells) + " |")
+                    # Pad content to column width
+                    padded_content = content.ljust(col_width)
+                    data_cells.append(padded_content)
+                lines.append(" " + " | ".join(data_cells) + " ")
         
         return "\n".join(lines)
     

@@ -33,10 +33,13 @@ class _TextJustifier:
         """
         # Import here to avoid circular imports
         if terminal_width is not None:
-            # Use explicit width if provided (no minimum enforcement for explicit widths)
-            self.terminal_width = terminal_width
+            # Use explicit width if provided, but enforce minimum only for 0/negative
+            if terminal_width <= 0:
+                self.terminal_width = 60
+            else:
+                self.terminal_width = terminal_width
         else:
-            # Only use detected terminal width if no explicit width provided
+            # Use detected terminal width if no explicit width provided
             try:
                 from .terminal import _get_terminal
                 terminal = _get_terminal()
@@ -44,7 +47,7 @@ class _TextJustifier:
             except (ImportError, AttributeError):
                 self.terminal_width = 60
             
-            # Only enforce minimum when using detected/default width
+            # Enforce minimum when using detected/default width
             self.terminal_width = max(60, self.terminal_width)
             
         # ANSI escape sequence pattern for stripping codes
@@ -162,8 +165,11 @@ class _TextJustifier:
                 total_width = 0
                 for char in clean_text:
                     char_width = wcwidth.wcwidth(char)
-                    if char_width is not None:
+                    if char_width is not None and char_width >= 0:
                         total_width += char_width
+                    else:
+                        # Handle control characters (like tabs) as single characters
+                        total_width += 1
                 return total_width
         except ImportError:
             pass
