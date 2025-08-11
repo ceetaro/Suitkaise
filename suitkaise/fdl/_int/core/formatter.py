@@ -20,8 +20,7 @@ from ..setup.color_conversion import _ColorConverter
 from ..setup.text_wrapping import _TextWrapper
 from ..setup.text_justification import _TextJustifier
 from ..setup.box_generator import _BoxGenerator
-from ..elements.base_element import _BaseElement
-from ..classes.progress_bar import _progress_bar_manager
+from ..setup.output_coordinator import _output_coordinator
 
 # Module-level setup utilities
 _color_converter = _ColorConverter()
@@ -72,7 +71,9 @@ class _Formatter:
     def __init__(self, fdl_string: str, 
                        values: Union[Tuple, Any],
                        custom_terminal_width: Optional[int] = None,
-                       destinations: Set[_OutputType] = { _OutputType.TERMINAL }):
+                       destinations: Set[_OutputType] = { _OutputType.TERMINAL },
+                       *,
+                       allow_when_display_active: bool = False):
         """
         Initialize the formatting pipeline.
 
@@ -84,6 +85,7 @@ class _Formatter:
 
         """
         self.fdl_string: str = fdl_string
+        self._allow_when_display_active = allow_when_display_active
         self.parsed_pieces: List[Dict[str, str]] = self._parse_fdl_string()
 
         self.output_types: Set[_OutputType] = destinations
@@ -126,9 +128,7 @@ class _Formatter:
     
         # Text formatting
         self.text_color: Optional[str] = None
-        self.current_text_color_command: Optional[str] = None  # Used to track current color command
         self.background_color: Optional[str] = None
-        self.current_background_color_command: Optional[str] = None  # Used to track current background color command
         self.bold: bool = False
         self.italic: bool = False
         self.underline: bool = False
@@ -356,6 +356,8 @@ class _Formatter:
         if codes:
             return f"\033[{';'.join(codes)}m"
         return ""
+
+    
     
     def _add_formatted_content_to_raw_output(self, content: str, use_current_formatting: bool = True):
         """Add content to raw output streams with appropriate formatting."""
@@ -646,37 +648,52 @@ class _Formatter:
             bool: True if the command was executed, False otherwise
         """
 
-        # many issues:
-        # we arent actually converting colors correctly here.
-        
+        # Normalize and set text color
         if _color_converter.is_valid_color(command):
-            self.current_text_color_command = command
-            # actually set text_color correctly by converting to RGB
+            normalized = _color_converter.normalize_color_string(command)
+            self.text_color = normalized
             return True
         
         # Background color commands
         if command.startswith('bkg '):
             bg_color = command[4:].strip()
             if _color_converter.is_valid_color(bg_color):
-                self.current_background_color_command = bg_color
-                # actually set background_color correctly by converting to RGB
-            return True
+                normalized_bg = _color_converter.normalize_color_string(bg_color)
+                self.background_color = normalized_bg
+                return True
+            else:
+                raise ValueError(f"Invalid background color: '{bg_color}'")
             
         # End color commands
         if command.startswith('end '):
-            color_name = command[4:]
-            if color_name == self.current_text_color_command:
-                self.text_color = None
-                self.current_text_color_command = None
-                return True
-            elif 'bkg' in color_name:
-                bg_color = color_name[4:].strip()
-                if bg_color == self.current_background_color_command:
+            target = command[4:].strip()
+            # Background color end: 'end bkg <color>'
+            if target.startswith('bkg '):
+                bg_target = target[4:].strip()
+                if not _color_converter.is_valid_color(bg_target):
+                    raise ValueError(f"Invalid background color in end command: '{bg_target}'")
+                normalized_bg_target = _color_converter.normalize_color_string(bg_target)
+                if self.background_color == normalized_bg_target:
                     self.background_color = None
-                    self.current_background_color_command = None
+                    return True
+                else:
+                    current_desc = self.background_color if self.background_color is not None else 'none'
+                    raise ValueError(
+                        f"Attempted to end background color '{bg_target}' but current background color is '{current_desc}'."
+                    )
+
+            # Text color end: 'end <color>'
+            if not _color_converter.is_valid_color(target):
+                raise ValueError(f"Invalid color in end command: '{target}'")
+            normalized_target = _color_converter.normalize_color_string(target)
+            if self.text_color == normalized_target:
+                self.text_color = None
                 return True
             else:
-                raise ValueError(f"End color command '{command}' does not match any current color command.")
+                current_desc = self.text_color if self.text_color is not None else 'none'
+                raise ValueError(
+                    f"Attempted to end text color '{target}' but current text color is '{current_desc}'."
+                )
             
         return False
     
@@ -826,7 +843,7 @@ class _Formatter:
             
         # Color commands for box
         if _color_converter.is_valid_color(command):
-            self.box_color = command
+            self.box_color = _color_converter.normalize_color_string(command)
             return True
             
         # Special box color commands
@@ -892,10 +909,8 @@ class _Formatter:
         # For now, handle the example "warning" format
         if format_name == 'warning':
             # From example: '</bkg yellow, black, bold>'
-            self.background_color = 'yellow'
-            self.current_background_color_command = 'yellow'
-            self.text_color = 'black'
-            self.current_text_color_command = 'black'
+            self.background_color = _color_converter.normalize_color_string('yellow')
+            self.text_color = _color_converter.normalize_color_string('black')
             self.bold = True
             return True
         return False
@@ -1055,9 +1070,6 @@ class _Formatter:
                 self.box_style = param
             elif param == 'color current':
                 self.box_color = self.text_color
-            elif param.startswith('bkg '):
-                # Background color for box
-                pass  # TODO: implement box background
             elif param.startswith('title '):
                 # Title is a variable reference - extract from values
                 title_ref = param[6:].strip()
@@ -1169,11 +1181,7 @@ class _Formatter:
                 current_time = time.time()
                 return self._format_timestamp(current_time)
         
-        # Handle spinner objects
-        if obj_type == 'spinner':
-            # TODO: Integrate refactored spinner system
-            # Return simple spinner character for now
-            return "●"
+        # Note: spinner objects are intentionally not supported in FDL strings
             
         # Note: Tables are separate fdl.Table class, not FDL objects
             
@@ -1345,6 +1353,12 @@ class _Formatter:
         """
         Process the FDL string according to the new architecture flow.
         """
+        # Prevent normal processing when an exclusive display is active,
+        # unless explicitly allowed (used by effects regeneration paths)
+        if not self._allow_when_display_active and _output_coordinator.is_active():
+            # Buffer output to be flushed when display releases
+            # We process anyway to generate outputs, but we do not write to stdout here.
+            pass
         # Process each piece sequentially
         for piece in self.parsed_pieces:
             self._process_piece(piece)
@@ -1352,18 +1366,20 @@ class _Formatter:
         # Process any remaining raw output
         self._process_raw_output()
 
-        # Wait for progress bars to complete
-        while _progress_bar_manager.has_active_bar():
-            time.sleep(0.0166)  # ~60 FPS
+        # If an exclusive display is active, the caller (effects/progress) coordinates flushing.
 
         self.ready_to_output = True
             
-        return {
+        result = {
             'terminal': self.terminal_output,
             'plain': self.plain_output,
             'markdown': self.markdown_output,
             'html': self.html_output
         }
+        # If a display is active and not allowed, buffer terminal output
+        # (Higher-level caller is responsible for flushing later.)
+        # We don't write here; returning the result lets callers decide.
+        return result
   
   
     def copy(self):
@@ -1372,9 +1388,7 @@ class _Formatter:
     def reset_text_formatting(self):
         """Reset all text formatting to defaults."""
         self.text_color = None
-        self.current_text_color_command = None
         self.background_color = None
-        self.current_background_color_command = None
         self.bold = False
         self.italic = False
         self.underline = False

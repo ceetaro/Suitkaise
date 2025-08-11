@@ -55,35 +55,37 @@ class _TextJustifier:
     
     def justify_text(self, text: str, justify: str) -> str:
         """
-        Apply justification to text.
-        
-        This method assumes text is already wrapped if needed.
-        It justifies each line independently.
-        
+        Apply justification to text and pad each line to terminal width.
+
+        Assumes text is already wrapped if needed. Justifies each line
+        independently, then right-pads with spaces to self.terminal_width
+        based on visual width (ANSI-safe).
+
         Args:
             text: Text to justify (may contain ANSI codes, may be multi-line)
             justify: Justification mode ('left', 'right', 'center')
-            
+
         Returns:
-            str: Justified text
+            str: Justified and padded text
         """
-        if not text or justify == 'left':
-            return text  # Left is default, no processing needed
-        
-        # Split text into lines and justify each line independently
+        if text is None:
+            return ""
+
         lines = text.split('\n')
         justified_lines = []
-        
+
         for line in lines:
             if justify == 'right':
                 justified_line = self._justify_right(line)
             elif justify == 'center':
                 justified_line = self._justify_center(line)
-            else:  # fallback to left
+            else:  # left
                 justified_line = line
-            
-            justified_lines.append(justified_line)
-        
+
+            # Ensure right padding to terminal width based on visual width
+            padded_line = self._pad_to_terminal_width(justified_line)
+            justified_lines.append(padded_line)
+
         return '\n'.join(justified_lines)
     
     def _justify_right(self, line: str) -> str:
@@ -136,6 +138,13 @@ class _TextJustifier:
         
         # Build the centered line with exact padding
         return ' ' * left_padding + line + ' ' * right_padding
+
+    def _pad_to_terminal_width(self, line: str) -> str:
+        """Right-pad line with spaces to reach terminal width (ANSI-safe)."""
+        visible_length = self._get_visual_width(line)
+        if visible_length >= self.terminal_width:
+            return line
+        return line + (' ' * (self.terminal_width - visible_length))
     
     def _get_visual_width(self, text: str) -> int:
         """
@@ -155,24 +164,24 @@ class _TextJustifier:
         
         # Try to use wcwidth for accurate measurement
         try:
-            import wcwidth
-            if wcwidth is not None:
-                width = wcwidth.wcswidth(clean_text)
-                if width is not None:
-                    return width
-                
-                # Fallback: character by character
-                total_width = 0
-                for char in clean_text:
-                    char_width = wcwidth.wcwidth(char)
-                    if char_width is not None and char_width >= 0:
-                        total_width += char_width
-                    else:
-                        # Handle control characters (like tabs) as single characters
-                        total_width += 1
-                return total_width
-        except ImportError:
-            pass
+            import wcwidth  # type: ignore
+        except Exception:
+            wcwidth = None  # type: ignore
+        if wcwidth is not None:
+            width = wcwidth.wcswidth(clean_text)
+            if width is not None:
+                return width
+
+            # Fallback: character by character
+            total_width = 0
+            for char in clean_text:
+                char_width = wcwidth.wcwidth(char)
+                if char_width is not None and char_width >= 0:
+                    total_width += char_width
+                else:
+                    # Handle control characters (like tabs) as single characters
+                    total_width += 1
+            return total_width
         
         # Fallback to len() if wcwidth not available
         return len(clean_text)

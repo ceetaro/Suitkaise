@@ -74,6 +74,29 @@ class _ColorConverter:
         # Updated RGB pattern to accept any digits (validation happens in parsing)
         self._rgb_pattern = re.compile(r'^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$')
     
+    def normalize_color_string(self, color: str) -> str:
+        """
+        Normalize a color string for internal storage/comparison.
+
+        - Lowercase and strip whitespace
+        - rgb() -> normalize spacing to 'rgb(R, G, B)'
+        - Hex -> keep lowercase (#fff or #ffffff)
+        - Named -> lowercase name
+        Returns empty string for invalid inputs (non-str or falsy)
+        """
+        if not isinstance(color, str):
+            return ""
+        s = color.strip().lower()
+        # Normalize rgb spacing if pattern matches
+        match = self._rgb_pattern.match(s)
+        if match:
+            try:
+                r, g, b = map(int, match.groups())
+                return f"rgb({r}, {g}, {b})"
+            except ValueError:
+                return s
+        return s
+
     def get_named_colors(self) -> set:
         """
         Get set of all supported named colors.
@@ -93,7 +116,8 @@ class _ColorConverter:
         Returns:
             bool: True if color is a named color
         """
-        return color.strip().lower() in self.NAMED_COLORS_FG
+        color = self.normalize_color_string(color)
+        return color in self.NAMED_COLORS_FG
     
     def is_hex_color(self, color: str) -> bool:
         """
@@ -105,7 +129,8 @@ class _ColorConverter:
         Returns:
             bool: True if color is valid hex format (#RGB or #RRGGBB)
         """
-        return bool(self._hex_pattern.match(color.strip()))
+        color = self.normalize_color_string(color)
+        return bool(self._hex_pattern.match(color))
     
     def is_rgb_color(self, color: str) -> bool:
         """
@@ -120,7 +145,8 @@ class _ColorConverter:
         Returns:
             bool: True if color is valid rgb() format
         """
-        match = self._rgb_pattern.match(color.strip())
+        color = self.normalize_color_string(color)
+        match = self._rgb_pattern.match(color)
         if not match:
             return False
         
@@ -163,8 +189,8 @@ class _ColorConverter:
         """
         if not color or not isinstance(color, str):
             return ""
-            
-        color = color.strip().lower()
+        
+        color = self.normalize_color_string(color)
         
         # Named colors
         if color in self.NAMED_COLORS_FG:
@@ -196,7 +222,7 @@ class _ColorConverter:
         if not color or not isinstance(color, str):
             return ""
             
-        color = color.strip().lower()
+        color = self.normalize_color_string(color)
         
         # Named colors
         if color in self.NAMED_COLORS_BG:
@@ -320,7 +346,7 @@ class _ColorConverter:
         if not color or not isinstance(color, str):
             return color
             
-        color = color.strip().lower()
+        color = self.normalize_color_string(color)
         
         # Named colors that are valid in CSS
         if color in self.HTML_COLOR_NAMES:
@@ -426,6 +452,11 @@ def _to_ansi_bg(color: str) -> str:
 def _normalize_for_html(color: str) -> str:
     """Normalize color for HTML/CSS output."""
     return _color_converter.normalize_for_html(color)
+
+
+def _normalize_color_string(color: str) -> str:
+    """Normalize a color string for internal storage/comparison."""
+    return _color_converter.normalize_color_string(color)
 
 
 def _get_color_info(color: str) -> dict:

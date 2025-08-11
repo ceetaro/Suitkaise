@@ -742,24 +742,36 @@ bar.stop()
 ```
 ## Creating spinners and boxes
 
-**Spinners**
+**Effects**
+
+Spinners are animated sets of characters that loop progression over and over. Use them for things like loading data, informing the user that a benchmark test is currently in progress, etc. Only one spinner can be active at a time, and starting a new spinner automatically stops the existing one currently animating. Spinners block other output while active.
+
 ```python
 from suitkaise import fdl
 
-fdl.print("<spinner:arrows>a message") 
-fdl.print("<spinner:dots>a message")
-fdl.print("<spinner:letters>a message")
+# create an effect and add a message, message can be more than one line.
+# if no message content appears on first line, effect is centered.
+fdl.start_new_effect("arrows", "green", "</bold>Initializing <value>, one moment...", value)
 
-# or use a command:
-fdl.print("</spinner arrows>a message")
+# update the message being displayed next frame
+fdl.update_effect_message("message")
 
-# adding color and background to a spinner is exactly the same as text!
-# does not support text formatting like bold, italic, etc.
+# stop the effect and add a completed message, can be more than one line.
+# must stop current effect before starting new one.
+fdl.stop_current_effect("</bold, green>Completed! Time: </smart time 2><elapsed:start_time>", start_time)
 
-# you can only have one active spinner at a time. if a new spinner is created, the last one stops.
+# check if an effect or progress bar is currently active
+while fdl.effect_active():
+    # sleep for 10 frames at 60 fps
+    time.sleep(0.167)
 
-# stopping a spinner manually
-fdl.stop_spinner()
+# create a new effect
+effect_frames = [' 0 ', ' O ', ' o ', ' O ', ' 0 ']
+fdl.create_new_effect(name="my_effect", frames=effect_frames, completed_frame=' O ', interval=0.2)
+
+# Notes:
+# - Effects are not used inside FDL strings (no <spinner:...> objects).
+# - Only one object between effects and progress bars can be active at any time.
 ```
 
 **Boxes**
