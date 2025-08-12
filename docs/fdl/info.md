@@ -250,6 +250,43 @@ This centralized architecture ensures complete encapsulation and predictable pro
 
 ---
 
+## **Exclusive Output Coordination and Animated Effects**
+
+### **Exclusive Output Coordinator**
+
+- A single coordinator enforces that only one animated display (an effect or a progress bar) can be active at any time.
+- While a display is active, all non-display output is buffered and flushed after the display ends.
+- Attempts to start a new display while one is active silently fail and a warning is queued; the warning is emitted when the current display completes.
+- User-provided content is sanitized to remove cursor movement/save/restore escape sequences; SGR color/style codes are preserved.
+
+### **Visual Width As First-Class Rule**
+
+- All width/fit calculations use visual width (wcwidth-based), never `len()`.
+- This applies to effects, boxes, tables, and internal layout.
+- The text justifier pads each rendered line to the full terminal width based on visual width, ensuring clean line composition and cursor positioning.
+
+### **Effects (Animated Terminal Output)**
+
+- Effects replace the old inline spinner concept and are not available inside FDL strings (no `<spinner:...>` objects).
+- Effects own the first terminal line while active and operate in one of two fixed modes for their lifetime:
+  - Inline: the effect frame and the first line of the message share line 1 when `terminal_width − effect_width ≥ 20`.
+  - Centered: the effect is centered alone on line 1; the message starts on line 2 when the available space is too narrow.
+- Effect styles are registered with `(frames, completed_frame, interval)`, and all frames including the completed frame must have identical visual width.
+- If frames are not supported by the terminal encoding or exceed terminal width, a warning is emitted and an ASCII fallback style is used. If the fallback still exceeds terminal width, the effect is not started and a warning is emitted.
+- Messages:
+  - Are processed through the formatter (wrapping and left justification normalized), then padded to terminal width by the justifier.
+  - Have all justify commands stripped for stability during animation; left justify is the baseline unless explicitly formatted otherwise in the message content.
+  - Cursor-movement escape sequences are removed before rendering.
+  - May be updated while the effect is active. Updates are applied by regenerating the first line per mode and redrawing the message block.
+- Stopping an effect replaces the current message content with the final message (if provided) and switches the frame to the completed frame. It does not append below the current content.
+
+### **Formatter Integration for Effects**
+
+- The formatter supports an internal option that allows formatting while a display is active. Effects use this to regenerate lines during animation without violating the exclusive output rule.
+- Normal formatter usage continues to rely on the coordinator: when a display is active, non-display output is buffered until the display releases.
+
+---
+
 ## **Debug Mode Processing (Type 3)**
 
 ### **Debug Mode Overview**

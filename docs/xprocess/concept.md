@@ -2,6 +2,8 @@
 
 A comprehensive guide to understanding the core concepts and patterns of the Suitkaise multiprocessing engine.
 
+Note: This page focuses on API examples with brief explanations. For internal architecture and deeper behaviors, see `info.md`.
+
 ## Table of Contents
 
 1. [Basic Process Creation](#1-basic-process-creation)

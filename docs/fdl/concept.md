@@ -1,12 +1,171 @@
 # FDL - Formatting, Debugging, and Logging for suitkaise
 
-**NOTE: F-strings are not supported by fdl print. Use `<>` syntax instead!**  
-**All commands are prefaced by a `/` as well.**
+**NOTE: F-strings are not supported by fdl print.**
 
-**PERFORMANCE ARCHITECTURE:**
-- **Thread-safe design**: Custom progress bars, spinners, and tables avoid Rich's threading bottlenecks
-- **Batched updates**: Progress bars use submitted updates with smooth animation
-- **Cached terminal detection**: Terminal width/capabilities detected once at startup
+## What is FDL, and what are fdl strings?
+
+### FDL is the all in one module that allows you to:
+
+- format your terminal output with easy, simple methods
+- text formatting, text color, background color, automatic text wrapping, text justification, boxes, tables, animated effects, progress bars, and more!
+
+- special debugging mode that automatically highlights values and provides a type hint for them
+- beautiful representations of collections (dicts, lists, tuples, sets) that make it easy to figure out what is where when debugging visually
+
+- feature packed logging
+- output to multiple locations (terminal, plain text file, markdown file, html) cleanly without having to create multiple different strings
+- TODO add more as I reorganize concept
+
+### ...and what are fdl strings?
+
+fdl strings, or fdl syntax, is the special way to easily format your text content, using `<` and `>` to signify special formatting. When referring to something as an fdl string or as fdl syntax, it means strings meant for FDL use that include special text surrounded by `<` and `>`. Here are the main patterns:
+
+- Regular text: no use of `<>`
+- Variables: `<variable>`
+- Objects: `<object type:> or <object type:variable>`
+- Commands: `</command1, command2, ...>, </end command1, command2, ...>, </reset> and </end all>`
+
+### Importing fdl
+```python
+from suitkaise import fdl
+```
+
+### Variable substitution
+```python
+# basic, plain string
+fdl.print("What's up, World?")
+
+# instead of using f-strings (f"{value} text"), use this to sub variables!
+username = "Pickles64"
+
+fdl.print("What's up, <username>?", username)
+
+# result: "What's up, Pickles64?"
+
+# for multiple variables...
+username = "Speedman"
+login_msg = "Today is a great day,"
+end = "!"
+# the representation in the <> doesn't have to directly match, it is there to help you organize your variables
+# but you should try to match them perfectly, better practice
+
+# best practice
+fdl.print("<login_msg> <username><end>", (login_msg, username, end))
+
+# can work, not recommended
+fdl.print("<msg> <name><end>", (login_msg, username, end))
+
+# result: "Today is a great day, Speedman!
+
+# does NOT work
+fdl.print("<> <><>", (login_msg, username, end))
+
+# will NOT work correctly, as variable order matters in the tuple
+fdl.print("<login_msg> <username><end>", (username, end, login_msg))
+
+# result: "Speedman, !Today is a great day,"
+
+
+```
+Use `<value>` to substitute the values, followed by the values in order after the string.
+
+- Variable syntax: use `<your variable>` (just `<` and `>`)
+
+- you don't need to match the name of the value perfectly in your `<>`.
+- variables will get substituted into string in the order they appear in the tuple.
+- if there are less variables than places to put them, `<ERROR>` will be shown instead for the remaining slots. 
+- leaving the space between the `<>` empty will not work and be treated as regular text.
+- while this is a little more annoying than f-strings, it becomes much more useful later on.
+
+### Basic text formatting
+```python
+# add bold text to the whole message
+username = "Speedman"
+login_msg = "Lookin' good,"
+end = "!"
+
+# use </command> syntax to format text
+# bold: </bold>
+fdl.print("</bold><login_msg> <username><end>", (login_msg, username, end))
+
+# result: Lookin' good, Speedman! 
+# - whole message is bold text.
+
+# use multiple commands at once
+# italic: </italic>
+fdl.print("</bold, italic><login_msg> <username><end>", (login_msg, username, end))
+
+# result: Lookin' good, Speedman! 
+# - whole message is bold text.
+# - whole message is italicized text.
+```
+These are what we call commands, and are commands because they follow the `</command>` pattern.
+
+Available text formatting commands:
+- `</bold>`
+- `</italic>`
+- `</underline>`
+- `</strikethrough>`
+
+### Ending all commands
+
+How to end commands:
+```python
+username = "Speedman"
+login_msg = "Lookin' good,"
+end = "!"
+
+# use </end command> to end a command
+fdl.print("</bold><login_msg></end bold> <username><end>", (login_msg, username, end))
+
+# result: Lookin' good, Speedman! 
+# - "Lookin' good" is bold text, rest of message is not.
+
+# use multiple end commands at once
+fdl.print(
+    "</bold, italic><login_msg></end bold, italic> <username><end>", 
+    (login_msg, username, end)
+)
+
+# order doesnt matter when ending commands, as long as they have been started
+# but we recommend that you order them the same way! (</bold, italic>, </end bold, italic>)
+
+# this still works:
+fdl.print(
+    "</bold, italic><login_msg></end italic, bold> <username><end>", 
+    (login_msg, username, end)
+)
+
+# result: Lookin' good, Speedman! 
+# - "Lookin' good" is bold text, rest of message is not.
+# - "Lookin' good" is italicized text, rest of message is not.
+
+# end one command but keep the others
+fdl.print(
+    "</bold, italic><login_msg></end italic> <username><end>", 
+    (login_msg, username, end)
+)
+
+# result: Lookin' good, Speedman! 
+# - whole message is bold text.
+# - "Lookin' good" is italicized text, rest of message is not.
+```
+To end a command, do `</end (the command you want to end)>`.
+
+
+There are also 2 different commands to end all commands at once, without having to end them one by one:
+
+- `</end all>`
+- `</reset>`
+
+###
+
+
+
+
+
+
+
 
 ## Setting up logging
 

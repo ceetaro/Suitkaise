@@ -680,11 +680,19 @@ class _ProjectRootDetector:
 # Global detector instance for convenience functions
 _global_detector = _ProjectRootDetector()
 
+# Global cache for project root detection
+_project_root_cache = {
+    'root': None,
+    'cache_key': None  # Cache based on start_path + expected_name
+}
+
 
 def _get_project_root(start_path: Optional[Union[str, Path]] = None,
                      expected_name: Optional[str] = None) -> Optional[Path]:
     """
     Find the project root directory starting from the caller's file location.
+    
+    Uses caching to avoid repeated expensive filesystem operations.
     
     Args:
         start_path: Override starting path (defaults to caller's file location)
@@ -693,6 +701,7 @@ def _get_project_root(start_path: Optional[Union[str, Path]] = None,
     Returns:
         Path object pointing to project root, or None if not found
     """
+    # Create cache key
     if start_path is None:
         caller_file = _get_non_sk_caller_file_path()
         if caller_file:
@@ -700,7 +709,20 @@ def _get_project_root(start_path: Optional[Union[str, Path]] = None,
         else:
             start_path = Path.cwd()
     
-    return _global_detector.find_project_root(start_path, expected_name)
+    cache_key = f"{start_path}:{expected_name}"
+    
+    # Check cache first
+    if _project_root_cache['cache_key'] == cache_key and _project_root_cache['root'] is not None:
+        return _project_root_cache['root']
+    
+    # Cache miss - do the expensive detection
+    result = _global_detector.find_project_root(start_path, expected_name)
+    
+    # Update cache
+    _project_root_cache['cache_key'] = cache_key
+    _project_root_cache['root'] = result
+    
+    return result
 
 
 def _force_project_root(path: Union[str, Path]) -> None:
@@ -711,11 +733,17 @@ def _force_project_root(path: Union[str, Path]) -> None:
         path: Path to use as project root
     """
     _global_detector.force_project_root(path)
+    # Clear cache when forcing a new root
+    _project_root_cache['cache_key'] = None
+    _project_root_cache['root'] = None
 
 
 def _clear_forced_project_root() -> None:
     """Clear any forced project root, returning to auto-detection."""
     _global_detector.clear_forced_root()
+    # Clear cache when clearing forced root
+    _project_root_cache['cache_key'] = None
+    _project_root_cache['root'] = None
 
 
 def _get_forced_project_root() -> Optional[Path]:
@@ -771,6 +799,8 @@ def _path_id(path: Union[str, Path], short: bool = False) -> str:
     Args:
         path: Path to generate ID for
         short: If True, return a shortened version of the ID
+        - full id is 32 characters long
+        - short id is 8 characters long
         
     Returns:
         Reproducible string ID for the path
@@ -792,6 +822,7 @@ def _path_id(path: Union[str, Path], short: bool = False) -> str:
         # Use path components and longer hash
         safe_parts = [part.replace('.', '_').replace('-', '_') for part in path_parts[-3:]]
         readable = '_'.join(safe_parts)
+        # create an id that is 8 characters long
         return f"{readable}_{hash_str[:8]}"
 
 
@@ -849,7 +880,7 @@ def _parse_gitignore_file(gitignore_path: Path) -> Set[str]:
 
 def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
                           as_str: bool = False,
-                          dont_ignore: bool = False,
+                          ignore: bool = True,
                           force_root: Optional[Union[str, Path]] = None) -> List[Union[Path, str]]:
     """
     Get all paths in the current project.
@@ -857,7 +888,7 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
     Args:
         except_paths: Paths to exclude from results
         as_str: Return string paths instead of Path objects
-        dont_ignore: Include paths that would normally be ignored
+        ignore: Respect .gitignore and .dockerignore files (default True)
         force_root: Force a specific project root
         
     Returns:
@@ -884,10 +915,10 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
         '__pycache__', '.git', '.pytest_cache', '.mypy_cache',
         'node_modules', '.venv', 'venv', 'env', '.env',
         'dist', 'build', '*.egg-info'
-    } if not dont_ignore else set()
+    } if not ignore else set()
     
     # Add patterns from .gitignore and .dockerignore files
-    if not dont_ignore:
+    if not ignore:
         gitignore_path = project_root / '.gitignore'
         dockerignore_path = project_root / '.dockerignore'
         
@@ -905,7 +936,7 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
             return True
         
         # Check ignore patterns
-        if not dont_ignore:
+        if ignore:
             for pattern in ignore_patterns:
                 if fnmatch.fnmatch(path_name.lower(), pattern.lower()):
                     return True
@@ -938,14 +969,14 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
 
 def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
                           except_paths: Optional[Union[str, List[str]]] = None,
-                          dont_ignore: bool = False) -> Dict:
+                          ignore: bool = True) -> Dict:
     """
     Get a nested dictionary representing the project structure.
     
     Args:
         force_root: Custom root directory (defaults to detected project root)
         except_paths: Paths to exclude from results
-        dont_ignore: Include paths that would normally be ignored
+        ignore: Include paths that would normally be ignored
         
     Returns:
         Nested dictionary representing directory structure
@@ -953,7 +984,7 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
     if force_root is None:
         root = _get_project_root()
     else:
-        root = Path(force_root)
+        root = Path(force_root).resolve()
     
     if root is None or not root.exists():
         return {}
@@ -971,10 +1002,10 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
         '__pycache__', '.git', '.pytest_cache', '.mypy_cache',
         'node_modules', '.venv', 'venv', 'env', '.env',
         'dist', 'build', '*.egg-info'
-    } if not dont_ignore else set()
+    } if not ignore else set()
     
     # Add patterns from .gitignore and .dockerignore files
-    if not dont_ignore:
+    if not ignore:
         gitignore_path = root / '.gitignore'
         dockerignore_path = root / '.dockerignore'
         
@@ -990,7 +1021,7 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
             return True
         
         # Check ignore patterns
-        if not dont_ignore:
+        if ignore:
             for pattern in ignore_patterns:
                 if fnmatch.fnmatch(path_name.lower(), pattern.lower()):
                     return True
@@ -1022,7 +1053,7 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
                                 max_depth: int = 3,
                                 show_files: bool = True,
                                 except_paths: Optional[Union[str, List[str]]] = None,
-                                dont_ignore: bool = False) -> str:
+                                ignore: bool = True) -> str:
     """
     Get a formatted string representation of the project structure.
 
@@ -1033,7 +1064,7 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         max_depth: Maximum depth to display (prevents huge output)
         show_files: Whether to show files or just directories
         except_paths: Paths to exclude from results
-        dont_ignore: Include paths that would normally be ignored
+        ignore: Include paths that would normally be ignored (default True)
         
     Returns:
         Formatted string representing directory structure
@@ -1041,7 +1072,7 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
     if force_root is None:
         root = _get_project_root()
     else:
-        root = Path(force_root)
+        root = Path(force_root).resolve()
     
     if root is None or not root.exists():
         return "No project root found"
@@ -1059,10 +1090,10 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         '__pycache__', '.git', '.pytest_cache', '.mypy_cache',
         'node_modules', '.venv', 'venv', 'env', '.env',
         'dist', 'build', '*.egg-info'
-    } if not dont_ignore else set()
+    } if not ignore else set()
     
     # Add patterns from .gitignore and .dockerignore files
-    if not dont_ignore:
+    if not ignore:
         gitignore_path = root / '.gitignore'
         dockerignore_path = root / '.dockerignore'
         
@@ -1078,7 +1109,7 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
             return True
         
         # Check ignore patterns
-        if not dont_ignore:
+        if ignore:
             for pattern in ignore_patterns:
                 if fnmatch.fnmatch(path_name.lower(), pattern.lower()):
                     return True

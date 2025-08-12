@@ -17,7 +17,7 @@ import os
 import inspect
 import fnmatch
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Union, Tuple, Any, Callable
+from typing import Dict, List, Set, Optional, Union, Tuple, Any, Callable, Sequence
 from functools import wraps
 
 # Import internal path operations with fallback
@@ -109,7 +109,8 @@ class SKPath:
     @property
     def ap(self) -> str:
         """Absolute path - the full system path."""
-        return str(self._absolute_path)
+        # Normalize separators to forward slashes for cross-OS consistency
+        return str(self._absolute_path).replace('\\', '/')
     
     @property
     def np(self) -> str:
@@ -117,7 +118,7 @@ class SKPath:
         return self._normalized_path
     
     @property
-    def project_root(self) -> Optional[Path]:
+    def root(self) -> Optional[Path]:
         """The detected project root directory."""
         return self._project_root
     
@@ -263,30 +264,6 @@ class SKPath:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ============================================================================
 # Convenience Functions - Direct access to path operations
 # ============================================================================
@@ -397,6 +374,7 @@ def get_module_path(obj: Any) -> Optional[SKPath]:
     return SKPath(module_file)
 
 
+
 def get_current_dir() -> SKPath:
     """
     Get the directory of the current calling file.
@@ -430,72 +408,54 @@ def get_cwd() -> SKPath:
 
 def equalpaths(path1: Union[str, Path, SKPath], path2: Union[str, Path, SKPath]) -> bool:
     """
-    Check if two paths are equal, handling different path types intelligently.
-    
+    Check if two paths are equal with project-aware semantics.
+
+    Compares normalized project-relative paths first (SKPath.np) for
+    cross-OS stability, then falls back to absolute path comparison.
+
     Args:
         path1: First path to compare
         path2: Second path to compare
-        
+
     Returns:
-        True if paths point to the same location
+        True if the paths are considered equal
 
     Example:
     ```python
         result = equalpaths("/path/to/file.txt", "file.txt")
-        print(result)  # True if both paths resolve to the same location
+        print(result)  # True if both normalize to the same relative location
 
         skpath1 = SKPath()
         result = equalpaths(skpath1, "/path/to/file.txt")
-        print(result)  # True if skpath1 (this module) matches the file.txt location
+        print(result)
 
         if equalpaths(path1, path2):
             do_something()
+    ```
     """
-    # Extract absolute paths for comparison
-    abs1 = str(path1) if isinstance(path1, SKPath) else str(Path(path1).resolve())
-    abs2 = str(path2) if isinstance(path2, SKPath) else str(Path(path2).resolve())
-    
-    return _equal_paths(abs1, abs2)
-
-def equalnormpaths(path1: Union[str, Path, SKPath], path2: Union[str, Path, SKPath]) -> bool:
-    """
-    Check if two normalized paths (SKPath.np) are equal.
-
-    Normalized paths are relative to your project root.
-
-    Can be helpful for path data saved from different operating systems or formats,
-    that should still be considered equivalent within the same project context.
-    
-    Args:
-        path1: First path to compare
-        path2: Second path to compare
-        
-    Returns:
-        True if normalized paths are equivalent
-
-    Example:
-    ```python
-        result = equalnormpaths("/path/to/file.txt", "file.txt")
-        print(result)  # True if both paths normalize to the same relative location
-
-        skpath1 = SKPath()
-        result = equalnormpaths(skpath1, "/path/to/file.txt")
-        print(result)  # True if skpath1 (this module) matches the normalized file.txt location
-
-        if equalnormpaths(path1, path2):
-            do_something()
-    """
+    # Normalized-first comparison
     if isinstance(path1, SKPath):
         np1 = path1.np
+        abs1 = str(path1)
     else:
-        np1 = SKPath(path1).np
+        sp1 = SKPath(path1)
+        np1 = sp1.np
+        abs1 = sp1.ap
 
     if isinstance(path2, SKPath):
         np2 = path2.np
+        abs2 = str(path2)
     else:
-        np2 = SKPath(path2).np
-    
-    return np1 == np2
+        sp2 = SKPath(path2)
+        np2 = sp2.np
+        abs2 = sp2.ap
+
+    if np1 == np2:
+        return True
+
+    # Fallback to absolute path comparison
+    return _equal_paths(abs1, abs2)
+
 
 def path_id(path: Union[str, Path, SKPath], short: bool = False) -> str:
     """
@@ -533,26 +493,27 @@ def path_id_short(path: Union[str, Path, SKPath]) -> str:
 
     Example:
     ```python
-        my_path_shortened_id = path_idshort(my_path)
+        my_path_shortened_id = path_id_short(my_path)
 
         # result will be consistent across runs and platforms
     """
     return path_id(path, short=True)
 
-def get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
-                         as_str: bool = False,
-                         dont_ignore: bool = False,
-                         force_root: Optional[Union[str, Path]] = None) -> List[Union[SKPath, str]]:
+def get_all_project_paths(
+    custom_root: Optional[Union[str, Path]] = None,
+    except_paths: Optional[Union[str, List[str]]] = None,
+    as_str: bool = False,
+    ignore: bool = True) -> Sequence[Union[SKPath, str]]:
     """
     Get all paths in the current project with intelligent filtering.
     
     Automatically respects .gitignore and .dockerignore files unless overridden.
     
     Args:
+        custom_root: Custom root directory (defaults to detected project root)
         except_paths: Paths to exclude from results
         as_str: Return string paths instead of SKPath objects
-        dont_ignore: Include paths that would normally be ignored
-        force_root: Force a specific project root
+        ignore: Respect .gitignore and .dockerignore files (default True)
         
     Returns:
         List of paths in the project (SKPaths or strings based on as_str)
@@ -571,37 +532,42 @@ def get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
 
         # including all .gitignore and .skignore paths
         proj_path_list = skpath.get_all_project_paths(
-            except_paths="this/one/path/i/dont/want", dont_ignore=True
+            except_paths="this/one/path/i/dont/want", ignore=True
         )
     """
     # Get raw paths from internal function
-    raw_paths = _get_all_project_paths(
+    if custom_root is not None:
+        custom_root = Path(custom_root).resolve()
+    raw = _get_all_project_paths(
         except_paths=except_paths,
         as_str=True,  # Always get strings first
-        dont_ignore=dont_ignore,
-        force_root=force_root
+        ignore=ignore,
+        force_root=custom_root if custom_root is not None else None
     )
+    raw_paths: List[str] = [str(p) for p in raw]
     
     if as_str:
         return raw_paths
     else:
-        # Convert to SKPaths
-        project_root = force_root or get_project_root()
-        return [SKPath(path, project_root) for path in raw_paths]
+        if custom_root is not None:
+            return [SKPath(path, custom_root) for path in raw_paths]
+        else:
+            return [SKPath(path) for path in raw_paths]
     
 
-def get_project_structure(force_root: Optional[Union[str, Path]] = None,
-                         except_paths: Optional[Union[str, List[str]]] = None,
-                         dont_ignore: bool = False) -> Dict:
+def get_project_structure(
+    custom_root: Optional[Union[str, Path]] = None,
+    except_paths: Optional[Union[str, List[str]]] = None,
+    ignore: bool = True) -> Dict:
     """
     Get a nested dictionary representing the project structure.
     
     Automatically respects .gitignore and .dockerignore files unless overridden.
     
     Args:
-        force_root: Custom root directory (defaults to detected project root)
+        custom_root: Custom root directory (defaults to detected project root)
         except_paths: Paths to exclude from results
-        dont_ignore: Include paths that would normally be ignored
+        ignore: Respect .gitignore and .dockerignore files (default True)
         
     Returns:
         Nested dictionary representing directory structure
@@ -611,13 +577,13 @@ def get_project_structure(force_root: Optional[Union[str, Path]] = None,
         project_structure = get_project_structure()
         print(project_structure)  # Nested dict of project directories and files
 
-        # Force a specific root directory
-        custom_structure = get_project_structure(force_root="/path/to/custom/root")
+        # Use a specific root directory
+        custom_structure = get_project_structure(custom_root="/path/to/custom/root")
         print(custom_structure)
 
         # Exclude specific paths
         custom_structure = get_project_structure(
-            force_root="/path/to/custom/root",
+            custom_root="/path/to/custom/root",
             except_paths=["/path/to/exclude"]
         )
     ```
@@ -636,14 +602,18 @@ def get_project_structure(force_root: Optional[Union[str, Path]] = None,
         }
     }
     """
-    return _get_project_structure(force_root, except_paths, dont_ignore)
+    return _get_project_structure(
+        custom_root if custom_root is not None else None,
+        except_paths, ignore
+    )
 
 
-def get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
-                               max_depth: int = 3,
-                               show_files: bool = True,
-                               except_paths: Optional[Union[str, List[str]]] = None,
-                               dont_ignore: bool = False) -> str:
+def get_formatted_project_tree(
+    custom_root: Optional[Union[str, Path]] = None,
+    max_depth: int = 3,
+    show_files: bool = True,
+    except_paths: Optional[Union[str, List[str]]] = None,
+    ignore: bool = True) -> str:
     """
     Get a formatted string representation of the project structure.
 
@@ -651,12 +621,12 @@ def get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
     Automatically respects .gitignore and .dockerignore files unless overridden.
     
     Args:
-        force_root: Custom root directory (defaults to detected project root)
+        custom_root: Custom root directory (defaults to detected project root)
         max_depth: Maximum depth to display (prevents huge output)
         show_files: Whether to show files or just directories
         except_paths: Paths to exclude from results
-        dont_ignore: Include paths that would normally be ignored
-        
+        ignore: Respect .gitignore and .dockerignore files (default True)
+
     Returns:
         Formatted string representing directory structure
 
@@ -665,13 +635,13 @@ def get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         tree_str = get_formatted_project_tree()
         print(tree_str)  # Displays project structure as a tree
 
-        # Force a specific root directory
-        custom_tree_str = get_formatted_project_tree(force_root="/path/to/custom/root")
+        # Use a specific root directory
+        custom_tree_str = get_formatted_project_tree(custom_root="/path/to/custom/root")
         print(custom_tree_str)
 
         # Exclude specific paths
         custom_tree_str = get_formatted_project_tree(
-            force_root="/path/to/custom/root",
+            custom_root="/path/to/custom/root",
             except_paths=["/path/to/exclude"]
         )
     ```
@@ -689,7 +659,10 @@ def get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         ├── tests/
         ... and more
     """
-    return _get_formatted_project_tree(force_root, max_depth, show_files, except_paths, dont_ignore)
+    return _get_formatted_project_tree(
+        custom_root if custom_root is not None else None, 
+        max_depth, show_files, except_paths, ignore
+    )
 
 def force_project_root(path: Union[str, Path, SKPath]) -> None:
     """
@@ -874,8 +847,10 @@ def autopath(autofill: bool = False,
 # Factory Functions
 # ============================================================================
 
-def create(path: Optional[Union[str, Path]] = None, 
-           project_root: Optional[Path] = None) -> SKPath:
+def create(
+    path: Optional[Union[str, Path]] = None,
+    custom_root: Optional[Union[str, Path]] = None,
+) -> SKPath:
     """
     Create an SKPath object from a given path.
     
@@ -883,7 +858,7 @@ def create(path: Optional[Union[str, Path]] = None,
     
     Args:
         path: The path to convert to SKPath (auto-detects caller if None)
-        project_root: Project root path (auto-detected if None)
+        custom_root: Project root path (auto-detected if None)
         
     Returns:
         SKPath object
@@ -897,9 +872,9 @@ def create(path: Optional[Union[str, Path]] = None,
         my_caller_path = create()
         
         # Create SKPath with custom project root
-        my_custom_path = create("/path/to/my/file.txt", project_root="/path/to/project")
+        my_custom_path = create("/path/to/my/file.txt", custom_root="/path/to/project")
     """
-    return SKPath(path, project_root)
+    return SKPath(path, Path(custom_root).resolve() if custom_root is not None else None)
 
 # ============================================================================
 # Module Exports
@@ -915,7 +890,6 @@ __all__ = [
     'get_current_dir',
     'get_cwd',
     'equalpaths',
-    'equalnormpaths',
     'path_id',
     'path_id_short',
     'get_all_project_paths',
