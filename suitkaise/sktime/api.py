@@ -7,9 +7,7 @@ sophisticated timing classes, and convenient decorators for performance measurem
 Key Features:
 - Simple timing functions (now, sleep, elapsed)
 - Yawn class for delayed sleep operations  
-- Stopwatch with pause/resume and lap functionality
-- Timer for statistical timing analysis with decorators and context managers
-- Comprehensive timing statistics and analysis
+- Timer for statistical timing analysis, pause and resume, context manager and decorator
 
 Philosophy: Make timing operations intuitive while providing powerful analysis capabilities.
 """
@@ -23,11 +21,8 @@ try:
     from .._int.core.time_ops import (
         _elapsed_time,
         _Yawn,
-        _Stopwatch, 
         _Timer,
-        _create_timer_context_manager,
         _timethis_decorator,
-        _create_standalone_timer_decorator,
         _get_current_time,
         _sleep
     )
@@ -216,211 +211,10 @@ class Yawn:
 
 
 # ============================================================================
-# Stopwatch Class - Precision Timing with Laps
-# ============================================================================
-
-class Stopwatch:
-    """
-    High-precision stopwatch with pause/resume and lap functionality.
-    
-    Perfect for measuring code execution time, user interactions,
-    or any scenario requiring precise timing with pause capability.
-    
-    Example:
-        ```python
-        sw = Stopwatch()
-        
-        sw.start()
-        sleep(2)
-        
-        sw.pause()
-        sleep(999)  # This time won't be counted
-        
-        sw.resume()  
-        sleep(3)
-        
-        sw.lap()  # Records ~5 seconds
-        sleep(2)
-        
-        total = sw.stop()  # ~7 seconds total
-        lap1 = sw.get_laptime(1)  # ~5 seconds
-        ```
-    """
-    
-    def __init__(self):
-        """Initialize a new stopwatch."""
-        self._stopwatch = _Stopwatch()
-    
-    def start(self) -> float:
-        """
-        Start the stopwatch.
-        
-        Returns:
-            Start timestamp
-            
-        Raises:
-            RuntimeError: If stopwatch is already running
-            
-        Example:
-            ```python
-            start_time = sw.start()
-            print(f"Started at: {start_time}")
-            ```
-        """
-        return self._stopwatch.start()
-    
-    def pause(self) -> float:
-        """
-        Pause the stopwatch.
-        
-        Returns:
-            Current elapsed time when paused
-            
-        Raises:
-            RuntimeError: If stopwatch is not running or already paused
-            
-        Example:
-            ```python
-            elapsed_when_paused = sw.pause()
-            print(f"Paused at: {elapsed_when_paused} seconds")
-            ```
-        """
-        return self._stopwatch.pause()
-    
-    def resume(self) -> float:
-        """
-        Resume the stopwatch from pause.
-        
-        Returns:
-            Time spent paused
-            
-        Raises:
-            RuntimeError: If stopwatch is not paused
-            
-        Example:
-            ```python
-            pause_duration = sw.resume()
-            print(f"Was paused for: {pause_duration} seconds")
-            ```
-        """
-        return self._stopwatch.resume()
-    
-    def lap(self) -> float:
-        """
-        Record a lap time.
-        
-        Returns:
-            Current elapsed time for this lap
-            
-        Raises:
-            RuntimeError: If stopwatch is not running
-            
-        Example:
-            ```python
-            lap_time = sw.lap()
-            print(f"Lap completed in: {lap_time} seconds")
-            ```
-        """
-        return self._stopwatch.lap()
-    
-    def stop(self) -> float:
-        """
-        Stop the stopwatch.
-        
-        Returns:
-            Total elapsed time
-            
-        Raises:
-            RuntimeError: If stopwatch is not running
-            
-        Example:
-            ```python
-            total_time = sw.stop()
-            print(f"Total elapsed: {total_time} seconds")
-            ```
-        """
-        return self._stopwatch.stop()
-    
-    @property
-    def total_time(self) -> float:
-        """
-        Get current elapsed time, accounting for pauses.
-        
-        Example:
-            ```python
-            print(f"Current elapsed: {sw.total_time} seconds")
-            ```
-        """
-        return self._stopwatch.total_time
-    
-    @property
-    def elapsed_time(self) -> float:
-        """Alias for total_time."""
-        return self._stopwatch.elapsed_time
-    
-    @property 
-    def is_running(self) -> bool:
-        """Check if stopwatch is currently running."""
-        return self._stopwatch.is_running
-    
-    @property
-    def is_paused(self) -> bool:
-        """Check if stopwatch is currently paused."""
-        return self._stopwatch.is_paused
-    
-    def get_laptime(self, lap_number: int) -> Optional[float]:
-        """
-        Get the time for a specific lap.
-        
-        Args:
-            lap_number: 1-based lap number
-            
-        Returns:
-            Lap time or None if lap doesn't exist
-            
-        Example:
-            ```python
-            lap1 = sw.get_laptime(1)
-            lap2 = sw.get_laptime(2)
-            if lap1:
-                print(f"First lap: {lap1} seconds")
-            ```
-        """
-        return self._stopwatch.get_laptime(lap_number)
-    
-    def get_lap_statistics(self) -> Dict[str, float]:
-        """
-        Get statistical analysis of lap times.
-        
-        Returns:
-            Dictionary with lap statistics
-            
-        Example:
-            ```python
-            stats = sw.get_lap_statistics()
-            if stats:
-                print(f"Average lap: {stats['mean']} seconds")
-                print(f"Fastest lap: {stats['fastest']} seconds")
-            ```
-        """
-        return self._stopwatch.get_lap_statistics()
-    
-    def reset(self) -> None:
-        """
-        Reset the stopwatch to initial state.
-        
-        Example:
-            ```python
-            sw.reset()  # Ready to start timing again
-            ```
-        """
-        self._stopwatch.reset()
-
-
-# ============================================================================
 # Timer Class - Statistical Timing Analysis
 # ============================================================================
 
+# TODO add examples from concept.md
 class Timer:
     """
     Statistical timer for collecting and analyzing execution times.
@@ -431,25 +225,7 @@ class Timer:
     
     Example:
         ```python
-        timer = Timer()
-        
-        # Method 1: Manual timing
-        timer.start()
-        do_work()
-        timer.stop()
-        
-        # Method 2: Context manager
-        with timer:
-            do_work()
-        
-        # Method 3: Decorator
-        @timethis(timer)
-        def my_function():
-            do_work()
-        
-        # Get statistics
-        print(f"Mean time: {timer.mean}")
-        print(f"Median time: {timer.median}")
+        add examples from concept.md
         ```
     """
     
@@ -492,6 +268,24 @@ class Timer:
             ```
         """
         return self._timer.stop()
+
+    def lap(self) -> float:
+        """
+        Record a lap time.
+        """
+        return self._timer.lap()
+
+    def pause(self) -> None:
+        """
+        Pause the timer.
+        """
+        self._timer.pause()
+    
+    def resume(self) -> None:
+        """
+        Resume the timer.
+        """
+        self._timer.resume()
     
     def add_time(self, elapsed_time: float) -> None:
         """
@@ -507,170 +301,200 @@ class Timer:
             ```
         """
         self._timer.add_time(elapsed_time)
-    
+
     @property
-    def count(self) -> int:
-        """Number of timing measurements recorded."""
-        return self._timer.count
-    
+    def num_times(self) -> int:
+        """
+        Number of times measured.
+        """
+        return self._timer.num_times
+
     @property
-    def times(self) -> int:
-        """Alias for count - number of measurements."""
-        return self.count
-    
+    def original_start_time(self) -> Optional[float]:
+        """
+        Original start time of the timer.
+        """
+        return self._timer.original_start_time
+
     @property
-    def mostrecent(self) -> Optional[float]:
-        """Most recent timing measurement."""
-        return self._timer.mostrecent
-    
+    def most_recent(self) -> Optional[float]:
+        """
+        Most recent time measured.
+        """
+        return self._timer.most_recent
+
+    @property
+    def most_recent_lap(self) -> Optional[int]:
+        """
+        Index of the most recent time measured.
+        """
+        return self._timer.most_recent_index
+
     @property
     def result(self) -> Optional[float]:
-        """Alias for mostrecent for context manager compatibility."""
-        return self._timer.result
+        """
+        Alias for most_recent.
+        """
+        return self._timer.most_recent
+
+    @property
+    def total_time(self) -> Optional[float]:
+        """
+        Total time of all measurements.
+        """
+        return self._timer.total_time
+
+    @property
+    def total_time_paused(self) -> Optional[float]:
+        """
+        Total time paused across all times.
+        """
+        return self._timer.total_time_paused
     
     @property
     def mean(self) -> Optional[float]:
-        """Mean (average) of all timing measurements."""
+        """
+        Mean time of all measurements.
+        """
         return self._timer.mean
-    
+
     @property
     def median(self) -> Optional[float]:
-        """Median of all timing measurements."""
+        """
+        Median time of all measurements.
+        """
         return self._timer.median
-    
+
     @property
-    def longest(self) -> Optional[float]:
-        """Longest (maximum) timing measurement."""
-        return self._timer.longest
-    
+    def slowest_lap(self) -> Optional[float]:
+        """
+        Time of the slowest lap.
+        """
+        return self._timer.slowest_lap
+
     @property
-    def shortest(self) -> Optional[float]:
-        """Shortest (minimum) timing measurement."""
-        return self._timer.shortest
-    
+    def fastest_lap(self) -> Optional[float]:
+        """
+        Time of the fastest lap.
+        """
+        return self._timer.fastest_lap
+
     @property
-    def std(self) -> Optional[float]:
-        """Standard deviation of timing measurements."""
-        return self._timer.std
-    
+    def slowest_time(self) -> Optional[float]:
+        """
+        Time of the slowest time.
+        """
+        return self._timer.slowest_time
+
+    @property
+    def fastest_time(self) -> Optional[float]:
+        """
+        Time of the fastest time.
+        """
+        return self._timer.fastest_time
+
+    @property
+    def min(self) -> Optional[float]:
+        """
+        Minimum time of all measurements.
+        """
+        return self._timer.min
+
+    @property
+    def max(self) -> Optional[float]:
+        """
+        Maximum time of all measurements.
+        """
+        return self._timer.max
+
+    @property
+    def stdev(self) -> Optional[float]:
+        """
+        Standard deviation of all measurements.
+        """
+        return self._timer.stdev
+
     @property
     def variance(self) -> Optional[float]:
-        """Variance of timing measurements."""
+        """
+        Variance of all measurements.
+        """
         return self._timer.variance
-    
-    def get_a_time(self, index: int) -> Optional[float]:
+
+    def get_time(self, index: int) -> Optional[float]:
         """
-        Get timing measurement by index (1-based).
-        
-        Args:
-            index: 1-based index of measurement
-            
-        Returns:
-            Timing measurement or None if index is invalid
-            
-        Example:
-            ```python
-            first_time = timer.get_a_time(1)
-            tenth_time = timer.get_a_time(10)
-            ```
+        Get time by index.
         """
-        return self._timer.get_a_time(index)
-    
+        return self._timer.get_time(index)
+
     def percentile(self, percent: float) -> Optional[float]:
         """
-        Get percentile of timing measurements.
-        
-        Args:
-            percent: Percentile to calculate (0-100)
-            
-        Returns:
-            Percentile value or None if no measurements
-            
-        Example:
-            ```python
-            p95 = timer.percentile(95)  # 95th percentile
-            p99 = timer.percentile(99)  # 99th percentile
-            ```
+        Get percentile of all measurements.
         """
         return self._timer.percentile(percent)
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
-        Get comprehensive timing statistics.
-        
-        Returns:
-            Dictionary with all available statistics
-            
-        Example:
-            ```python
-            stats = timer.get_statistics()
-            print(f"Count: {stats['count']}")
-            print(f"Mean: {stats['mean']}")
-            print(f"95th percentile: {stats['percentile_95']}")
-            ```
+        Get statistics of all measurements.
         """
         return self._timer.get_statistics()
-    
+
     def reset(self) -> None:
         """
-        Clear all timing measurements.
-        
-        Example:
-            ```python
-            timer.reset()  # Start fresh
-            ```
+        Reset the timer.
         """
         self._timer.reset()
-    
-    def TimeThis(self):
-        """
-        Get a context manager for this timer instance.
-        
-        Allows using with timer.TimeThis() to accumulate statistics
-        in this timer while timing code blocks.
-        
-        Returns:
-            Context manager for this timer
-            
-        Example:
-            ```python
-            timer = Timer()
-            
-            for i in range(100):
-                with timer.TimeThis():
-                    do_work()
-            
-            print(f"Mean time: {timer.mean}")
-            print(f"Times measured: {timer.count}")
-            ```
-        """
-        return _create_timer_context_manager(self._timer)
-    
+
+
+# ============================================================================
+# TimeThis Context Manager
+# ============================================================================
+
+class TimeThis:
+    """
+    Context manager for timing code blocks using Timer.
+
+    Helpful for visualizing what timers are being used for what.
+    """
+
+    def __init__(self, timer: Optional[Timer] = None):
+        self.timer = timer or Timer()
+
+    def pause(self):
+        self.timer.pause()
+
+    def resume(self):
+        self.timer.resume()
+
+    def lap(self):
+        self.timer.lap()
+
     def __enter__(self):
-        """Context manager entry - start timing."""
-        return self._timer.__enter__()
+        self.timer.start()
+        return self.timer
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - stop timing."""
-        return self._timer.__exit__(exc_type, exc_val, exc_tb)
+        self.timer.stop()
 
 
 # ============================================================================
 # Timing Decorators
 # ============================================================================
 
-def timethis(timer_instance: Timer) -> Callable:
+def timethis(timer_instance: Optional[Timer] = None) -> Callable:
     """
     Create a timing decorator that accumulates statistics in a Timer instance.
     
     Args:
-        timer_instance: Timer to accumulate timing data in
+        timer_instance: Timer to accumulate timing data in. If None, creates
+                       a global timer with name pattern: module_[class_]function_timer
         
     Returns:
         Decorator function
         
     Example:
         ```python
+        # Method 1: With explicit timer (recommended for analysis)
         timer = Timer()
         
         @timethis(timer)
@@ -682,15 +506,71 @@ def timethis(timer_instance: Timer) -> Callable:
             do_work()
         
         print(f"Mean execution time: {timer.mean}")
-        print(f"Standard deviation: {timer.std}")
+        print(f"Standard deviation: {timer.stdev}")
+        
+        # Method 2: With automatic global timer (convenient for quick timing)
+        @timethis()
+        def quick_task():
+            sleep(0.5)
+        
+        # Access the auto-created timer via function attribute
+        quick_task()
+        print(f"Last execution: {quick_task.timer.mostrecent}")
         ```
     """
-    return _timethis_decorator(timer_instance._timer)
+    def decorator(func: Callable) -> Callable:
+        # Determine timer to use
+        if timer_instance is not None:
+            # Use provided timer
+            actual_timer = timer_instance._timer
+            wrapper = _timethis_decorator(actual_timer)(func)
+        else:
+            # Create global timer with naming convention (do this once at decoration time)
+            import inspect
+            
+            frame = inspect.currentframe()
+            if frame is not None and frame.f_back is not None:
+                module_name = frame.f_back.f_globals.get('__name__', 'unknown')
+            else:
+                module_name = 'unknown'
+            
+            # Extract just the module name (remove package path)
+            if '.' in module_name:
+                module_name = module_name.split('.')[-1]
+            
+            # Check if function is in a class by looking at qualname
+            func_qualname = func.__qualname__
+            if '.' in func_qualname:
+                # Function is in a class: Class.method
+                class_name, func_name = func_qualname.rsplit('.', 1)
+                timer_name = f"{module_name}_{class_name}_{func_name}_timer"
+            else:
+                # Function is at module level
+                func_name = func_qualname
+                timer_name = f"{module_name}_{func_name}_timer"
+            
+            # Get or create global timer
+            if not hasattr(timethis, '_global_timers'):
+                setattr(timethis, '_global_timers', {})
+            
+            global_timers = getattr(timethis, '_global_timers')
+            if timer_name not in global_timers:
+                global_timers[timer_name] = Timer()
+            
+            actual_timer = global_timers[timer_name]._timer
+            wrapper = _timethis_decorator(actual_timer)(func)
+            
+            # Attach timer to function for easy access
+            setattr(wrapper, 'timer', global_timers[timer_name])
+        
+        return wrapper
+    
+    return decorator
 
 
-# Note: We don't expose the standalone timer decorator from the internal module
-# as the API concept doesn't show this usage pattern. Users should create 
-# Timer instances explicitly for better clarity and control.
+# Note: We've enhanced timethis() to support both explicit Timer instances and
+# automatic global timer creation, providing the best of both worlds: convenience
+# when you want quick timing, and explicit control when you need detailed analysis.
 
 
 # ============================================================================
@@ -706,8 +586,10 @@ __all__ = [
     
     # Timing classes
     'Yawn',
-    'Stopwatch',
     'Timer',
+
+    # Context managers
+    'TimeThis',
     
     # Decorators
     'timethis',

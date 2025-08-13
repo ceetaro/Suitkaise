@@ -1,6 +1,10 @@
+this is an unreleased project, so backwards compatibility is not needed.
+
 concept.md: goal api for the module and simple explanations of how to use said goal api. refer to the skpath concept.md file for an example of how to do these files.
 
 most of the api will already be present in the concept.md files. if there is implemented code that doesn't have api, we will sort it out. do not directly change api in the concept, rather bring up discrepancies between the concept and the code in api.py for that module.
+
+for real world examples, the examples should be snapshots of real code and show how pain points are resolved using the module, with contextual explanation outside of the code.
 
 info.md: 
 

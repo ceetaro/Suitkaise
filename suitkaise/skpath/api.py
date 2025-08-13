@@ -784,58 +784,65 @@ def autopath(autofill: bool = False,
                 if param_value is None:
                     continue
                 
-                # Determine if parameter accepts SKPath objects
-                accepts_skpath = (
-                    param_annotation == SKPath or
-                    (hasattr(param_annotation, '__origin__') and 
-                     hasattr(param_annotation, '__args__') and
-                     SKPath in getattr(param_annotation, '__args__', []))
-                )
+                # Determine priority type for conversion based on annotation
+                # Priority: SKPath > Path > str (SKPath default for no annotation)
+                def get_annotation_types(annotation):
+                    """Extract types from annotation, handling Union types"""
+                    if annotation == inspect.Parameter.empty:
+                        return []
+                    elif hasattr(annotation, '__origin__') and hasattr(annotation, '__args__'):
+                        # Union type like str | SKPath or Union[str, Path]
+                        return list(annotation.__args__)
+                    else:
+                        # Single type
+                        return [annotation]
                 
-                # Determine if parameter accepts strings
-                accepts_str = (
-                    param_annotation == str or
-                    param_annotation == inspect.Parameter.empty or
-                    (hasattr(param_annotation, '__origin__') and 
-                     hasattr(param_annotation, '__args__') and
-                     str in getattr(param_annotation, '__args__', []))
-                )
+                annotation_types = get_annotation_types(param_annotation)
                 
-                # Convert based on current type and what function accepts
-                if isinstance(param_value, SKPath):
-                    # SKPath object
-                    if not accepts_skpath and accepts_str:
-                        # Function only accepts strings, convert to string
-                        bound_args.arguments[param_name] = str(param_value)
-                    # Otherwise, leave as SKPath
+                # Determine target type based on priority: SKPath > Path > str
+                if not annotation_types:
+                    # No annotation - default to SKPath
+                    target_type = SKPath
+                elif SKPath in annotation_types:
+                    # SKPath is available - use it
+                    target_type = SKPath
+                elif Path in annotation_types:
+                    # Path is available - use it
+                    target_type = Path
+                elif str in annotation_types:
+                    # Only str is available - use it
+                    target_type = str
+                else:
+                    # No compatible types, skip conversion
+                    continue
                 
-                elif isinstance(param_value, (str, Path)):
-                    # String or Path object
-                    try:
-                        # Check if it's a valid path
-                        path_obj = Path(param_value)
-                        
-                        # Additional validation: check if it looks like a reasonable path
-                        # Skip conversion if it's clearly not a path (no separators, no extensions, too generic)
-                        path_str = str(param_value)
-                        looks_like_path = (
-                            '/' in path_str or '\\' in path_str or  # Has path separators
-                            '.' in path_str or                      # Has extension or relative reference
-                            path_str in ['.', '..'] or              # Special path references
-                            path_obj.is_absolute()                  # Is absolute path
-                        )
-                        
-                        if looks_like_path and accepts_skpath:
-                            # Convert to SKPath if function accepts them
-                            bound_args.arguments[param_name] = SKPath(param_value)
-                        elif looks_like_path and accepts_str and not isinstance(param_value, str):
-                            # Convert Path to string if needed
-                            bound_args.arguments[param_name] = str(path_obj.resolve())
-                        # Otherwise leave as-is (not a path-like string)
-                        
-                    except (OSError, ValueError):
-                        # Not a valid path, leave as-is
-                        pass
+                # Convert based on current type and target type
+                if isinstance(param_value, (str, Path, SKPath)):
+                    # Validate it looks like a path
+                    path_str = str(param_value)
+                    looks_like_path = (
+                        '/' in path_str or '\\' in path_str or  # Has path separators
+                        '.' in path_str or                      # Has extension or relative reference
+                        path_str in ['.', '..'] or              # Special path references
+                        (isinstance(param_value, Path) and param_value.is_absolute()) or  # Absolute Path
+                        (hasattr(param_value, 'is_absolute') and param_value.is_absolute())  # Absolute SKPath
+                    )
+                    
+                    if looks_like_path:
+                        try:
+                            # Convert to target type
+                            if target_type == SKPath:
+                                if not isinstance(param_value, SKPath):
+                                    bound_args.arguments[param_name] = SKPath(param_value)
+                            elif target_type == Path:
+                                if not isinstance(param_value, Path):
+                                    bound_args.arguments[param_name] = Path(param_value).resolve()
+                            elif target_type == str:
+                                if not isinstance(param_value, str):
+                                    bound_args.arguments[param_name] = str(Path(param_value).resolve())
+                        except (OSError, ValueError):
+                            # Not a valid path, leave as-is
+                            pass
             
             # Call function with converted arguments
             return func(*bound_args.args, **bound_args.kwargs)

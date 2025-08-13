@@ -8,14 +8,14 @@ for performance measurement and time-based operations.
 Key Features:
 - Elapsed time calculations with automatic current time detection
 - Yawn class for delayed sleep operations
-- Stopwatch with pause/resume/lap functionality
-- Timer for statistical timing analysis
+- Timer class for statistical timing analysis with pause and resume
 - Comprehensive timing decorators and context managers
 
 The internal operations handle all the complex timing logic and state management.
 """
 
 import time
+from math import fabs
 import statistics
 from typing import List, Optional, Union, Callable, Any, Dict
 from functools import wraps
@@ -37,7 +37,7 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
         time2 = time.time()
     
     # Return absolute difference so order doesn't matter
-    return abs(time2 - time1)
+    return fabs(time2 - time1)
 
 
 class _Yawn:
@@ -97,189 +97,6 @@ class _Yawn:
             'yawns_until_sleep': self.yawn_threshold - self.yawn_count
         }
 
-
-class _Stopwatch:
-    """
-    High-precision stopwatch with pause/resume and lap functionality.
-    
-    Provides precise timing measurements with the ability to pause timing,
-    record lap times, and get detailed timing statistics.
-    """
-    
-    def __init__(self):
-        """Initialize a new stopwatch."""
-        self.start_time: Optional[float] = None
-        self.pause_time: Optional[float] = None
-        self.total_paused_time: float = 0.0
-        self.lap_times: List[float] = []
-        self.is_running: bool = False
-        self.is_paused: bool = False
-        self.final_time: Optional[float] = None
-        
-    def start(self) -> float:
-        """
-        Start the stopwatch.
-        
-        Returns:
-            Start timestamp
-            
-        Raises:
-            RuntimeError: If stopwatch is already running
-        """
-        if self.is_running:
-            raise RuntimeError("Stopwatch is already running. Use resume() if paused.")
-        
-        self.start_time = time.time()
-        self.is_running = True
-        self.is_paused = False
-        self.total_paused_time = 0.0
-        self.lap_times.clear()
-        
-        return self.start_time
-    
-    def pause(self) -> float:
-        """
-        Pause the stopwatch.
-        
-        Returns:
-            Current elapsed time when paused
-            
-        Raises:
-            RuntimeError: If stopwatch is not running or already paused
-        """
-        if not self.is_running:
-            raise RuntimeError("Cannot pause stopwatch that is not running.")
-        if self.is_paused:
-            raise RuntimeError("Stopwatch is already paused.")
-        
-        self.pause_time = time.time()
-        self.is_paused = True
-        
-        return self.elapsed_time
-    
-    def resume(self) -> float:
-        """
-        Resume the stopwatch from pause.
-        
-        Returns:
-            Time spent paused
-            
-        Raises:
-            RuntimeError: If stopwatch is not paused
-        """
-        if not self.is_running:
-            raise RuntimeError("Cannot resume stopwatch that is not running.")
-        if not self.is_paused:
-            raise RuntimeError("Stopwatch is not paused.")
-        
-        pause_duration = time.time() - self.pause_time
-        self.total_paused_time += pause_duration
-        self.pause_time = None
-        self.is_paused = False
-        
-        return pause_duration
-    
-    def lap(self) -> float:
-        """
-        Record a lap time.
-        
-        Returns:
-            Current elapsed time for this lap
-            
-        Raises:
-            RuntimeError: If stopwatch is not running
-        """
-        if not self.is_running:
-            raise RuntimeError("Cannot record lap time when stopwatch is not running.")
-        
-        current_time = self.elapsed_time
-        self.lap_times.append(current_time)
-        
-        return current_time
-    
-    def stop(self) -> float:
-        """
-        Stop the stopwatch.
-        
-        Returns:
-            Total elapsed time
-            
-        Raises:
-            RuntimeError: If stopwatch is not running
-        """
-        if not self.is_running:
-            raise RuntimeError("Cannot stop stopwatch that is not running.")
-        
-        # If paused, resume to calculate final time
-        if self.is_paused:
-            self.resume()
-        
-        final_time = self.elapsed_time
-        self.final_time = final_time
-        self.is_running = False
-        
-        return final_time
-    
-    @property
-    def elapsed_time(self) -> float:
-        """Get current elapsed time, accounting for pauses."""
-        if self.start_time is None:
-            return 0.0
-        
-        if not self.is_running and self.final_time is not None:
-            return self.final_time
-        
-        if self.is_paused:
-            # Calculate time up to pause point
-            return (self.pause_time - self.start_time) - self.total_paused_time
-        else:
-            # Calculate current time minus pauses
-            return (time.time() - self.start_time) - self.total_paused_time
-    
-    @property
-    def total_time(self) -> float:
-        """Alias for elapsed_time for compatibility."""
-        return self.elapsed_time
-    
-    def get_laptime(self, lap_number: int) -> Optional[float]:
-        """
-        Get the time for a specific lap.
-        
-        Args:
-            lap_number: 1-based lap number
-            
-        Returns:
-            Lap time or None if lap doesn't exist
-        """
-        if 1 <= lap_number <= len(self.lap_times):
-            return self.lap_times[lap_number - 1]
-        return None
-    
-    def get_lap_statistics(self) -> Dict[str, float]:
-        """Get statistical analysis of lap times."""
-        if not self.lap_times:
-            return {}
-        
-        return {
-            'count': len(self.lap_times),
-            'mean': statistics.mean(self.lap_times),
-            'median': statistics.median(self.lap_times),
-            'fastest': min(self.lap_times),
-            'slowest': max(self.lap_times),
-            'stdev': statistics.stdev(self.lap_times) if len(self.lap_times) > 1 else 0.0
-        }
-    
-    def reset(self) -> None:
-        """Reset the stopwatch to initial state."""
-        self.start_time = None
-        self.pause_time = None
-        self.total_paused_time = 0.0
-        self.lap_times.clear()
-        self.is_running = False
-        self.is_paused = False
-        self.final_time = None
-
-
 class _Timer:
     """
     Statistical timer for collecting and analyzing execution times.
@@ -290,8 +107,19 @@ class _Timer:
     
     def __init__(self):
         """Initialize a new timer."""
+        # first _Timer.start() call
+        self.original_start_time: Optional[float] = None
+
+        # list of all times recorded
         self.times: List[float] = []
-        self.current_start: Optional[float] = None
+
+        # current _Timer.start() call
+        self.current_start_time: Optional[float] = None
+        self.current_pause_time: Optional[float] = None
+
+        # whether the current _Timer.start() call is paused
+        self.paused = False
+
         
     def start(self) -> float:
         """
@@ -300,8 +128,11 @@ class _Timer:
         Returns:
             Start timestamp
         """
-        self.current_start = time.time()
-        return self.current_start
+        if self.original_start_time is None:
+            self.original_start_time = time.time()
+
+        self.current_start_time = time.time()
+        return self.current_start_time
     
     def stop(self) -> float:
         """
@@ -313,14 +144,70 @@ class _Timer:
         Raises:
             RuntimeError: If timer was not started
         """
-        if self.current_start is None:
+        if self.current_start_time is None:
             raise RuntimeError("Timer was not started. Call start() first.")
+
+        if self.paused:
+            self.resume()
         
-        elapsed = time.time() - self.current_start
+        elapsed = time.time() - self.current_start_time
         self.times.append(elapsed)
-        self.current_start = None
+        self.current_start_time = None
         
         return elapsed
+
+    def lap(self) -> float:
+        """
+        Record a lap time.
+        """
+        if self.current_start_time is None:
+            raise RuntimeError("Timer was not started. Call start() first.")
+
+        self.stop()
+        self.start()
+        return self.most_recent # type: ignore
+
+    def pause(self):
+        """
+        Pause the current timing measurement.
+
+        Returns:
+            Current elapsed time when paused
+
+        Raises:
+            RuntimeError: If timer is not running
+        """
+        if self.current_start_time is None:
+            raise RuntimeError("Timer is not running. Call start() first.")
+
+        if self.paused:
+            # TODO raise warning
+            return
+        
+        self.current_pause_time = time.time()
+        self.paused = True
+
+    def resume(self):
+        """
+        Resume the current timing measurement.
+
+        Returns:
+            Current elapsed time when resumed
+
+        Raises:
+            RuntimeError: If timer is not paused
+        """
+        if self.current_start_time is None:
+            raise RuntimeError("Timer is not running. Call start() first.")
+        
+        if not self.paused:
+            # TODO raise warning
+            return
+        
+        # Calculate how long we were paused and adjust start time
+        pause_duration = time.time() - self.current_pause_time # type: ignore
+        self.current_start_time += pause_duration
+        self.paused = False
     
     def add_time(self, elapsed_time: float) -> None:
         """
@@ -332,19 +219,32 @@ class _Timer:
         self.times.append(elapsed_time)
     
     @property
-    def count(self) -> int:
+    def num_times(self) -> int:
         """Number of timing measurements recorded."""
         return len(self.times)
     
     @property
-    def mostrecent(self) -> Optional[float]:
+    def most_recent(self) -> Optional[float]:
         """Most recent timing measurement."""
         return self.times[-1] if self.times else None
-    
+
     @property
-    def result(self) -> Optional[float]:
-        """Alias for mostrecent for context manager compatibility."""
-        return self.mostrecent
+    def most_recent_index(self) -> Optional[int]:
+        """Index of most recent timing measurement."""
+        return len(self.times) - 1 if self.times else None
+
+    @property
+    def total_time(self) -> Optional[float]:
+        """Total time of all timing measurements."""
+        return sum(self.times) if self.times else None
+
+    @property
+    def total_time_paused(self) -> Optional[float]:
+        """Total time paused across all times."""
+        if not self.total_time:
+            return None
+
+        return time.time() - self.original_start_time - self.total_time # type: ignore
     
     @property
     def mean(self) -> Optional[float]:
@@ -357,17 +257,37 @@ class _Timer:
         return statistics.median(self.times) if self.times else None
     
     @property
-    def longest(self) -> Optional[float]:
-        """Longest (maximum) timing measurement."""
+    def slowest_lap(self) -> Optional[float]:
+        """Index number of the slowest timing measurement."""
+        return self.times.index(max(self.times)) if self.times else None
+    
+    @property
+    def fastest_lap(self) -> Optional[float]:
+        """Index of the fastest timing measurement."""
+        return self.times.index(min(self.times)) if self.times else None
+
+    @property
+    def slowest_time(self) -> Optional[float]:
+        """Time of the slowest timing measurement."""
         return max(self.times) if self.times else None
     
     @property
-    def shortest(self) -> Optional[float]:
-        """Shortest (minimum) timing measurement."""
+    def fastest_time(self) -> Optional[float]:
+        """Time of the fastest timing measurement."""
+        return min(self.times) if self.times else None
+
+    @property
+    def min(self) -> Optional[float]:
+        """Minimum timing measurement."""
         return min(self.times) if self.times else None
     
     @property
-    def std(self) -> Optional[float]:
+    def max(self) -> Optional[float]:
+        """Maximum timing measurement."""
+        return max(self.times) if self.times else None
+    
+    @property
+    def stdev(self) -> Optional[float]:
         """Standard deviation of timing measurements."""
         if len(self.times) <= 1:
             return None
@@ -380,18 +300,18 @@ class _Timer:
             return None
         return statistics.variance(self.times)
     
-    def get_a_time(self, index: int) -> Optional[float]:
+    def get_time(self, index: int) -> Optional[float]:
         """
-        Get timing measurement by index (1-based).
+        Get timing measurement by index (0-based).
         
         Args:
-            index: 1-based index of measurement
+            index: 0-based index of measurement
             
         Returns:
             Timing measurement or None if index is invalid
         """
-        if 1 <= index <= len(self.times):
-            return self.times[index - 1]
+        if 0 <= index < len(self.times):
+            return self.times[index]
         return None
     
     def percentile(self, percent: float) -> Optional[float]:
@@ -430,12 +350,20 @@ class _Timer:
             return {'count': 0}
         
         return {
-            'count': self.count,
+            'num_times': self.num_times,
+            'most_recent': self.most_recent,
+            'most_recent_index': self.most_recent_index,
+            'total_time': self.total_time,
+            'total_time_paused': self.total_time_paused,
             'mean': self.mean,
             'median': self.median,
-            'longest': self.longest,
-            'shortest': self.shortest,
-            'std': self.std,
+            'slowest_lap': self.slowest_lap,
+            'fastest_lap': self.fastest_lap,
+            'slowest_time': self.slowest_time,
+            'fastest_time': self.fastest_time,
+            'min': self.min,
+            'max': self.max,
+            'stdev': self.stdev,
             'variance': self.variance,
             'percentile_95': self.percentile(95),
             'percentile_99': self.percentile(99),
@@ -445,40 +373,10 @@ class _Timer:
     def reset(self) -> None:
         """Clear all timing measurements."""
         self.times.clear()
-        self.current_start = None
-    
-    def __enter__(self):
-        """Context manager entry - start timing."""
-        self.start()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - stop timing."""
-        if self.current_start is not None:
-            self.stop()
-
-
-def _create_timer_context_manager(timer_instance: _Timer):
-    """
-    Create a context manager for an existing timer instance.
-    
-    This allows using timer.TimeThis() to time code blocks while
-    accumulating statistics in the timer instance.
-    """
-    class TimerContextManager:
-        def __init__(self, timer: _Timer):
-            self.timer = timer
-            
-        def __enter__(self):
-            self.timer.start()
-            return self.timer
-            
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if self.timer.current_start is not None:
-                self.timer.stop()
-    
-    return TimerContextManager(timer_instance)
-
+        self.current_start_time = None
+        self.current_pause_time = None
+        self.paused = False
+        self.original_start_time = None
 
 def _timethis_decorator(timer_instance: _Timer):
     """
@@ -501,33 +399,6 @@ def _timethis_decorator(timer_instance: _Timer):
                 timer_instance.stop()
         return wrapper
     return decorator
-
-
-def _create_standalone_timer_decorator():
-    """
-    Create a standalone timing decorator that uses its own timer instance.
-    
-    Returns:
-        Decorator function
-    """
-    timer_instance = _Timer()
-    
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            timer_instance.start()
-            try:
-                result = func(*args, **kwargs)
-                return result
-            finally:
-                timer_instance.stop()
-        
-        # Attach timer instance to function for access to statistics
-        wrapper.timer = timer_instance
-        return wrapper
-    
-    return decorator
-
 
 # Convenience functions for direct access
 def _get_current_time() -> float:

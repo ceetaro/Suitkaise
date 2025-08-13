@@ -7,46 +7,16 @@ sophisticated timing classes, and convenient decorators for performance measurem
 Key Features:
 - Simple timing functions (now, sleep, elapsed)
 - Yawn class for threshold-based delayed sleep operations
-- Stopwatch with pause/resume and lap functionality  
-- Timer for statistical timing analysis with context managers and decorators
+- Timer for statistical timing analysis with pause/resume and lap functionality
+- TimeThis context manager for convenient timing of code blocks
 - Comprehensive timing statistics and performance analysis
 
 Philosophy: Make timing operations intuitive while providing powerful analysis capabilities.
 """
 
 # Import all API functions and classes
-from .api import (
-    # Simple timing functions
-    now,
-    get_current_time, 
-    sleep,
-    elapsed,
-    
-    # Timing classes
-    Yawn,
-    Stopwatch,
-    Timer,
-    
-    # Decorators
-    timethis,
-)
-
-# Re-export everything for direct import from module
-__all__ = [
-    # Simple timing functions
-    'now',
-    'get_current_time', 
-    'sleep',
-    'elapsed',
-    
-    # Timing classes
-    'Yawn',
-    'Stopwatch',
-    'Timer',
-    
-    # Decorators
-    'timethis',
-]
+from .api import *
+from .api import __all__
 
 # Module-level convenience - expose main classes at module level
 # This allows: import suitkaise.sktime; timer = suitkaise.sktime.Timer()

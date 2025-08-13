@@ -816,14 +816,14 @@ def _path_id(path: Union[str, Path], short: bool = False) -> str:
     if short:
         # Use only filename and short hash
         filename = Path(abs_path).stem.replace('.', '_')
-        short_hash = hash_str[:4]
+        short_hash = hash_str[:8]
         return f"{filename}_{short_hash}"
     else:
-        # Use path components and longer hash
+        # Use path components and full hash
         safe_parts = [part.replace('.', '_').replace('-', '_') for part in path_parts[-3:]]
         readable = '_'.join(safe_parts)
-        # create an id that is 8 characters long
-        return f"{readable}_{hash_str[:8]}"
+        # create an id that is 32 characters long
+        return f"{readable}_{hash_str}"
 
 
 def _path_id_short(path: Union[str, Path]) -> str:
