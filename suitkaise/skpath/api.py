@@ -142,6 +142,7 @@ class SKPath:
         """The file extension."""
         return self._absolute_path.suffix
     
+    # TODO: remember what this is for
     @property
     def suffixes(self) -> List[str]:
         """All suffixes of the path."""
@@ -162,39 +163,65 @@ class SKPath:
         """The path components as a tuple."""
         return self._absolute_path.parts
     
+    @property
     def exists(self) -> bool:
         """Check if the path exists."""
         return self._absolute_path.exists()
     
+    @property
     def is_file(self) -> bool:
         """Check if the path is a file."""
         return self._absolute_path.is_file()
     
+    @property
     def is_dir(self) -> bool:
         """Check if the path is a directory."""
         return self._absolute_path.is_dir()
     
+    @property
     def is_absolute(self) -> bool:
         """Check if the path is absolute."""
         return self._absolute_path.is_absolute()
     
+    @property
     def is_symlink(self) -> bool:
         """Check if the path is a symbolic link."""
         return self._absolute_path.is_symlink()
     
+    @property
     def stat(self):
         """Get stat information for the path."""
         return self._absolute_path.stat()
     
+    @property
     def lstat(self):
         """Get lstat information for the path."""
         return self._absolute_path.lstat()
     
+    @property
     def iterdir(self) -> List['SKPath']:
         """Iterate over directory contents as SKPaths."""
-        if not self.is_dir():
+        if not self.is_dir:
             raise NotADirectoryError(f"{self} is not a directory")
         return [SKPath(item, self._project_root) for item in self._absolute_path.iterdir()]
+
+    @property
+    def as_dict(self) -> Dict[str, str]:
+        """Return the dual-path structure as a dictionary."""
+        return {
+            "ap": self.ap,
+            "np": self.np
+        }
+
+    @property
+    def id(self) -> str:
+        """Return the path ID."""
+        return path_id(self)
+
+    @property
+    def id_short(self) -> str:
+        """Return the short path ID."""
+        return path_id_short(self)
     
     def glob(self, pattern: str) -> List['SKPath']:
         """Find all paths matching the pattern."""
@@ -210,28 +237,21 @@ class SKPath:
             return self._absolute_path.relative_to(other._absolute_path)
         return self._absolute_path.relative_to(Path(other))
     
-    def with_name(self, name: str) -> 'SKPath':
+    def with_new_name(self, name: str) -> 'SKPath':
         """Return a new SKPath with different name."""
         return SKPath(self._absolute_path.with_name(name), self._project_root)
     
-    def with_stem(self, stem: str) -> 'SKPath':
+    def with_new_stem(self, stem: str) -> 'SKPath':
         """Return a new SKPath with different stem."""
         return SKPath(self._absolute_path.with_stem(stem), self._project_root)
     
-    def with_suffix(self, suffix: str) -> 'SKPath':
+    def with_new_suffix(self, suffix: str) -> 'SKPath':
         """Return a new SKPath with different suffix."""
         return SKPath(self._absolute_path.with_suffix(suffix), self._project_root)
     
     def resolve(self) -> 'SKPath':
         """Return absolute version of the path."""
         return SKPath(self._absolute_path.resolve(), self._project_root)
-    
-    def as_dict(self) -> Dict[str, str]:
-        """Return the dual-path structure as a dictionary."""
-        return {
-            "ap": self.ap,
-            "np": self.np
-        }
     
     def __str__(self) -> str:
         """String conversion returns absolute path for compatibility."""
@@ -243,11 +263,7 @@ class SKPath:
     
     def __eq__(self, other) -> bool:
         """Compare SKPaths based on their absolute paths."""
-        if isinstance(other, SKPath):
-            return self._absolute_path == other._absolute_path
-        elif isinstance(other, (str, Path)):
-            return self._absolute_path == Path(other).resolve()
-        return False
+        return equalpaths(self, other)
     
     def __hash__(self) -> int:
         """Hash based on absolute path for use in sets/dicts."""
@@ -499,7 +515,7 @@ def path_id_short(path: Union[str, Path, SKPath]) -> str:
     """
     return path_id(path, short=True)
 
-def get_all_project_paths(
+def get_project_paths(
     custom_root: Optional[Union[str, Path]] = None,
     except_paths: Optional[Union[str, List[str]]] = None,
     as_str: bool = False,
@@ -521,17 +537,17 @@ def get_all_project_paths(
     Example:
     ```python
         # get all project paths
-        proj_path_list = skpath.get_all_project_paths(
+        proj_path_list = skpath.get_project_paths(
             except_paths="this/one/path/i/dont/want"
         )
 
         # as abspath strings instead of skpaths
-        proj_path_list = skpath.get_all_project_paths(
+        proj_path_list = skpath.get_project_paths(
             except_paths="this/one/path/i/dont/want", as_str=True
         )
 
         # including all .gitignore and .skignore paths
-        proj_path_list = skpath.get_all_project_paths(
+        proj_path_list = skpath.get_project_paths(
             except_paths="this/one/path/i/dont/want", ignore=True
         )
     """
@@ -899,7 +915,7 @@ __all__ = [
     'equalpaths',
     'path_id',
     'path_id_short',
-    'get_all_project_paths',
+    'get_project_paths',
     'get_project_structure',
     'get_formatted_project_tree',
     

@@ -2,3 +2,5 @@
 - [ ] ensure module is thread safe
 - [ ] resolve TODOs in code and concept.md
 - [ ] create example.py file and update info.md file
+- [ ] re create all tests to test final api
+- [ ] create benchmark tests and record results
