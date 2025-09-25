@@ -946,12 +946,42 @@ print(f"Time taken: {stats['mean']:.3f}s")
 ## 11. Performance Considerations
 
 ### Timing Overhead
-`sktime` is designed for super simple code with minimal overhead:
+`sktime` is designed for minimal overhead in common operations:
 
-- **Basic functions** (`now()`, `elapsed()`): # TODO benchmark test
-- **Timer decorators**: # TODO benchmark test
-- **Stopwatch operations**: # TODO benchmark test
-- **Statistical calculations**: Only computed when accessed or requested(lazy evaluation)
+- **Basic functions** (`now()`, `get_current_time()`): Near parity with `time.time()` in call overhead.
+- **`elapsed()`**: Within a small constant factor of manual `abs(t2 - t1)` with the benefit of order independence and one-arg convenience.
+- **Timer operations**: `start()/stop()`, `lap()`, and `pause()/resume()` are lightweight and thread-safe.
+- **Statistical calculations**: Computed lazily when accessed via properties or `get_statistics()`.
+
+You can run the included microbenchmarks to see colored, human-readable numbers on your machine:
+
+```bash
+pytest -q tests/test_sktime/test_performance.py
+```
+
+Example output (will vary by machine/CI):
+
+```
+time.time() avg call                     < 0.000001 s
+sktime.now() avg call                    < 0.000001 s
+Timer start+stop (noop) avg              0.000001 s
+@timethis wrapped call avg               0.000001 s
+```
+
+### Implementation details affecting precision
+
+- **High-resolution intervals**: Internals use `time.perf_counter()` for interval timing in `Timer`, `TimeThis`, and `@timethis`. Wall time functions (`now()`, `get_current_time()`) continue to use `time.time()`.
+- **Paused-time accounting**: `Timer.total_time_paused` reports a strict sum of paused durations accumulated across recorded measurements.
+
+### Managing global decorator timers
+
+When using `@timethis()` without an explicit `Timer`, a per-function timer is auto-created and stored in a small registry for convenient access via `your_func.timer`. In long-lived/dev environments, you can reset this registry:
+
+```python
+from suitkaise import sktime
+
+sktime.clear_global_timers()  # clears registry of auto-created timers
+```
 
 ### Memory Efficiency
 - Timer instances store measurements efficiently
@@ -960,7 +990,8 @@ print(f"Time taken: {stats['mean']:.3f}s")
 - No memory leaks in long-running applications
 
 ### Multi-threading and Multi-processing
-- Thread and process safe # TODO ensure this is true and implement if not
+- Thread-safe across multiple threads (per-thread sessions under the hood)
+- Compatible with multi-processing; decorate top-level functions if using process pools
 
 
 ### Production Considerations

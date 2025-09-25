@@ -23,8 +23,82 @@ import fnmatch
 import inspect
 import hashlib
 import importlib
+import threading
+import time
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Union, Tuple, Any
+from typing import Dict, List, Set, Optional, Union, Tuple, Any, TypedDict
+
+# ============================================================================
+# Internal Exception Classes
+# ============================================================================
+
+class DetectionError(RuntimeError):
+    """
+    Exception raised when automatic detection fails in SKPath operations.
+    
+    This occurs when SKPath cannot automatically detect:
+    - Caller file paths (for zero-argument SKPath initialization)
+    - Project root directories
+    - Module file paths
+    
+    Solutions:
+    1. Provide explicit parameters instead of relying on auto-detection
+    2. Ensure you're running from a valid project with proper structure
+    3. Use force_project_root() to manually set the project root
+    """
+    
+    def __init__(self, detection_type: str, context: str = ""):
+        self.detection_type = detection_type
+        self.context = context
+        
+        if context:
+            message = f"Could not auto-detect {detection_type} in {context}. Please provide explicit parameters."
+        else:
+            message = f"Could not auto-detect {detection_type}. Please provide explicit parameters."
+            
+        super().__init__(message)
+
+
+class MultiplePathsError(ValueError):
+    """
+    Exception raised when SKPath encounters multiple files with the same name.
+    
+    This occurs when trying to create an SKPath with just a filename (e.g., 'api.py')
+    and multiple files with that name exist under the project root.
+    
+    Recommended solutions:
+    1. Use relative paths: SKPath('feature1/api.py') vs SKPath('feature2/api.py')
+    2. Use unique filenames: SKPath('feature1_api.py') vs SKPath('feature2_api.py')
+    """
+    
+    def __init__(self, filename: str, matches: List[Path], project_root: Path):
+        """
+        Initialize MultiplePathsError with detailed information.
+        
+        Args:
+            filename: The ambiguous filename that was requested
+            matches: List of absolute paths that matched the filename
+            project_root: The project root where the search was performed
+        """
+        relative_matches = [match.relative_to(project_root) for match in matches]
+        
+        message = (
+            f"Ambiguous path '{filename}' - found {len(matches)} matches under project root:\n" +
+            "\n".join(f"  - {match}" for match in relative_matches) +
+            f"\n\nRecommended solutions:\n" +
+            f"  1. Use relative paths: SKPath('{relative_matches[0].parent}/{filename}')\n" +
+            f"  2. Use unique filenames: SKPath('{relative_matches[0].parent.name}_{filename}')\n" +
+            f"\nFor better project organization, consider:\n" +
+            f"  - Using descriptive directory structures (feature1/api.py, feature2/api.py)\n" +
+            f"  - Adopting unique naming conventions (feature1_api.py, feature2_api.py)"
+        )
+        
+        super().__init__(message)
+        self.filename = filename
+        self.matches = matches
+        self.project_root = project_root
+        self.relative_matches = relative_matches
+
 
 # Get the actual suitkaise module base path for robust checking
 _SUITKAISE_BASE_PATH = Path(__file__).resolve().parent.parent
@@ -77,6 +151,8 @@ def _get_non_sk_caller_file_path() -> Optional[Path]:
     frame = inspect.currentframe()
     try:
         # Start from the caller's frame
+        if frame is None:
+            return None
         caller_frame = frame.f_back
         
         # Keep going up the stack until we find a frame that's not from suitkaise
@@ -364,7 +440,7 @@ class _IndicatorExpander:
     - Pattern normalization and validation
     """
     
-    def __init__(self, indicators: Dict = None):
+    def __init__(self, indicators: Optional[Dict] = None):
         """
         Initialize the indicator expander.
         
@@ -467,7 +543,7 @@ class _ProjectRootDetector:
     2. Score based on other indicators to determine confidence
     """
 
-    def __init__(self, indicators: Dict = None, confidence_threshold: float = 0.5):
+    def __init__(self, indicators: Optional[Dict] = None, confidence_threshold: float = 0.5):
         """
         Initialize the project root detector.
         
@@ -479,6 +555,7 @@ class _ProjectRootDetector:
         self.expander = _IndicatorExpander(self.indicators)
         self.confidence_threshold = confidence_threshold
         self._forced_root = None  # Override for project root
+        self._lock = threading.RLock()  # Thread-safe access to forced root
         
         # Scoring weights for different indicator types (after necessary check passes)
         self.weights = {
@@ -501,15 +578,18 @@ class _ProjectRootDetector:
         if not forced_path.is_dir():
             raise NotADirectoryError(f"Forced project root is not a directory: {forced_path}")
         
-        self._forced_root = forced_path
+        with self._lock:
+            self._forced_root = forced_path
     
     def clear_forced_root(self) -> None:
         """Clear any forced project root, returning to auto-detection."""
-        self._forced_root = None
+        with self._lock:
+            self._forced_root = None
     
     def get_forced_root(self) -> Optional[Path]:
         """Get the currently forced project root, if any."""
-        return self._forced_root
+        with self._lock:
+            return self._forced_root
 
     def _check_necessary_files(self, files: Set[str]) -> Tuple[bool, Set[str]]:
         """
@@ -624,10 +704,13 @@ class _ProjectRootDetector:
             Path to project root if found with sufficient confidence
         """
         # Check for forced root first
-        if self._forced_root is not None:
+        with self._lock:
+            forced_root = self._forced_root
+        
+        if forced_root is not None:
             # Validate expected name if provided
-            if expected_name is None or self._forced_root.name.lower() == expected_name.lower():
-                return self._forced_root
+            if expected_name is None or forced_root.name.lower() == expected_name.lower():
+                return forced_root
             else:
                 return None  # Forced root doesn't match expected name
         
@@ -677,14 +760,39 @@ class _ProjectRootDetector:
         return None
 
 
+class _ProjectRootCache(TypedDict):
+    root: Optional[Path]
+    cache_key: Optional[str]
+
+
+class _IgnorePatternsCache(TypedDict):
+    patterns: Optional[Set[str]]
+    cache_key: Optional[str]
+    timestamp: float
+
+
 # Global detector instance for convenience functions
 _global_detector = _ProjectRootDetector()
 
 # Global cache for project root detection
-_project_root_cache = {
+_project_root_cache: _ProjectRootCache = {
     'root': None,
-    'cache_key': None  # Cache based on start_path + expected_name
+    'cache_key': None,
 }
+
+# Store previous auto-detected cache to restore after clearing a forced root
+_previous_auto_root: Optional[Path] = None
+_previous_auto_cache_key: Optional[str] = None
+
+# Global cache for ignore file patterns
+_ignore_patterns_cache: _IgnorePatternsCache = {
+    'patterns': None,
+    'cache_key': None,
+    'timestamp': 0.0,
+}
+
+# Thread-safe lock for both caches
+_cache_lock = threading.RLock()
 
 
 def _get_project_root(start_path: Optional[Union[str, Path]] = None,
@@ -712,15 +820,21 @@ def _get_project_root(start_path: Optional[Union[str, Path]] = None,
     cache_key = f"{start_path}:{expected_name}"
     
     # Check cache first
-    if _project_root_cache['cache_key'] == cache_key and _project_root_cache['root'] is not None:
-        return _project_root_cache['root']
+    with _cache_lock:
+        if _project_root_cache['cache_key'] == cache_key and _project_root_cache['root'] is not None:
+            return _project_root_cache['root']
     
-    # Cache miss - do the expensive detection
+    # Cache miss - do the expensive detection (outside lock to avoid holding lock during expensive operation)
     result = _global_detector.find_project_root(start_path, expected_name)
     
-    # Update cache
-    _project_root_cache['cache_key'] = cache_key
-    _project_root_cache['root'] = result
+    # Update cache and also remember previous auto-detected root for restoration
+    with _cache_lock:
+        global _previous_auto_root, _previous_auto_cache_key
+        if expected_name is None:
+            _previous_auto_root = _project_root_cache['root']
+            _previous_auto_cache_key = _project_root_cache['cache_key']
+        _project_root_cache['cache_key'] = cache_key
+        _project_root_cache['root'] = result
     
     return result
 
@@ -734,16 +848,29 @@ def _force_project_root(path: Union[str, Path]) -> None:
     """
     _global_detector.force_project_root(path)
     # Clear cache when forcing a new root
-    _project_root_cache['cache_key'] = None
-    _project_root_cache['root'] = None
+    with _cache_lock:
+        # Save current auto-detected root before overriding
+        global _previous_auto_root, _previous_auto_cache_key
+        _previous_auto_root = _project_root_cache['root']
+        _previous_auto_cache_key = _project_root_cache['cache_key']
+        _project_root_cache['cache_key'] = None
+        _project_root_cache['root'] = None
 
 
 def _clear_forced_project_root() -> None:
     """Clear any forced project root, returning to auto-detection."""
     _global_detector.clear_forced_root()
-    # Clear cache when clearing forced root
-    _project_root_cache['cache_key'] = None
-    _project_root_cache['root'] = None
+    # Restore previous auto-detected root if available; otherwise clear
+    with _cache_lock:
+        global _previous_auto_root, _previous_auto_cache_key
+        if _previous_auto_root is not None and _previous_auto_cache_key is not None:
+            _project_root_cache['cache_key'] = _previous_auto_cache_key
+            _project_root_cache['root'] = _previous_auto_root
+        else:
+            _project_root_cache['cache_key'] = None
+            _project_root_cache['root'] = None
+        _previous_auto_root = None
+        _previous_auto_cache_key = None
 
 
 def _get_forced_project_root() -> Optional[Path]:
@@ -878,6 +1005,67 @@ def _parse_gitignore_file(gitignore_path: Path) -> Set[str]:
     return patterns
 
 
+def _get_cached_ignore_patterns(project_root: Path) -> Set[str]:
+    """
+    Get ignore patterns for a project root with caching.
+    
+    Caches patterns based on project root and modification times of ignore files.
+    Cache is invalidated if any ignore file is modified or if different project root.
+    
+    Args:
+        project_root: Project root directory to scan for ignore files
+        
+    Returns:
+        Set of ignore patterns from all .*ignore files
+    """
+    if not project_root or not project_root.exists():
+        return set()
+    
+    # Find all ignore files and their modification times
+    ignore_files = []
+    try:
+        for item in project_root.iterdir():
+            if item.is_file() and item.name.startswith('.') and 'ignore' in item.name:
+                try:
+                    mtime = item.stat().st_mtime
+                    ignore_files.append((item, mtime))
+                except (OSError, PermissionError):
+                    continue
+    except (OSError, PermissionError):
+        # Fallback to specific known ignore files if directory scan fails
+        for ignore_name in ['.gitignore', '.dockerignore']:
+            ignore_path = project_root / ignore_name
+            if ignore_path.exists():
+                try:
+                    mtime = ignore_path.stat().st_mtime
+                    ignore_files.append((ignore_path, mtime))
+                except (OSError, PermissionError):
+                    continue
+    
+    # Create cache key from project root and file modification times
+    cache_key = str(project_root) + '|' + '|'.join(f"{path}:{mtime}" for path, mtime in ignore_files)
+    
+    # Check cache
+    with _cache_lock:
+        if (_ignore_patterns_cache['cache_key'] == cache_key and 
+            _ignore_patterns_cache['patterns'] is not None and
+            time.time() - _ignore_patterns_cache['timestamp'] < 300):  # 5 minute cache
+            return _ignore_patterns_cache['patterns'].copy()
+    
+    # Cache miss - parse all ignore files
+    patterns = set()
+    for ignore_path, _ in ignore_files:
+        patterns.update(_parse_gitignore_file(ignore_path))
+    
+    # Update cache
+    with _cache_lock:
+        _ignore_patterns_cache['cache_key'] = cache_key
+        _ignore_patterns_cache['patterns'] = patterns.copy()
+        _ignore_patterns_cache['timestamp'] = time.time()
+    
+    return patterns
+
+
 def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
                           as_str: bool = False,
                           ignore: bool = True,
@@ -917,13 +1105,9 @@ def _get_all_project_paths(except_paths: Optional[Union[str, List[str]]] = None,
         'dist', 'build', '*.egg-info'
     } if not ignore else set()
     
-    # Add patterns from .gitignore and .dockerignore files
+    # Add patterns from all .*ignore files using cached function
     if not ignore:
-        gitignore_path = project_root / '.gitignore'
-        dockerignore_path = project_root / '.dockerignore'
-        
-        ignore_patterns.update(_parse_gitignore_file(gitignore_path))
-        ignore_patterns.update(_parse_gitignore_file(dockerignore_path))
+        ignore_patterns.update(_get_cached_ignore_patterns(project_root))
     
     all_paths = []
     
@@ -1004,13 +1188,9 @@ def _get_project_structure(force_root: Optional[Union[str, Path]] = None,
         'dist', 'build', '*.egg-info'
     } if not ignore else set()
     
-    # Add patterns from .gitignore and .dockerignore files
+    # Add patterns from all .*ignore files using cached function
     if not ignore:
-        gitignore_path = root / '.gitignore'
-        dockerignore_path = root / '.dockerignore'
-        
-        ignore_patterns.update(_parse_gitignore_file(gitignore_path))
-        ignore_patterns.update(_parse_gitignore_file(dockerignore_path))
+        ignore_patterns.update(_get_cached_ignore_patterns(root))
     
     def should_ignore(path: Path) -> bool:
         """Check if path should be ignored."""
@@ -1069,6 +1249,20 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
     Returns:
         Formatted string representing directory structure
     """
+    # Ensure unicode box drawing is supported (per fdl/_int/setup/unicode.py)
+    try:
+        from ...fdl._int.setup.unicode import _supports_box_drawing
+        if not _supports_box_drawing():
+            raise RuntimeError(
+                "Unicode tree characters are not supported; cannot render formatted project tree. "
+                "Use get_project_structure() for programmatic access or enable a unicode-capable terminal."
+            )
+    except Exception as e:
+        # If detection import fails or unicode unsupported, raise a clear error as requested
+        raise RuntimeError(
+            f"Unicode capability check failed or unsupported for formatted project tree: {e}"
+        )
+
     if force_root is None:
         root = _get_project_root()
     else:
@@ -1092,13 +1286,9 @@ def _get_formatted_project_tree(force_root: Optional[Union[str, Path]] = None,
         'dist', 'build', '*.egg-info'
     } if not ignore else set()
     
-    # Add patterns from .gitignore and .dockerignore files
+    # Add patterns from all .*ignore files using cached function
     if not ignore:
-        gitignore_path = root / '.gitignore'
-        dockerignore_path = root / '.dockerignore'
-        
-        ignore_patterns.update(_parse_gitignore_file(gitignore_path))
-        ignore_patterns.update(_parse_gitignore_file(dockerignore_path))
+        ignore_patterns.update(_get_cached_ignore_patterns(root))
     
     def should_ignore(path: Path) -> bool:
         """Check if path should be ignored."""

@@ -39,13 +39,29 @@ There are also simple, no-arguments-needed functions to:
     - can use custom root to only get paths from a certain directory
 - and a decorator that will automatically convert relative paths to `SKPath` objects, or relative paths to strings if `SKPath` objects aren't accepted.
 
+Best Practices for Path Organization:
+1. Use relative paths for clarity: SKPath('feature1/api.py') and SKPath('feature2/api.py') instead of SKPath('api.py')
+2. Use unique filenames when possible: SKPath('feature1_api.py') and SKPath('feature2_api.py') instead of SKPath('api.py')
+3. Organize files in descriptive directory structures
+4. Avoid bare filenames (like 'config.py') when multiple files with the same name exist
+
+Best Practices for Project Root Management:
+1. Either use auto-detection or force a root for the whole script
+2. If you want to change the root mid-script, use it in an isolated context and clear it after
+3. Only use `SKPath` objects created under the auto-detected root OR a manually forced root
+
+Important Behavioral Notes:
+- Each `SKPath` instance captures its project root at creation time
+- Calling `force_project_root()` affects only NEW instances created after the call
+- Existing `SKPath` objects retain their original project root for consistency
+- The `np` property returns `None` for paths outside the project root
+
 ## 3. `SKPath` Class and Structure
 
 `SKPath` is a class with properties that expose two path views:
 
-# TODO ensure these are strings and property methods work with them
 - `ap`: Absolute filesystem path (string), with separators normalized (all `/`)
-- `np`: Normalized path relative to your project root (string)
+- `np`: Normalized path relative to your project root (string), or `None` if outside project root
 
 To access them, simply do:
 
@@ -64,6 +80,7 @@ normpath = SKPath().np
 
 # example ap: /Users/johndoe/Documents/my_project_root/my/relative/path
 # example np: my/relative/path (auto detects my_project_root as root)
+# example np: None (if path is outside the project root)
 ```
 
 `SKPath` objects have a bunch of properties that make them easy to work with:
@@ -853,7 +870,9 @@ With `skpath`: ***also 2 lines***
 - extended functionality for resulting path object
 
 ```python
-cwd = skpath.get_cwd()
+from suitkaise import skpath # 1
+
+cwd = skpath.get_cwd() # 2
 print(f"Working from: {cwd.np}")  # Shows "scripts/" instead of "/home/user/myproject/scripts"
 ```
 
@@ -1270,7 +1289,7 @@ if skpath.get_forced_project_root():
 def process_user_uploads(upload_dir, custom_project_root=None):
     """Process files with different project context."""
     
-    for file_path in upload_dir.iterdir():
+    for file_path in upload_dir.iterdir:
         # Create SKPath with custom project root for processing
         skpath_file = skpath.create(file_path, custom_root=custom_project_root)
         
