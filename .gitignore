@@ -45,3 +45,6 @@ suitkaise_depr/
 
 # .sk files
 .sk/
+
+# fileconv test results
+suitkaise/fileconv/tests/*_results/
