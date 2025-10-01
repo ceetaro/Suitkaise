@@ -17,7 +17,7 @@ from .processes import _Process, _FunctionProcess, PStatus
 from .configs import _PConfig, _QPConfig
 from .runner import _ProcessRunner
 from .pdata import _PData
-from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
+from suitkaise.sktime._int.time_ops import _get_current_time, _elapsed_time
 from suitkaise._int.core.format_ops import _create_debug_message
 from suitkaise._int.serialization.cerial_core import _serialize, _deserialize
 

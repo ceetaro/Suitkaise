@@ -337,13 +337,13 @@ class _Timer:
             return statistics.median(self.times) if self.times else None
     
     @property
-    def slowest_lap(self) -> Optional[float]:
+    def slowest_lap(self) -> Optional[int]:
         """Index number of the slowest timing measurement."""
         with self._lock:
             return self.times.index(max(self.times)) if self.times else None
     
     @property
-    def fastest_lap(self) -> Optional[float]:
+    def fastest_lap(self) -> Optional[int]:
         """Index of the fastest timing measurement."""
         with self._lock:
             return self.times.index(min(self.times)) if self.times else None

@@ -12,7 +12,7 @@ from enum import Enum
 
 from .configs import _PConfig
 from .stats import ProcessStats
-from suitkaise._int.core.time_ops import _get_current_time, _elapsed_time
+from suitkaise.sktime._int.time_ops import _get_current_time, _elapsed_time
 
 
 class PStatus(Enum):

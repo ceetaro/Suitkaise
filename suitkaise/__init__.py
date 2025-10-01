@@ -60,13 +60,8 @@ if _skpath_available:
     except ImportError:
         pass  # Graceful degradation
 
-# SKTime convenience imports (when available)
-if _sktime_available:
-    try:
-        from .sktime import Timer, Stopwatch, now, timethis
-        __all__.extend(['Timer', 'Stopwatch', 'now', 'timethis'])
-    except ImportError:
-        pass  # Graceful degradation
+# SKTime module is available as `suitkaise.sktime` and via `from suitkaise import sktime`
+# Objects should be imported from `suitkaise.sktime` per documentation.
 
 # =============================================================================
 # Package Information and Status

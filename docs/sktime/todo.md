@@ -1,23 +1,28 @@
 # SKTime TODO
 
-First, resolve all the TODOs in time_ops.py and sktime/api.py. *
+-1: time_ops was moved to ..sktime/_int/time_ops.py. ensure that all reference imports to time_ops are updated to the new location across the project.
 
-Next, re update the concept.md file to reflect the small changes. *
+0. ensure that init files work as intended and documented (incl. documented in quiz)
+options to import:
+- from suitkaise import sktime
+- from suitkaise.sktime import (something)
 
-## Core Implementation Tasks
-- [ ] Create example.py file and update info.md file
-- [ ] Re-create all tests to test final api
-- [ ] Create benchmark tests and record results
-- [ ] Test thread safety
+1. ensure that concept.md matches api content
+- the api represents the final rendition of v1.0.0 of the module. the concept file has not been updated to reflect this.
 
-## Documentation TODOs from Concept File
-- [ ] Filter timestamps to show last 24h calls in performance monitoring example (concept.md:636)
-- [ ] Benchmark test basic functions (now, elapsed) and document performance (concept.md:951)
-- [ ] Benchmark test Timer decorators and document performance (concept.md:952)
-
-## Integration and Testing (DEFERRED)
-- [ ] Test cross-platform compatibility
-- [ ] Ensure that other suitkaise modules are compatible with the sktime module when dealing with time
+2. recreate the info.md file to actually explain how each component works internally
+- the info file needs to be redone completely from scratch and actually document exactly how sktime works
+3. recreate the final test suite and test everything
+- including performance tests
+- including thread safety tests
 
 
-Follow-up (docs-only): note perf_counter usage, strict paused semantics, and the new clear_global_timers in docs/sktime/concept.md.
+4. create the example.py file that will give an in-depth example of how to use the module
+5. ensure that quiz is accurate and correctly formatted (and that content in questions is possible, works, and accurately matches the api)
+
+6. create the final documentation for the module
+7. create the suitkaise website
+8. update project status and dependencies
+9. check that only sktime works when uploaded to test pypi
+10. upload to pypi
+

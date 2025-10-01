@@ -19,7 +19,7 @@ from functools import wraps
 
 # Import internal time operations with fallback
 try:
-    from .._int.core.time_ops import (
+    from ._int.time_ops import (
         _elapsed_time,
         _Yawn,
         _Timer,
@@ -645,7 +645,7 @@ class Timer:
         return self._timer.most_recent
 
     @property
-    def most_recent_lap(self) -> Optional[int]:
+    def most_recent_index(self) -> Optional[int]:
         """
         Index of the most recent time measured.
         """
@@ -686,17 +686,19 @@ class Timer:
         """
         return self._timer.median
 
+
     @property
-    def slowest_lap(self) -> Optional[float]:
+    def slowest_time_index(self) -> Optional[int]:
         """
-        Time of the slowest lap.
+        Index of the slowest lap.
         """
         return self._timer.slowest_lap
 
+
     @property
-    def fastest_lap(self) -> Optional[float]:
+    def fastest_time_index(self) -> Optional[int]:
         """
-        Time of the fastest lap.
+        Index of the fastest time.
         """
         return self._timer.fastest_lap
 
@@ -717,14 +719,14 @@ class Timer:
     @property
     def min(self) -> Optional[float]:
         """
-        Minimum time of all measurements.
+        Minimum time of all measurements. (same as fastest_time)
         """
         return self._timer.min
 
     @property
     def max(self) -> Optional[float]:
         """
-        Maximum time of all measurements.
+        Maximum time of all measurements. (same as slowest_time)
         """
         return self._timer.max
 
@@ -754,7 +756,7 @@ class Timer:
         """
         return self._timer.percentile(percent)
 
-    def get_statistics(self) -> Optional[_TimerStats]:
+    def get_stats(self) -> Optional[_TimerStats]:
         """
         Get statistics of all measurements.
         """
