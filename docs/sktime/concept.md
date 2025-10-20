@@ -19,13 +19,13 @@
 
 ## 1. Overview
 
-`sktime` provides comprehensive timing functionality that goes far beyond basic `time.time()` calls, offering specialized classes and utilities for different timing scenarios. It's designed to <u>**save you time**</u> and be a foundational piece in your development process.
+`sktime` provides comprehensive timing functionality that goes far beyond basic `time.time()` calls, offering specialized classes and utilities for different timing scenarios. It's designed to <u>**save you time**</u> and be a foundational piece in your development process. `sktime` is THREAD SAFE!
 
 ## 2. Core Concepts
 
-`sktime` transforms timing from a manual, error-prone process into an *intuitive, powerful toolkit* that is extremely easy to use. Whether you need quick performance measurements, sophisticated statistical analysis, or specialized timing behaviors like rate limiting, `sktime` provides the right tool for the job in as few lines of code as possible.
+`sktime` transforms timing from a manual, error-prone process into an *intuitive, powerful, and easy to use* toolkit. Whether you need quick performance measurements, sophisticated statistical analysis, or specialized timing behaviors like rate limiting, `sktime` provides the right tool for the job in as few lines of code as possible.
 
-People and AI alike can easily understand the concepts in `sktime` much better than reading several files of time related code, and `sktime` is much better than simple `time.*()` calls.
+People and AI alike can easily understand the concepts in `sktime` much better than reading several files of time related code, and `sktime` is much better than simple `time.*()` calls. Here's why.
 
 **Key principles:**
 - **Simplicity**: Common operations are 1-2 lines, complex operations are less than 10.
@@ -44,7 +44,7 @@ People and AI alike can easily understand the concepts in `sktime` much better t
 
 You can also just use the `time` module directly with `sktime`, but that requires an extra import.
 
-The `elapsed` function is super easy to use:
+The `elapsed()` function is super easy to use:
 - uses `math.fabs()` for best precision when calculating absolute value of floats
 
 ```python
@@ -58,8 +58,8 @@ elapsed = sktime.elapsed(start) # end time automatically set to current time
 
 # with 2 times
 start = sktime.now() # 100
-sktime.sleep(2)
-end = sktime.now() # 102
+
+end = sktime.sleep(2) # gets current time after sleeping
 
 elapsed1 = sktime.elapsed(start, end)  # |100 - 102| = 2
 elapsed2 = sktime.elapsed(end, start)  # |102 - 100| = 2
@@ -147,7 +147,7 @@ The `Timer` class makes it easy to time anything and everything. It gives you hi
 
 **When you might use `Timer`:**
 - Need to figure out what part of your code is causing lag spikes due to slow operations
-- Need to handle consistent timing without inconsistencies like user input
+- Need to handle consistent timing of processing without inconsistencies like waiting for user input
 - Timing something over and over to see if it's getting faster or slower
 - Using multiple timers to time different parts of the same code
 - Collect statistics on everything during runtime
@@ -162,7 +162,6 @@ from suitkaise import sktime
 
 timer = sktime.Timer()
 timer.start()
-
 
 # Download a large file
 current_file = download_file("https://example.com/data.zip")
@@ -211,10 +210,9 @@ from suitkaise import sktime
 
 timer = sktime.Timer()
 
-# time something as normal...
-
 timer.add_time(1.5)  # Add a time you measured elsewhere
 timer.add_time(2.1)  # Add another measurement from somewhere else
+
 print(f"Average of added times: {timer.mean:.2f}s")
 ```
 
@@ -232,7 +230,7 @@ print(f"Average of added times: {timer.mean:.2f}s")
 #### **Measurement Access**
 - `timer.num_times` - Number of times recorded
 - `timer.most_recent` - Most recent time
-- `timer.most_recent_lap` - Index of most recent time
+- `timer.most_recent_index` - Index of most recent time
 - `timer.result` - Most recent time  
 - `timer.get_time(index)` - Get time by standard 0-based index
 
@@ -247,8 +245,10 @@ print(f"Average of added times: {timer.mean:.2f}s")
 - `timer.max` / `timer.slowest_time` - Maximum time
 - `timer.stdev` - Standard deviation
 - `timer.variance` - Variance
-- `timer.slowest_lap` - Index of slowest time
-- `timer.fastest_lap` - Index of fastest time
+- `timer.slowest_time` - Slowest time (same as `timer.max`)
+- `timer.fastest_time` - Fastest time (same as `timer.min`)
+- `timer.slowest_index` - Index of slowest time
+- `timer.fastest_index` - Index of fastest time
 
 #### **Advanced Analysis**
 - `timer.percentile(percent)` - Calculate any percentile (0-100)
@@ -263,11 +263,12 @@ print(f"Average of added times: {timer.mean:.2f}s")
 After accumulating measurements, `Timer` provides comprehensive statistics:
 
 ```python
+timer.start()
+
 # Run multiple measurements
 for i in range(100):
-    timer.start()
     expensive_operation()
-    timer.stop()
+    timer.lap()
 
 # Get detailed statistics
 stats = timer.get_statistics()
@@ -478,7 +479,7 @@ print(f"Slowest execution: {performance_timer.slowest_time:.3f}s")
 `sktime` eliminates the frustration of timing code manually. Instead of importing `time`, calculating differences, worrying about order, and building your own statistics - you just use `sktime` and get the same results immediately. Even more convenience is offered to you in the form of the `@timethis` decorator, which you can just slap on a function and get all the main benefits of the `Timer` class.
 
 **What makes it so easy:**
-- **One import for everything**: Import `sktime` and you have all timing tools ready
+- **One import for everything**: `from suitkaise import sktime` and you have all timing tools ready
 - **No setup required**: Can work instantly with smart defaults - zero or minimal configuration needed (great for beginners as well)
 - **Order doesn't matter**: Functions like `elapsed()` can take just a start time and insert current time automatically
 - **Smart**: `Timer` knows when it is paused, and `Yawn` knows when to sleep.
@@ -486,7 +487,7 @@ print(f"Slowest execution: {performance_timer.slowest_time:.3f}s")
 - **Real-world ready**: Handle rate limiting, performance monitoring, and user interactions easily
 - **AI friendly**: AI agents and chatbots don't have to worry about replicating complex timing when working with code, they can just use it simply like you do.
 
-***It's the simplicity of the code versus the complexity of the result - it will save you a bunch of time and effort, and new developers will have a much easier time outputting professional grade content!***
+*It's the simplicity of the code versus the complexity of the result - it will save you a bunch of time and effort, and new developers will have a much easier time outputting professional grade content!*
 
 ## 9. Real Examples
 
@@ -569,6 +570,7 @@ def run_quiz():
 
         # process answer and explain
         quiz._process_answer_and_explain(answer)
+
         if answer.correct:
             sktime.sleep(1) # wait 1 second before proceeding to next question
         else:
@@ -588,6 +590,7 @@ def run_quiz():
     
     # Get detailed timing stats
     print(f"Total answering time: {total_time:.1f} seconds")
+
     if total_time / 60 > 45:
         print(f"Quiz took {total_time / 60:.1f} minutes, which is over the 45-minute allotted time.")
 
@@ -610,16 +613,20 @@ from flask import Flask
 app = Flask(__name__)
 
 @app.route('/api/search')
-@sktime.timethis()  # Just add this decorator - that's it!
+@sktime.timethis()  # just add timethis - that's it!
 def search_products():
-    # Your existing code doesn't change at all
+
+    # ... Your existing code doesn't change at all ...
+
     results = database.query("SELECT * FROM products WHERE...")
     return {"products": results}
 
 @app.route('/api/checkout')
-@sktime.timethis()  # Every function gets its own timer automatically
+@sktime.timethis()  # remember - every function gets its own timer automatically
 def process_checkout():
-    # Complex checkout logic
+
+    # ... Complex checkout logic ...
+
     validate_payment()
     update_inventory()
     send_confirmation_email()
@@ -627,21 +634,31 @@ def process_checkout():
 
 @app.route('/debug/performance')
 def show_performance():
-    """Check this URL to see what's slow"""
+    """Check this URL to see what's slow."""
+
     return {
         "search_endpoint": {
+
             "avg_time": f"{search_products.timer.mean:.3f}s",
+
             "slowest_call": f"{search_products.timer.slowest:.3f}s",
+
             "total_calls": search_products.timer.count,
+
             "last_24h_calls": "TODO: filter by timestamp"
         },
+
         "checkout_endpoint": {
+
             "avg_time": f"{process_checkout.timer.mean:.3f}s",
+
             "slowest_call": f"{process_checkout.timer.slowest:.3f}s", 
+
             "total_calls": process_checkout.timer.count
         }
     }
-    # Visit /debug/performance to instantly see: "checkout taking 3.2s avg!"
+
+    # Visit /debug/performance to see: "checkout taking 3.2s avg!"
 ```
 
 #### 5. Database Query Optimization - "Which queries are killing us?"
@@ -654,12 +671,17 @@ import sqlite3
 class DatabaseConnection:
     @sktime.timethis()
     def get_user_profile(self, user_id):
-        # Your existing query - no changes needed
+
+        # ... Your existing query - no changes needed ...
+
         return self.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     
+
     @sktime.timethis() 
     def get_user_orders(self, user_id):
-        # Another existing query
+
+        # ... Another existing query ...
+
         return self.execute("""
             SELECT o.*, p.name 
             FROM orders o 
@@ -667,9 +689,12 @@ class DatabaseConnection:
             WHERE o.user_id = ?
         """, (user_id,))
     
+
     @sktime.timethis()
     def search_products(self, query):
+
         # Potentially slow search
+        
         return self.execute("SELECT * FROM products WHERE name LIKE ?", (f"%{query}%",))
 
 # Use your database normally
@@ -684,6 +709,7 @@ products = db.search_products("laptop")
 print(f"User profile: {db.get_user_profile.timer.mean:.3f}s avg")
 print(f"User orders: {db.get_user_orders.timer.mean:.3f}s avg")  
 print(f"Product search: {db.search_products.timer.mean:.3f}s avg")
+
 # Output: "Product search: 2.847s avg" - found your problem!
 
 # You could even generate line charts of the data for real time visuals!
@@ -737,9 +763,6 @@ Without `sktime`: ***2 lines***
 import time # 1 (first line of code to get this to work)
 
 current_timestamp = time.time() # 2 (second line of code to get this (current time) to work)
-
-# sleep for 1 second
-time.sleep(1) # 2 (second line of code to get this (sleep) to work)
 ```
 
 With `sktime`: ***2 lines***
@@ -751,9 +774,6 @@ current_timestamp = sktime.now() # 2 (as in "time right now")
 
 # or the more explicit version
 current_timestamp = sktime.get_current_time() # 2 (obvious wording)
-
-# sleep for 1 second
-sktime.sleep(1) # 2
 ```
 
 Real use case: Timestamping events or storing timestamps as metadata
@@ -764,6 +784,30 @@ def log_event(message):
 ```
 
 This is just better names for `time.time()` and a `time.sleep()` function, so that you don't have to import `time` AND `sktime`.
+
+#### `sleep()` - easy way to sleep for a given number of seconds and get result after
+
+Without `sktime`: ***3 lines***
+```python
+import time # 1
+
+time.sleep(1) # 2
+
+current_timestamp = time.time() # 3
+```
+
+With `sktime`: ***2 lines***
+```python
+from suitkaise import sktime # 1
+
+current_timestamp = sktime.sleep(1) # 2
+```
+
+Real use case: Waiting for a process to finish
+```python
+while not process_finished():
+    sktime.sleep(1)
+```
 
 #### `elapsed()` - easy way to calculate elapsed time
 
@@ -781,15 +825,20 @@ start_time = time.time() # 3
 end_time = time.time() # 4
 
 try: # 5
-    elapsed = fabs(end_time - start_time) # 6, have to use absolute value to handle order mismatch
+    elapsed = fabs(end_time - start_time) # 6, have to use absolute value to handle order correctly
+
 except TypeError: # 7
     print("Error: start_time and end_time must be of type float") # 8
-
-# ========================================================================================
-
-# The error-prone way without absolute value - wrong order gives negative time
-elapsed = start_time - end_time  # Negative time, causes issues or requires extra code to handle
 ```
+
+```python
+# The error-prone way without absolute value
+# Wrong order gives negative time
+elapsed = start_time - end_time  
+
+# Negative time, causes issues or requires extra code to handle
+```
+
 
 With `sktime`: ***3-4 lines*** 
 - argument option with automatic end time (uses current time)
@@ -802,46 +851,35 @@ from suitkaise import sktime # 1
 start_time = sktime.now() # 2
 # ... do work ...
 time_to_complete = sktime.elapsed(start_time) # 3, current time is end time automatically
+```
 
-# ========================================================================================
-
+```python
 # or give 2 times
-end_time = start_time + 60 # 3 (60 seconds later)
+from suitkaise import sktime # 1
+
+start_time = sktime.now() # 2
+end_time = start_time + 60 # 3
+
 time_to_complete = sktime.elapsed(start_time, end_time) # 4
+
 # or...
-time_to_complete = sktime.elapsed(end_time, start_time) # 4 (order doesn't matter, sktime will handle it)
+
+# order doesn't matter, sktime will handle it
+time_to_complete = sktime.elapsed(end_time, start_time) # 4 
 ```
 
 ### `timethis()` decorator - super powerful for how easy it is to use
 
-Without `sktime`: ***> 50 lines*** (5 lines for basic setup)
-- more than 50 lines of code to achieve a simple version of what `sktime` does
+Without `sktime`: ***> 500 lines*** (5 lines for basic timer setup)
+- more than 50 lines of code to achieve a simple version of what `sktime.Timer` does
 - have to manually calculate statistics and create a class object to use across project (200-400 lines)
+- have to create a decorator to use across project (100-200 lines)
 
-```python
-import time # 1
-
-times = [] # 2
-for i in range(100):
-    start = time.time() # 3
-    expensive_function()
-    end = time.time() # 4
-    times.append(end - start) # 5
-
-# ========================================================================================
-
-# Manual statistical calculation (error-prone and takes time to set up)
-# > 30 lines of code
-import statistics
-
-mean_time = statistics.mean(times)
-median_time = statistics.median(times)
-# ... lots of fetching and manual statistical calculations
-```
 
 With `sktime`: ***3 lines***
 - uses comprehensive `Timer` class
 - zero setup decorator that automatically times functions every time they are called
+- thread safe!
 
 ```python
 from suitkaise import sktime # 1
@@ -857,29 +895,9 @@ for i in range(100):
 
 # Get comprehensive set of statistics automatically with 1 line of code
 stats = expensive_function.timer.get_statistics() # 3
+```
 
-# ========================================================================================
-
-# or access individual statistics
-mean = timer.mean
-median = timer.median
-percentile_95 = timer.percentile(95)
-std = timer.stdev
-# ... and more!
-
-# ========================================================================================
-
-# or use an explicit timer instance
-timer = sktime.Timer()
-
-timer.start()
-expensive_function()
-elapsed_time = timer.stop()
-
-print(f"Time taken: {elapsed_time:.3f}s")
-
-# ========================================================================================
-
+```python
 # time multiple functions with one timer
 timer = sktime.Timer()
 
@@ -901,16 +919,18 @@ def expensive_function_api(self):
 def expensive_function_2_api(self):
     MyClass.expensive_function_2()
 
-# timer collects these into one set of times:
-# direct calls of expensive_function
-# direct calls of expensive_function_2
-# calls of expensive_function through expensive_function_api
-# calls of expensive_function_2 through expensive_function_2_api
+# timer collects these into one set of measurements:
+
+# 1. direct calls of expensive_function
+# 2. direct calls of expensive_function_2
+
+# 3. calls of expensive_function through expensive_function_api
+# 4. calls of expensive_function_2 through expensive_function_2_api
 ```
 
 ### `TimeThis` context manager
 
-Without `sktime`: ***? lines***
+Without `sktime`: ***> 250 lines***
 - have to create a custom class object and then a context manager to use it
 
 With `sktime`: ***3-4 lines***
@@ -948,9 +968,12 @@ print(f"Time taken: {stats['mean']:.3f}s")
 ### Timing Overhead
 `sktime` is designed for minimal overhead in common operations:
 
-- **Basic functions** (`now()`, `get_current_time()`): Near parity with `time.time()` in call overhead.
-- **`elapsed()`**: Within a small constant factor of manual `abs(t2 - t1)` with the benefit of order independence and one-arg convenience.
+- **Basic functions** (`now()`, `get_current_time()`): Parity with `time.time()` in call overhead.
+
+- **`elapsed()`**: Within a small constant factor of manual `abs(t2 - t1)` with the benefit of order independence and one-argument convenience.
+
 - **Timer operations**: `start()/stop()`, `lap()`, and `pause()/resume()` are lightweight and thread-safe.
+
 - **Statistical calculations**: Computed lazily when accessed via properties or `get_statistics()`.
 
 You can run the included microbenchmarks to see colored, human-readable numbers on your machine:
@@ -964,13 +987,15 @@ Example output (will vary by machine/CI):
 ```
 time.time() avg call                     < 0.000001 s
 sktime.now() avg call                    < 0.000001 s
+
 Timer start+stop (noop) avg              0.000001 s
 @timethis wrapped call avg               0.000001 s
 ```
 
 ### Implementation details affecting precision
 
-- **High-resolution intervals**: Internals use `time.perf_counter()` for interval timing in `Timer`, `TimeThis`, and `@timethis`. Wall time functions (`now()`, `get_current_time()`) continue to use `time.time()`.
+- **High-resolution intervals**: Internals use `time.perf_counter()` for interval timing in `Timer`, `TimeThis`, and `@timethis`. Wall time functions `now()` and `get_current_time()` use `time.time()`.
+
 - **Paused-time accounting**: `Timer.total_time_paused` reports a strict sum of paused durations accumulated across recorded measurements.
 
 ### Managing global decorator timers
@@ -1026,7 +1051,9 @@ from suitkaise import sktime
 timer = sktime.Timer()
 current_time = sktime.now()
 rate_limiter = sktime.Yawn(2, 5)
+```
 
+```python
 # Direct imports
 from suitkaise.sktime import Timer, now, Yawn
 
