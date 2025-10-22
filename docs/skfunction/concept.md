@@ -1,262 +1,64 @@
 # SKFunction Concept
 
-## Overview
+skfunction is a module that upgrades function calling
 
-SKFunction will remain somewhat the same, but with a slightly different approach that makes for broader usage opportunities and isolates it from other suitkaise modules (before, it was dependent on skglobals).
-
-SKFunctions are packaged instances consisting of a callable, args with set values, kwargs with set values, and metadata that helps us reference, find, and do other things with an SKFunction.
-
-## Core Features
-
-- **Preset Arguments**: Allows you to call a function with preset arg values at different times
-- **Function Storage**: Store all of a function in one object
-- **Delayed Execution**: Delay calling a function until needed
-- **Clean Execution**: Cleaner, less time consuming execution through use of callable
-
-What I mean by clean execution is that it is a pain in the ass to always organize the positional args exactly in the correct order, and it takes time and space and makes it hard to organize and debug functions with many args.
-
-Instead of adding args positionally, you can add them just by param name as key and value you want to put in that parameter as value. You can even make a dictionary of args to add to a callable and organize it cleanly!
-
-## Key Benefits
-
-✅ **Encapsulation** - Complete execution context in one object
-✅ **Reusability** - Define once, use many times with variations
-✅ **Testability** - Isolated, repeatable function objects
-✅ **Maintainability** - Centralized parameter management
-✅ **Composition** - Build complex operations from simple ones
-✅ **Registry Pattern** - Global function discovery and reuse
-
-## Developer Experience Benefits
-
-✅ **No parameter juggling** - Named parameter injection
-✅ **State preservation** - Exact execution context saved
-✅ **Lazy evaluation** - Define now, execute later
-✅ **Performance tracking** - Built-in metrics and monitoring
-✅ **Cross-process support** - Serializable function objects
-
-## Before vs After SKFunction
-
-### Before SKFunction:
-❌ Remember all parameters every time
-❌ Copy-paste settings between scripts
-❌ Hard to share setups with team
-❌ Re-run expensive reports accidentally
-
-### With SKFunction:
-✅ Set up once, use everywhere
-✅ Override only what you need to change
-✅ Share with entire team automatically
-✅ Cache results to save time
-✅ Build complex workflows from simple pieces
-
-## Integration with Other Modules
-
-- **SKTree/SKGlobal**: Function registries and discovery
-- **XProcess**: Cross-process function execution
-- **Caching**: Built-in result caching with metadata flags
-
-## Philosophy
-
-The beginner-friendly part: You don't need to understand multiprocessing, serialization, or caching - you just create functions with presets and the system handles the complexity!
-
-## Detailed Examples
-
-### Machine Learning Pipeline Example
+there are issues with passing functions as arguments to other functions.
+- you have to pass the function with its arguments in the correct order.
+- especially annoying if some args aren't needed and you have to pass them as None
 
 ```python
-from suitkaise import xprocess, sktree, skfunction
-
-xp = xprocess.CrossProcessing()
-
-# create a machine learning pipeline that works across processes
-def preprocess_data(data_path, model_type, batch_size, normalize=True):
-    # Expensive preprocessing that takes 10+ minutes
-    return processed_data
-
-def train_model(processed_data, model_type, learning_rate, epochs):
-    # Training that takes hours!
-    return trained_model
-
-# create reusable presets for different trials
-image_processing = skfunction.create("image_classifier", preprocess_data, {
-    "model_type": "CNN",
-    "batch_size": 32,
-    "normalize": True
-})
-
-# use the same function base callable but with different param values!
-nlp_processing = skfunction.create("text_classifier", preprocess_data, {
-    "model_type": "Transformer", 
-    "batch_size": 16,
-    "normalize": False
-})
-
-# Register in global function library
-tree = sktree.connect()
-# will also autoregister to a skfunction registry, allowing you to search either actual location or func rej
-tree.add("image_classifier", image_processing, path="ml/preprocessing")
-tree.add("text_classifier", nlp_processing, path="ml/preprocessing")
-
-# you can ALSO add a function straight to the function registry
-# will FAIL if a tree or global storage isn't connected
-tree.add_to_funcrej("image_classifier", image_processing, connection=tree)
-
-# Now ANY process can discover and use these functions themselves
-# Process 1: Data preprocessing worker
-with xp.ProcessSetup() as setup:
-    # get available preprocessing functions (if relpath is given, tries to normalize it first)
-    available_functions = tree.get_all_from("ml/preprocessing")
-    # or...
-    image_classifier = tree.get_from_funcrej("image_classifier")
-
-    # execute correct one based on job type
-    if job_type == "images":
-        result = available_functions["image_classifier"].call(data_path="./images/")
-
-# Process 2: Hyperparameter tuning worker  
-with xprocess.ProcessSetup() as setup:
-    # Use the same preprocessing function with different parameters
-    preprocessor = tree.get_from_funcrej("image_classifier")
+def format_text(text, font_size=12, font_family="Arial", bold=False, italic=False, underline=False, color="black", background_color="white"):
     
-    # Override specific parameters for this experiment
-    result = preprocessor.call(data_path="./experiments/run_5/", batch_size=64)
+    # ... format and return text ...
+    return formatted_text
 
-# Process 3: Production inference server
-@skfunction.cache_results(ttl=3600, save_to_file=True)
-def inference_pipeline(image_data):
-    preprocessor = tree.get_from_funcrej("image_classifier") 
-    model = tree.get("trained_model_v3")
-    
-    # Cached preprocessing + model inference
-    processed = preprocessor.call(image_data)
-    return model.predict(processed)
 
-# The power: Functions are discoverable, reusable across processes, 
-# cacheable, and maintain full execution context
+def process_data(data, debug_message=None):
 
-# NOTE: you can use tree.get instead of tree.get_from_funcrej, but it will take much longer to find the function!
-```
+    # ... process data ...
 
-### Business Reports Example
+    if debug_message:
+        print(debug_message)
 
-```python
-# Let's say you run a small business and need different reports
-from suitkaise import skfunction, sktree, autopath
+    return data
 
-# Step 1: Define a flexible report function
-@autopath(defaultpath="./reports/misc")
-def generate_sales_report(store_name, start_date, end_date, 
-                         format="PDF", include_charts=True, 
-                         email_to=None, save_location_path=None):
-    """
-    Creates a sales report - normally takes 2-3 minutes to run
-    """
-    # Imagine this does: fetch data, calculate totals, create charts, format as PDF
-    print(f"Generating {format} report for {store_name} from {start_date} to {end_date}")
-    # ... complex report generation logic ...
-    return f"Report saved to {save_location}"
 
-# Step 2: Create presets for different stores (avoid repetition!)
-downtown_store = skfunction.create("downtown_reports", generate_sales_report, {
-    "store_name": "Downtown Branch",
-    "format": "PDF",
-    "include_charts": True,
-    "email_to": "manager.downtown@business.com",
-    "save_location": "./reports/downtown/"
-})
-
-mall_store = skfunction.create("mall_reports", generate_sales_report, {
-    "store_name": "Mall Location", 
-    "format": "Excel",
-    "include_charts": False,  # Mall manager prefers Excel
-    "email_to": "manager.mall@business.com",
-    "save_location": "./reports/mall/"
-})
-
-# Step 3: Save these presets so anyone can use them
-tree = sktree.connect()
-tree.add("downtown_reports", downtown_store, path="business/reports")
-tree.add("mall_reports", mall_store, path="business/reports")
-
-# Now the magic happens...
-
-# ✅ Your assistant can generate reports without knowing all the details:
-downtown_report = tree.get("downtown_reports")
-downtown_report.call(start_date="2024-01-01", end_date="2024-01-31")
-# Automatically uses: PDF format, includes charts, emails to right person, saves to right folder
-
-# ✅ Different computers/processes can run the same reports:
-# On your laptop, your server, your assistant's computer - same exact setup (just make sure to include .sk files that have the persistent data!)
-
-# ✅ Override settings when needed:
-# Emergency report with different format
-downtown_report.call(
-    start_date="2024-06-01", 
-    end_date="2024-06-28",
-    format="Excel",  # Override just this one setting
-    email_to="ceo@business.com"  # Send to CEO instead
+# you want bold, black, underlined text with yellow background color
+# without skfunction:
+process_data(
+    "Hello, World!", 
+    format_text(
+        text="Hello, World!", 
+        font_size=12, 
+        font_family="Impact", 
+        bold=True, 
+        underline=True, 
+        background_color="yellow"
+    )
 )
 
-# ✅ Build complex workflows easily:
-def monthly_report_batch():
-    """Generate all monthly reports automatically"""
-    all_report_functions = tree.get_all_from("business/reports")
-    
-    for store_name, report_func in all_report_functions.items():
-        print(f"Generating report for {store_name}...")
-        report_func.call(start_date="2024-06-01", end_date="2024-06-30")
-    
-    print("All monthly reports completed!")
+# with skfunction:
+args = {
+    "font_size": 12, 
+    "font_family": "Impact", 
+    "bold": True, 
+    "underline": True, 
+    "background_color": "yellow"
+}
 
-# ✅ Add caching and/or saving so you don't regenerate identical reports:
-@skfunction.cache_results(save_to_file="file/to/save/to") # or just skfunction.save_results("file/to/save/to")
-def saved_annual_report(store_name, year):
-    # Annual reports take 20+ minutes - cache them!
-    return generate_sales_report(
-        store_name=store_name,
-        start_date=f"{year}-01-01", 
-        end_date=f"{year}-12-31",
-        format="PDF"
-    )
+debug_format = SKFunction(format_text, args)
+
+process_data("Hello, World!", debug_format("Hello, World!"))
 ```
 
-## Key API Design Goals
+pros of skfunction:
+- simple dict that uses paramter names instead of perfect positional order
+- saves callable + args in one object
+- delayed calling
+- call multiple times with different args
+- easy to override args
+- simple and very readable code
+- can create skfunctions from other skfunctions
+- easy to pass to other functions because it's a single object
+- serializable and deserializable
 
-The SKFunction API aims to provide intuitive function object creation and management:
-
-### Basic Function Creation
-```python
-# Simple function creation with presets
-report_func = skfunction.create("sales_report", generate_report, {
-    "format": "PDF",
-    "include_charts": True
-})
-
-# Call with parameter overrides
-result = report_func.call(start_date="2024-01-01", end_date="2024-01-31")
-```
-
-### Function Registry and Discovery
-```python
-# Function registry and discovery
-tree = sktree.connect()
-tree.add_to_funcrej("sales_report", report_func)
-discovered_func = tree.get_from_funcrej("sales_report")
-```
-
-### Caching Integration
-```python
-# Caching decorator
-@skfunction.cache_results(ttl=3600)
-def expensive_computation(data):
-    # Complex processing here
-    return result
-```
-
-## Core Value Proposition
-
-**The Power**: Functions are discoverable, reusable across processes, cacheable, and maintain full execution context.
-
-**Performance Note**: You can use `tree.get()` instead of `tree.get_from_funcrej()`, but it will take much longer to find the function!
-
-The API should make function reusability effortless while providing powerful caching and discovery features, all while hiding the complexity of multiprocessing, serialization, and caching from the user.
