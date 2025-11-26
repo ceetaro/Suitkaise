@@ -43,7 +43,7 @@ class ClassInstanceHandler(Handler):
         We check for this LAST in the handler chain, after all
         specialized handlers have had a chance.
         """
-        # Skip built-in types (they're handled elsewhere or by pickle)
+        # Skip built-in types (handled by base pickle)
         if isinstance(obj, (int, float, str, bytes, bool, type(None),
                            list, tuple, dict, set, frozenset)):
             return False

@@ -10,15 +10,18 @@ cerial prioritizes **capability and consistency** over raw speed:
 
 - builds directly on base pickle (no dill or other dependencies)
 - all objects go through handlers for uniform behavior and control
-- slightly slower on simple objects (~5-10% overhead vs base pickle)
-- massively faster on complex objects (automatic vs hours of manual reconstruction)
+- slightly slower on simple objects, but still uses base pickle for them
+- slightly slower on objects that are commonly handled by cloudpickle/dill/etc.
+- can handle objects that are not supported by base pickle or other libraries, such as locks, loggers, file handles, database connections, etc.
+- therefore, massively faster on complex objects (automatic vs hours of manual reconstruction boilerplate)
 
 **the trade-off:**
 if you need maximum speed for simple data structures, use pickle directly. 
 if you need to serialize "impossible" objects (locks, loggers, files, functions in `__main__`, nested classes), use cerial.
+if you don't want to think about how to serialize objects, use cerial. we handle everything for you at a small speed tradeoff.
 
 **the guarantee:**
-> "if you can create it in python, cerial can serialize it."
+"if you can create it in python, cerial can serialize it."
 
 ## core problem
 
@@ -34,6 +37,11 @@ cerial solves this by serializing the instructions and metadata needed to recons
 
 cerial intelligently serializes objects by understanding their structure and current state, without requiring manual serialization code.
 
+- uses precoded handlers meant specifically for different object types.
+- these handlers dissect the object state and extract the necessary information needed to reconstruct the object correctly in the target process.
+- the state object is then serialized to bytes using base pickle.
+- then, on the other end, the deserializer uses the same handlers to reconstruct the object correctly in the target process.
+
 ### automatic serialization
 
 cerial automatically handles serialization by:
@@ -44,6 +52,16 @@ cerial automatically handles serialization by:
 5. preserving reconstruction instructions with the serialized data
 
 no need to write custom serialization logic - cerial figures it out.
+
+but if you want to, you can!
+
+use the `__serialize__` / `__deserialize__` methods to add extra control over the serialization/deserialization process.
+
+__serialize__: extract the object's state and return it as a dictionary.
+
+__deserialize__: reconstruct the object from the given state, updating attributes if needed.
+
+cerial won't update attributes like current time, attempt to gather network data, or do anything else that might change object state. it will only store the state before serialization, and then reconstruct the object using that exact state.
 
 ### optional customization
 
@@ -77,6 +95,8 @@ class Point:
 
 cerial automatically detects and uses whichever method is available, with no configuration needed.
 
+this is used when no other methods are available, and cerial attempts to recursively serialize the object's state and any nested objects within.
+
 ### usage
 
 ```python
@@ -92,6 +112,8 @@ serialized = cerial.serialize(processor)
 # ... send to worker process
 processor_copy = cerial.deserialize(serialized)  # exact state restored
 ```
+
+note that this will cause the object to exist in both the source and target processes. just keep this in mind!
 
 supports serialization of (importance rating 1-100, where number = % of users who need this):
 - functions (95)
@@ -174,12 +196,18 @@ obj = ComplexObject()
 serializer = CerialSerializer()
 
 # 1. Serializer checks: is this a primitive type?
+# 1a. Yes - pass through to base pickle
 # 2. No - get handler for ComplexObject
 # 3. Handler extracts: {"attr1": <Lock>, "attr2": 42}
 # 4. Serializer recursively processes extracted state:
 #    - Sees <Lock>, gets LockHandler, extracts lock state
 #    - Sees 42, passes through (primitive)
-# 5. Result: nested dict of primitives, ready for pickle
+# 5. Result: nested dict of primitives, ready for basic pickle
+# 6. Base pickle serializes the result to bytes
+# 7. Bytes are sent to the target process
+# 8. Deserializer receives bytes
+# 9. Deserializer uses the same handlers to reconstruct the object correctly in the target process
+# 10. Result: exact copy of the original object when it was serialized into bytes
 ```
 
 **benefits:**
@@ -324,6 +352,7 @@ each complex type has a handler that extracts reconstruction instructions:
 **database connections**: extract path, schema, and data dump
 **partial functions**: extract wrapped function and bound arguments
 **bound methods**: extract instance reference and method name
+... and more (add them all here)
 
 handlers recursively serialize nested objects within their state.
 
@@ -382,28 +411,27 @@ fail hard with clear error messages:
 
 ### thread safety
 
-serialization should be atomic - the object shouldn't change while being serialized. handlers may need to acquire locks during serialization to ensure consistent snapshots of state.
+serialization should be atomic - the object shouldn't change while being serialized. handlers should acquire locks during serialization to ensure consistent snapshots of state.
 
 ### integration with suitkaise
 
 cerial deeply integrates with other suitkaise modules:
 - uses **skpath** for path resolution (relative to project root, works across machines as long as project root is the same)
-- provides handlers for **sktime** timers, **fdl** objects, etc.
-- powers multiprocessing in **circuit** and **xprocess** modules
+- provides handlers for all other objects in other suitkaise modules
 
 ## validation: the worst possible object
 
-cerial includes a comprehensive test object (`WorstPossibleObject`) that contains every difficult-to-serialize type in a deeply nested structure:
+cerial includes a comprehensive test object (`WorstPossibleObject`) that contains every difficult-to-serialize type in a nested structure:
 
-- all critical types (functions, loggers, partials, bound methods)
-- all very common types (file handles, locks, queues, events)
-- all common types (generators, regex, context managers, db connections)
-- 3+ levels of deep nesting
-- circular references
-- nested class definitions
-- suitkaise-specific objects
+the worst possible object contains every object type that cerial can handle in a class nested within another class.
 
-**the goal**: serialize and deserialize this object with 100% field verification passing.
+TODO
+
+1. ensure that the object has 3+ levels of nested classes
+2. has nested objects/collections
+3. has checks to ensure that object still functions correctly after serialization/deserialization
+
+**the goal**: serialize and deserialize this object with 100% field verification passing. the object should work correctly and contain the same data state as before serialization.
 
 if cerial can handle the worst possible object, it can handle anything users throw at it.
 

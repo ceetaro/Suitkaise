@@ -73,8 +73,8 @@ class FileHandleHandler(Handler):
             from suitkaise.skpath.api import SKPath
             sk_path = SKPath(file_path)
             # Store both absolute and relative paths
-            relative_path = str(sk_path.relative_to_project_root())
-            absolute_path = str(sk_path.absolute())
+            relative_path = str(sk_path.np)
+            absolute_path = str(sk_path.ap)
         except ImportError:
             # skpath not available
             relative_path = None
@@ -128,8 +128,8 @@ class FileHandleHandler(Handler):
             try:
                 from suitkaise.skpath.api import SKPath
                 # Try relative path (better for cross-machine)
-                sk_path = SKPath.from_project_relative(state["relative_path"])
-                file_path = str(sk_path.absolute())
+                sk_path = SKPath(state["relative_path"])
+                file_path = sk_path.ap
             except ImportError:
                 # skpath not available, fall back to absolute path
                 file_path = state["path"]
