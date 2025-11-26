@@ -121,9 +121,9 @@ class WorstPossibleObject:
         else:
             self._debug_file = None
         
-        self._log("="*70)
+        self._log("=" * 70)
         self._log("INITIALIZING WORST POSSIBLE OBJECT")
-        self._log("="*70)
+        self._log("=" * 70 + "\n")
         
         self.init_all_base_pickle_supported_objects()
         self.init_all_complex_types_in_random_order()
@@ -174,14 +174,14 @@ class WorstPossibleObject:
         self.bool_false = False
         self._track_init('primitives', 'bool_true/false', self.bool_true)
         
-        self.int_value = 42
-        self.large_int = 123456789012345678901234567890
-        self.negative_int = -999
-        self._track_init('primitives', 'int_value/large/negative', self.int_value)
+        # random ints between -2147483648 and 2147483647
+        self.int_value = random.randint(-2147483648, 2147483647)
+        # random very large ints between -10^30 and 10^30
+        self.large_int = random.randint(-10**30, 10**30)
+        self._track_init('primitives', 'int_value/large', self.int_value)
         
-        self.float_value = 3.14159
-        self.negative_float = -2.71828
-        self._track_init('primitives', 'float_value/negative', self.float_value)
+        self.float_value = random.uniform(-10**30, 10**30)
+        self._track_init('primitives', 'float_value', self.float_value)
         
         self.complex_value = complex(2, 3)
         self.complex_negative = complex(-1, -1)
