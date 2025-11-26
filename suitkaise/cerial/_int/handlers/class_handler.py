@@ -90,6 +90,11 @@ class ClassInstanceHandler(Handler):
             "strategy": strategy,
         }
         
+        # Check if this is a locally-defined class (inside a function/method)
+        if "<locals>" in obj_class.__qualname__:
+            # Locally-defined class - must serialize the class definition
+            state["class_definition"] = self._serialize_class_definition(obj_class)
+        
         # Extract nested class definitions if this is a nested class
         nested_classes = self._extract_nested_classes(obj_class)
         if nested_classes:
@@ -97,8 +102,14 @@ class ClassInstanceHandler(Handler):
         
         # Extract state based on strategy
         if strategy == "custom_serialize":
-            # User provided __serialize__ method
+            # User provided __serialize__ method (module-level class)
             state["custom_state"] = obj.__serialize__()
+            
+        elif strategy == "custom_serialize_local":
+            # User provided __serialize__/__deserialize__ for locally-defined class
+            # Save both the state AND the __deserialize__ function
+            state["custom_state"] = obj.__serialize__()
+            state["deserialize_function"] = obj_class.__deserialize__
             
         elif strategy == "to_dict":
             # Library pattern: to_dict() / from_dict()
@@ -126,19 +137,34 @@ class ClassInstanceHandler(Handler):
         """
         Determine which extraction strategy to use.
         
-        Returns: "custom_serialize", "to_dict", or "dict"
+        Returns: "custom_serialize", "custom_serialize_local", "to_dict", or "dict"
         """
+        obj_class = obj.__class__
+        
         # Check for __serialize__ / __deserialize__
         if hasattr(obj, '__serialize__'):
-            obj_class = obj.__class__
             if hasattr(obj_class, '__deserialize__'):
-                return "custom_serialize"
+                # Check if locally-defined
+                if "<locals>" in obj_class.__qualname__:
+                    # For locally-defined classes, only use custom_serialize_local
+                    # if __deserialize__ is a staticmethod (not a classmethod)
+                    # Check the descriptor in __dict__
+                    if '__deserialize__' in obj_class.__dict__:
+                        deserialize_desc = obj_class.__dict__['__deserialize__']
+                        if isinstance(deserialize_desc, staticmethod):
+                            return "custom_serialize_local"
+                    # else: classmethod or regular method - fall through to dict strategy
+                else:
+                    # Module-level class - use normal custom_serialize
+                    return "custom_serialize"
         
         # Check for to_dict / from_dict
+        # Same limitation for locally-defined classes
         if hasattr(obj, 'to_dict'):
-            obj_class = obj.__class__
             if hasattr(obj_class, 'from_dict'):
-                return "to_dict"
+                if "<locals>" not in obj_class.__qualname__:
+                    return "to_dict"
+                # else: fall through to dict strategy
         
         # Check for __slots__
         obj_class = obj.__class__
@@ -288,14 +314,35 @@ class ClassInstanceHandler(Handler):
                 self._reconstruct_class_definition(class_def)
         
         # Get the class
-        cls = self._get_class(state["module"], state["qualname"])
+        # Check if this is a locally-defined class (has <locals> in qualname)
+        if "<locals>" in state["qualname"]:
+            # Locally-defined class - must reconstruct from definition
+            if "class_definition" in state:
+                cls = self._reconstruct_class_definition(state["class_definition"])
+            else:
+                raise DeserializationError(
+                    f"Locally-defined class '{state['qualname']}' has no class definition. "
+                    f"Cannot reconstruct."
+                )
+        else:
+            # Regular or nested class - try to import
+            cls = self._get_class(state["module"], state["qualname"])
         
         # Reconstruct based on strategy
         strategy = state["strategy"]
         
         if strategy == "custom_serialize":
-            # Use class's __deserialize__ method
+            # Use class's __deserialize__ method (module-level class)
             return cls.__deserialize__(state["custom_state"])
+            
+        elif strategy == "custom_serialize_local":
+            # Locally-defined class with custom __serialize__/__deserialize__
+            # The __deserialize__ function was serialized and should be reconstructed
+            deserialize_func = state["deserialize_function"]
+            
+            # Call the function with cls and state
+            # Note: User should define __deserialize__ as @staticmethod that takes (cls, state)
+            return deserialize_func(cls, state["custom_state"])
             
         elif strategy == "to_dict":
             # Use class's from_dict method
@@ -381,7 +428,15 @@ class ClassInstanceHandler(Handler):
         """
         Reconstruct a class definition using type().
         
-        This is used for nested classes that were serialized.
+        This is used for nested/locally-defined classes that were serialized.
+        
+        NOTE: class_def["dict"] contains the IR (intermediate representation) of
+        class attributes/methods. We don't deserialize them here - we just pass
+        them to type(). This means methods won't work correctly, but the class
+        will exist and can be used for isinstance checks.
+        
+        For fully functional reconstruction of locally-defined classes with
+        methods, users should move the class to module level or use pickle directly.
         """
         # Get base classes
         bases = []
@@ -393,11 +448,40 @@ class ClassInstanceHandler(Handler):
         if not bases:
             bases = [object]
         
+        # Note: class_def["dict"] is in IR format (serialized by central serializer)
+        # For basic attributes this works fine, but methods will be broken
+        # This is a known limitation for locally-defined classes
+        # 
+        # To properly reconstruct, we'd need access to the deserializer here,
+        # but that creates circular dependencies. Instead, we create a minimal
+        # class definition that can at least be used for isinstance checks.
+        
+        # Create a minimal class dict with just the essentials
+        # Skip methods, functions, classmethods, staticmethods, properties
+        # These don't work after dynamic class reconstruction
+        class_dict = {}
+        for key, value in class_def["dict"].items():
+            # Skip anything that's a cerial-serialized object (has __cerial_type__)
+            if isinstance(value, dict) and "__cerial_type__" in value:
+                continue
+            
+            # Skip methods, functions, and descriptors
+            # These include: function, method, classmethod, staticmethod, property
+            if callable(value) or isinstance(value, (classmethod, staticmethod, property)):
+                continue
+            
+            # Skip special attributes
+            if key.startswith('_'):
+                continue
+            
+            # Include simple attributes (strings, numbers, etc.)
+            class_dict[key] = value
+        
         # Create class using type()
         cls = type(
             class_def["name"],
             tuple(bases),
-            class_def["dict"]
+            class_dict
         )
         
         # Set __module__ and __qualname__

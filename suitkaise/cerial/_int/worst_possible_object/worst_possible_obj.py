@@ -1082,6 +1082,8 @@ class WorstPossibleObject:
             'partial_callable': callable(self.partial_function),
             'bound_method_callable': callable(self.bound_method),
         }
+        
+        return self._verification_checksums
     
     def verify(self, other):
         """

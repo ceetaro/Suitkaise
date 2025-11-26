@@ -295,3 +295,109 @@ class TemporaryFileHandler(Handler):
         
         return temp_file
 
+
+class StringIOHandler(Handler):
+    """
+    Serializes io.StringIO objects.
+    
+    StringIO is an in-memory text stream. We capture the content and position.
+    """
+    
+    type_name = "string_io"
+    
+    def can_handle(self, obj: Any) -> bool:
+        """Check if object is a StringIO."""
+        return isinstance(obj, io.StringIO)
+    
+    def extract_state(self, obj: io.StringIO) -> Dict[str, Any]:
+        """
+        Extract StringIO state.
+        
+        What we capture:
+        - content: The full string buffer
+        - position: Current position (from tell())
+        """
+        # Save current position
+        original_pos = obj.tell()
+        
+        # Read all content
+        obj.seek(0)
+        content = obj.read()
+        
+        # Restore position
+        obj.seek(original_pos)
+        
+        return {
+            "content": content,
+            "position": original_pos,
+        }
+    
+    def reconstruct(self, state: Dict[str, Any]) -> io.StringIO:
+        """
+        Reconstruct StringIO.
+        
+        Process:
+        1. Create new StringIO with content
+        2. Seek to same position
+        """
+        # Create new StringIO with content
+        string_io = io.StringIO(state["content"])
+        
+        # Seek to same position
+        string_io.seek(state["position"])
+        
+        return string_io
+
+
+class BytesIOHandler(Handler):
+    """
+    Serializes io.BytesIO objects.
+    
+    BytesIO is an in-memory binary stream. We capture the content and position.
+    """
+    
+    type_name = "bytes_io"
+    
+    def can_handle(self, obj: Any) -> bool:
+        """Check if object is a BytesIO."""
+        return isinstance(obj, io.BytesIO)
+    
+    def extract_state(self, obj: io.BytesIO) -> Dict[str, Any]:
+        """
+        Extract BytesIO state.
+        
+        What we capture:
+        - content: The full bytes buffer
+        - position: Current position (from tell())
+        """
+        # Save current position
+        original_pos = obj.tell()
+        
+        # Read all content
+        obj.seek(0)
+        content = obj.read()
+        
+        # Restore position
+        obj.seek(original_pos)
+        
+        return {
+            "content": content,
+            "position": original_pos,
+        }
+    
+    def reconstruct(self, state: Dict[str, Any]) -> io.BytesIO:
+        """
+        Reconstruct BytesIO.
+        
+        Process:
+        1. Create new BytesIO with content
+        2. Seek to same position
+        """
+        # Create new BytesIO with content
+        bytes_io = io.BytesIO(state["content"])
+        
+        # Seek to same position
+        bytes_io.seek(state["position"])
+        
+        return bytes_io
+

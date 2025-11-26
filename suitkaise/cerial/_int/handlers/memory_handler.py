@@ -50,30 +50,75 @@ class MMapHandler(Handler):
         - fileno: File descriptor number
         - length: Length of mapping
         - position: Current position in mapping
-        - access: Access mode (ACCESS_READ, ACCESS_WRITE, etc.)
+        - file_path: Path to backing file (if we can determine it)
+        - content: Full mmap content (for cross-process transfer)
         - closed: Whether mmap is closed
         
-        Note: For anonymous mmaps (no file backing), we capture the content.
+        Strategy:
+        For inter-process communication, we ALWAYS save the content.
+        We also try to get the file path for file-backed mmaps.
+        This enables reliable multiple round-trips across processes.
         """
         # Get current position
-        position = obj.tell()
+        try:
+            position = obj.tell()
+        except (OSError, ValueError):
+            position = 0
         
         # Get length
-        length = obj.size()
+        try:
+            length = obj.size()
+        except (OSError, ValueError):
+            # If size() fails, the mmap is invalid/closed
+            # Try to read all content to determine size
+            try:
+                current = obj.tell()
+                obj.seek(0)
+                content = obj.read()
+                length = len(content)
+                obj.seek(current)
+            except:
+                # Completely invalid mmap
+                raise MemorySerializationError(
+                    "Cannot serialize mmap: object is closed or in invalid state"
+                )
         
-        # Get file descriptor
-        fileno = obj.fileno() if hasattr(obj, 'fileno') else -1
+        # Try to get file descriptor
+        fileno = -1
+        try:
+            if hasattr(obj, 'fileno'):
+                fileno = obj.fileno()
+        except (OSError, ValueError):
+            # Bad file descriptor or invalid mmap
+            fileno = -1
         
-        # Determine if this is an anonymous mmap (no file backing)
-        is_anonymous = fileno == -1
+        # Try to get file path from file descriptor (for file-backed mmaps)
+        file_path: Optional[str] = None
+        if fileno != -1:
+            if sys.platform.startswith('linux'):
+                # Linux: use /proc/self/fd/
+                try:
+                    file_path = os.readlink(f'/proc/self/fd/{fileno}')
+                except (OSError, FileNotFoundError):
+                    pass
+            
+            elif sys.platform == 'darwin':
+                # macOS: use fcntl.F_GETPATH
+                try:
+                    import fcntl
+                    path_bytes = fcntl.fcntl(fileno, fcntl.F_GETPATH, bytes(1024))
+                    file_path = path_bytes.rstrip(b'\x00').decode('utf-8')
+                except (ImportError, OSError, AttributeError):
+                    pass
         
-        # For anonymous mmaps, save the content
-        if is_anonymous:
-            obj.seek(0)
-            content = obj.read()
-            obj.seek(position)
-        else:
-            content = None
+        # ALWAYS save content for reliable cross-process transfer
+        # Even for file-backed mmaps, the file might not exist in target process
+        obj.seek(0)
+        content = obj.read()
+        obj.seek(position)
+        
+        # Determine if this is anonymous (no file backing found)
+        is_anonymous = fileno == -1 or file_path is None
         
         return {
             "fileno": fileno,
@@ -81,6 +126,7 @@ class MMapHandler(Handler):
             "position": position,
             "closed": obj.closed,
             "is_anonymous": is_anonymous,
+            "file_path": file_path,
             "content": content,
         }
     
@@ -88,32 +134,37 @@ class MMapHandler(Handler):
         """
         Reconstruct mmap.
         
-        Process:
-        - For file-backed mmaps: reopen file and create new mmap
-        - For anonymous mmaps: create new anonymous mmap with same content
+        Strategy:
+        1. If we have a file_path and the file exists, try to create a file-backed mmap
+        2. Otherwise, create an anonymous mmap with the saved content
+        3. This ensures reliable reconstruction across processes
         
-        Note: File descriptor numbers don't transfer across processes,
-        so we can't use the original fileno. This handler is limited
-        for file-backed mmaps.
+        The content is always preserved, making this work for inter-process
+        communication even when the backing file doesn't exist in target process.
         """
-        if state["is_anonymous"]:
-            # Create anonymous mmap with content
-            length = state["length"]
-            mm = mmap.mmap(-1, length)
-            
-            if state["content"]:
-                mm.write(state["content"])
-            
-            mm.seek(state["position"])
-            return mm
-        else:
-            # File-backed mmap - we can't easily recreate this without
-            # the file path. Raise an error with instructions.
-            raise NotImplementedError(
-                "Cannot reconstruct file-backed mmap without file path. "
-                "File descriptors don't transfer across processes. "
-                "Consider using FileHandleHandler for the underlying file instead."
-            )
+        # Try file-backed mmap first (if we have a path and file exists)
+        file_path = state.get("file_path")
+        if file_path and os.path.exists(file_path):
+            try:
+                # Open the file and create a file-backed mmap
+                with open(file_path, 'r+b') as f:
+                    mm = mmap.mmap(f.fileno(), state["length"])
+                    mm.seek(state["position"])
+                    return mm
+            except (OSError, ValueError, IOError):
+                # File-backed mmap failed, fall back to anonymous
+                pass
+        
+        # Fall back to anonymous mmap with content
+        # This works reliably across processes
+        length = state["length"]
+        mm = mmap.mmap(-1, length)
+        
+        if state["content"]:
+            mm.write(state["content"])
+        
+        mm.seek(state["position"])
+        return mm
 
 
 class SharedMemoryHandler(Handler):

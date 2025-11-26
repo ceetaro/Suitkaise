@@ -205,10 +205,20 @@ class FormatterHandler(Handler):
         - datefmt: Date format string
         - _style: Format style ('%', '{', or '$')
         """
+        # Determine style from _style object type
+        style = '%'  # default
+        if hasattr(obj, '_style'):
+            style_class_name = obj._style.__class__.__name__
+            if 'StrFormat' in style_class_name:
+                style = '{'
+            elif 'StringTemplate' in style_class_name or 'Template' in style_class_name:
+                style = '$'
+            # else: default to '%'
+        
         return {
             "fmt": obj._fmt,
             "datefmt": obj.datefmt,
-            "style": obj._style._fmt if hasattr(obj._style, '_fmt') else '%',
+            "style": style,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> logging.Formatter:

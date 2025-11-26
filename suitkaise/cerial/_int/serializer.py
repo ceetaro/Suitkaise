@@ -83,6 +83,11 @@ class CerialSerializer:
         self._serialization_depth = 0
         self._max_depth = 1000
         self._object_path: list = []  # Breadcrumb trail for error reporting
+        
+        # Debug tracking
+        self._all_object_ids: set = set()  # All __object_id__ values added
+        self._all_circular_refs: set = set()  # All __cerial_ref__ values created
+        self._circular_ref_details: list = []  # (obj_id, type, path) for each circular ref
     
     def serialize(self, obj: Any) -> bytes:
         """
@@ -103,6 +108,9 @@ class CerialSerializer:
         self.seen_objects = {}
         self._serialization_depth = 0
         self._object_path = []
+        self._all_object_ids = set()
+        self._all_circular_refs = set()
+        self._circular_ref_details = []
         
         if self.verbose:
             print(f"[CERIAL] Starting serialization of {type(obj).__name__}")
@@ -222,41 +230,90 @@ class CerialSerializer:
             if self._is_circular_capable(obj):
                 if obj_id in self.seen_objects:
                     # Already serialized - return reference marker
+                    self._all_circular_refs.add(obj_id)
+                    path_str = " → ".join(self._object_path[-3:])
+                    self._circular_ref_details.append((obj_id, type(obj).__name__, path_str))
                     return {"__cerial_ref__": obj_id}
                 # Mark as seen
                 self.seen_objects[obj_id] = obj
             
             # Step 2: Check if base pickle can handle natively
             if self._is_pickle_native(obj):
-                # Step 2a: Primitives - return as-is
+                # Step 2a: Primitives - check if they need __object_id__ (for circular refs)
+                # Singletons and immutable primitives
                 if obj is None or obj is Ellipsis or obj is NotImplemented:
+                    # Check if circular ref
+                    if obj_id in self.seen_objects:
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "pickle_native",
+                            "__object_id__": obj_id,
+                            "value": obj,
+                        }
                     return obj
                 
                 if isinstance(obj, (bool, int, float, complex, str, bytes, bytearray)):
+                    # These are never circular (immutable primitives)
                     return obj
                 
                 if isinstance(obj, (range, slice)):
+                    # Check if circular ref
+                    if obj_id in self.seen_objects:
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "pickle_native",
+                            "__object_id__": obj_id,
+                            "value": obj,
+                        }
                     return obj
                 
                 # Step 2b: Collections - recursively serialize contents
-                if isinstance(obj, dict):
+                # BUT: Check for special collection types first (Counter, defaultdict, etc.)
+                # These are dict/list subclasses but pickle handles them correctly
+                if self._is_special_pickle_native(obj):
+                    # Special collections types - return as-is (with object_id if needed)
+                    if obj_id in self.seen_objects:
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "pickle_native",
+                            "__object_id__": obj_id,
+                            "value": obj,
+                        }
+                    return obj
+                
+                elif isinstance(obj, dict):
                     # Recursively serialize BOTH keys and values
                     # Keys can be tuples/frozensets with complex objects inside
                     serialized_items = [
                         (self._serialize_recursive(k), self._serialize_recursive(v))
                         for k, v in obj.items()
                     ]
-                    return {
+                    result = {
                         "__cerial_type__": "dict",
                         "items": serialized_items,
                     }
+                    # Add object_id if this dict is circular-capable (was tracked)
+                    if obj_id in self.seen_objects:
+                        result["__object_id__"] = obj_id
+                        self._all_object_ids.add(obj_id)
+                    return result
                 
                 elif isinstance(obj, list):
                     # Recursively serialize list items
-                    return [
+                    # Lists come out as plain lists (not wrapped) unless they have circular refs
+                    serialized_items = [
                         self._serialize_recursive(item)
                         for item in obj
                     ]
+                    # If list is circular-capable, wrap it with metadata
+                    if obj_id in self.seen_objects:
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "list",
+                            "items": serialized_items,
+                            "__object_id__": obj_id,
+                        }
+                    return serialized_items
                 
                 elif isinstance(obj, tuple):
                     # Recursively serialize tuple items
@@ -265,10 +322,15 @@ class CerialSerializer:
                         self._serialize_recursive(item)
                         for item in obj
                     ]
-                    return {
+                    result = {
                         "__cerial_type__": "tuple",
                         "items": serialized_items,
                     }
+                    # Add object_id if this tuple is circular-capable (was tracked)
+                    if obj_id in self.seen_objects:
+                        result["__object_id__"] = obj_id
+                        self._all_object_ids.add(obj_id)
+                    return result
                 
                 elif isinstance(obj, set):
                     # Recursively serialize set items
@@ -276,10 +338,15 @@ class CerialSerializer:
                         self._serialize_recursive(item)
                         for item in obj
                     ]
-                    return {
+                    result = {
                         "__cerial_type__": "set",
                         "items": serialized_items,
                     }
+                    # Add object_id if this set is circular-capable (was tracked)
+                    if obj_id in self.seen_objects:
+                        result["__object_id__"] = obj_id
+                        self._all_object_ids.add(obj_id)
+                    return result
                 
                 elif isinstance(obj, frozenset):
                     # Recursively serialize frozenset items
@@ -287,10 +354,32 @@ class CerialSerializer:
                         self._serialize_recursive(item)
                         for item in obj
                     ]
-                    return {
+                    result = {
                         "__cerial_type__": "frozenset",
                         "items": serialized_items,
                     }
+                    # Add object_id if this frozenset is circular-capable (was tracked)
+                    if obj_id in self.seen_objects:
+                        result["__object_id__"] = obj_id
+                        self._all_object_ids.add(obj_id)
+                    return result
+                
+                # Step 2c: Other pickle-native types (datetime, UUID, Decimal, Path, etc.)
+                # These implement __reduce__ properly
+                # BUT: if they're circular-capable and were seen, we need to track their ID
+                else:
+                    # Check if this object needs an __object_id__ (is in seen_objects)
+                    if obj_id in self.seen_objects:
+                        # Wrap with metadata to include __object_id__
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "pickle_native",
+                            "__object_id__": obj_id,
+                            "value": obj,
+                        }
+                    else:
+                        # No circular refs, return as-is
+                        return obj
             
             # Step 3: Find handler for complex object
             handler = self._find_handler(obj)
@@ -303,6 +392,16 @@ class CerialSerializer:
                     if self.verbose:
                         indent = "  " * min(self._serialization_depth, 5)
                         print(f"{indent}    ↳ Pickle native (no handler)")
+                    
+                    # Check if it needs __object_id__ (for circular refs)
+                    if obj_id in self.seen_objects:
+                        self._all_object_ids.add(obj_id)
+                        return {
+                            "__cerial_type__": "pickle_native",
+                            "__object_id__": obj_id,
+                            "value": obj,
+                        }
+                    
                     return obj
                 except Exception as pickle_err:
                     path_str = " -> ".join(self._object_path)
@@ -345,6 +444,8 @@ class CerialSerializer:
             serialized_state = self._serialize_recursive(state)
             
             # Step 6: Wrap in metadata
+            # ALWAYS include object_id for handler objects - keeps things simple and consistent
+            self._all_object_ids.add(obj_id)
             return {
                 "__cerial_type__": handler.type_name,
                 "__handler__": handler.__class__.__name__,
@@ -357,6 +458,29 @@ class CerialSerializer:
             self._serialization_depth -= 1
             if self._object_path:
                 self._object_path.pop()
+    
+    def _is_special_pickle_native(self, obj: Any) -> bool:
+        """
+        Check if object is a special pickle-native type that should not be decomposed.
+        
+        These are subclasses of basic collections (Counter, defaultdict, etc.) that
+        pickle handles correctly and should be serialized as-is.
+        """
+        try:
+            import collections
+            
+            if isinstance(obj, (
+                collections.Counter,
+                collections.defaultdict,
+                collections.OrderedDict,
+                collections.deque,
+                collections.ChainMap
+            )):
+                return True
+        except (ImportError, AttributeError):
+            pass
+        
+        return False
     
     def _is_pickle_native(self, obj: Any) -> bool:
         """
@@ -386,6 +510,40 @@ class CerialSerializer:
         # Check for other pickle-native types
         if isinstance(obj, (range, slice)):
             return True
+        
+        # Standard library pickle-native types (implement __reduce__ properly)
+        try:
+            import datetime
+            import decimal
+            import uuid
+            import pathlib
+            import collections
+            import fractions
+            
+            # datetime module types
+            if isinstance(obj, (datetime.datetime, datetime.date, datetime.time, datetime.timedelta)):
+                return True
+            
+            # Numeric types
+            if isinstance(obj, (decimal.Decimal, fractions.Fraction)):
+                return True
+            
+            # UUID
+            if isinstance(obj, uuid.UUID):
+                return True
+            
+            # pathlib.Path and subclasses
+            if isinstance(obj, pathlib.Path):
+                return True
+            
+            # collections module types
+            if isinstance(obj, (collections.defaultdict, collections.OrderedDict, 
+                              collections.Counter, collections.deque, collections.ChainMap)):
+                return True
+        
+        except ImportError:
+            # Module not available, skip these checks
+            pass
         
         return False
     

@@ -27,6 +27,8 @@ from .lock_handler import (
 from .file_handler import (
     FileHandleHandler,
     TemporaryFileHandler,
+    StringIOHandler,
+    BytesIOHandler,
 )
 
 # Queue handlers (65% + events 50%)
@@ -178,6 +180,8 @@ __all__ = [
     # Files
     'FileHandleHandler',
     'TemporaryFileHandler',
+    'StringIOHandler',
+    'BytesIOHandler',
     
     # Queues and events
     'QueueHandler',
@@ -296,6 +300,8 @@ ALL_HANDLERS = [
     # File handles
     FileHandleHandler(),
     TemporaryFileHandler(),
+    StringIOHandler(),
+    BytesIOHandler(),
     
     # Locks
     LockHandler(),
