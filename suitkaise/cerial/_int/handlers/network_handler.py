@@ -67,7 +67,13 @@ class HTTPSessionHandler(Handler):
         if hasattr(obj, 'cookies'):
             try:
                 cookies = dict(obj.cookies)
-            except Exception:
+            except (TypeError, AttributeError):
+                # Cookies not convertible to dict - use empty
+                cookies = {}
+            except Exception as e:
+                # Unexpected error extracting cookies - log and use empty
+                import warnings
+                warnings.warn(f"Failed to extract HTTP session cookies: {e}")
                 cookies = {}
         
         # Extract headers

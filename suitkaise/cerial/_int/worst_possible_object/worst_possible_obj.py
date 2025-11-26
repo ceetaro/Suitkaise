@@ -24,6 +24,11 @@ import contextvars
 import subprocess
 import socket
 import sys
+import uuid
+from datetime import datetime, date, time, timedelta
+from decimal import Decimal
+from fractions import Fraction
+from collections import defaultdict, OrderedDict, Counter, deque, ChainMap
 from functools import partial
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Set
@@ -218,6 +223,37 @@ class WorstPossibleObject:
         self.slice_full = slice(10, 50, 2)
         self._track_init('primitives', 'slice_value/full', self.slice_value)
         
+        # Additional pickle-native types (datetime, Decimal, etc.)
+        self._log("\n[INIT] Additional pickle-native types")
+        
+        self.datetime_value = datetime(2023, 5, 15, 10, 30, 45)
+        self.datetime_now = datetime.now()
+        self._track_init('primitives', 'datetime_value/now', self.datetime_value)
+        
+        self.date_value = date(2023, 5, 15)
+        self.date_today = date.today()
+        self._track_init('primitives', 'date_value/today', self.date_value)
+        
+        self.time_value = time(10, 30, 45)
+        self.time_with_micro = time(10, 30, 45, 123456)
+        self._track_init('primitives', 'time_value/micro', self.time_value)
+        
+        self.timedelta_value = timedelta(days=5, hours=3, minutes=30)
+        self.timedelta_negative = timedelta(days=-10)
+        self._track_init('primitives', 'timedelta_value/negative', self.timedelta_value)
+        
+        self.decimal_value = Decimal('123.456')
+        self.decimal_precision = Decimal('1.123456789012345678901234567890')
+        self._track_init('primitives', 'decimal_value/precision', self.decimal_value)
+        
+        self.fraction_value = Fraction(3, 4)
+        self.fraction_from_float = Fraction(0.5)
+        self._track_init('primitives', 'fraction_value/from_float', self.fraction_value)
+        
+        self.uuid_value = uuid.uuid4()
+        self.uuid_fixed = uuid.UUID('12345678-1234-5678-1234-567812345678')
+        self._track_init('primitives', 'uuid_value/fixed', self.uuid_value)
+        
         # Collections with primitives
         self._log("\n[INIT] Base collections")
         
@@ -244,6 +280,51 @@ class WorstPossibleObject:
         self.dict_mixed = {1: "int key", "str": 2, (1, 2): "tuple key"}
         self.dict_empty = {}
         self._track_init('collections', 'dict_value/mixed/empty', self.dict_value)
+        
+        # Advanced collections (pickle-native)
+        self._log("\n[INIT] Advanced collections (collections module)")
+        
+        self.defaultdict_value = defaultdict(list)
+        self.defaultdict_value['key1'].append(1)
+        self.defaultdict_value['key1'].append(2)
+        self.defaultdict_value['key2'].append(3)
+        self._track_init('collections', 'defaultdict_value (list factory)', self.defaultdict_value)
+        
+        self.defaultdict_int = defaultdict(int)
+        self.defaultdict_int['count'] += 5
+        self._track_init('collections', 'defaultdict_int (int factory)', self.defaultdict_int)
+        
+        self.ordereddict_value = OrderedDict([('first', 1), ('second', 2), ('third', 3)])
+        self._track_init('collections', 'ordereddict_value', self.ordereddict_value)
+        
+        self.counter_value = Counter(['apple', 'banana', 'apple', 'orange', 'apple', 'banana'])
+        self._track_init('collections', 'counter_value', self.counter_value)
+        
+        self.counter_from_dict = Counter({'red': 4, 'blue': 2})
+        self._track_init('collections', 'counter_from_dict', self.counter_from_dict)
+        
+        self.deque_value = deque([1, 2, 3, 4, 5], maxlen=10)
+        self.deque_value.append(6)
+        self.deque_value.appendleft(0)
+        self._track_init('collections', 'deque_value (maxlen=10)', self.deque_value)
+        
+        self.deque_unlimited = deque(['a', 'b', 'c'])
+        self._track_init('collections', 'deque_unlimited', self.deque_unlimited)
+        
+        dict1 = {'one': 1, 'two': 2}
+        dict2 = {'three': 3, 'four': 4}
+        dict3 = {'five': 5}
+        self.chainmap_value = ChainMap(dict1, dict2, dict3)
+        self._track_init('collections', 'chainmap_value (3 dicts)', self.chainmap_value)
+        
+        # pathlib.Path objects (pickle-native)
+        self._log("\n[INIT] pathlib.Path objects")
+        
+        self.path_current = Path('.')
+        self.path_home = Path.home()
+        self.path_absolute = Path(__file__).absolute()
+        self.path_parent = Path(__file__).parent
+        self._track_init('primitives', 'path objects (current/home/absolute/parent)', self.path_current)
 
     def init_all_complex_types_in_random_order(self):
         """Initialize all complex, unpickleable objects that cerial handlers must handle."""
@@ -901,6 +982,16 @@ class WorstPossibleObject:
             'bytes_value': self.bytes_value,
             'complex_value': self.complex_value,
             
+            # Pickle-native types (datetime, Decimal, etc.)
+            'datetime_value': self.datetime_value,
+            'date_value': self.date_value,
+            'time_value': self.time_value,
+            'timedelta_value': self.timedelta_value,
+            'decimal_value': self.decimal_value,
+            'fraction_value': self.fraction_value,
+            'uuid_value': self.uuid_value,
+            'uuid_fixed': self.uuid_fixed,
+            
             # Collections
             'tuple_value': self.tuple_value,
             'list_value': self.list_value,
@@ -910,9 +1001,23 @@ class WorstPossibleObject:
             'range_value': tuple(self.range_value),  # Convert to comparable
             'slice_value': (self.slice_value.start, self.slice_value.stop, self.slice_value.step),
             
+            # Advanced collections
+            'defaultdict_value_keys': sorted(self.defaultdict_value.keys()),
+            'defaultdict_int_count': self.defaultdict_int['count'],
+            'ordereddict_value_keys': list(self.ordereddict_value.keys()),
+            'counter_value_most_common': self.counter_value.most_common(1)[0] if self.counter_value else None,
+            'deque_value_len': len(self.deque_value),
+            'deque_value_maxlen': self.deque_value.maxlen,
+            'chainmap_value_keys': sorted(self.chainmap_value.keys()),
+            
+            # pathlib.Path
+            'path_current_str': str(self.path_current),
+            'path_absolute_name': self.path_absolute.name,
+            
             # Threading states
             'lock_acquired_locked': self.lock_acquired.locked(),
-            'rlock_acquired_locked': self.rlock_acquired.locked(),
+            # Note: RLock doesn't have .locked() method, check via acquire
+            'rlock_acquired_locked': not self.rlock_acquired.acquire(blocking=False) or (self.rlock_acquired.release() or False),
             'event_is_set': self.event.is_set(),
             'event_set_is_set': self.event_set.is_set(),
             'semaphore_value': self.semaphore._value,

@@ -40,29 +40,19 @@ class GeneratorHandler(Handler):
         
         What we capture:
         - remaining_values: Values not yet yielded from the generator
-        - generator_name: Name of the generator function (if available)
-        - generator_code: Code object of the generator function (if available)
+        - generator_name: Name of the generator function (for debugging)
         
         Note: This EXHAUSTS the generator! Original will be empty.
         This is the only way to preserve the remaining values.
+        
+        We do NOT serialize the code object or frame locals because:
+        1. They can't be used to reconstruct the generator's execution state
+        2. Code objects are very large/complex (co_consts, co_names, bytecode, etc.)
+        3. Reconstruction just returns iter(remaining_values) anyway
         """
-        # Get generator function info if available
+        # Get generator function info for debugging/logging only
         generator_name = obj.__name__ if hasattr(obj, '__name__') else None
         generator_qualname = obj.__qualname__ if hasattr(obj, '__qualname__') else None
-        
-        # Try to get the generator's code object
-        generator_code = None
-        if hasattr(obj, 'gi_code'):
-            generator_code = obj.gi_code
-        
-        # Try to get generator frame locals (current state)
-        frame_locals = None
-        if hasattr(obj, 'gi_frame') and obj.gi_frame:
-            try:
-                frame_locals = dict(obj.gi_frame.f_locals)
-            except (AttributeError, RuntimeError):
-                # Frame might be None if generator is exhausted
-                pass
         
         # Exhaust generator to get remaining values
         remaining_values = []
@@ -79,8 +69,6 @@ class GeneratorHandler(Handler):
         return {
             "generator_name": generator_name,
             "generator_qualname": generator_qualname,
-            "generator_code": generator_code,  # Will be recursively serialized
-            "frame_locals": frame_locals,  # Will be recursively serialized
             "remaining_values": remaining_values,  # Will be recursively serialized
         }
     

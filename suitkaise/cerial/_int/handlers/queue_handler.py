@@ -135,7 +135,8 @@ class MultiprocessingQueueHandler(Handler):
             for _ in range(min(size, 10000)):  # Safety limit
                 try:
                     items.append(obj.get_nowait())
-                except:
+                except Exception:
+                    # Queue empty or get failed - stop iteration
                     break
             # Put items back to restore state
             for item in items:

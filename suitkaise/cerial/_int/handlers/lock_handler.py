@@ -57,17 +57,31 @@ class LockHandler(Handler):
         - type_name: "Lock" or "RLock" 
         - locked: Boolean indicating if lock is currently acquired
         
-        Note: Lock objects have a locked() method that returns True/False.
+        Note: Lock has locked() method, RLock doesn't.
+        For RLock, we try acquire(blocking=False) to check state.
         """
         # Determine lock type by comparing to known lock types
-        if type(obj) == threading.RLock().__class__:
+        is_rlock = type(obj) == threading.RLock().__class__
+        
+        if is_rlock:
             lock_type_name = "RLock"
+            # RLock doesn't have locked() method
+            # Try non-blocking acquire to check if it's locked
+            acquired = obj.acquire(blocking=False)
+            if acquired:
+                # We acquired it, so it wasn't locked. Release it.
+                obj.release()
+                locked = False
+            else:
+                # Couldn't acquire, so it's locked
+                locked = True
         else:
             lock_type_name = "Lock"
+            locked = obj.locked()  # Lock has locked() method
         
         return {
             "lock_type": lock_type_name,
-            "locked": obj.locked(),  # True if acquired, False otherwise
+            "locked": locked,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:

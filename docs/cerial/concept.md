@@ -118,25 +118,25 @@ processor_copy = cerial.deserialize(serialized)  # exact state restored
 note that this will cause the object to exist in both the source and target processes. just keep this in mind!
 
 supports serialization of (importance rating 1-100, where number = % of users who need this):
-- functions (95)
+- functions (95) *
 - loggers (90) *
-- partial functions (85)
-- bound methods (80)
+- partial functions (85) *
+- bound methods (80) *
 - file handles (75) *
 - locks (70) *
 - queues (65) *
 - http sessions (60) *
 - database connections (55) *
 - event objects (50) *
-- generators (45)
+- generators (45) *
 - regex patterns (40) *
-- context managers (40)
-- subprocess objects (35)
+- context managers (40) *
+- subprocess objects (35) *
 - sqlite connections (30) *
-- decorators (25)
-- async objects (24)
-- weak references (20)
-- dynamic modules (18)
+- decorators (25) *
+- async objects (24) *
+- weak references (20) *
+- dynamic modules (18) *
 - socket connections (15) *
 - database cursors (15) *
 - semaphores/barriers (12) *
@@ -153,8 +153,15 @@ supports serialization of (importance rating 1-100, where number = % of users wh
 - properties/descriptors (2) *
 - contextvars (2) *
 - threading.local (2) *
-- circular reference handling (2)
-- suitkaise specific objects (predicted for cerial users: 98)
+- enums (all types) *
+- namedtuples (both collections and typing) *
+- __slots__ classes *
+- dataclasses *
+- circular reference handling (automatic)
+- suitkaise specific objects (predicted for cerial users: 98) *
+
+* = has dedicated handler or special support
+(all other items are pickle-native)
 
 ## api
 
@@ -419,7 +426,7 @@ serialization should be atomic - the object shouldn't change while being seriali
 
 cerial deeply integrates with other suitkaise modules:
 - uses **skpath** for path resolution (relative to project root, works across machines as long as project root is the same)
-- provides handlers for all other objects in other suitkaise modules
+- all suitkaise class objects use the __serialize__ and __deserialize__ methods to serialize and deserialize themselves.
 
 ## validation: the worst possible object
 
@@ -461,7 +468,23 @@ this serves as both a test suite and a proof of concept that demonstrates cerial
 - bytes (byte strings)
 - bytearray (mutable byte arrays)
 
-**collections:**
+**datetime module:**
+- datetime
+- date
+- time
+- timedelta
+
+**numeric types:**
+- Decimal (from decimal module)
+- Fraction (from fractions module)
+
+**identifiers:**
+- UUID (from uuid module)
+
+**path objects:**
+- pathlib.Path and all Path subclasses (PosixPath, WindowsPath, etc.)
+
+**basic collections:**
 - tuple
 - list
 - set
@@ -470,16 +493,103 @@ this serves as both a test suite and a proof of concept that demonstrates cerial
 - range objects
 - slice objects
 
+**collections module:**
+- defaultdict
+- OrderedDict
+- Counter
+- deque
+- ChainMap
+- namedtuple (created with collections.namedtuple)
+
 **special singletons:**
 - type (class objects at module level)
 - Ellipsis (the ... object)
 - NotImplemented
 
-**everything else goes through handlers:**
-- functions (all types)
-- classes (all types, including nested)
-- class instances (all types)
-- locks, files, loggers, queues, events, etc.
+**everything else goes through cerial handlers:**
+
+**functions and methods:**
+- functions (regular, nested, in __main__)
+- lambda functions
+- partial functions (functools.partial)
+- bound methods
+- static methods
+- class methods
+
+**classes and instances:**
+- class instances (with __dict__)
+- class instances (with __slots__)
+- class instances (with both __dict__ and __slots__)
+- nested classes (classes defined inside other classes)
+- dynamic classes (created with type())
+- dataclasses
+- enums (all enum types)
+- namedtuples (collections.namedtuple and typing.NamedTuple)
+
+**threading and synchronization:**
+- locks (Lock, RLock)
+- semaphores (Semaphore, BoundedSemaphore)
+- barriers (Barrier)
+- conditions (Condition)
+- events (Event)
+- thread-local storage (threading.local)
+
+**queues:**
+- queue.Queue, LifoQueue, PriorityQueue
+- multiprocessing.Queue
+- multiprocessing.Event
+
+**file and I/O:**
+- file handles (open files)
+- temporary files (tempfile.NamedTemporaryFile)
+- StringIO, BytesIO
+- memory-mapped files (mmap)
+
+**logging:**
+- loggers (logging.Logger)
+- handlers (StreamHandler, FileHandler, etc.)
+- formatters (logging.Formatter)
+
+**database:**
+- sqlite3 connections and cursors
+- generic database connections (with limitations)
+
+**network:**
+- HTTP sessions (requests.Session)
+- sockets (socket.socket)
+
+**subprocess:**
+- subprocess.Popen
+- subprocess.CompletedProcess
+
+**async/await (Python 3.5+):**
+- coroutines (async def functions)
+- async generators
+- asyncio.Task
+- asyncio.Future
+
+**context managers:**
+- custom context managers (__enter__/__exit__)
+- contextlib.contextmanager decorators
+
+**modules:**
+- dynamic modules (types.ModuleType)
+
+**advanced Python:**
+- generators (with state)
+- iterators (enumerate, zip, filter, map, etc.)
+- regex patterns (re.Pattern)
+- weak references (weakref.ref, WeakValueDictionary, etc.)
+- code objects (types.CodeType)
+- properties and descriptors
+- context variables (contextvars.ContextVar)
+- pipes (multiprocessing.Pipe)
+- shared memory (multiprocessing.shared_memory.SharedMemory)
+- executors (ThreadPoolExecutor, ProcessPoolExecutor)
+
+**circular references:**
+- automatic detection and handling
+- two-pass reconstruction for complex circular structures
 
 this ensures uniform behavior and complete control over serialization/deserialization.
 

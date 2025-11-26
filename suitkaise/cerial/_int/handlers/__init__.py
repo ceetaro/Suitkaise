@@ -38,12 +38,18 @@ from .queue_handler import (
 )
 
 # Regex handler (40% importance)
-from .regex_handler import RegexPatternHandler
+from .regex_handler import RegexPatternHandler, MatchObjectHandler
 
 # SQLite handlers (30% + cursors 15%)
 from .sqlite_handler import (
     SQLiteConnectionHandler,
     SQLiteCursorHandler,
+)
+
+# Context variable handlers (2% importance)
+from .contextvar_handler import (
+    ContextVarHandler,
+    TokenHandler,
 )
 
 # Network handlers (60% + 15% + 55%)
@@ -84,12 +90,11 @@ from .pipe_handler import (
 )
 
 # Advanced handlers (2% each)
-from .advanced_handler import (
+from .advanced_py_handler import (
     CodeObjectHandler,
     FrameObjectHandler,
     PropertyHandler,
     DescriptorHandler,
-    ContextVarHandler,
 )
 
 # Function handlers
@@ -110,6 +115,41 @@ from .weakref_handler import (
     WeakrefHandler,
     WeakValueDictionaryHandler,
     WeakKeyDictionaryHandler,
+)
+
+# Enum handlers
+from .enum_handler import (
+    EnumHandler,
+    EnumClassHandler,
+)
+
+# Context manager handlers
+from .context_manager_handler import (
+    ContextManagerHandler,
+    ContextlibGeneratorHandler,
+)
+
+# Subprocess handlers
+from .subprocess_handler import (
+    PopenHandler,
+    CompletedProcessHandler,
+)
+
+# Async handlers
+from .async_handler import (
+    CoroutineHandler,
+    AsyncGeneratorHandler,
+    TaskHandler,
+    FutureHandler,
+)
+
+# Module handler
+from .module_handler import ModuleHandler
+
+# NamedTuple handlers
+from .namedtuple_handler import (
+    NamedTupleHandler,
+    TypedDictHandler,
 )
 
 # Class handlers (all user-defined classes)
@@ -202,6 +242,31 @@ __all__ = [
     'WeakValueDictionaryHandler',
     'WeakKeyDictionaryHandler',
     
+    # Enums
+    'EnumHandler',
+    'EnumClassHandler',
+    
+    # Context managers
+    'ContextManagerHandler',
+    'ContextlibGeneratorHandler',
+    
+    # Subprocess
+    'PopenHandler',
+    'CompletedProcessHandler',
+    
+    # Async
+    'CoroutineHandler',
+    'AsyncGeneratorHandler',
+    'TaskHandler',
+    'FutureHandler',
+    
+    # Modules
+    'ModuleHandler',
+    
+    # NamedTuple
+    'NamedTupleHandler',
+    'TypedDictHandler',
+    
     # Classes
     'ClassInstanceHandler',
     'ClassObjectHandler',
@@ -254,10 +319,15 @@ ALL_HANDLERS = [
     
     # Regex
     RegexPatternHandler(),
+    MatchObjectHandler(),
     
     # SQLite
     SQLiteConnectionHandler(),
     SQLiteCursorHandler(),
+    
+    # Context variables
+    ContextVarHandler(),
+    TokenHandler(),
     
     # Socket connections
     SocketHandler(),
@@ -306,16 +376,41 @@ ALL_HANDLERS = [
     FrameObjectHandler(),
     PropertyHandler(),
     DescriptorHandler(),
-    ContextVarHandler(),
     ThreadLocalHandler(),
     StaticMethodHandler(),
     ClassMethodHandler(),
+    
+    # Enums (check before general class handlers)
+    EnumHandler(),
+    EnumClassHandler(),
+    
+    # NamedTuples (check before general class/tuple handlers)
+    NamedTupleHandler(),
+    TypedDictHandler(),
+    
+    # Context managers (check before general class handlers)
+    ContextManagerHandler(),
+    ContextlibGeneratorHandler(),
+    
+    # Subprocess objects
+    PopenHandler(),
+    CompletedProcessHandler(),
+    
+    # Async objects
+    CoroutineHandler(),
+    AsyncGeneratorHandler(),
+    TaskHandler(),
+    FutureHandler(),
+    
+    # Modules
+    ModuleHandler(),
     
     # Class objects (classes themselves)
     ClassObjectHandler(),
     
     # Class instances (LAST - catch-all for user-defined classes)
     # This must be last so specialized handlers get first chance
+    # Now supports __slots__, __dict__, custom serialize, and to_dict patterns
     ClassInstanceHandler(),
 ]
 

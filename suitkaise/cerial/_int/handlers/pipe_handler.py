@@ -163,8 +163,13 @@ class MultiprocessingManagerHandler(Handler):
                 else:
                     # Generic: try to copy
                     value = obj
-        except:
+        except (AttributeError, TypeError):
+            # Proxy doesn't support value extraction - that's okay
             pass
+        except Exception as e:
+            # Unexpected error extracting proxy value
+            import warnings
+            warnings.warn(f"Failed to extract manager proxy value: {e}")
         
         return {
             "type_name": obj_type_name,

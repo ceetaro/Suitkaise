@@ -60,3 +60,70 @@ class RegexPatternHandler(Handler):
         """
         return re.compile(state["pattern"], state["flags"])
 
+
+class MatchObjectHandler(Handler):
+    """
+    Serializes regex Match objects.
+    
+    Strategy:
+    - Extract match information (matched string, groups, positions)
+    - Store as a dict since Match objects cannot be reconstructed
+    - On reconstruction, return a dict with the match info
+    
+    Note: re.Match objects have no public constructor and cannot be truly
+    reconstructed. We serialize the data for inspection but return a dict.
+    """
+    
+    type_name = "regex_match"
+    
+    def can_handle(self, obj: Any) -> bool:
+        """Check if object is a regex Match object."""
+        return isinstance(obj, re.Match)
+    
+    def extract_state(self, obj: re.Match) -> Dict[str, Any]:
+        """
+        Extract match object state.
+        
+        What we capture:
+        - pattern: The pattern that was matched
+        - string: The string that was searched
+        - pos: Start position of search
+        - endpos: End position of search
+        - match_string: The matched substring
+        - span: (start, end) of the match
+        - groups: All captured groups
+        - groupdict: Named groups
+        """
+        return {
+            "pattern": obj.re.pattern,
+            "flags": obj.re.flags,
+            "string": obj.string,
+            "pos": obj.pos,
+            "endpos": obj.endpos,
+            "match_string": obj.group(0),  # The matched text
+            "span": obj.span(),  # (start, end)
+            "groups": obj.groups(),  # All captured groups
+            "groupdict": obj.groupdict(),  # Named groups
+        }
+    
+    def reconstruct(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Reconstruct match information.
+        
+        Since Match objects cannot be instantiated directly, we return
+        a dict containing all the match information. This preserves the
+        data while being honest about the limitation.
+        """
+        return {
+            "__match_info__": True,
+            "pattern": state["pattern"],
+            "flags": state["flags"],
+            "string": state["string"],
+            "pos": state["pos"],
+            "endpos": state["endpos"],
+            "matched": state["match_string"],
+            "span": state["span"],
+            "groups": state["groups"],
+            "groupdict": state["groupdict"],
+        }
+

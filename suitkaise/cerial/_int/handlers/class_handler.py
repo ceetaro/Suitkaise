@@ -38,7 +38,7 @@ class ClassInstanceHandler(Handler):
         We handle any object that:
         - Is not a built-in type
         - Is not a primitive type
-        - Has a __dict__ or custom serialization methods
+        - Has a __dict__, __slots__, or custom serialization methods
         
         We check for this LAST in the handler chain, after all
         specialized handlers have had a chance.
@@ -57,12 +57,13 @@ class ClassInstanceHandler(Handler):
         if not hasattr(obj, '__class__'):
             return False
         
-        # Must have __dict__ OR custom serialization methods
+        # Must have __dict__, __slots__, OR custom serialization methods
         has_dict = hasattr(obj, '__dict__')
+        has_slots = hasattr(type(obj), '__slots__')
         has_serialize = hasattr(obj, '__serialize__')
         has_to_dict = hasattr(obj, 'to_dict')
         
-        return has_dict or has_serialize or has_to_dict
+        return has_dict or has_slots or has_serialize or has_to_dict
     
     def extract_state(self, obj: Any) -> Dict[str, Any]:
         """
@@ -106,6 +107,16 @@ class ClassInstanceHandler(Handler):
         elif strategy == "dict":
             # Generic: use __dict__
             state["instance_dict"] = dict(obj.__dict__)
+        
+        elif strategy == "slots":
+            # __slots__ class: extract slot values
+            state["slots_dict"] = self._extract_slots(obj)
+        
+        elif strategy == "dict_and_slots":
+            # Class has both __dict__ and __slots__
+            state["instance_dict"] = dict(obj.__dict__)
+            state["slots_dict"] = self._extract_slots(obj)
+        
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
         
@@ -129,11 +140,60 @@ class ClassInstanceHandler(Handler):
             if hasattr(obj_class, 'from_dict'):
                 return "to_dict"
         
-        # Fall back to __dict__
-        if hasattr(obj, '__dict__'):
+        # Check for __slots__
+        obj_class = obj.__class__
+        has_slots = hasattr(obj_class, '__slots__')
+        has_dict = hasattr(obj, '__dict__')
+        
+        if has_slots and has_dict:
+            # Class has both (can happen with inheritance)
+            return "dict_and_slots"
+        elif has_slots:
+            # Only __slots__
+            return "slots"
+        elif has_dict:
+            # Only __dict__
             return "dict"
         
         raise ValueError(f"Cannot determine extraction strategy for {type(obj)}")
+    
+    def _extract_slots(self, obj: Any) -> Dict[str, Any]:
+        """
+        Extract values from __slots__ attributes.
+        
+        __slots__ classes don't have __dict__ by default.
+        We need to extract each slot attribute value.
+        """
+        slots_dict = {}
+        obj_class = type(obj)
+        
+        # Collect all slots from class and parent classes
+        all_slots = set()
+        for cls in obj_class.__mro__:
+            if hasattr(cls, '__slots__'):
+                slots = cls.__slots__
+                # __slots__ can be a string, iterable, or dict
+                if isinstance(slots, str):
+                    all_slots.add(slots)
+                elif isinstance(slots, dict):
+                    all_slots.update(slots.keys())
+                else:
+                    all_slots.update(slots)
+        
+        # Extract value for each slot
+        for slot_name in all_slots:
+            # Skip __dict__ and __weakref__ special slots
+            if slot_name in ('__dict__', '__weakref__'):
+                continue
+            
+            try:
+                value = getattr(obj, slot_name)
+                slots_dict[slot_name] = value
+            except AttributeError:
+                # Slot not set (no value)
+                pass
+        
+        return slots_dict
     
     def _extract_nested_classes(self, cls: type) -> Dict[str, Dict]:
         """
@@ -248,6 +308,35 @@ class ClassInstanceHandler(Handler):
             if isinstance(state["instance_dict"], dict):
                 obj.__dict__.update(state["instance_dict"])
             return obj
+        
+        elif strategy == "slots":
+            # __slots__ reconstruction
+            obj = cls.__new__(cls)  # type: ignore
+            # Set each slot value
+            if isinstance(state["slots_dict"], dict):
+                for slot_name, value in state["slots_dict"].items():
+                    try:
+                        setattr(obj, slot_name, value)
+                    except AttributeError:
+                        # Slot might be read-only or not exist, skip
+                        pass
+            return obj
+        
+        elif strategy == "dict_and_slots":
+            # Both __dict__ and __slots__
+            obj = cls.__new__(cls)  # type: ignore
+            # Populate __dict__
+            if isinstance(state.get("instance_dict"), dict):
+                obj.__dict__.update(state["instance_dict"])
+            # Set slot values
+            if isinstance(state.get("slots_dict"), dict):
+                for slot_name, value in state["slots_dict"].items():
+                    try:
+                        setattr(obj, slot_name, value)
+                    except AttributeError:
+                        pass
+            return obj
+        
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
     
@@ -355,7 +444,13 @@ class ClassObjectHandler(Handler):
             # Try to get class from module
             module_class = getattr(module, obj.__name__, None)
             is_module_level = module_class is obj
-        except:
+        except (ImportError, AttributeError):
+            # Module doesn't exist or class not in module - it's dynamic
+            is_module_level = False
+        except Exception as e:
+            # Unexpected error - log and treat as dynamic
+            import warnings
+            warnings.warn(f"Error checking if class is module-level: {e}")
             is_module_level = False
         
         if is_module_level:

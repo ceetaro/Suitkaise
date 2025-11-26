@@ -76,11 +76,17 @@ class FileHandleHandler(Handler):
             relative_path = str(sk_path.np)
             absolute_path = str(sk_path.ap)
         except ImportError:
-            # skpath not available
+            # skpath not available - use absolute path only
             relative_path = None
             absolute_path = str(file_path)
-        except Exception:
-            # Path outside project or other error
+        except (ValueError, TypeError):
+            # Path outside project or invalid path - use absolute only
+            relative_path = None
+            absolute_path = str(file_path)
+        except Exception as e:
+            # Unexpected skpath error - log and use absolute path
+            import warnings
+            warnings.warn(f"Unexpected error using skpath for file {file_path}: {e}")
             relative_path = None
             absolute_path = str(file_path)
         
@@ -133,8 +139,13 @@ class FileHandleHandler(Handler):
             except ImportError:
                 # skpath not available, fall back to absolute path
                 file_path = state["path"]
-            except Exception:
-                # Other error, fall back to absolute path
+            except (ValueError, TypeError):
+                # Invalid path, fall back to absolute
+                file_path = state["path"]
+            except Exception as e:
+                # Unexpected error - log and fall back
+                import warnings
+                warnings.warn(f"Unexpected error resolving relative path {state['relative_path']}: {e}")
                 file_path = state["path"]
         else:
             file_path = state["path"]

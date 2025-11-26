@@ -58,7 +58,13 @@ class SQLiteConnectionHandler(Handler):
             cursor = obj.execute("PRAGMA database_list")
             db_info = cursor.fetchone()
             database_path = db_info[2] if db_info else ':memory:'
-        except Exception:
+        except (AttributeError, TypeError):
+            # PRAGMA not supported or returns unexpected format - assume in-memory
+            database_path = ':memory:'
+        except Exception as e:
+            # Unexpected error querying database info - log and assume in-memory
+            import warnings
+            warnings.warn(f"Failed to get SQLite database path: {e}")
             database_path = ':memory:'
         
         is_memory = database_path == ':memory:' or database_path == ''

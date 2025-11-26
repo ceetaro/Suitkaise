@@ -185,8 +185,13 @@ class ThreadLocalHandler(Handler):
         data = {}
         try:
             data = dict(obj.__dict__)
-        except:
+        except AttributeError:
+            # No __dict__ on this threading.local - use empty dict
             pass
+        except Exception as e:
+            # Unexpected error accessing thread-local data
+            import warnings
+            warnings.warn(f"Failed to extract threading.local data: {e}")
         
         return {
             "data": data,  # Will be recursively serialized
