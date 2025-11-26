@@ -1687,6 +1687,9 @@ def create(
 __all__ = [
     # Main class
     'SKPath',
+
+    # Special types
+    'AnyPath',
     
     # Convenience functions
     'get_project_root',
@@ -1704,6 +1707,9 @@ __all__ = [
     'force_project_root',
     'clear_forced_project_root', 
     'get_forced_project_root',
+
+    # Forcing project root
+    'ForceRoot',
     
     # Decorators
     'autopath',

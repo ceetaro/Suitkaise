@@ -4,6 +4,8 @@
 
 read docs/cerial/concept.md
 
+1.5. we are here for a second, to redo worst possible object to ensure that it correctly tests everything in a more dynamic and comprehensive way.
+
 2. if you are reviewing the file handle handler, review skpath
 
 understand how skpath works by reading docs/skpath/concept.md

@@ -55,13 +55,15 @@ no need to write custom serialization logic - cerial figures it out.
 
 but if you want to, you can!
 
-use the `__serialize__` / `__deserialize__` methods to add extra control over the serialization/deserialization process.
+use the `__serialize__` / `__deserialize__` methods in your own classes to add extra control over the serialization/deserialization process.
 
 __serialize__: extract the object's state and return it as a dictionary.
 
 __deserialize__: reconstruct the object from the given state, updating attributes if needed.
 
 cerial won't update attributes like current time, attempt to gather network data, or do anything else that might change object state. it will only store the state before serialization, and then reconstruct the object using that exact state.
+
+since it uses __new__ to reconstruct the object, it will not call __init__ or any other methods on the object and update these values.
 
 ### optional customization
 
