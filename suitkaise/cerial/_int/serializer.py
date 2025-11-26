@@ -168,6 +168,12 @@ class CerialSerializer:
         Returns:
             Intermediate representation (pickle-native nested structure)
         """
+        # Fast path: Immutable primitives can skip ALL overhead
+        # These types are never circular and pickle handles them natively
+        # Place this FIRST to avoid depth/path tracking overhead
+        if obj is None or isinstance(obj, (bool, int, float, str, bytes)):
+            return obj
+        
         # Step 0: Check recursion depth for safety
         self._serialization_depth += 1
         if self._serialization_depth > self._max_depth:
