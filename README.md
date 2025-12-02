@@ -1,35 +1,97 @@
-# Licensing
+# Suitkaise
 
-This software is available under your choice of the following licenses:
+Making things easier for developers of all skill levels to develop complex applications.
 
-1. Apache License, Version 2.0 (see LICENSE.APACHE)
-2. The GNU General Public License v3.0 (see LICENSE.GPL)
+## Installation
 
-You may select either license. Using this software and/or application constitutes acceptance of the terms of the license you choose.
+```bash
+pip install suitkaise
+```
 
-## Selection Guidelines
+## Modules
 
-* **Apache 2.0**: Choose this license if you want to incorporate Suitkaise (or any part of Suitkaise's code) into proprietary software, need patent protection, or 
-require more flexible terms. 
+### cerial - Serialization for the Unpicklable
 
-This option allows integration without requiring your entire codebase to be open source.
+Serialize objects that standard pickle can't handle: locks, loggers, file handles, circular references, and more.
 
-Examples under Apache Licensing: 
+```python
+from suitkaise import cerial
 
-- using Suitkaise to develop a commercially available application, which runs using source code from Suitkaise. Applications developed mainly using Suitkaise will likely have Suitkaise's source code present, even if the application is running on its own.
+# Serialize any object - even with locks and loggers
+data = cerial.serialize(complex_object)
 
-- using Suitkaise as a base to create an internal custom code editor
+# Deserialize back
+restored = cerial.deserialize(data)
+```
 
-* **GNU GPL v3**: Choose this license if you are developing open source software, and want to ensure that all modifications, improvements, and derivative works remain open source.
+### circuit - Circuit Breaker Pattern
 
-Please note that choosing this option REQUIRES that ANY software incorporating Suitkaise (or any part of Suitkaise's code) must also be released under GPL v3.
+Controlled failure handling and resource management in loops.
 
-Examples under General Public Licensing:
+```python
+from suitkaise import circuit
 
-- making a direct modification (like changing a color theme) or a direct improvement (like adding language support) to the open source Suitkaise licensed under GPL v3, or any derivative works of Suitkaise under this license.
+breaker = circuit.Circuit(shorts=3, break_sleep=1.0)
 
-- using and editing Suitkaise source code to better tailor Suitkaise towards personal (non-commercial) use.
+while breaker.flowing:
+    try:
+        result = risky_operation()
+        break
+    except SomeError:
+        breaker.short()  # Break after 3 failures
+```
 
+### skpath - Smart Path Operations
 
+Intelligent path handling with dual-path architecture and automatic project root detection.
 
+```python
+from suitkaise import skpath
 
+# Auto-detects caller file path
+path = skpath.SKPath()
+
+# Dual paths: absolute and project-relative
+print(path.ap)  # /Users/you/MyProject/src/main.py
+print(path.np)  # MyProject/src/main.py
+
+# Get project root automatically
+root = skpath.get_project_root()
+```
+
+### sktime - Smart Timing Operations
+
+Intuitive timing with statistical analysis.
+
+```python
+from suitkaise import sktime
+
+# Simple timing
+start = sktime.now()
+sktime.sleep(1)
+elapsed = sktime.elapsed(start)
+
+# Statistical timer
+timer = sktime.Timer()
+timer.start()
+# ... work ...
+timer.stop()
+print(f"Mean: {timer.mean}, Stdev: {timer.stdev}")
+
+# Decorator for automatic timing
+@sktime.timethis()
+def my_function():
+    pass
+
+my_function()
+print(my_function.timer.most_recent)
+```
+
+## Requirements
+
+- Python 3.11+
+- No external dependencies (standard library only)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
