@@ -55,7 +55,7 @@ class SerializationError(Exception):
     """Raised when serialization fails."""
     pass
 
-class CerialSerializer:
+class Cerializer:
     """
     Central serializer that coordinates object serialization.
     

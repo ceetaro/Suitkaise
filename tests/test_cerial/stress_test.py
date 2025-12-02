@@ -13,8 +13,8 @@ serialization cycles to validate:
 import gc
 import sys
 import time
-from suitkaise.cerial._int.serializer import CerialSerializer
-from suitkaise.cerial._int.deserializer import CerialDeserializer
+from suitkaise.cerial._int.serializer import Cerializer
+from suitkaise.cerial._int.deserializer import Decerializer
 from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
 
 
@@ -22,8 +22,8 @@ class StressTest:
     """Comprehensive stress test for cerial."""
     
     def __init__(self):
-        self.serializer = CerialSerializer()
-        self.deserializer = CerialDeserializer()
+        self.serializer = Cerializer()
+        self.deserializer = Decerializer()
         self.errors = []
         self.stats = {
             "objects_created": 0,

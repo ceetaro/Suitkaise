@@ -97,7 +97,7 @@ class _ReconstructionPlaceholder:
         return f"<Placeholder for {self.type_name} id={self.obj_id}>"
 
 
-class CerialDeserializer:
+class Decerializer:
     """
     Central deserializer that converts pickled bytes back into Python objects.
     

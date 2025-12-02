@@ -202,7 +202,7 @@ cerial uses a **central manager** with specialized handlers:
 ```python
 # Serialize
 obj = ComplexObject()
-serializer = CerialSerializer()
+serializer = Cerializer()
 
 # 1. Serializer checks: is this a primitive type?
 # 1a. Yes - pass through to base pickle

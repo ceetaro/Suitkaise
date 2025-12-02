@@ -5,23 +5,66 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "suitkaise"
 version = "0.1.0"
-description = "Development assistance, code visualization, and more."
+description = "Making things easier for developers of all skill levels to develop complex applications."
 authors = [
     {name = "Casey Eddings", email = "caseyeddings@gmail.com"}
 ]
-license = {text = "Apache-2.0, GNU GPLv3"}
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "pyqt6>=6.9.0,<7.0.0",
+keywords = [
+    "serialization",
+    "pickle",
+    "time",
+    "timing",
+    "paths",
+    "path-operations",
+    "circuit-breaker",
+    "developer-tools",
+    "utilities"
 ]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+"Homepage" = "https://github.com/caseyeddings/suitkaise"
+"Bug Tracker" = "https://github.com/caseyeddings/suitkaise/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["suitkaise*"]
+exclude = ["tests*", "docs*", "examples*", "suitkaise_depr*", "_suitkaise_wip*"]
 
 [tool.pytest.ini_options]
 markers = [
-  "basic: SKTime basic function tests",
-  "yawn: SKTime Yawn behavior tests",
-  "timer: SKTime Timer tests",
-  "timethis: SKTime timethis decorator tests",
-  "concurrent: concurrency/thread/process tests",
-  "benchmark: performance/throughput tests"
+    "basic: SKTime basic function tests",
+    "yawn: SKTime Yawn behavior tests",
+    "timer: SKTime Timer tests",
+    "timethis: SKTime timethis decorator tests",
+    "concurrent: concurrency/thread/process tests",
+    "benchmark: performance/throughput tests",
 ]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["suitkaise"]
+exclude = ["suitkaise_depr", "_suitkaise_wip", "tests"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.11"

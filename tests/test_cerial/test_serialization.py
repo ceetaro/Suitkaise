@@ -24,46 +24,46 @@ from decimal import Decimal
 from uuid import UUID
 
 # Import the serializer
-from suitkaise.cerial._int.serializer import CerialSerializer, SerializationError
+from suitkaise.cerial._int.serializer import Cerializer, SerializationError
 
 
 class TestPrimitiveTypes:
     """Test pickle-native primitive types."""
     
     def test_none(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         result = serializer.serialize(None)
         assert isinstance(result, bytes)
         assert len(result) > 0
     
     def test_bool(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(True), bytes)
         assert isinstance(serializer.serialize(False), bytes)
     
     def test_int(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(42), bytes)
         assert isinstance(serializer.serialize(-999), bytes)
         assert isinstance(serializer.serialize(10**50), bytes)  # Large int
     
     def test_float(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(3.14), bytes)
         assert isinstance(serializer.serialize(-0.001), bytes)
     
     def test_complex(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(complex(1, 2)), bytes)
     
     def test_string(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize("hello"), bytes)
         assert isinstance(serializer.serialize("unicode: 你好 🌍"), bytes)
         assert isinstance(serializer.serialize(""), bytes)
     
     def test_bytes(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(b"bytes"), bytes)
         assert isinstance(serializer.serialize(bytearray(b"mutable")), bytes)
 
@@ -72,15 +72,15 @@ class TestDatetimeTypes:
     """Test datetime module types (pickle-native)."""
     
     def test_datetime(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(datetime.now()), bytes)
     
     def test_date(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(date.today()), bytes)
     
     def test_timedelta(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(timedelta(days=5)), bytes)
 
 
@@ -88,11 +88,11 @@ class TestNumericTypes:
     """Test numeric types (pickle-native)."""
     
     def test_decimal(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(Decimal('123.456')), bytes)
     
     def test_uuid(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         uuid = UUID('12345678-1234-5678-1234-567812345678')
         assert isinstance(serializer.serialize(uuid), bytes)
 
@@ -101,7 +101,7 @@ class TestPathTypes:
     """Test pathlib types (pickle-native)."""
     
     def test_path(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(Path('.')), bytes)
         assert isinstance(serializer.serialize(Path.home()), bytes)
 
@@ -110,31 +110,31 @@ class TestCollections:
     """Test collection types."""
     
     def test_list(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize([1, 2, 3]), bytes)
         assert isinstance(serializer.serialize([]), bytes)
     
     def test_tuple(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize((1, 2, 3)), bytes)
         assert isinstance(serializer.serialize(()), bytes)
     
     def test_dict(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize({"a": 1}), bytes)
         assert isinstance(serializer.serialize({}), bytes)
     
     def test_set(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize({1, 2, 3}), bytes)
         assert isinstance(serializer.serialize(set()), bytes)
     
     def test_frozenset(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(frozenset([1, 2])), bytes)
     
     def test_nested_collections(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         nested = {
             "list": [1, 2, [3, 4]],
             "dict": {"inner": {"deep": [5, 6]}},
@@ -147,23 +147,23 @@ class TestAdvancedCollections:
     """Test collections module types (pickle-native)."""
     
     def test_defaultdict(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         dd = defaultdict(int)
         dd['a'] = 5
         assert isinstance(serializer.serialize(dd), bytes)
     
     def test_deque(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         dq = deque([1, 2, 3], maxlen=10)
         assert isinstance(serializer.serialize(dq), bytes)
     
     def test_counter(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         counter = Counter(['a', 'b', 'a', 'c', 'a'])
         assert isinstance(serializer.serialize(counter), bytes)
     
     def test_namedtuple(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         Point = namedtuple('Point', ['x', 'y'])
         p = Point(10, 20)
         assert isinstance(serializer.serialize(p), bytes)
@@ -191,7 +191,7 @@ class TestComplexDictKeys:
             return 42
         
         data = {(my_func, "key"): "value"}
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(data), bytes)
     
     def test_frozenset_key_with_logger(self):
@@ -202,7 +202,7 @@ class TestComplexDictKeys:
         # Can't use logger directly in frozenset (not hashable)
         # But can use tuple of hashable items
         data = {("logger_name", logger.name): logger}
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(data), bytes)
 
 
@@ -210,11 +210,11 @@ class TestEnums:
     """Test enum types."""
     
     def test_basic_enum(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(Color.RED), bytes)
     
     def test_int_enum(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(Status.ACTIVE), bytes)
 
 
@@ -225,11 +225,11 @@ class TestFunctions:
         def test_func(x, y=10):
             return x + y
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         assert isinstance(serializer.serialize(test_func), bytes)
     
     def test_lambda(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         lam = lambda x: x * 2
         assert isinstance(serializer.serialize(lam), bytes)
     
@@ -237,12 +237,12 @@ class TestFunctions:
         def multiply(x, y):
             return x * y
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         double = partial(multiply, 2)
         assert isinstance(serializer.serialize(double), bytes)
     
     def test_bound_method(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         my_list = [1, 2, 3]
         assert isinstance(serializer.serialize(my_list.append), bytes)
 
@@ -251,27 +251,27 @@ class TestThreading:
     """Test threading objects."""
     
     def test_lock(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         lock = threading.Lock()
         assert isinstance(serializer.serialize(lock), bytes)
     
     def test_rlock(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         rlock = threading.RLock()
         assert isinstance(serializer.serialize(rlock), bytes)
     
     def test_event(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         event = threading.Event()
         assert isinstance(serializer.serialize(event), bytes)
     
     def test_semaphore(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         sem = threading.Semaphore(5)
         assert isinstance(serializer.serialize(sem), bytes)
     
     def test_thread_local(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         local = threading.local()
         local.value = 42
         assert isinstance(serializer.serialize(local), bytes)
@@ -281,20 +281,20 @@ class TestQueues:
     """Test queue objects."""
     
     def test_queue(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         q = queue.Queue()
         q.put("item1")
         q.put("item2")
         assert isinstance(serializer.serialize(q), bytes)
     
     def test_lifo_queue(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         q = queue.LifoQueue()
         q.put("item")
         assert isinstance(serializer.serialize(q), bytes)
     
     def test_priority_queue(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         q = queue.PriorityQueue()
         q.put((1, "high"))
         q.put((5, "low"))
@@ -305,7 +305,7 @@ class TestFileObjects:
     """Test file-related objects."""
     
     def test_temp_file(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as f:
             f.write("test content")
             f.flush()
@@ -313,12 +313,12 @@ class TestFileObjects:
             assert isinstance(serializer.serialize(f), bytes)
     
     def test_string_io(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         sio = io.StringIO("test content")
         assert isinstance(serializer.serialize(sio), bytes)
     
     def test_bytes_io(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         bio = io.BytesIO(b"test content")
         assert isinstance(serializer.serialize(bio), bytes)
 
@@ -327,13 +327,13 @@ class TestLogging:
     """Test logging objects."""
     
     def test_logger(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         logger = logging.getLogger("test_logger")
         logger.setLevel(logging.DEBUG)
         assert isinstance(serializer.serialize(logger), bytes)
     
     def test_logger_with_handler(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         logger = logging.getLogger("test_logger_2")
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
@@ -345,7 +345,7 @@ class TestRegex:
     """Test regex objects."""
     
     def test_regex_pattern(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         pattern = re.compile(r'\d+\.\d+', re.IGNORECASE)
         assert isinstance(serializer.serialize(pattern), bytes)
 
@@ -354,7 +354,7 @@ class TestSQLite:
     """Test SQLite objects."""
     
     def test_sqlite_connection(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         conn = sqlite3.connect(':memory:')
         cursor = conn.cursor()
         cursor.execute("CREATE TABLE test (id INTEGER, name TEXT)")
@@ -363,7 +363,7 @@ class TestSQLite:
         assert isinstance(serializer.serialize(conn), bytes)
     
     def test_sqlite_cursor(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         conn = sqlite3.connect(':memory:')
         cursor = conn.cursor()
         assert isinstance(serializer.serialize(cursor), bytes)
@@ -378,7 +378,7 @@ class TestCustomClasses:
                 self.value = value
                 self.data = [1, 2, 3]
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         obj = SimpleClass(42)
         assert isinstance(serializer.serialize(obj), bytes)
     
@@ -390,7 +390,7 @@ class TestCustomClasses:
                 self.logger = logging.getLogger("complex")
                 self.data = {"nested": [1, 2, 3]}
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         obj = ComplexClass()
         assert isinstance(serializer.serialize(obj), bytes)
     
@@ -408,7 +408,7 @@ class TestCustomClasses:
                 obj.value = state["value"]
                 return obj
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         obj = CustomSerialize()
         assert isinstance(serializer.serialize(obj), bytes)
 
@@ -417,19 +417,19 @@ class TestCircularReferences:
     """Test circular reference handling."""
     
     def test_self_referencing_dict(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         circular = {"name": "test"}
         circular["self"] = circular
         assert isinstance(serializer.serialize(circular), bytes)
     
     def test_self_referencing_list(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         circular = [1, 2, 3]
         circular.append(circular)
         assert isinstance(serializer.serialize(circular), bytes)
     
     def test_mutual_references(self):
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         a = {"name": "A"}
         b = {"name": "B"}
         a["ref"] = b
@@ -506,7 +506,7 @@ class TestErrorHandling:
             current["next"] = {}
             current = current["next"]
         
-        serializer = CerialSerializer()
+        serializer = Cerializer()
         # Should succeed (only 100 levels)
         assert isinstance(serializer.serialize(deep), bytes)
 

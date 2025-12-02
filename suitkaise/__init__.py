@@ -8,20 +8,48 @@ Philosophy: "Grand ideas, little coding experience" - enabling anyone with
 great ideas to build complex, production-ready applications.
 
 Core Modules:
-- skpath: Smart path operations with dual-path architecture (coming soon)
-- sktime: Smart timing operations with statistical analysis (coming soon)
+- cerial: Serialization for the unpicklable (locks, loggers, file handles)
+- circuit: Circuit breaker pattern for controlled failure handling
+- skpath: Smart path operations with dual-path architecture
+- sktime: Smart timing operations with statistical analysis
 
 Import Usage Examples:
     ```python
+    from suitkaise import cerial, circuit, skpath, sktime
+    
+    # Serialize objects with locks and loggers
+    data = cerial.serialize(complex_object)
+    
+    # Circuit breaker for retry loops
+    breaker = circuit.Circuit(shorts=3)
+    
+    # Smart path handling
+    path = skpath.SKPath("my/file.txt")
+    
+    # Timing operations
+    timer = sktime.Timer()
     ```
 """
 
 # Import core modules for direct access
 try:
+    from . import cerial
+    _cerial_available = True
+except ImportError:
+    cerial = None
+    _cerial_available = False
+
+try:
+    from . import circuit
+    _circuit_available = True
+except ImportError:
+    circuit = None
+    _circuit_available = False
+
+try:
     from . import skpath
     _skpath_available = True
 except ImportError:
-    # Graceful degradation if skpath module unavailable
     skpath = None
     _skpath_available = False
 
@@ -29,20 +57,23 @@ try:
     from . import sktime
     _sktime_available = True
 except ImportError:
-    # Graceful degradation if sktime module unavailable
     sktime = None
     _sktime_available = False
 
 # Package metadata
-__version__ = "0.0.0"
-__author__ = "Suitkaise Development Team"
+__version__ = "0.1.0"
+__author__ = "Casey Eddings"
 __description__ = "Democratizing complex application development for Python"
-__url__ = "https://github.com/suitkaise/suitkaise"  # Update when you have a repo
+__url__ = "https://github.com/caseyeddings/suitkaise"
 
 # Available modules (expanding as more modules are added)
 __all__ = []
 
 # Add available modules to __all__
+if _cerial_available:
+    __all__.append('cerial')
+if _circuit_available:
+    __all__.append('circuit')
 if _skpath_available:
     __all__.append('skpath')
 if _sktime_available:
@@ -60,8 +91,21 @@ if _skpath_available:
     except ImportError:
         pass  # Graceful degradation
 
-# SKTime module is available as `suitkaise.sktime` and via `from suitkaise import sktime`
-# Objects should be imported from `suitkaise.sktime` per documentation.
+# Cerial convenience imports (when available)
+if _cerial_available:
+    try:
+        from .cerial import serialize, deserialize
+        __all__.extend(['serialize', 'deserialize'])
+    except ImportError:
+        pass  # Graceful degradation
+
+# Circuit convenience imports (when available)
+if _circuit_available:
+    try:
+        from .circuit import Circuit
+        __all__.append('Circuit')
+    except ImportError:
+        pass  # Graceful degradation
 
 # =============================================================================
 # Package Information and Status
@@ -75,6 +119,30 @@ def get_available_modules():
         dict: Module availability status and versions
     """
     modules = {}
+    
+    if _cerial_available:
+        try:
+            modules['cerial'] = {
+                'available': True,
+                'version': cerial.__version__ if hasattr(cerial, '__version__') else __version__,
+                'description': 'Serialization for the unpicklable'
+            }
+        except:
+            modules['cerial'] = {'available': True, 'version': 'unknown', 'description': 'Serialization for the unpicklable'}
+    else:
+        modules['cerial'] = {'available': False, 'description': 'Serialization for the unpicklable'}
+    
+    if _circuit_available:
+        try:
+            modules['circuit'] = {
+                'available': True,
+                'version': circuit.__version__ if hasattr(circuit, '__version__') else __version__,
+                'description': 'Circuit breaker pattern'
+            }
+        except:
+            modules['circuit'] = {'available': True, 'version': 'unknown', 'description': 'Circuit breaker pattern'}
+    else:
+        modules['circuit'] = {'available': False, 'description': 'Circuit breaker pattern'}
     
     if _skpath_available:
         try:
@@ -120,10 +188,10 @@ def show_status():
         version = f"v{info['version']}" if info['available'] and 'version' in info else ""
         print(f"{module_name:12} {status:15} {version:10} - {info['description']}")
     
-    print("\nMost common imports:")
-    if _fdprint_available:
-        print("  from suitkaise import fprint, dprint")
-    print("  from suitkaise.fdprint import fmt, timestamp")
+    print("\nCommon imports:")
+    print("  from suitkaise import cerial, circuit, skpath, sktime")
+    print("  from suitkaise import serialize, deserialize  # cerial shortcuts")
+    print("  from suitkaise import SKPath, Circuit, Timer  # class shortcuts")
     
     print(f"\nFor more information: {__url__}")
 
@@ -132,13 +200,14 @@ def show_status():
 # Module-level convenience
 # =============================================================================
 
-# This allows: import suitkaise; suitkaise.fprint("Hello")
-# while still supporting: from suitkaise import fprint; fprint("Hello")
-
 # Show a helpful message if someone tries to access unavailable modules
 def __getattr__(name):
-    if name == 'skpath' and not _skpath_available:
-        raise ImportError("skpath module is not available. This module is coming soon!")
+    if name == 'cerial' and not _cerial_available:
+        raise ImportError("cerial module is not available. Check installation.")
+    elif name == 'circuit' and not _circuit_available:
+        raise ImportError("circuit module is not available. Check installation.")
+    elif name == 'skpath' and not _skpath_available:
+        raise ImportError("skpath module is not available. Check installation.")
     elif name == 'sktime' and not _sktime_available:
-        raise ImportError("sktime module is not available. This module is coming soon!")
+        raise ImportError("sktime module is not available. Check installation.")
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

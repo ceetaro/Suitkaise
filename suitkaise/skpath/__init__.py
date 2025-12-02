@@ -17,6 +17,6 @@ from .api import *
 from .api import __all__
 
 # Module-level convenience - expose the main class at module level
-# This allows: import suitkaise.skpath; path = suitkaise.skpath.SKPath()
+# This allows: import suitkaise.skpath; then use skpath.SKPath() to get a SKPath object, for example.
 __version__ = "0.1.0"
 __author__ = "Suitkaise Development Team"

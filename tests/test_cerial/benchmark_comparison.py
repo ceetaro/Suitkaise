@@ -29,8 +29,8 @@ except ImportError:
     HAS_CLOUDPICKLE = False
     cloudpickle = None
 
-from suitkaise.cerial._int.serializer import CerialSerializer
-from suitkaise.cerial._int.deserializer import CerialDeserializer
+from suitkaise.cerial._int.serializer import Cerializer
+from suitkaise.cerial._int.deserializer import Decerializer
 
 
 class BenchmarkRunner:
@@ -38,8 +38,8 @@ class BenchmarkRunner:
     
     def __init__(self):
         self.results = {}
-        self.cerial_s = CerialSerializer()
-        self.cerial_d = CerialDeserializer()
+        self.cerial_s = Cerializer()
+        self.cerial_d = Decerializer()
     
     def benchmark_serializer(self, name: str, obj: Any, num_iterations: int = 1000):
         """

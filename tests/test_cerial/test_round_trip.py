@@ -6,8 +6,8 @@ back to their original state.
 """
 
 import pytest
-from suitkaise.cerial._int.serializer import CerialSerializer
-from suitkaise.cerial._int.deserializer import CerialDeserializer
+from suitkaise.cerial._int.serializer import Cerializer
+from suitkaise.cerial._int.deserializer import Decerializer
 
 
 class TestBasicRoundTrip:
@@ -15,8 +15,8 @@ class TestBasicRoundTrip:
     
     def setup_method(self):
         """Create serializer and deserializer for each test."""
-        self.serializer = CerialSerializer(debug=False, verbose=False)
-        self.deserializer = CerialDeserializer(debug=False, verbose=False)
+        self.serializer = Cerializer(debug=False, verbose=False)
+        self.deserializer = Decerializer(debug=False, verbose=False)
     
     def test_primitives(self):
         """Test round-trip of primitive types."""

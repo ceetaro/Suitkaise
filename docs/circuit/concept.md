@@ -19,7 +19,7 @@ The Circuit class provides a clean, intuitive way to handle failure thresholds a
 ### Flow Control
 - **Flowing state**: Circuit is operational (`circ.flowing` = True)
 - **Broken state**: Circuit has exceeded limits (`circ.broken` = True)
-- **Manual breaking**: Force circuit break with `circ.break()`
+- **Manual breaking**: Force circuit break with `circ.trip()`
 - **Short counting**: Track number of shorts with `circ.times_shorted`
 
 ### Resource Management
@@ -35,7 +35,7 @@ Circuit is perfect for:
 ```python
 from suitkaise import Circuit
 
-circ = Circuit(shorts=4)  # Break after 4 shorts
+circ = Circuit(shorts=4, break_sleep=0.5)  # Break after 4 shorts, sleep 0.5 seconds after breaking
 
 while circ.flowing:
     try:
@@ -56,7 +56,7 @@ while program.running:
         memory_usage = get_memory_usage()
         
         if memory_usage > max_threshold:
-            circ.break(5)  # Break and sleep 5 seconds
+            circ.trip(5)  # Trip (break) and sleep 5 seconds
         elif memory_usage > warning_threshold:
             circ.short(0.05)  # Short and maybe sleep 0.05s
 ```
@@ -70,7 +70,7 @@ for item in large_dataset:
         circ.short()  # This type causes issues
     
     if isinstance(item, CriticalError):
-        circ.break()  # Stop immediately
+        circ.trip()  # Stop immediately
     
     if circ.broken:
         break
@@ -87,7 +87,7 @@ for item in large_dataset:
 
 ### Breaking vs Shorting
 - **Short**: `circ.short()` - increment failure count, break if limit reached
-- **Break**: `circ.break()` - immediately break circuit
+- **Trip**: `circ.trip()` - immediately trip (break) circuit
 - **Sleep on break**: Both methods accept sleep duration parameter
 
 ## Integration Benefits
@@ -107,7 +107,7 @@ objs_to_check = [dict1, dict2, dict3, dict4, dict5]  # a bunch of dicts
 index = 0
 
 # create a Circuit object
-circ = Circuit(shorts=4)
+circ = Circuit(shorts=4, break_sleep=0.5)
 
 # while we have a flowing circuit
 while circ.flowing:
@@ -119,8 +119,8 @@ while circ.flowing:
             # short the circuit. if this circuit shorts 4 times, it will break
             circ.short()
         if isinstance(item, ComplexObject):
-            # immediately break the circuit
-            circ.break()
+            # immediately trip (break) the circuit
+            circ.trip()
 
         # if the circuit has broken (opposite of flowing, flowing gets set to False)
         if circ.broken:
@@ -140,17 +140,17 @@ while circ.flowing:
 # sleeping after a circuit break
 
 while program.running:
-    circ = Circuit(100)
+    circ = Circuit(100, 0.1)
 
     while circ.flowing:
         current_mem_usage = mem_mgr.get_current_usage()
 
         if current_mem_usage > max_mem_threshold:
-            # will sleep execution for 5 seconds if circ.break() is called here
-            circ.break(5)
+            # will sleep execution for 5 seconds if circ.trip() is called here
+            circ.trip(5)
 
         if current_mem_usage > recc_mem_threshold:
-            # will sleep execution for 0.05 seconds if this short causes a break
+            # will sleep execution for 0.05 seconds instead of default 0.1 seconds if this short causes a break
             circ.short(0.05)
             print(f"Shorted circuit {circ.times_shorted} times.")
 
@@ -184,8 +184,8 @@ def process_risky_data(data_items):
             circ.short()  # Count this as a failure
             print(f"Minor error, shorts: {circ.times_shorted}")
         except CriticalError:
-            circ.break()  # Immediately break on critical error
-            print("Critical error, breaking circuit")
+            circ.trip()  # Immediately trip on critical error
+            print("Critical error, tripping circuit")
             break
     
     return successful_items
@@ -205,11 +205,11 @@ def smart_retry_loop(operation, max_attempts=10):
             result = operation()
             return result  # Success!
         except RetryableError as e:
-            circ.short()
+            circ.short(0.05)
             print(f"Attempt {attempt + 1} failed: {e}")
             attempt += 1
         except FatalError as e:
-            circ.break()  # Don't retry fatal errors
+            circ.trip(2)  # Don't retry fatal errors
             print(f"Fatal error: {e}")
             break
     
