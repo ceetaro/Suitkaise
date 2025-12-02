@@ -102,20 +102,58 @@ this is used when no other methods are available, and cerial attempts to recursi
 ### usage
 
 ```python
-# serialize any object
-serialized_data = cerial.serialize(obj)
+from suitkaise import cerial
 
-# deserialize to get exact copy
-obj_copy = cerial.deserialize(serialized_data)
+# serialize any object to bytes
+data = cerial.serialize(my_object)
 
-# works with complex objects
-processor = DataProcessor()  # has loggers, locks, file handles, etc.
-serialized = cerial.serialize(processor)
-# ... send to worker process
-processor_copy = cerial.deserialize(serialized)  # exact state restored
+# deserialize bytes back to an object
+restored = cerial.deserialize(data)
 ```
 
-note that this will cause the object to exist in both the source and target processes. just keep this in mind!
+a real example with complex objects:
+
+```python
+from suitkaise import cerial
+import threading
+import logging
+
+class DataProcessor:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.logger = logging.getLogger("processor")
+        self.config = {"batch_size": 100}
+        self.results = []
+
+processor = DataProcessor()
+processor.results.append({"status": "done"})
+
+# serialize - handles locks, loggers, everything
+data = cerial.serialize(processor)
+
+# ... send to worker process ...
+
+# deserialize - exact state restored
+processor_copy = cerial.deserialize(data)
+# processor_copy.results == [{"status": "done"}]
+# processor_copy.lock is a new lock (unlocked)
+# processor_copy.logger is reconnected to logging system
+```
+
+when something goes wrong, use debug mode to see what's happening:
+
+```python
+# debug mode gives detailed error messages
+data = cerial.serialize(problematic_object, debug=True)
+
+# verbose mode prints progress through nested structures
+data = cerial.serialize(complex_object, verbose=True)
+
+# combine both for maximum visibility
+data = cerial.serialize(obj, debug=True, verbose=True)
+```
+
+note that serialization creates a copy - the object will exist in both the source and target processes.
 
 supports serialization of (importance rating 1-100, where number = % of users who need this):
 - functions (95) *
@@ -165,19 +203,62 @@ supports serialization of (importance rating 1-100, where number = % of users wh
 
 ## api
 
-cerial provides a simple two-method api:
+### main functions
 
 ```python
-cerial.serialize(obj) -> bytes
+cerial.serialize(obj, debug=False, verbose=False) -> bytes
 ```
 serialize any python object to bytes. automatically handles complex types, nested structures, and circular references.
 
+- `obj` - any python object
+- `debug` - when True, provides detailed error messages showing exactly where serialization failed
+- `verbose` - when True, prints progress as it walks through nested structures
+
 ```python
-cerial.deserialize(data: bytes) -> object
+cerial.deserialize(data, debug=False, verbose=False) -> object
 ```
 deserialize bytes back to the original object with exact state restoration.
 
+- `data` - bytes from `cerial.serialize()`
+- `debug` - when True, provides detailed error messages showing exactly where deserialization failed
+- `verbose` - when True, prints progress as it reconstructs objects
+
 both methods will call optional `__serialize__` / `__deserialize__` methods if defined on custom classes, otherwise use automatic handlers.
+
+### advanced usage
+
+for more control, use the classes directly:
+
+```python
+from suitkaise.cerial import Cerializer, Decerializer
+
+# create instances with settings
+serializer = Cerializer(debug=True, verbose=True)
+deserializer = Decerializer(debug=True, verbose=True)
+
+# reuse for multiple operations
+data1 = serializer.serialize(obj1)
+data2 = serializer.serialize(obj2)
+
+restored1 = deserializer.deserialize(data1)
+restored2 = deserializer.deserialize(data2)
+```
+
+### exceptions
+
+```python
+from suitkaise.cerial import SerializationError, DeserializationError
+
+try:
+    data = cerial.serialize(obj)
+except SerializationError as e:
+    print(f"couldn't serialize: {e}")
+
+try:
+    obj = cerial.deserialize(data)
+except DeserializationError as e:
+    print(f"couldn't deserialize: {e}")
+```
 
 ## internals
 
@@ -200,23 +281,32 @@ cerial uses a **central manager** with specialized handlers:
 
 **flow:**
 ```python
-# Serialize
-obj = ComplexObject()
-serializer = Cerializer()
+from suitkaise import cerial
 
-# 1. Serializer checks: is this a primitive type?
-# 1a. Yes - pass through to base pickle
-# 2. No - get handler for ComplexObject
-# 3. Handler extracts: {"attr1": <Lock>, "attr2": 42}
-# 4. Serializer recursively processes extracted state:
-#    - Sees <Lock>, gets LockHandler, extracts lock state
-#    - Sees 42, passes through (primitive)
-# 5. Result: nested dict of primitives, ready for basic pickle
-# 6. Base pickle serializes the result to bytes
-# 7. Bytes are sent to the target process
-# 8. Deserializer receives bytes
-# 9. Deserializer uses the same handlers to reconstruct the object correctly in the target process
-# 10. Result: exact copy of the original object when it was serialized into bytes
+# serialization
+obj = ComplexObject()  # has locks, loggers, etc.
+data = cerial.serialize(obj)
+
+# what happens internally:
+# 1. check: is this a primitive type?
+#    yes -> pass through to base pickle
+#    no  -> get handler for ComplexObject
+# 2. handler extracts: {"attr1": <Lock>, "attr2": 42}
+# 3. serializer recursively processes extracted state:
+#    - sees <Lock>, gets LockHandler, extracts lock state
+#    - sees 42, passes through (primitive)
+# 4. result: nested dict of primitives, ready for basic pickle
+# 5. base pickle serializes the result to bytes
+
+# deserialization (in target process)
+restored = cerial.deserialize(data)
+
+# what happens internally:
+# 1. base pickle unpickles bytes to nested dict
+# 2. deserializer walks the dict structure
+# 3. for each complex object, finds the right handler
+# 4. handler reconstructs the object from state
+# 5. result: exact copy of the original object
 ```
 
 **benefits:**
@@ -287,6 +377,7 @@ generic fallback that works for most classes.
 
 **example:**
 ```python
+from suitkaise import cerial
 from dataclasses import dataclass, asdict
 
 @dataclass
@@ -303,8 +394,9 @@ class Point:
 
 # cerial automatically uses to_dict/from_dict
 point = Point(10, 20)
-serialized = cerial.serialize(point)
-point2 = cerial.deserialize(serialized)
+data = cerial.serialize(point)
+point2 = cerial.deserialize(data)
+# point2.x == 10, point2.y == 20
 ```
 
 ### reconstruction strategy
