@@ -10,6 +10,7 @@ great ideas to build complex, production-ready applications.
 Core Modules:
 - cerial: Serialization for the unpicklable (locks, loggers, file handles)
 - circuit: Circuit breaker pattern for controlled failure handling
+- processing: Subprocess-based task execution with lifecycle management
 - skpath: Smart path operations with dual-path architecture
 - sktime: Smart timing operations with statistical analysis
 
@@ -60,6 +61,13 @@ except ImportError:
     sktime = None
     _sktime_available = False
 
+try:
+    from . import processing
+    _processing_available = True
+except ImportError:
+    processing = None
+    _processing_available = False
+
 # Package metadata
 __version__ = "0.1.2"
 __author__ = "Casey Eddings"
@@ -74,6 +82,8 @@ if _cerial_available:
     __all__.append('cerial')
 if _circuit_available:
     __all__.append('circuit')
+if _processing_available:
+    __all__.append('processing')
 if _skpath_available:
     __all__.append('skpath')
 if _sktime_available:
@@ -168,6 +178,18 @@ def get_available_modules():
     else:
         modules['sktime'] = {'available': False, 'description': 'Smart timing operations'}
     
+    if _processing_available:
+        try:
+            modules['processing'] = {
+                'available': True,
+                'version': processing.__version__ if hasattr(processing, '__version__') else __version__,
+                'description': 'Subprocess-based task execution'
+            }
+        except:
+            modules['processing'] = {'available': True, 'version': 'unknown', 'description': 'Subprocess-based task execution'}
+    else:
+        modules['processing'] = {'available': False, 'description': 'Subprocess-based task execution'}
+    
     return modules
 
 
@@ -189,9 +211,9 @@ def show_status():
         print(f"{module_name:12} {status:15} {version:10} - {info['description']}")
     
     print("\nCommon imports:")
-    print("  from suitkaise import cerial, circuit, skpath, sktime")
+    print("  from suitkaise import cerial, circuit, processing, skpath, sktime")
     print("  from suitkaise import serialize, deserialize  # cerial shortcuts")
-    print("  from suitkaise import SKPath, Circuit, Timer  # class shortcuts")
+    print("  from suitkaise.processing import Process, timesection  # processing")
     
     print(f"\nFor more information: {__url__}")
 
@@ -206,6 +228,8 @@ def __getattr__(name):
         raise ImportError("cerial module is not available. Check installation.")
     elif name == 'circuit' and not _circuit_available:
         raise ImportError("circuit module is not available. Check installation.")
+    elif name == 'processing' and not _processing_available:
+        raise ImportError("processing module is not available. Check installation.")
     elif name == 'skpath' and not _skpath_available:
         raise ImportError("skpath module is not available. Check installation.")
     elif name == 'sktime' and not _sktime_available:

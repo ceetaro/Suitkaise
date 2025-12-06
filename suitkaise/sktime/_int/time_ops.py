@@ -46,7 +46,7 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
     return fabs(time2 - time1)
 
 
-class _Yawn:
+class Yawn:
     """
     Sleep controller that sleeps after a specified number of "yawns".
     
@@ -107,7 +107,7 @@ class _Yawn:
                 'yawns_until_sleep': self.yawn_threshold - self.yawn_count
             }
 
-class _TimerStats:
+class TimerStats:
     """
     Statistics about a timer returned by _Timer.get_statistics()
     """
@@ -160,7 +160,7 @@ class _TimerStats:
         """Get time by index."""
         return self.times[index] if 0 <= index < len(self.times) else None
         
-class _Timer:
+class Timer:
     """
     Statistical timer for collecting and analyzing execution times.
     
@@ -188,16 +188,16 @@ class _Timer:
         self._lock = threading.RLock()
 
         # Session management: keyed by thread ident
-        self._sessions: Dict[int, "_TimerSession"] = {}
+        self._sessions: Dict[int, "TimerSession"] = {}
 
-    def _get_or_create_session(self) -> "_TimerSession":
+    def _get_or_create_session(self) -> "TimerSession":
 
         ident = threading.get_ident()
 
         with self._lock:
             sess = self._sessions.get(ident)
             if sess is None:
-                sess = _TimerSession(self)
+                sess = TimerSession(self)
                 self._sessions[ident] = sess
             return sess
 
@@ -303,6 +303,11 @@ class _Timer:
         """Most recent timing measurement."""
         with self._lock:
             return self.times[-1] if self.times else None
+
+    @property
+    def result(self) -> Optional[float]:
+        """Alias for most_recent."""
+        return self.most_recent
 
     @property
     def most_recent_index(self) -> Optional[int]:
@@ -453,12 +458,12 @@ class _Timer:
             return (sorted_times[lower_index] * (1 - weight) + 
                    sorted_times[upper_index] * weight)
     
-    def get_statistics(self) -> Optional[_TimerStats]:
+    def get_statistics(self) -> Optional[TimerStats]:
         """Get comprehensive timing statistics."""
         with self._lock:
             if not self.times:
                 return None
-            return _TimerStats(self.times, self.original_start_time, self._paused_durations)
+            return TimerStats(self.times, self.original_start_time, self._paused_durations)
     
     def reset(self) -> None:
         """Clear all timing measurements."""
@@ -470,10 +475,10 @@ class _Timer:
             self._paused_durations.clear()
 
 
-class _TimerSession:
+class TimerSession:
     """Per-thread timing session supporting nested frames (stack)."""
 
-    def __init__(self, manager: _Timer):
+    def __init__(self, manager: Timer):
         self._manager = manager
         self._frames: Deque[Dict[str, Any]] = deque()
         self._lock = threading.RLock()
@@ -535,7 +540,7 @@ class _TimerSession:
             paused_extra = end - frame['pause_started_at']
         return frame['total_paused'] + paused_extra
 
-    def stop(self) -> (float, float):
+    def stop(self) -> tuple[float, float]:
         with self._lock:
             frame = self._top()
             elapsed = self._elapsed_from_frame(frame)
@@ -543,7 +548,7 @@ class _TimerSession:
             self._frames.pop()
             return elapsed, paused_total
 
-    def lap(self) -> (float, float):
+    def lap(self) -> tuple[float, float]:
         with self._lock:
             frame = self._top()
             elapsed = self._elapsed_from_frame(frame)
@@ -555,7 +560,8 @@ class _TimerSession:
             frame['pause_started_at'] = None
             return elapsed, paused_total
 
-def _timethis_decorator(timer_instance: _Timer):
+
+def _timethis_decorator(timer_instance: Timer):
     """
     Create a timing decorator for an existing timer instance.
     

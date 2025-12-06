@@ -1,220 +1,483 @@
-# Suitkaise Multiprocessing — Internal Architecture and Behavior
+# `processing` Technical Information
 
-This document explains how the xprocess engine works under the hood. It is deliberately detailed and walks through the runtime flow, restart logic, timeouts, result passing, pools, and subprocess behavior. For usage-oriented examples, see `concept.md`.
+This document covers the internal architecture and implementation details of the `processing` module. For user-facing documentation, see `concept.md`.
 
-## Top-level structure
+## Table of Contents
 
-- Managers: `CrossProcessing`, `SubProcessing` (process orchestration)
-- Processes: `_Process` (base class), `_FunctionProcess` (function wrapper)
-- Configuration: `_PConfig` (full), `_QPConfig` (function shorthand)
-- Data and stats: `_PData` (process metadata + result), `ProcessStats` (timings/errors)
-- Runner: `_ProcessRunner` (executes lifecycle in the child process)
-- Pools: `ProcessPool`, `PoolMode`, `PoolTaskError`
-- Exceptions: `PreloopError`, `MainLoopError`, `PostLoopError` and timeout variants
+1. [Module Integration](#1-module-integration)
+2. [Subprocess Mechanics](#2-subprocess-mechanics)
+3. [Communication Architecture](#3-communication-architecture)
+4. [The Engine](#4-the-engine)
+5. [Timeout Implementation](#5-timeout-implementation)
+6. [Error Handling Internals](#6-error-handling-internals)
+7. [Lives System Flow](#7-lives-system-flow)
+8. [Config Structure](#8-config-structure)
+9. [Timers Structure](#9-timers-structure)
+10. [File Structure](#10-file-structure)
 
-Note on naming: internal classes are underscored (e.g., `_Process`, `_PConfig`). The examples in `concept.md` use simplified public-facing names like `Process`, `PConfig` for readability; they correspond to these internal implementations.
+---
 
-## The `_Process` lifecycle (what your class actually does)
+## 1. Module Integration
 
-Location: `suitkaise/_int/mp/processes.py`
+The `processing` module integrates with other `suitkaise` modules:
 
-- You implement hooks on a subclass of `_Process`:
-  - `__preloop__()` — optional per-iteration setup
-  - `__loop__()` — required per-iteration work
-  - `__postloop__()` — optional per-iteration cleanup
-  - `__onfinish__()` — optional once-per-process finalization
-  - `__result__()` — optional return value at the very end
-- Timing controls (opt-in, call in `__init__`):
-  - Start at: `start_timer_before_preloop()` or `start_timer_before_loop()` (default)
-  - End at: `end_timer_after_loop()` (default) or `end_timer_after_postloop()`
-- Control methods (you can call these inside your hooks):
-  - `rejoin()` — finish the current iteration then stop
-  - `skip_and_rejoin()` — stop immediately, skip `__postloop__`
-  - `instakill()` — terminate now, no `__onfinish__`, no `__result__`
-- Status: `PStatus` (`CREATED`, `STARTING`, `RUNNING`, `STOPPING`, `FINISHED`, `CRASHED`, `KILLED`)
-- Loop continuation logic combines multiple signals:
-  - if `num_loops` is set and reached → stop
-  - if `_PConfig.join_after` loops reached → stop
-  - if `_PConfig.join_in` duration elapsed → stop
-  - if a control signal (rejoin/skip/kill) is set → stop
-  - if cascading shutdown flag from a subprocess is set → stop
+- **cerial**: Serializes the `Process` object to send to a subprocess. Handles complex objects like locks, loggers, timers, custom classes, etc.
+- **sktime**: Powers the `@timesection()` decorator and `self.timers.*` statistics.
+- **circuit** (optional): Can be used inside lifecycle methods for failure tracking within loops.
 
-Key fields visible to your hooks:
-- `self.current_loop` — 1-based loop counter (incremented at the start of each iteration)
-- `self.last_loop_time` — duration of the last timed window (based on start/end settings)
-- `self.stats` — a `ProcessStats` object; the runtime records loop times, errors, restarts
+---
 
-## The `_ProcessRunner` (how hooks actually run)
+## 2. Subprocess Mechanics
 
-Location: `suitkaise/_int/mp/runner.py`
+Processing uses Python's `multiprocessing` module. When `process.start()` is called:
 
-When a process starts, `CrossProcessing` or `ProcessPool` constructs a `_ProcessRunner` in the child process. It performs:
+1. The `Process` object is serialized with `cerial`
+2. Original serialized state is saved (for retries)
+3. A new subprocess is spawned
+4. The subprocess deserializes and runs the engine loop
+5. Results are serialized back to the parent process
 
-1) Initialization
-- Calls `_start_process()` on your `_Process` to set `pid`, status to `RUNNING`, and mark start time.
-- Logs initial configuration if `config.log_loops`.
+### Why `multiprocessing` over `threading`?
 
-2) Main loop execution
-- While `_should_continue_loop()` returns True:
-  - Checks for `instakill` or `skip_and_rejoin` control signals — exit immediately if set.
-  - Executes a single iteration with granular timeout protection via threads:
-    - `__preloop__()` (timeout: `preloop_timeout`)
-    - `__loop__()` (timeout: `loop_timeout`)
-    - `__postloop__()` (timeout: `postloop_timeout`)
-  - If timing is configured to end after loop or postloop, records the duration into stats and `last_loop_time`.
-  - After iteration, checks for `rejoin` control signal — exit the loop if set.
+- True parallelism (bypasses GIL)
+- Process isolation (errors don't corrupt parent)
+- Clean termination (can `kill()` subprocess)
 
-3) Error and timeout handling
-- Each section’s exceptions are wrapped in a phase-specific error type:
-  - `PreloopError`, `MainLoopError`, `PostLoopError`
-  - `PreloopTimeoutError`, `MainLoopTimeoutError`, `PostLoopTimeoutError`
-- On any of these errors:
-  - Status is set to `CRASHED` immediately.
-  - Error is recorded in `ProcessStats` and mirrored into the `_PData` (so the parent can read it).
-  - Decision: if `config.crash_restart` and restarts remain (< `max_restarts`), return cleanly to allow the manager to restart the process; otherwise re-raise to crash the process with a non-zero exit code.
-- On truly unexpected exceptions, it also sets status to `CRASHED`, records details, and re-raises.
+Threading support may be added later as a separate module.
 
-4) Finish, `__onfinish__`, and `__result__`
-- Unless it was `instakill`, the runner calls your `__onfinish__()`.
-- It then calls `__result__()` if you implemented your own (i.e., not the default):
-  - The return value is serialized with Cerial (`_serialize`) and pushed to a queue as `('success', serialized_bytes)`.
-  - If serialization fails: `('serialize_error', message)` is pushed instead.
-  - If `__result__()` itself raises: `('result_error', message)` is pushed.
-- If you did not override `__result__()`, it pushes `('success', None)`.
-- If the process status is `CRASHED`, the runner forces exit code 1 (so the parent can detect a crash). Otherwise it exits with code 0 (status already set to `FINISHED`).
+---
 
-## What the manager does (parent side)
+## 3. Communication Architecture
 
-Location: `suitkaise/_int/mp/managers.py`
+Uses a **hybrid approach** for efficiency:
 
-### `CrossProcessing`
+- **`multiprocessing.Event`** for stop signal - nearly zero-cost to check
+- **`multiprocessing.Queue`** for results/errors - flexible serialized data
 
-Registry and monitoring
-- `create_process(key, process_setup, config)` creates a new OS process, keeps an internal record, and returns a `_PData` for that key. It injects the `_PData` into your `_Process` instance.
-- A background monitoring thread periodically:
-  - Updates the `_PData` with current status, pid, and completed loops
-  - Checks crashes and performs restarts if `config.crash_restart` is True and `max_restarts` not exceeded
+### Why this approach?
 
-Joining, results, and status
-- `join_process(key, timeout=None)` waits for the child process to finish.
-- `get_process_result(key, timeout=None)` joins the child, reads from the child’s result queue, and:
-  - On `('success', bytes)`, deserializes with Cerial (`_deserialize`) and writes the concrete object into `_PData`, then returns it.
-  - On `('serialize_error', message)` or `('result_error', message)`, records the error into `_PData` and returns `None`.
-  - If nothing is available, returns `None`.
-- `get_process_status(key)` translates exit codes back to `PStatus` (`CRASHED` if non-zero, otherwise `FINISHED` if not already set).
-- `list_processes()` exposes a dictionary of tracked information (status, pid, loops, restarts, and remaining time/loops if configured).
-- `terminate_process(key, force=False)` uses `_Process`’s control methods: graceful (`rejoin()`) or force (`instakill()`).
-- `shutdown(...)` shuts down all processes, attempting graceful stop first, then force-kill remaining ones if requested.
+| Approach | Fast stop check | Send results | Complexity |
+|----------|-----------------|--------------|------------|
+| Event only | ✅ | ❌ (need separate mechanism) | Low |
+| Queue only | ❌ (must poll with `get_nowait`) | ✅ | Medium |
+| **Hybrid (chosen)** | ✅ | ✅ | Low |
 
-Restart flow (high-level)
-- Manager sees not-alive process with a status that’s not `FINISHED`/`KILLED`.
-- If restarts remain:
-  - Bumps `_restart_count`, resets state (pid, loops, result queue, shared flags), and starts a fresh OS process with a new `_ProcessRunner`.
-  - `_PData` is kept and updated; the new run will rewrite results/status there.
-- If out of restarts: mark `CRASHED` and stop.
+The Event is a shared memory flag - `is_set()` is essentially just reading a boolean. The Queue handles the complexity of serializing result objects back to the parent.
 
-### `SubProcessing`
+### Communication Primitives
 
-Subordinate manager for processes created from inside another process.
-- Enforces a maximum nesting depth of 2 via `XPROCESS_DEPTH` environment variable.
-- API mirrors `CrossProcessing` (create/join/get/list/shutdown) but note termination helpers use signals:
-  - `terminate_subprocess(..., force=False)` → sends `SIGUSR1` for graceful
-  - `terminate_subprocess(..., force=True)`  → sends `SIGUSR2` for force
-- Results are also read from a queue and deserialized just like in `CrossProcessing`.
+```python
+self._stop_event = multiprocessing.Event()   # Parent → Child: stop signal
+self._result_queue = multiprocessing.Queue() # Child → Parent: result or error
+```
 
-## `_PData` (the process “handle” you get back)
+### Flow Diagram
 
-Location: `suitkaise/_int/mp/pdata.py`
+```
+PARENT PROCESS                          CHILD PROCESS
+─────────────────                       ─────────────────
+process = MyProcess()
+process.start()
+  │
+  ├─► create _stop_event (Event)
+  ├─► create _result_queue (Queue)
+  ├─► serialize process with cerial
+  ├─► save original state for retries
+  ├─► spawn subprocess ──────────────────►  deserialize process
+  │                                         │
+  │                                         ├─► run engine loop:
+  │                                         │     check _stop_event
+  │                                         │     __preloop__()
+  │                                         │     check _stop_event
+  │                                         │     __loop__()
+  │                                         │     check _stop_event
+  │                                         │     __postloop__()
+  │                                         │     increment lap
+  │                                         │     update full_loop timer
+  │                                         │     (repeat until done)
+  │                                         │
+process.stop()                              │
+  ├─► _stop_event.set() ─────────────────►  │ (sees signal between sections)
+  │                                         ├─► __onfinish__()
+  │                                         ├─► result = __result__()
+  │                                         ├─► serialize result
+  │                                         └─► _result_queue.put(result)
+  │                                         
+process.wait()                              
+  ├─► subprocess.join()                     
+  │
+process.result
+  ├─► _result_queue.get()
+  ├─► deserialize
+  ├─► if error, raise it
+  └─► return result
+```
 
-- Contains `pkey`, `pclass`, `pid`, `num_loops`, `completed_loops`, `status`, `result`, and any error string.
-- If you access `.result` when there is an error, it raises `ProcessResultError` (so you handle failures explicitly).
-- Managers continuously keep `_PData` in sync with the live process status and PID.
+### Future Extensibility
 
-## `ProcessStats` (what is recorded)
+If we later need parent → child commands (pause/resume, dynamic config updates), we can add a `_cmd_queue` without changing the existing primitives:
 
-Location: `suitkaise/_int/mp/stats.py`
+```python
+# Future addition (not in v1):
+# self._cmd_queue = multiprocessing.Queue()  # Parent → Child: commands
+```
 
-- Tracks `start_time`, `end_time`, total loops, per-loop durations (`loop_times`), error events, restart count, timeout count, and placeholders for heartbeats/resources.
-- `get_summary()` returns aggregate metrics (avg/fastest/slowest loop, restart count, timeouts, etc.).
+---
 
-## Configuration classes
+## 4. The Engine
 
-Location: `suitkaise/_int/mp/configs.py`
+The engine is the code that runs in the child process. It orchestrates the lifecycle:
 
-### `_PConfig` (full)
-- Termination controls: `join_in` (seconds), `join_after` (loops)
-- Restart policy: `crash_restart`, `max_restarts`
-- Logging: `log_loops`
-- Per-section timeouts: `preloop_timeout`, `loop_timeout`, `postloop_timeout`
-- Lifecycle: `startup_timeout`, `shutdown_timeout`
-- Monitoring: `heartbeat_interval`, `resource_monitoring`
-- Helpers: `disable_timeouts()`, `set_quick_timeouts()`, `set_long_timeouts()`, `copy_with_overrides(...)`
+- **User defines** *what* happens (`__preloop__`, `__loop__`, `__postloop__`, etc.)
+- **Engine defines** *when* and *how* those things get called
 
-### `_QPConfig` (function shorthand)
-- For one-shot function tasks; converts to a `_PConfig` via `to_process_config()` with `join_after=1` and a tighter `startup/shutdown` profile and `function_timeout` mapped to the main loop timeout.
+### Engine Responsibilities
 
-## Pools (how tasks are executed in batches)
+- Calling lifecycle methods in order
+- Checking stop signals between sections
+- Enforcing timeouts on each section
+- Managing the lives/retry system
+- Tracking lap count and timers
+- Sending results or errors back to parent
 
-Location: `suitkaise/_int/mp/pool.py`
+### stop() vs kill()
 
-Key pieces
-- `ProcessPool(size=8, mode=PoolMode.ASYNC)` controls the number of workers and scheduling mode.
-- Modes:
-  - `ASYNC`: tasks are dispatched as workers become available
-  - `PARALLEL`: tasks are dispatched in synchronized batches
-- Submitting tasks:
-  - `submit(_PTask)` where `_PTask` wraps a process class and optional config
-  - `submit(key, process_class, config)` convenience path
-  - `submit_function(key, func, args=(), kwargs={}, config=_QPConfig())` wraps a function into `_FunctionProcess`
-  - `submit_multiple([...])` and `set_parallel()`/`set_async()` to switch modes
-- Collecting results:
-  - `get_result(key) -> _PTaskResult` for a specific task (raises `PoolTaskError` on failure)
-  - `get_all_results(timeout=None)` for all submitted tasks (raises `PoolTaskError` if any failed)
-- Error strategy (important detail): the pool prioritizes the child process exit code; even if the result queue says success, a non-zero exit code is treated as failure. If both indicate success, the queue payload is deserialized using Cerial and attached to the task’s `_PData`.
+- `stop()` - Sets the stop event. Process finishes current section, runs `__onfinish__`, sends result.
+- `kill()` - Calls `subprocess.terminate()` immediately. No cleanup, no result, abandoned.
 
-Worker lifecycle
-- A coordinator thread creates workers on demand (up to pool size), assigns tasks, and collects results.
-- On completion, a `_PTaskResult` is created with: key, class name, worker PID/number, task order, deserialized result or error, and the `_PData` snapshot.
+---
 
-## Control methods vs control signals
+## 5. Timeout Implementation
 
-In the child process, control methods set a shared integer signal:
-- `rejoin()` → `1` (finish current iteration then stop)
-- `skip_and_rejoin()` → `2` (stop immediately, skip `__postloop__`)
-- `instakill()` → `3` (terminate without any cleanup/result)
+### The Challenge
 
-The runner checks these signals at safe points in the loop and exits accordingly.
+How do you interrupt arbitrary Python code that's blocking (infinite loop, stuck network call, etc.)?
 
-## Typical status transitions
+| Approach | Can interrupt blocking code? | Cross-platform? | Clean termination? |
+|----------|------------------------------|-----------------|-------------------|
+| **Signal (SIGALRM)** | Yes | Unix only | Yes |
+| **Timer thread** | No (zombie continues) | Yes | No |
+| **Subprocess per section** | Yes | Yes | Yes (but heavy overhead) |
 
-1) Parent creates process → `_ProcessRunner` starts → status: `STARTING` → `RUNNING`
-2) Normal completion → runner calls `__onfinish__` → queues result → `_join_process()` sets status: `FINISHED`
-3) Lifecycle error or timeout → status: `CRASHED` → exit code 1
-   - If restart enabled and attempts remain, parent restarts with a fresh OS process, preserving the same `_PData` handle
-4) Forced kill → status: `KILLED`
+### Our Approach: Platform-specific with Fallback
 
-## Subprocess depth and signals
+```python
+import platform
 
-`SubProcessing` enforces a maximum nesting depth of 2 via the `XPROCESS_DEPTH` env var. If exceeded, it raises an error immediately. Its `terminate_subprocess` method uses `SIGUSR1` (graceful) and `SIGUSR2` (force) to request shutdown from the parent side.
+if platform.system() != 'Windows':
+    run_with_timeout = _signal_based_timeout
+else:
+    run_with_timeout = _thread_based_timeout
+```
 
-## Result format details
+### Signal-based Timeout (Unix/Linux/macOS)
 
-- Child-to-parent message is a 2-tuple `(status, data)` in the result queue:
-  - `('success', cerial_bytes_or_None)`
-  - `('serialize_error', str_message)`
-  - `('result_error', str_message)`
-- Parent deserializes `cerial_bytes` with `_deserialize`. On any error, it records `.error` into `_PData` and returns `None`.
+- Signals are handled at the OS level
+- Can interrupt most blocking operations (syscalls, sleep, etc.)
+- Clean and reliable
 
-## Where things live (quick map)
+```python
+import signal
 
-- `_Process`, `_FunctionProcess`, `PStatus`: `suitkaise/_int/mp/processes.py`
-- `_ProcessRunner`: `suitkaise/_int/mp/runner.py`
-- `CrossProcessing`, `SubProcessing`: `suitkaise/_int/mp/managers.py`
-- `ProcessPool`, `PoolMode`, `PoolTaskError`: `suitkaise/_int/mp/pool.py`
-- `_PConfig`, `_QPConfig`: `suitkaise/_int/mp/configs.py`
-- `_PData`: `suitkaise/_int/mp/pdata.py`
-- `ProcessStats`: `suitkaise/_int/mp/stats.py`
-- Exception classes: `suitkaise/_int/mp/exceptions.py`
+def _signal_based_timeout(func, timeout, section_name, current_lap):
+    if timeout is None:
+        return func()
+    
+    def handler(signum, frame):
+        raise TimeoutError(section_name, timeout, current_lap)
+    
+    old_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(int(timeout) + 1)  # Round up for sub-second timeouts
+    try:
+        return func()
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+```
 
+### Timer Thread Fallback (Windows)
 
+- Windows doesn't have `SIGALRM`
+- Timer thread detects timeout but can't forcefully interrupt blocking code
+- The "zombie" thread continues running until subprocess terminates
 
+```python
+import threading
+
+def _thread_based_timeout(func, timeout, section_name, current_lap):
+    if timeout is None:
+        return func()
+    
+    result = [None]
+    exception = [None]
+    completed = threading.Event()
+    
+    def wrapper():
+        try:
+            result[0] = func()
+        except Exception as e:
+            exception[0] = e
+        finally:
+            completed.set()
+    
+    thread = threading.Thread(target=wrapper, daemon=True)
+    thread.start()
+    
+    finished = completed.wait(timeout=timeout)
+    
+    if not finished:
+        raise TimeoutError(section_name, timeout, current_lap)
+    
+    if exception[0]:
+        raise exception[0]
+    return result[0]
+```
+
+### Windows Limitation Mitigation
+
+On Windows, if user code has an infinite loop or long-blocking call, the timeout will fire but the code keeps running in a "zombie" thread. This is mitigated because:
+
+1. We're already in a subprocess - zombie dies when subprocess terminates
+2. On retry (lives system), we deserialize fresh original state, so zombie modifying old state doesn't affect new attempt
+3. Most code isn't truly infinite - timeouts work for "slow but finite" operations
+
+---
+
+## 6. Error Handling Internals
+
+### Error Wrapping
+
+When an error occurs in a lifecycle method, it's wrapped in a section-specific error class:
+
+| Error Class | Source Method | Attributes |
+|-------------|---------------|------------|
+| `PreloopError` | `__preloop__()` | `current_lap`, `original_error` |
+| `MainLoopError` | `__loop__()` | `current_lap`, `original_error` |
+| `PostLoopError` | `__postloop__()` | `current_lap`, `original_error` |
+| `OnFinishError` | `__onfinish__()` | `current_lap`, `original_error` |
+| `ResultError` | `__result__()` | `current_lap`, `original_error` |
+| `TimeoutError` | Any section | `section`, `timeout`, `current_lap` |
+
+### Error Class Structure
+
+```python
+class MainLoopError(Exception):
+    def __init__(self, current_lap: int, original_error: Exception | None = None):
+        self.current_lap = current_lap
+        self.original_error = original_error  # Stored for serialization
+        super().__init__(f"Error in __loop__ on lap {current_lap}")
+```
+
+The `original_error` attribute is stored explicitly because Python's `__cause__` (from `raise ... from e`) doesn't survive `cerial` serialization.
+
+---
+
+## 7. Lives System Flow
+
+```
+Error occurs in section
+        │
+        ▼
+Wrap in *LoopError
+        │
+        ▼
+Lives remaining > 1? ─── Yes ──► Decrement lives
+        │                              │
+        No                             ▼
+        │                   Deserialize original state
+        ▼                   (fresh copy, lives decremented)
+Set self.error = wrapped error         │
+        │                              ▼
+        ▼                   Retry from beginning
+Call __error__()
+        │
+        ▼
+Serialize __error__() return value
+        │
+        ▼
+Send to parent via queue
+        │
+        ▼
+Parent's .result raises the error
+```
+
+### Key Implementation Details
+
+- On retry, we deserialize the *original* process state (saved at `start()`)
+- Only `lives` is decremented, everything else is fresh
+- This ensures retries start clean, not with corrupted state
+- `__error__()` return value is sent back like a normal result
+
+---
+
+## 8. Config Structure
+
+Nested dataclasses with generous defaults:
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class TimeoutConfig:
+    preloop: Optional[float] = 30.0    # 30 seconds
+    loop: Optional[float] = 300.0       # 5 minutes
+    postloop: Optional[float] = 60.0    # 1 minute
+    onfinish: Optional[float] = 60.0    # 1 minute
+
+@dataclass
+class ProcessConfig:
+    num_loops: Optional[int] = None     # None = infinite until stopped
+    join_in: Optional[float] = None     # None = no time limit
+    lives: int = 1                      # 1 = no retries (fail on first error)
+    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+```
+
+Created automatically by `Process._setup()` before user's `__init__` runs.
+
+---
+
+## 9. Timers Structure
+
+`self.timers` is only created if at least one `@timesection()` decorator exists.
+
+```python
+from typing import Optional
+from suitkaise.sktime import Timer
+
+class ProcessTimers:
+    def __init__(self):
+        self.preloop: Optional[Timer] = None
+        self.loop: Optional[Timer] = None
+        self.postloop: Optional[Timer] = None
+        self.onfinish: Optional[Timer] = None
+        self.full_loop: Timer = Timer()  # Always exists once timers is created
+    
+    def _update_full_loop(self):
+        """Called by engine after each complete loop iteration."""
+        total = 0.0
+        for timer in [self.preloop, self.loop, self.postloop]:
+            if timer is not None and timer.num_times > 0:
+                total += timer.most_recent
+        if total > 0:
+            self.full_loop.add_time(total)
+```
+
+### How `@timesection()` Works
+
+1. Checks if `self.timers` exists, creates `ProcessTimers` if not
+2. Determines which timer slot based on method name (`__preloop__` → `self.timers.preloop`)
+3. Creates a `Timer` in that slot if it doesn't exist
+4. Wraps the method to time each call
+
+---
+
+## 10. File Structure
+
+```
+suitkaise/processing/
+├── __init__.py              # Public exports: Process, timesection
+├── api.py                   # Process class, timesection decorator (re-exports)
+└── _int/
+    ├── __init__.py          # Internal imports
+    ├── process_class.py     # Process class implementation
+    ├── config.py            # ProcessConfig, TimeoutConfig dataclasses
+    ├── timers.py            # ProcessTimers container
+    ├── errors.py            # PreloopError, MainLoopError, etc.
+    ├── engine.py            # Loop runner that executes in subprocess
+    └── timeout.py           # Platform-specific timeout implementations
+```
+
+### Module Responsibilities
+
+| File | Responsibility |
+|------|----------------|
+| `process_class.py` | `Process` base class, `__init_subclass__`, control methods, `__serialize__`/`__deserialize__` |
+| `config.py` | `ProcessConfig` and `TimeoutConfig` dataclasses |
+| `timers.py` | `ProcessTimers` container with `full_loop` aggregation |
+| `errors.py` | All custom exception classes with `original_error` storage |
+| `engine.py` | `_engine_main` function that runs lifecycle in subprocess |
+| `timeout.py` | `run_with_timeout` with platform detection |
+
+---
+
+## Auto-Initialization Internals
+
+The `Process` class uses `__init_subclass__` to automatically wrap subclass `__init__` methods:
+
+```python
+class Process:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        
+        # Wrap the child's __init__ to auto-call parent setup
+        if '__init__' in cls.__dict__:
+            original_init = cls.__dict__['__init__']
+            
+            def wrapped_init(self, *args, **kwargs):
+                Process._setup(self)  # Parent initialization
+                original_init(self, *args, **kwargs)  # User's __init__
+            
+            cls.__init__ = wrapped_init
+        else:
+            # No custom __init__, still need setup
+            def default_init(self, *args, **kwargs):
+                Process._setup(self)
+            
+            cls.__init__ = default_init
+```
+
+This means:
+- Every class that inherits from `Process` automatically gets parent setup
+- User never needs to call `super().__init__()`
+- Works for all subclasses, even nested inheritance
+
+---
+
+## Serialization Internals
+
+The `Process` class implements custom `__serialize__` and `__deserialize__` methods for `cerial`:
+
+```python
+_LIFECYCLE_METHODS = (
+    '__preloop__', '__loop__', '__postloop__',
+    '__onfinish__', '__result__', '__error__'
+)
+
+def __serialize__(self) -> dict:
+    """Capture instance state and lifecycle methods for cerial."""
+    # Get user-defined lifecycle methods (not base class defaults)
+    methods = {}
+    for name in self._LIFECYCLE_METHODS:
+        method = getattr(self.__class__, name, None)
+        base_method = getattr(Process, name, None)
+        if method is not None and method is not base_method:
+            methods[name] = getattr(self, name).__func__
+    
+    return {
+        '__dict__': self.__dict__.copy(),
+        '__class_name__': self.__class__.__name__,
+        '__methods__': methods,
+    }
+
+@classmethod
+def __deserialize__(cls, state: dict) -> 'Process':
+    """Recreate process from serialized state."""
+    # Dynamically create the subclass with captured methods
+    new_class = type(
+        state['__class_name__'],
+        (Process,),
+        state['__methods__']
+    )
+    
+    # Create instance without calling __init__
+    instance = object.__new__(new_class)
+    instance.__dict__.update(state['__dict__'])
+    
+    return instance
+```
+
+This custom serialization is necessary because:
+1. `cerial`'s default class handler skips dunder methods
+2. User-defined lifecycle methods must be preserved
+3. Locally-defined classes (inside functions/tests) need special handling

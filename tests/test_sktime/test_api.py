@@ -245,7 +245,7 @@ def test_timer_errors_and_warnings():
     # resume while not paused should warn, but only if a frame exists; start first
     timer.start()
     with pytest.warns(UserWarning):
-        timer._timer.resume()  # reach underlying session warning via internal call
+        timer.resume()  # resume while not paused triggers warning
     # clean up frame to not leak state between tests
     timer.stop()
 
