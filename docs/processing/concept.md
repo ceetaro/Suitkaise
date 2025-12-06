@@ -316,6 +316,359 @@ self.current_lap
 ```
 
 
+---
+
+## Internal Architecture
+
+### Integration with other suitkaise modules
+
+- **cerial**: Serializes the Process object to send to a subprocess. Handles complex objects like locks, loggers, timers, etc. that might be in user's process object.
+- **sktime**: Powers the `@processing.timethis()` decorator and `self.timers.*` statistics.
+
+### Subprocess mechanics
+
+Processing uses Python's `multiprocessing` module. When `process.start()` is called:
+
+1. The Process object is serialized with cerial
+2. A new subprocess is spawned
+3. The subprocess deserializes and runs the engine loop
+4. Results are serialized back to the parent process
+
+Threading support will be added later as a separate module.
+
+### Communication between parent and child
+
+Uses a hybrid approach (Option C) for efficiency:
+
+- **`multiprocessing.Event`** for stop signal - nearly zero-cost to check
+- **`multiprocessing.Queue`** for results/errors - flexible serialized data
+
+**Why this approach:**
+
+| Approach | Fast stop check | Send results | Complexity |
+|----------|-----------------|--------------|------------|
+| Event only | ✅ | ❌ (need separate mechanism) | Low |
+| Queue only | ❌ (must poll with get_nowait) | ✅ | Medium |
+| **Hybrid (chosen)** | ✅ | ✅ | Low |
+
+The Event is a shared memory flag - `is_set()` is essentially just reading a boolean. The Queue handles the complexity of serializing result objects back to the parent.
+
+**Communication primitives:**
+
+```python
+self._stop_event = multiprocessing.Event()   # Parent → Child: stop signal
+self._result_queue = multiprocessing.Queue() # Child → Parent: result or error
+```
+
+**Flow diagram:**
+
+```
+PARENT PROCESS                          CHILD PROCESS
+─────────────────                       ─────────────────
+process = MyProcess()
+process.start()
+  │
+  ├─► create _stop_event (Event)
+  ├─► create _result_queue (Queue)
+  ├─► serialize process with cerial
+  ├─► save original state for retries
+  ├─► spawn subprocess ──────────────────►  deserialize process
+  │                                         │
+  │                                         ├─► run engine loop:
+  │                                         │     check _stop_event
+  │                                         │     __preloop__()
+  │                                         │     check _stop_event
+  │                                         │     __loop__()
+  │                                         │     check _stop_event
+  │                                         │     __postloop__()
+  │                                         │     increment lap
+  │                                         │     update full_loop timer
+  │                                         │     (repeat until done)
+  │                                         │
+process.stop()                              │
+  ├─► _stop_event.set() ─────────────────►  │ (sees signal between sections)
+  │                                         ├─► __onfinish__()
+  │                                         ├─► result = __result__()
+  │                                         ├─► serialize result
+  │                                         └─► _result_queue.put(result)
+  │                                         
+process.wait()                              
+  ├─► subprocess.join()                     
+  │
+process.result()
+  ├─► _result_queue.get()
+  ├─► deserialize
+  ├─► if error, raise it
+  └─► return result
+```
+
+**Future extensibility:**
+
+If we later need parent → child commands (pause/resume, dynamic config updates), we can add a `_cmd_queue` without changing the existing primitives. The code is structured to allow this:
+
+```python
+# Future addition (not in v1):
+# self._cmd_queue = multiprocessing.Queue()  # Parent → Child: commands
+```
+
+### The engine
+
+The engine is the code that runs in the child process. It orchestrates the lifecycle:
+
+- User defines *what* happens (`__preloop__`, `__loop__`, `__postloop__`, etc.)
+- Engine defines *when* and *how* those things get called
+
+The engine handles:
+- Calling lifecycle methods in order
+- Checking stop signals between sections
+- Enforcing timeouts on each section
+- Managing the lives/retry system
+- Tracking lap count and timers
+- Sending results or errors back to parent
+
+### stop() vs kill()
+
+- `stop()` - Sets the stop event. Process finishes current section, runs `__onfinish__`, sends result.
+- `kill()` - Calls `subprocess.terminate()` immediately. No cleanup, no result, abandoned.
+
+
+---
+
+## Timeout Implementation
+
+### The challenge
+
+How do you interrupt arbitrary Python code that's blocking (infinite loop, stuck network call, etc.)?
+
+| Approach | Can interrupt blocking code? | Cross-platform? | Clean termination? |
+|----------|------------------------------|-----------------|-------------------|
+| **Signal (SIGALRM)** | Yes | Unix only | Yes |
+| **Timer thread** | No (zombie continues) | Yes | No |
+| **Subprocess per section** | Yes | Yes | Yes (but heavy overhead) |
+
+### Our approach: Platform-specific with fallback
+
+**On Unix/Linux/macOS**: Use `signal.SIGALRM`
+- Signals are handled at the OS level
+- Can interrupt most blocking operations (syscalls, sleep, etc.)
+- Clean and reliable
+
+**On Windows**: Fall back to timer thread
+- Windows doesn't have `SIGALRM`
+- Timer thread detects timeout but can't forcefully interrupt blocking code
+- The "zombie" thread continues running until subprocess terminates
+
+```python
+import platform
+
+if platform.system() != 'Windows':
+    _run_with_timeout = _signal_based_timeout
+else:
+    _run_with_timeout = _thread_based_timeout
+```
+
+### Signal-based timeout (Unix)
+
+```python
+import signal
+
+def _signal_based_timeout(func, timeout):
+    if timeout is None:
+        return func()
+    
+    def handler(signum, frame):
+        raise TimeoutError(f"Section timed out after {timeout}s")
+    
+    old_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(int(timeout))
+    try:
+        return func()
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+```
+
+### Timer thread fallback (Windows)
+
+```python
+import threading
+
+def _thread_based_timeout(func, timeout):
+    if timeout is None:
+        return func()
+    
+    result = [None]
+    exception = [None]
+    
+    def wrapper():
+        try:
+            result[0] = func()
+        except Exception as e:
+            exception[0] = e
+    
+    thread = threading.Thread(target=wrapper)
+    thread.start()
+    thread.join(timeout=timeout)
+    
+    if thread.is_alive():
+        # Thread still running - can't kill it, but we know timeout occurred
+        raise TimeoutError(f"Section timed out after {timeout}s")
+    
+    if exception[0]:
+        raise exception[0]
+    return result[0]
+```
+
+### Windows limitation
+
+On Windows, if user code has an infinite loop or long-blocking call, the timeout will fire but the code keeps running in a "zombie" thread. This is mitigated because:
+
+1. We're already in a subprocess - zombie dies when subprocess terminates
+2. On retry (lives system), we deserialize fresh original state, so zombie modifying old state doesn't affect new attempt
+3. Most code isn't truly infinite - timeouts work for "slow but finite" operations
+
+
+---
+
+## Error Handling and Lives System
+
+### Error wrapping
+
+When an error occurs in a lifecycle method, it's wrapped in a section-specific error:
+
+- `PreloopError` wraps errors from `__preloop__()`
+- `MainLoopError` wraps errors from `__loop__()`
+- `PostLoopError` wraps errors from `__postloop__()`
+
+This lets users see both *where* the error occurred and *what* the actual error was:
+
+```
+PreloopError: RuntimeError: Connection refused
+```
+
+### Lives and retry flow
+
+```
+Error occurs in section
+        │
+        ▼
+Wrap in *LoopError
+        │
+        ▼
+Lives remaining? ─── Yes ──► Decrement lives
+        │                         │
+        No                        ▼
+        │                   Deserialize original state
+        ▼                   (fresh copy, lives decremented)
+Set self.error = wrapped error    │
+        │                         ▼
+        ▼                   Retry from beginning
+Call __error__()
+        │
+        ▼
+Return error result to parent
+        │
+        ▼
+Parent's result() raises the error
+```
+
+Key points:
+- On retry, we deserialize the *original* process state (saved at start)
+- Only `lives` is decremented, everything else is fresh
+- This ensures retries start clean, not with corrupted state
+
+### __error__() behavior
+
+- Called when no lives remaining and an error occurred
+- Receives error via `self.error` attribute
+- Default behavior: returns the error
+- User can override to add logging, cleanup, custom error transformation
+- Whatever `__error__()` returns is sent back like a result
+
+### result() behavior
+
+- Blocks until process finishes (or call `wait()` first)
+- Checks if result contains an error
+- If error, raises it
+- If not, returns the result (default: None if no `__result__` defined)
+
+
+---
+
+## Config Structure
+
+Nested dataclasses with generous defaults:
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class TimeoutConfig:
+    preloop: float | None = 30.0
+    loop: float | None = 300.0
+    postloop: float | None = 60.0
+    onfinish: float | None = 60.0
+
+@dataclass
+class ProcessConfig:
+    num_loops: int | None = None       # None = infinite until stopped
+    join_in: float | None = None       # None = no time limit
+    lives: int = 1                     # 1 = no retries (fail on first error)
+    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
+```
+
+Created automatically by `Process._setup()` before user's `__init__` runs.
+
+
+---
+
+## Timers Structure
+
+`self.timers` is only created if at least one `@processing.timethis()` decorator exists.
+
+```python
+class ProcessTimers:
+    def __init__(self):
+        self.preloop: Timer | None = None
+        self.loop: Timer | None = None
+        self.postloop: Timer | None = None
+        self.onfinish: Timer | None = None
+        self.full_loop: Timer = Timer()  # always exists once timers is created
+    
+    def _update_full_loop(self):
+        """Called by engine after each complete loop iteration"""
+        total = 0.0
+        for timer in [self.preloop, self.loop, self.postloop]:
+            if timer is not None and timer.num_times > 0:
+                total += timer.most_recent
+        if total > 0:
+            self.full_loop.add_time(total)
+```
+
+The `@processing.timethis()` decorator:
+1. Checks if `self.timers` exists, creates `ProcessTimers` if not
+2. Determines which timer slot based on method name (`__preloop__` → `self.timers.preloop`)
+3. Creates a `Timer` in that slot if it doesn't exist
+4. Wraps the method to time each call
+
+
+---
+
+## File Structure
+
+```
+suitkaise/processing/
+├── __init__.py              # public exports
+├── api.py                   # Process base class, timethis decorator
+└── _int/
+    ├── __init__.py
+    ├── base_process.py      # Process class implementation
+    ├── config.py            # ProcessConfig, TimeoutConfig dataclasses
+    ├── timers.py            # ProcessTimers container
+    ├── errors.py            # PreloopError, MainLoopError, PostLoopError
+    ├── engine.py            # Loop runner that executes in subprocess
+    └── timeout.py           # Platform-specific timeout implementations
+```
 
 
 
