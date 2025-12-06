@@ -69,7 +69,7 @@ except ImportError:
     _processing_available = False
 
 # Package metadata
-__version__ = "0.1.2"
+__version__ = "0.2.3"
 __author__ = "Casey Eddings"
 __description__ = "Democratizing complex application development for Python"
 __url__ = "https://github.com/caseyeddings/suitkaise"

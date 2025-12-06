@@ -8,6 +8,31 @@ Making things easier for developers of all skill levels to develop complex appli
 pip install suitkaise
 ```
 
+## Documentation
+
+You can easily download and access the documentation for all suitkaise modules.
+
+- AI agents can understand these documents and use suitkaise modules correctly after reading them.
+- You can easily access them by placing them in your project root or your home directory.
+
+Download module documentation directly:
+
+```python
+from suitkaise import docs
+
+# Download to a specific folder
+docs.download("/path/to/folder")
+
+# Or auto-detect project root
+docs.download()
+
+# Or download to ~/Downloads
+with docs.Permission():
+    docs.download()
+```
+
+This copies `info.md` and `concept.md` for each module to help you understand how everything works.
+
 ## Modules
 
 ### cerial - Serialization for the Unpicklable
@@ -85,6 +110,30 @@ def my_function():
 
 my_function()
 print(my_function.timer.most_recent)
+```
+
+### processing - Subprocess-Based Task Execution
+
+Run tasks in isolated subprocesses with automatic lifecycle management and timing.
+
+```python
+from suitkaise.processing import Process, timesection
+
+# Run a function in a subprocess
+def heavy_computation(x):
+    return x ** 2
+
+process = Process(target=heavy_computation, args=(42,))
+process.start()
+process.join()
+print(process.result)  # 1764
+
+# Time sections of work
+with timesection("data loading"):
+    data = load_data()
+
+with timesection("processing"):
+    result = process_data(data)
 ```
 
 ## Requirements

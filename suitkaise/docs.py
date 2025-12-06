@@ -74,8 +74,8 @@ def download(destination: skpath.AnyPath | None = None):
     else:
         dest_dir = _get_destination()
     
-    # Find the docs directory relative to this file
-    docs_dir = skpath.SKPath(__file__).parent.parent / "docs"
+    # Find the docs directory relative to this file (inside suitkaise package)
+    docs_dir = skpath.SKPath(__file__).parent / "suitkaise-docs"
     
     # Clean up existing export folder if it exists
     if dest_dir.exists:

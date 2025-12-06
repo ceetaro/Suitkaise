@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suitkaise"
-version = "0.1.2"
+version = "0.2.3"
 description = "Making things easier for developers of all skill levels to develop complex applications."
 authors = [
     {name = "Casey Eddings", email = "caseyeddings@gmail.com"}
@@ -50,6 +50,9 @@ dev = [
 where = ["."]
 include = ["suitkaise*"]
 exclude = ["tests*", "docs*", "examples*", "suitkaise_depr*", "_suitkaise_wip*"]
+
+[tool.setuptools.package-data]
+"*" = ["**/*.md"]
 
 [tool.pytest.ini_options]
 markers = [
