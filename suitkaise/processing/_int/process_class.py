@@ -68,8 +68,11 @@ class Process:
         This means users don't need to call super().__init__() - it happens
         automatically before their __init__ runs.
         
-        Also copies __serialize__ and __deserialize__ to each subclass's __dict__
-        so cerial can detect them for locally-defined classes.
+        Also handles serialization for cerial:
+        - If user defined __serialize__/__deserialize__, we wrap them to include
+          Process internals (lifecycle methods, class attrs) while preserving
+          user's custom state.
+        - If not defined, we provide Process's serialization methods.
         """
         super().__init_subclass__(**kwargs)
         
@@ -94,13 +97,52 @@ class Process:
             
             cls.__init__ = default_init
         
-        # Copy serialization methods to subclass's __dict__ so cerial can find them.
+        # Handle serialization methods for cerial compatibility.
         # cerial requires these to be in the class's own __dict__ (not inherited)
         # for locally-defined classes.
-        if '__serialize__' not in cls.__dict__:
-            cls.__serialize__ = Process.__serialize__
-        if '__deserialize__' not in cls.__dict__:
-            cls.__deserialize__ = staticmethod(Process._deserialize_impl)  # type: ignore[assignment]
+        #
+        # IMPORTANT: cerial handles locally-defined vs module-level classes differently:
+        # - Locally-defined (has <locals> in qualname): requires staticmethod with (cls, state) signature
+        #   cerial calls: deserialize_func(cls, state["custom_state"])
+        # - Module-level: expects classmethod with (state) signature (cls is implicit)
+        #   cerial calls: cls.__deserialize__(state["custom_state"])
+        #
+        # If user defined their own __serialize__/__deserialize__, we capture them
+        # and wrap to include Process internals alongside user's custom state.
+        
+        user_serialize = cls.__dict__.get('__serialize__')
+        user_deserialize = cls.__dict__.get('__deserialize__')
+        
+        # Create the __serialize__ method that handles both Process state and user state
+        def make_serialize(user_ser):
+            def __serialize__(self):
+                return Process._serialize_with_user(self, user_ser)
+            return __serialize__
+        
+        cls.__serialize__ = make_serialize(user_serialize)
+        
+        # Determine if this is a locally-defined class
+        is_local = "<locals>" in cls.__qualname__
+        
+        if is_local:
+            # For locally-defined classes: staticmethod with (cls, state) signature
+            # cerial calls: deserialize_func(cls, state["custom_state"])
+            def make_deserialize_static(user_deser):
+                def __deserialize__(reconstructed_cls, state):
+                    return Process._deserialize_with_user(reconstructed_cls, state, user_deser)
+                return staticmethod(__deserialize__)
+            
+            cls.__deserialize__ = make_deserialize_static(user_deserialize)
+        else:
+            # For module-level classes: classmethod with (state) signature (cls is implicit)
+            # cerial calls: cls.__deserialize__(state["custom_state"])
+            def make_deserialize_classmethod(user_deser):
+                @classmethod
+                def __deserialize__(inner_cls, state):
+                    return Process._deserialize_with_user(inner_cls, state, user_deser)
+                return __deserialize__
+            
+            cls.__deserialize__ = make_deserialize_classmethod(user_deserialize)
     
     # =========================================================================
     # Serialization support for cerial
@@ -112,7 +154,8 @@ class Process:
         '__onfinish__', '__result__', '__error__'
     )
     
-    def __serialize__(self) -> dict:
+    @staticmethod
+    def _serialize_with_user(instance: "Process", user_serialize=None) -> dict:
         """
         Serialize this Process instance for cerial.
         
@@ -120,12 +163,17 @@ class Process:
         - Instance __dict__ (all instance attributes)
         - Lifecycle methods defined on the subclass
         - Class name for reconstruction
+        - User's custom state if they defined __serialize__
+        
+        Args:
+            instance: The Process instance to serialize
+            user_serialize: User's __serialize__ method (if they defined one)
         """
-        cls = self.__class__
+        cls = instance.__class__
         
         # Capture lifecycle methods defined on THIS class (not inherited from Process)
         lifecycle_methods = {}
-        for name in self._LIFECYCLE_METHODS:
+        for name in Process._LIFECYCLE_METHODS:
             if name in cls.__dict__:
                 # This is a method defined on the subclass
                 lifecycle_methods[name] = cls.__dict__[name]
@@ -140,24 +188,32 @@ class Process:
             # Include class variables, but not inherited stuff
             class_attrs[name] = value
         
-        return {
-            'instance_dict': self.__dict__.copy(),
+        state = {
+            'instance_dict': instance.__dict__.copy(),
             'class_name': cls.__name__,
             'lifecycle_methods': lifecycle_methods,
             'class_attrs': class_attrs,
         }
+        
+        # If user defined their own __serialize__, call it and include that state
+        if user_serialize is not None:
+            state['user_custom_state'] = user_serialize(instance)
+            state['has_user_serialize'] = True
+        
+        return state
     
     @staticmethod
-    def _deserialize_impl(reconstructed_cls: type, state: dict) -> "Process":
+    def _deserialize_with_user(reconstructed_cls: type, state: dict, user_deserialize=None) -> "Process":
         """
         Deserialize a Process instance from cerial state.
         
-        This is a staticmethod that cerial calls for locally-defined classes.
         Args:
             reconstructed_cls: The class cerial reconstructed (we ignore this and build our own)
             state: The serialized state dict
+            user_deserialize: User's __deserialize__ method (if they defined one)
         
         Recreates the subclass dynamically with type() and restores state.
+        If user had custom deserialize, applies it after Process reconstruction.
         """
         # Build class dict with lifecycle methods and class attributes
         class_dict = {}
@@ -179,13 +235,49 @@ class Process:
         # Restore instance state directly (includes config, timers, etc.)
         obj.__dict__.update(state['instance_dict'])
         
+        # If user defined their own __deserialize__, apply it now
+        if state.get('has_user_serialize') and user_deserialize is not None:
+            # User's __deserialize__ should be a classmethod that takes (cls, state)
+            # We call it with the user's custom state portion
+            user_state = state.get('user_custom_state', {})
+            
+            # Handle both classmethod and staticmethod signatures
+            # The user_deserialize we captured is the raw method/function
+            if isinstance(user_deserialize, classmethod):
+                # It's already a classmethod descriptor, extract the function
+                user_func = user_deserialize.__func__
+                user_result = user_func(new_class, user_state)
+            elif isinstance(user_deserialize, staticmethod):
+                # It's a staticmethod, extract and call with (cls, state)
+                user_func = user_deserialize.__func__
+                user_result = user_func(new_class, user_state)
+            else:
+                # Regular function or unbound method - try calling as classmethod-style
+                try:
+                    user_result = user_deserialize(new_class, user_state)
+                except TypeError:
+                    # Maybe it just expects state
+                    user_result = user_deserialize(user_state)
+            
+            # If user's __deserialize__ returned an object, use it to update our obj
+            # This allows user to restore their custom attributes
+            if user_result is not None and hasattr(user_result, '__dict__'):
+                # Merge user's restored attributes into our obj
+                for key, value in user_result.__dict__.items():
+                    if key not in obj.__dict__:
+                        obj.__dict__[key] = value
+        
         return obj
     
-    # For module-level classes, cerial uses classmethod __deserialize__
+    # Fallback for direct calls on Process base class
+    def __serialize__(self) -> dict:
+        """Serialize this Process instance (base class fallback)."""
+        return Process._serialize_with_user(self, None)
+    
     @classmethod
     def __deserialize__(cls, state: dict) -> "Process":
-        """Deserialize for module-level classes."""
-        return Process._deserialize_impl(cls, state)
+        """Deserialize for module-level classes (base class fallback)."""
+        return Process._deserialize_with_user(cls, state, None)
     
     # =========================================================================
     # Internal setup

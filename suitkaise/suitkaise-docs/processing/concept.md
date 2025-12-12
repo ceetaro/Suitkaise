@@ -23,7 +23,7 @@
 
 `processing` provides a simple, intuitive way to run Python code in subprocesses. Designed to make using multiple processes really easy.
 
-It uses suikaise's cerial engine as the base serializer, meaning you can send basically any object through without having to worry if it will work or not.
+It uses suitkaise's `cerial` engine as the base serializer, meaning you can send basically any object through without having to worry if it will work or not.
 
 In a single, simple class structure, you can create a well managed process object that can use almost any object you want.
 
@@ -885,6 +885,51 @@ results = {tid: res for tid, res in (w.result for w in workers)} # 6
 - When you don't need lifecycle management
 - using basic primitives that stdlib pickle can handle
 
+### Limitations
+
+The `__main__` Limitation
+
+When you run a script directly (`python script.py`), your code lives in a special module called `__main__`. On macOS and Windows, subprocesses start fresh Python interpreters that can't access classes defined in `__main__`.
+
+**What happens:**
+1. You define `class MyProcessor(Process)` in your script
+2. `cerial` serializes it as `"__main__.MyProcessor"`
+3. Subprocess starts → imports `__main__` → but it's different now (multiprocessing bootstrap code)
+4. Your class methods aren't found
+
+**What works:**
+- Lifecycle methods (`__loop__`, `__result__`, etc.) - handled specially by `processing`
+- Instance attributes - serialized in `__dict__`
+
+**What doesn't work:**
+- Custom helper methods you define on the class
+
+**Solution:** Put your `Process` subclass in an importable module:
+
+```python
+# processors.py
+from suitkaise.processing import Process
+
+class MyProcessor(Process):
+    def __loop__(self):
+        result = self._helper()  # ✓ Works!
+    
+    def _helper(self):
+        return "hello"
+# main.py
+from processors import MyProcessor  # Import from real module
+
+p = MyProcessor()
+p.start()
+```
+Do this:
+```python
+# main.py
+from processors import MyProcessor  # Import from real module
+
+p = MyProcessor()
+p.start()
+```
 ### Performance
 
 There is NO SIGNIFICANT DIFFERENCE between using `processing` and raw `multiprocessing` for creating a single process.

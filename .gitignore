@@ -48,3 +48,7 @@ suitkaise_depr/
 
 # fileconv test results
 suitkaise/fileconv/tests/*_results/
+
+# image assets
+site/__assets__/
+Suitkaise-noncode/
