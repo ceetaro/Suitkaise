@@ -11,7 +11,22 @@ columns = 2
 
 # 1.1
 
-text = "processing module text here"
+rows = 2
+columns = 1
+
+## 1.1: text = "easy_multiprocessing = processing.Process()\n\n# start the process\neasy_multiprocessing.start()"
+
+## 2.1: link = "<--- Learn More"(site/processing/__processing__.md)
+
+/*
+text block should be code styled (think ```python in md)
+
+The learn more should be a button with the same background color as the home page.
+
+when this link is hovered, the arrow should move slightly to the right and stay there until the mouse is no longer hovering over the link.
+
+this link takes you to the processing main page.
+*/
 
 # 1.2
 
@@ -23,11 +38,38 @@ image = __assets__/cerial-text-with-cerealbowl-neon.png
 
 # 2.2
 
-text = "cerial module text here"
+rows = 2
+columns = 1
+
+## 1.1: text = "Serialize anything."
+
+## 2.1: link = "Learn More --->"(site/cerial/__cerial__.md)
+
+/*
+The learn more should be a button with the same background color as the home page.
+
+when this link is hovered, the arrow should move slightly to the right and stay there until the mouse is no longer hovering over the link.
+
+this link takes you to the cerial main page.
+*/
 
 # 3.1
 
-text = "sktime module text here"
+rows = 2
+columns = 1
+
+## 1.1: text = "Time a function every time it runs with 1 line of code."
+
+## 2.1: link = "<--- Learn More"(site/sktime/__sktime__.md)
+
+/*
+The learn more should be a button with the same background color as the home page.
+
+when this link is hovered, the arrow should move slightly to the left and stay there until the mouse is no longer hovering over the link.
+
+this link takes you to the sktime main page.
+*/
+
 
 # 3.2
 
@@ -39,11 +81,35 @@ image = __assets__/skpath-text-with-path-neon.png
 
 # 4.2
 
-text = "skpath module text here"
+text = "File path management + skpath == big win for you."
+
+link = "Learn More --->"(site/skpath/__skpath__.md)
+
+/*
+The learn more should be a button with the same background color as the home page.
+
+when this link is hovered, the arrow should move slightly to the right and stay there until the mouse is no longer hovering over the link.
+
+this link takes you to the skpath main page.
+*/
 
 # 5.1
 
-text = "circuit module text here"
+rows = 2
+columns = 1
+
+## 1.1: text = "Simple, readable code to manage resources and control flow."
+
+## 2.1: link = "<--- Learn More"(site/circuit/__circuit__.md)
+
+/*
+The learn more should be a button with the same background color as the home page.
+
+when this link is hovered, the arrow should move slightly to the left and stay there until the mouse is no longer hovering over the link.
+
+this link takes you to the circuit main page.
+*/
+
 
 # 5.2
 

@@ -4,6 +4,10 @@ navigation bar.
 
 it has a button for opening the sidebar, a button for opening the about page, a button for opening the donate page, and a button for heading back to the top of home page (reloads page)
 
+the hamburger menu button should be on the left side of the page
+
+the about, donate and home buttons should be on the right side of the page.
+
 */
 
 rows = 1

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suitkaise</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-briefcase">
+            <img src="../__assets__/briefcase-laptop-closed.png" alt="Loading..." class="loading-img" id="loadingImg">
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay (closes sidebar when clicked) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-close-btn" id="sidebarCloseBtn">&lt;</button>
+        <nav class="sidebar-nav">
+            <a href="#processing" class="sidebar-item">Processing</a>
+            <a href="#cerial" class="sidebar-item">Cerial</a>
+            <a href="#sktime" class="sidebar-item">Sktime</a>
+            <a href="#skpath" class="sidebar-item">Skpath</a>
+            <a href="#circuit" class="sidebar-item">Circuit</a>
+        </nav>
+    </aside>
+
+    <!-- Navigation Bar -->
+    <header class="nav-bar">
+        <button class="nav-btn sidebar-toggle" id="sidebarToggle">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+        <div class="nav-right">
+            <a href="#about" class="nav-btn nav-link" data-page="about">About</a>
+            <a href="#error" class="nav-btn nav-link" data-page="error">Donate</a>
+            <a href="#home" class="nav-btn home-btn nav-link" id="homeBtn" data-page="home">
+                <img src="../__assets__/briefcase-laptop-closed.png" alt="Home" class="home-icon" id="homeIcon">
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Page Content Container -->
+    <main class="page-content" id="pageContent">
+        <!-- Module Section -->
+        <section class="module-section">
+            <!-- Row 1: Processing (text left, image right) -->
+            <div class="module-row" id="processing">
+                <div class="module-text">
+                    <pre class="code-block"><code>easy_multiprocessing = processing.Process()
+
+<span class="comment"># start the process</span>
+easy_multiprocessing.start()</code></pre>
+                    <a href="#processing-page" class="learn-more-link arrow-left">
+                        <span class="arrow">⟵</span> learn more
+                    </a>
+                </div>
+                <div class="module-image">
+                    <img src="../__assets__/processing-text-with-branch-neon.png" alt="Processing">
+                </div>
+            </div>
+
+            <!-- Row 2: Cerial (image left, text right) -->
+            <div class="module-row" id="cerial">
+                <div class="module-image">
+                    <img src="../__assets__/cerial-text-with-cerealbowl-neon.png" alt="Cerial">
+                </div>
+                <div class="module-text">
+                    <p class="module-tagline">Serialize anything.</p>
+                    <a href="#cerial-page" class="learn-more-link arrow-right">
+                        learn more <span class="arrow">⟶</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Row 3: Sktime (text left, image right) -->
+            <div class="module-row" id="sktime">
+                <div class="module-text">
+                    <p class="module-tagline">Time a function every time it runs with 1 line of code.</p>
+                    <a href="#sktime-page" class="learn-more-link arrow-left">
+                        <span class="arrow">⟵</span> learn more
+                    </a>
+                </div>
+                <div class="module-image">
+                    <img src="../__assets__/sktime-text-with-clock-neon.png" alt="Sktime">
+                </div>
+            </div>
+
+            <!-- Row 4: Skpath (image left, text right) -->
+            <div class="module-row" id="skpath">
+                <div class="module-image">
+                    <img src="../__assets__/skpath-text-with-trail-neon.png" alt="Skpath">
+                </div>
+                <div class="module-text">
+                    <p class="module-tagline">File path management + skpath == big win for you.</p>
+                    <a href="#skpath-page" class="learn-more-link arrow-right">
+                        learn more <span class="arrow">⟶</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Row 5: Circuit (text left, image right) -->
+            <div class="module-row" id="circuit">
+                <div class="module-text">
+                    <p class="module-tagline">Simple, readable code to manage resources and control flow.</p>
+                    <a href="#circuit-page" class="learn-more-link arrow-left">
+                        <span class="arrow">⟵</span> learn more
+                    </a>
+                </div>
+                <div class="module-image">
+                    <img src="../__assets__/circuit-text-neon.png" alt="Circuit">
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer Section (for testing) -->
+        <footer class="footer-section">
+            <a href="#password" class="nav-link test-btn" data-page="password">Test Password Page</a>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,700 @@
+/* ============================================
+   Suitkaise Website Styles
+   Colors from __home__.md:
+   - Background: rgb(3, 5, 5)
+   - Text: rgb(109, 233, 149)
+   - Border: rgb(33, 40, 35)
+   ============================================ */
+
+:root {
+    --bg-color: rgb(3, 5, 5);
+    --text-color: rgb(109, 233, 149);
+    --border-color: rgb(33, 40, 35);
+    --hover-color: rgba(109, 233, 149, 0.2);
+    --nav-height: 80px;
+    --sidebar-width: 250px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    min-height: 100vh;
+}
+
+/* ============================================
+   Loading Screen
+   - Briefcase opening animation
+   ============================================ */
+
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.loading-briefcase {
+    width: 250px;
+    height: 250px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loading-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Adjust sizes for open briefcase images to match visual size */
+.loading-img.half-open {
+    max-width: 115%;
+    max-height: 115%;
+}
+
+.loading-img.fully-open {
+    max-width: 130%;
+    max-height: 130%;
+}
+
+/* ============================================
+   Navigation Bar
+   - Sticky, stays on top
+   - 4 columns: sidebar toggle, about, donate, home
+   ============================================ */
+
+.nav-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--nav-height);
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 100;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.nav-bar.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1rem;
+    padding: 10px 20px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    border-radius: 4px;
+}
+
+.nav-btn:hover {
+    background-color: var(--hover-color);
+}
+
+/* Hamburger Menu Button */
+.sidebar-toggle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    padding: 15px;
+}
+
+.hamburger-line {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background-color: var(--text-color);
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-toggle:hover .hamburger-line {
+    background-color: rgba(109, 233, 149, 0.7);
+}
+
+/* Home Button with Logo */
+.home-btn {
+    padding: 5px 10px;
+    background: none;
+    /* Reserve space for the larger open image to prevent shifting */
+    width: 90px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.home-btn:hover {
+    background: none;
+}
+
+.home-icon {
+    height: 50px;
+    width: auto;
+    transition: transform 0.2s ease;
+}
+
+.home-icon.open {
+    height: 65px; /* ~30% larger to match visual size of closed briefcase */
+}
+
+/* ============================================
+   Sidebar
+   - Slides in from left
+   - 6 rows: close button + 5 module links
+   ============================================ */
+
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 150;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: calc(-1 * var(--sidebar-width));
+    width: var(--sidebar-width);
+    height: 100vh;
+    background-color: var(--bg-color);
+    border-right: 1px solid var(--border-color);
+    transition: left 0.3s ease;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar-close-btn {
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 1.5rem;
+    padding: 15px 20px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-close-btn:hover {
+    background-color: var(--hover-color);
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-item {
+    color: var(--text-color);
+    text-decoration: none;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-item:hover {
+    background-color: var(--hover-color);
+}
+
+/* ============================================
+   Page Content
+   - Offset by nav height
+   - Contains module section and footer
+   ============================================ */
+
+.page-content {
+    margin-top: var(--nav-height);
+    min-height: calc(100vh - var(--nav-height));
+}
+
+/* ============================================
+   Module Section
+   - 5 rows, 2 columns
+   - Alternating text/image placement
+   ============================================ */
+
+.module-section {
+    width: 100%;
+    padding: 40px 60px;
+}
+
+.module-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 60px 0;
+    align-items: center;
+}
+
+/* Fade-in animation for module content */
+.module-row .module-text,
+.module-row .module-image {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.module-row .module-text.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.module-row .module-image.visible {
+    opacity: 0.8;
+    transform: translateY(0);
+}
+
+/* Neon flicker animation (1/10 chance) */
+.module-image.flicker {
+    animation: neonFlicker 0.8s ease forwards;
+}
+
+@keyframes neonFlicker {
+    0% { opacity: 0; }
+    10% { opacity: 0.6; }
+    15% { opacity: 0.15; }
+    25% { opacity: 0.7; }
+    30% { opacity: 0.3; }
+    40% { opacity: 0.1; }
+    50% { opacity: 0.55; }
+    55% { opacity: 0.25; }
+    65% { opacity: 0.7; }
+    70% { opacity: 0.4; }
+    80% { opacity: 0.75; }
+    85% { opacity: 0.55; }
+    100% { opacity: 0.8; transform: translateY(0); }
+}
+
+.module-text {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 25px;
+}
+
+.module-text h2 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+}
+
+.module-text p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+.module-tagline {
+    font-size: 2.2rem;
+    line-height: 1.4;
+    max-width: 500px;
+    font-weight: 500;
+}
+
+/* Code block styling */
+.code-block {
+    background-color: transparent;
+    border: none;
+    padding: 20px 0;
+    margin-top: 55px;
+    text-align: left;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    overflow-x: auto;
+}
+
+.code-block code {
+    color: var(--text-color);
+}
+
+.code-block .comment {
+    color: rgba(109, 233, 149, 0.35);
+}
+
+/* Learn More links */
+.learn-more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    color: rgba(109, 233, 149, 0.15);
+    text-decoration: none;
+    font-size: 1.3rem;
+    padding: 15px 0;
+    margin-top: 20px;
+    transition: color 0.2s ease;
+    align-self: center;
+}
+
+.learn-more-link:hover {
+    color: rgba(109, 233, 149, 0.3);
+}
+
+.learn-more-link .arrow {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 2rem;
+    position: relative;
+    top: -2px;
+}
+
+/* Arrow moves right on hover for right arrows */
+.learn-more-link.arrow-right:hover .arrow {
+    transform: translateX(40px);
+}
+
+/* Arrow moves left on hover for left arrows */
+.learn-more-link.arrow-left:hover .arrow {
+    transform: translateX(-40px);
+}
+
+.module-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.module-image img {
+    max-width: 100%;
+    height: auto;
+    max-height: 450px;
+    object-fit: contain;
+}
+
+/* ============================================
+   Footer Section
+   ============================================ */
+
+.footer-section {
+    border-top: 1px solid var(--border-color);
+    padding: 60px 20px;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    text-align: center;
+}
+
+.donate-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.donate-btn {
+    display: inline-block;
+    padding: 15px 40px;
+    background-color: var(--text-color);
+    color: var(--bg-color);
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 6px;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.donate-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+.footer-info {
+    opacity: 0.6;
+    font-size: 0.9rem;
+}
+
+/* ============================================
+   Footer Section
+   ============================================ */
+
+.footer-section {
+    padding: 40px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.test-btn {
+    display: inline-block;
+    padding: 15px 30px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.test-btn:hover {
+    background-color: var(--hover-color);
+}
+
+/* ============================================
+   Generic Page Sections (About, Donate, etc.)
+   ============================================ */
+
+.page-section {
+    width: 100%;
+    padding: 60px;
+    min-height: calc(100vh - var(--nav-height));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-header h1 {
+    font-size: 3rem;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.page-body {
+    max-width: 800px;
+    text-align: center;
+    font-size: 1.2rem;
+    line-height: 1.8;
+}
+
+/* ============================================
+   Error Page
+   ============================================ */
+
+.error-page {
+    width: 100%;
+    min-height: calc(100vh - var(--nav-height));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 30px;
+}
+
+.error-briefcase {
+    /* Reserve space for larger hover image and text */
+    width: 250px;
+    height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.error-briefcase-img {
+    height: 180px;
+    width: auto;
+    transition: transform 0.2s ease;
+}
+
+.error-briefcase-img.half-open {
+    height: 210px; /* Larger to match visual size */
+}
+
+.error-back-text {
+    margin-bottom: 15px;
+    color: var(--text-color);
+    font-size: 1rem;
+    opacity: 0;
+    /* Reserve space so nothing shifts */
+    height: 24px;
+    order: -1; /* Move text above the image */
+}
+
+.error-back-text.visible {
+    opacity: 1;
+}
+
+.error-title {
+    font-size: 4rem;
+    font-weight: bold;
+    letter-spacing: 0.2em;
+}
+
+.error-message {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    max-width: 500px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+/* ============================================
+   Password Page
+   ============================================ */
+
+.password-page {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 30px;
+    margin-top: 0; /* No nav bar offset */
+}
+
+/* Remove nav bar offset for pages without nav */
+.page-content.no-nav {
+    margin-top: 0;
+}
+
+.password-briefcase {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.password-briefcase-img {
+    height: 150px;
+    width: auto;
+}
+
+.password-message {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    max-width: 500px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.password-input-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.password-input {
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 15px 20px;
+    font-size: 1rem;
+    width: 300px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.password-input:focus {
+    border-color: var(--text-color);
+}
+
+.password-input::placeholder {
+    color: var(--text-color);
+    opacity: 0.5;
+}
+
+.password-input.shake {
+    animation: shake 0.4s ease;
+    border-color: #ff6b6b;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px); }
+    40% { transform: translateX(10px); }
+    60% { transform: translateX(-10px); }
+    80% { transform: translateX(10px); }
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 768px) {
+    .nav-bar {
+        grid-template-columns: auto 1fr 1fr auto;
+        padding: 0 10px;
+    }
+
+    .nav-btn {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+
+    .module-row {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 40px 0;
+    }
+
+    /* On mobile, always show text first then image */
+    .module-row .module-image {
+        order: 2;
+    }
+
+    .module-row .module-text {
+        order: 1;
+    }
+
+    .module-text h2 {
+        font-size: 1.5rem;
+    }
+}
