@@ -47,11 +47,15 @@ body {
     opacity: 1;
     visibility: visible;
     transition: opacity 0.3s ease, visibility 0.3s ease;
+    /* Block all interaction while loading */
+    pointer-events: all;
+    cursor: wait;
 }
 
 .loading-screen.hidden {
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
 }
 
 .loading-briefcase {
@@ -662,6 +666,71 @@ body {
     40% { transform: translateX(10px); }
     60% { transform: translateX(-10px); }
     80% { transform: translateX(10px); }
+}
+
+/* ============================================
+   Module Bar (sub-navigation for module pages)
+   ============================================ */
+
+.module-bar {
+    position: sticky;
+    top: var(--nav-height);
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 15px 40px;
+    gap: 40px;
+    z-index: 50;
+}
+
+.module-bar-title {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    font-size: 1rem;
+    opacity: 0.6;
+}
+
+.module-bar-nav {
+    display: flex;
+    gap: 25px;
+}
+
+.module-bar-link {
+    color: var(--text-color);
+    text-decoration: none;
+    opacity: 0.4;
+    font-size: 0.95rem;
+    padding: 5px 0;
+    transition: opacity 0.2s ease;
+}
+
+.module-bar-link:hover {
+    opacity: 0.7;
+}
+
+.module-bar-link.active {
+    opacity: 1;
+    border-bottom: 1px solid var(--text-color);
+}
+
+/* ============================================
+   Module Page Content
+   ============================================ */
+
+.module-page {
+    padding: 60px 80px;
+    min-height: calc(100vh - var(--nav-height) - 60px);
+}
+
+.module-page h1 {
+    font-size: 2.5rem;
+    margin-bottom: 30px;
+}
+
+.module-page p {
+    font-size: 1.2rem;
+    line-height: 1.7;
+    opacity: 0.8;
 }
 
 /* ============================================

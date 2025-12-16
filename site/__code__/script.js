@@ -21,26 +21,48 @@ document.addEventListener('DOMContentLoaded', () => {
     let loadingFrame = 0;
     let loadingInterval = null;
 
+    // Flag to track if we're waiting for animation to finish
+    let loadingComplete = false;
+    
+    function stopLoadingAnimation() {
+        // Mark that content is ready
+        loadingComplete = true;
+        
+        // If animation isn't running (instant page), hide immediately
+        if (!loadingInterval) {
+            loadingScreen.classList.add('hidden');
+            return;
+        }
+        
+        // Otherwise, let the animation finish its current cycle
+        // The interval handler will check loadingComplete and hide when at frame 0
+    }
+    
     function startLoadingAnimation() {
         loadingFrame = 0;
+        loadingComplete = false;
         loadingImg.src = loadingImages[0].src;
         loadingImg.className = 'loading-img';
         loadingScreen.classList.remove('hidden');
+        
+        // Clear any existing interval
+        if (loadingInterval) {
+            clearInterval(loadingInterval);
+        }
         
         loadingInterval = setInterval(() => {
             loadingFrame = (loadingFrame + 1) % loadingImages.length;
             const frame = loadingImages[loadingFrame];
             loadingImg.src = frame.src;
             loadingImg.className = 'loading-img ' + frame.class;
+            
+            // If content is ready and we're back at the start of the loop, hide
+            if (loadingComplete && loadingFrame === 0) {
+                clearInterval(loadingInterval);
+                loadingInterval = null;
+                loadingScreen.classList.add('hidden');
+            }
         }, 250); // Change image every 250ms
-    }
-
-    function stopLoadingAnimation() {
-        if (loadingInterval) {
-            clearInterval(loadingInterval);
-            loadingInterval = null;
-        }
-        loadingScreen.classList.add('hidden');
     }
 
     // Preload loading images for smooth animation
@@ -51,10 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ============================================
     // Page Content Storage
-    // Store page HTML for SPA navigation
+    // Pre-loaded pages are stored here (instant navigation)
+    // Lazy-loaded pages will be fetched when requested
     // ============================================
     
-    const pages = {
+    // Pages that are pre-loaded (lightweight, instant)
+    const preloadedPages = {
         home: document.getElementById('pageContent').innerHTML,
         about: `
             <section class="page-section">
@@ -96,8 +120,460 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="password" class="password-input" id="passwordInput" placeholder="Enter password...">
                 </div>
             </section>
+        `,
+        
+        // ============================================
+        // Processing Module Pages
+        // ============================================
+        'processing': `
+            <div class="module-bar" data-module="processing">
+                <span class="module-bar-title">suitkaise.processing</span>
+                <nav class="module-bar-nav">
+                    <a href="#processing" class="module-bar-link active" data-page="processing">how to use</a>
+                    <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+                    <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+                    <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+                    <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+                    <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how to use</h1>
+                <p>Processing module - how to use content coming soon...</p>
+            </section>
+        `,
+        'processing-how-it-works': `
+            <div class="module-bar" data-module="processing">
+                <span class="module-bar-title">suitkaise.processing</span>
+                <nav class="module-bar-nav">
+                    <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
+                    <a href="#processing-how-it-works" class="module-bar-link active" data-page="processing-how-it-works">how it works</a>
+                    <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+                    <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+                    <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+                    <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how it works</h1>
+                <p>Processing module - how it works content coming soon...</p>
+            </section>
+        `,
+        // processing-videos and processing-tests are lazy-loaded
+        'processing-examples': `
+            <div class="module-bar" data-module="processing">
+                <span class="module-bar-title">suitkaise.processing</span>
+                <nav class="module-bar-nav">
+                    <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
+                    <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+                    <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+                    <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+                    <a href="#processing-examples" class="module-bar-link active" data-page="processing-examples">examples</a>
+                    <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>examples</h1>
+                <p>Processing module - examples content coming soon...</p>
+            </section>
+        `,
+        'processing-why': `
+            <div class="module-bar" data-module="processing">
+                <span class="module-bar-title">suitkaise.processing</span>
+                <nav class="module-bar-nav">
+                    <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
+                    <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+                    <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+                    <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+                    <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+                    <a href="#processing-why" class="module-bar-link active" data-page="processing-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>why</h1>
+                <p>Processing module - why content coming soon...</p>
+            </section>
+        `,
+        
+        // ============================================
+        // Cerial Module Pages
+        // ============================================
+        'cerial': `
+            <div class="module-bar" data-module="cerial">
+                <span class="module-bar-title">suitkaise.cerial</span>
+                <nav class="module-bar-nav">
+                    <a href="#cerial" class="module-bar-link active" data-page="cerial">how to use</a>
+                    <a href="#cerial-how-it-works" class="module-bar-link" data-page="cerial-how-it-works">how it works</a>
+                    <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+                    <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
+                    <a href="#cerial-examples" class="module-bar-link" data-page="cerial-examples">examples</a>
+                    <a href="#cerial-why" class="module-bar-link" data-page="cerial-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how to use</h1>
+                <p>Cerial module - how to use content coming soon...</p>
+            </section>
+        `,
+        'cerial-how-it-works': `
+            <div class="module-bar" data-module="cerial">
+                <span class="module-bar-title">suitkaise.cerial</span>
+                <nav class="module-bar-nav">
+                    <a href="#cerial" class="module-bar-link" data-page="cerial">how to use</a>
+                    <a href="#cerial-how-it-works" class="module-bar-link active" data-page="cerial-how-it-works">how it works</a>
+                    <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+                    <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
+                    <a href="#cerial-examples" class="module-bar-link" data-page="cerial-examples">examples</a>
+                    <a href="#cerial-why" class="module-bar-link" data-page="cerial-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how it works</h1>
+                <p>Cerial module - how it works content coming soon...</p>
+            </section>
+        `,
+        // cerial-videos and cerial-tests are lazy-loaded
+        'cerial-examples': `
+            <div class="module-bar" data-module="cerial">
+                <span class="module-bar-title">suitkaise.cerial</span>
+                <nav class="module-bar-nav">
+                    <a href="#cerial" class="module-bar-link" data-page="cerial">how to use</a>
+                    <a href="#cerial-how-it-works" class="module-bar-link" data-page="cerial-how-it-works">how it works</a>
+                    <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+                    <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
+                    <a href="#cerial-examples" class="module-bar-link active" data-page="cerial-examples">examples</a>
+                    <a href="#cerial-why" class="module-bar-link" data-page="cerial-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>examples</h1>
+                <p>Cerial module - examples content coming soon...</p>
+            </section>
+        `,
+        'cerial-why': `
+            <div class="module-bar" data-module="cerial">
+                <span class="module-bar-title">suitkaise.cerial</span>
+                <nav class="module-bar-nav">
+                    <a href="#cerial" class="module-bar-link" data-page="cerial">how to use</a>
+                    <a href="#cerial-how-it-works" class="module-bar-link" data-page="cerial-how-it-works">how it works</a>
+                    <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+                    <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
+                    <a href="#cerial-examples" class="module-bar-link" data-page="cerial-examples">examples</a>
+                    <a href="#cerial-why" class="module-bar-link active" data-page="cerial-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>why</h1>
+                <p>Cerial module - why content coming soon...</p>
+            </section>
+        `,
+        
+        // ============================================
+        // Sktime Module Pages
+        // ============================================
+        'sktime': `
+            <div class="module-bar" data-module="sktime">
+                <span class="module-bar-title">suitkaise.sktime</span>
+                <nav class="module-bar-nav">
+                    <a href="#sktime" class="module-bar-link active" data-page="sktime">how to use</a>
+                    <a href="#sktime-how-it-works" class="module-bar-link" data-page="sktime-how-it-works">how it works</a>
+                    <a href="#sktime-videos" class="module-bar-link" data-page="sktime-videos">videos</a>
+                    <a href="#sktime-tests" class="module-bar-link" data-page="sktime-tests">tests</a>
+                    <a href="#sktime-examples" class="module-bar-link" data-page="sktime-examples">examples</a>
+                    <a href="#sktime-why" class="module-bar-link" data-page="sktime-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how to use</h1>
+                <p>Sktime module - how to use content coming soon...</p>
+            </section>
+        `,
+        'sktime-how-it-works': `
+            <div class="module-bar" data-module="sktime">
+                <span class="module-bar-title">suitkaise.sktime</span>
+                <nav class="module-bar-nav">
+                    <a href="#sktime" class="module-bar-link" data-page="sktime">how to use</a>
+                    <a href="#sktime-how-it-works" class="module-bar-link active" data-page="sktime-how-it-works">how it works</a>
+                    <a href="#sktime-videos" class="module-bar-link" data-page="sktime-videos">videos</a>
+                    <a href="#sktime-tests" class="module-bar-link" data-page="sktime-tests">tests</a>
+                    <a href="#sktime-examples" class="module-bar-link" data-page="sktime-examples">examples</a>
+                    <a href="#sktime-why" class="module-bar-link" data-page="sktime-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how it works</h1>
+                <p>Sktime module - how it works content coming soon...</p>
+            </section>
+        `,
+        // sktime-videos and sktime-tests are lazy-loaded
+        'sktime-examples': `
+            <div class="module-bar" data-module="sktime">
+                <span class="module-bar-title">suitkaise.sktime</span>
+                <nav class="module-bar-nav">
+                    <a href="#sktime" class="module-bar-link" data-page="sktime">how to use</a>
+                    <a href="#sktime-how-it-works" class="module-bar-link" data-page="sktime-how-it-works">how it works</a>
+                    <a href="#sktime-videos" class="module-bar-link" data-page="sktime-videos">videos</a>
+                    <a href="#sktime-tests" class="module-bar-link" data-page="sktime-tests">tests</a>
+                    <a href="#sktime-examples" class="module-bar-link active" data-page="sktime-examples">examples</a>
+                    <a href="#sktime-why" class="module-bar-link" data-page="sktime-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>examples</h1>
+                <p>Sktime module - examples content coming soon...</p>
+            </section>
+        `,
+        'sktime-why': `
+            <div class="module-bar" data-module="sktime">
+                <span class="module-bar-title">suitkaise.sktime</span>
+                <nav class="module-bar-nav">
+                    <a href="#sktime" class="module-bar-link" data-page="sktime">how to use</a>
+                    <a href="#sktime-how-it-works" class="module-bar-link" data-page="sktime-how-it-works">how it works</a>
+                    <a href="#sktime-videos" class="module-bar-link" data-page="sktime-videos">videos</a>
+                    <a href="#sktime-tests" class="module-bar-link" data-page="sktime-tests">tests</a>
+                    <a href="#sktime-examples" class="module-bar-link" data-page="sktime-examples">examples</a>
+                    <a href="#sktime-why" class="module-bar-link active" data-page="sktime-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>why</h1>
+                <p>Sktime module - why content coming soon...</p>
+            </section>
+        `,
+        
+        // ============================================
+        // Skpath Module Pages
+        // ============================================
+        'skpath': `
+            <div class="module-bar" data-module="skpath">
+                <span class="module-bar-title">suitkaise.skpath</span>
+                <nav class="module-bar-nav">
+                    <a href="#skpath" class="module-bar-link active" data-page="skpath">how to use</a>
+                    <a href="#skpath-how-it-works" class="module-bar-link" data-page="skpath-how-it-works">how it works</a>
+                    <a href="#skpath-videos" class="module-bar-link" data-page="skpath-videos">videos</a>
+                    <a href="#skpath-tests" class="module-bar-link" data-page="skpath-tests">tests</a>
+                    <a href="#skpath-examples" class="module-bar-link" data-page="skpath-examples">examples</a>
+                    <a href="#skpath-why" class="module-bar-link" data-page="skpath-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how to use</h1>
+                <p>Skpath module - how to use content coming soon...</p>
+            </section>
+        `,
+        'skpath-how-it-works': `
+            <div class="module-bar" data-module="skpath">
+                <span class="module-bar-title">suitkaise.skpath</span>
+                <nav class="module-bar-nav">
+                    <a href="#skpath" class="module-bar-link" data-page="skpath">how to use</a>
+                    <a href="#skpath-how-it-works" class="module-bar-link active" data-page="skpath-how-it-works">how it works</a>
+                    <a href="#skpath-videos" class="module-bar-link" data-page="skpath-videos">videos</a>
+                    <a href="#skpath-tests" class="module-bar-link" data-page="skpath-tests">tests</a>
+                    <a href="#skpath-examples" class="module-bar-link" data-page="skpath-examples">examples</a>
+                    <a href="#skpath-why" class="module-bar-link" data-page="skpath-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how it works</h1>
+                <p>Skpath module - how it works content coming soon...</p>
+            </section>
+        `,
+        // skpath-videos and skpath-tests are lazy-loaded
+        'skpath-examples': `
+            <div class="module-bar" data-module="skpath">
+                <span class="module-bar-title">suitkaise.skpath</span>
+                <nav class="module-bar-nav">
+                    <a href="#skpath" class="module-bar-link" data-page="skpath">how to use</a>
+                    <a href="#skpath-how-it-works" class="module-bar-link" data-page="skpath-how-it-works">how it works</a>
+                    <a href="#skpath-videos" class="module-bar-link" data-page="skpath-videos">videos</a>
+                    <a href="#skpath-tests" class="module-bar-link" data-page="skpath-tests">tests</a>
+                    <a href="#skpath-examples" class="module-bar-link active" data-page="skpath-examples">examples</a>
+                    <a href="#skpath-why" class="module-bar-link" data-page="skpath-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>examples</h1>
+                <p>Skpath module - examples content coming soon...</p>
+            </section>
+        `,
+        'skpath-why': `
+            <div class="module-bar" data-module="skpath">
+                <span class="module-bar-title">suitkaise.skpath</span>
+                <nav class="module-bar-nav">
+                    <a href="#skpath" class="module-bar-link" data-page="skpath">how to use</a>
+                    <a href="#skpath-how-it-works" class="module-bar-link" data-page="skpath-how-it-works">how it works</a>
+                    <a href="#skpath-videos" class="module-bar-link" data-page="skpath-videos">videos</a>
+                    <a href="#skpath-tests" class="module-bar-link" data-page="skpath-tests">tests</a>
+                    <a href="#skpath-examples" class="module-bar-link" data-page="skpath-examples">examples</a>
+                    <a href="#skpath-why" class="module-bar-link active" data-page="skpath-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>why</h1>
+                <p>Skpath module - why content coming soon...</p>
+            </section>
+        `,
+        
+        // ============================================
+        // Circuit Module Pages
+        // ============================================
+        'circuit': `
+            <div class="module-bar" data-module="circuit">
+                <span class="module-bar-title">suitkaise.circuit</span>
+                <nav class="module-bar-nav">
+                    <a href="#circuit" class="module-bar-link active" data-page="circuit">how to use</a>
+                    <a href="#circuit-how-it-works" class="module-bar-link" data-page="circuit-how-it-works">how it works</a>
+                    <a href="#circuit-videos" class="module-bar-link" data-page="circuit-videos">videos</a>
+                    <a href="#circuit-tests" class="module-bar-link" data-page="circuit-tests">tests</a>
+                    <a href="#circuit-examples" class="module-bar-link" data-page="circuit-examples">examples</a>
+                    <a href="#circuit-why" class="module-bar-link" data-page="circuit-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how to use</h1>
+                <p>Circuit module - how to use content coming soon...</p>
+            </section>
+        `,
+        'circuit-how-it-works': `
+            <div class="module-bar" data-module="circuit">
+                <span class="module-bar-title">suitkaise.circuit</span>
+                <nav class="module-bar-nav">
+                    <a href="#circuit" class="module-bar-link" data-page="circuit">how to use</a>
+                    <a href="#circuit-how-it-works" class="module-bar-link active" data-page="circuit-how-it-works">how it works</a>
+                    <a href="#circuit-videos" class="module-bar-link" data-page="circuit-videos">videos</a>
+                    <a href="#circuit-tests" class="module-bar-link" data-page="circuit-tests">tests</a>
+                    <a href="#circuit-examples" class="module-bar-link" data-page="circuit-examples">examples</a>
+                    <a href="#circuit-why" class="module-bar-link" data-page="circuit-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>how it works</h1>
+                <p>Circuit module - how it works content coming soon...</p>
+            </section>
+        `,
+        // circuit-videos and circuit-tests are lazy-loaded
+        'circuit-examples': `
+            <div class="module-bar" data-module="circuit">
+                <span class="module-bar-title">suitkaise.circuit</span>
+                <nav class="module-bar-nav">
+                    <a href="#circuit" class="module-bar-link" data-page="circuit">how to use</a>
+                    <a href="#circuit-how-it-works" class="module-bar-link" data-page="circuit-how-it-works">how it works</a>
+                    <a href="#circuit-videos" class="module-bar-link" data-page="circuit-videos">videos</a>
+                    <a href="#circuit-tests" class="module-bar-link" data-page="circuit-tests">tests</a>
+                    <a href="#circuit-examples" class="module-bar-link active" data-page="circuit-examples">examples</a>
+                    <a href="#circuit-why" class="module-bar-link" data-page="circuit-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>examples</h1>
+                <p>Circuit module - examples content coming soon...</p>
+            </section>
+        `,
+        'circuit-why': `
+            <div class="module-bar" data-module="circuit">
+                <span class="module-bar-title">suitkaise.circuit</span>
+                <nav class="module-bar-nav">
+                    <a href="#circuit" class="module-bar-link" data-page="circuit">how to use</a>
+                    <a href="#circuit-how-it-works" class="module-bar-link" data-page="circuit-how-it-works">how it works</a>
+                    <a href="#circuit-videos" class="module-bar-link" data-page="circuit-videos">videos</a>
+                    <a href="#circuit-tests" class="module-bar-link" data-page="circuit-tests">tests</a>
+                    <a href="#circuit-examples" class="module-bar-link" data-page="circuit-examples">examples</a>
+                    <a href="#circuit-why" class="module-bar-link active" data-page="circuit-why">why</a>
+                </nav>
+            </div>
+            <section class="module-page">
+                <h1>why</h1>
+                <p>Circuit module - why content coming soon...</p>
+            </section>
         `
     };
+    
+    // Cache for lazy-loaded pages (once loaded, stored here for instant access)
+    const loadedPages = {};
+    
+    // Registry of pages that need lazy loading
+    // These pages will show the loading animation while content loads
+    const lazyPages = {
+        // Processing
+        'processing-videos': async () => await loadModulePage('processing', 'videos'),
+        'processing-tests': async () => await loadModulePage('processing', 'tests'),
+        
+        // Cerial
+        'cerial-videos': async () => await loadModulePage('cerial', 'videos'),
+        'cerial-tests': async () => await loadModulePage('cerial', 'tests'),
+        
+        // Sktime
+        'sktime-videos': async () => await loadModulePage('sktime', 'videos'),
+        'sktime-tests': async () => await loadModulePage('sktime', 'tests'),
+        
+        // Skpath
+        'skpath-videos': async () => await loadModulePage('skpath', 'videos'),
+        'skpath-tests': async () => await loadModulePage('skpath', 'tests'),
+        
+        // Circuit
+        'circuit-videos': async () => await loadModulePage('circuit', 'videos'),
+        'circuit-tests': async () => await loadModulePage('circuit', 'tests'),
+    };
+    
+    // Loader function for module pages
+    // Fetches HTML content from static files
+    async function loadModulePage(moduleName, subPage) {
+        try {
+            const response = await fetch(`pages/${moduleName}-${subPage}.html`);
+            if (!response.ok) {
+                throw new Error(`Failed to load: ${response.status}`);
+            }
+            return await response.text();
+        } catch (error) {
+            console.error(`Error loading ${moduleName}-${subPage}:`, error);
+            // Return fallback content on error
+            return `
+                <div class="module-bar" data-module="${moduleName}">
+                    <span class="module-bar-title">suitkaise.${moduleName}</span>
+                    <nav class="module-bar-nav">
+                        <a href="#${moduleName}" class="module-bar-link" data-page="${moduleName}">how to use</a>
+                        <a href="#${moduleName}-how-it-works" class="module-bar-link" data-page="${moduleName}-how-it-works">how it works</a>
+                        <a href="#${moduleName}-videos" class="module-bar-link ${subPage === 'videos' ? 'active' : ''}" data-page="${moduleName}-videos">videos</a>
+                        <a href="#${moduleName}-tests" class="module-bar-link ${subPage === 'tests' ? 'active' : ''}" data-page="${moduleName}-tests">tests</a>
+                        <a href="#${moduleName}-examples" class="module-bar-link" data-page="${moduleName}-examples">examples</a>
+                        <a href="#${moduleName}-why" class="module-bar-link" data-page="${moduleName}-why">why</a>
+                    </nav>
+                </div>
+                <section class="module-page">
+                    <h1>${subPage}</h1>
+                    <p>Content loading failed. Please try again.</p>
+                </section>
+            `;
+        }
+    }
+    
+    // Check if a page is available (pre-loaded or cached)
+    function isPageReady(pageName) {
+        return preloadedPages[pageName] || loadedPages[pageName];
+    }
+    
+    // Get page content (from pre-loaded, cache, or load it)
+    async function getPageContent(pageName) {
+        // Check pre-loaded pages first
+        if (preloadedPages[pageName]) {
+            return preloadedPages[pageName];
+        }
+        
+        // Check if already lazy-loaded and cached
+        if (loadedPages[pageName]) {
+            return loadedPages[pageName];
+        }
+        
+        // Need to lazy load
+        if (lazyPages[pageName]) {
+            const content = await lazyPages[pageName]();
+            loadedPages[pageName] = content; // Cache it
+            return content;
+        }
+        
+        // Page doesn't exist
+        return null;
+    }
     
     // ============================================
     // Password Page Functionality
@@ -190,47 +666,70 @@ document.addEventListener('DOMContentLoaded', () => {
     // Pages that should hide the nav bar
     const noNavPages = ['password', 'error'];
 
-    function navigateTo(pageName) {
-        if (pageName === currentPage) return;
+    async function navigateTo(pageName, force = false) {
+        if (!force && pageName === currentPage) return;
         
-        // Show loading screen
-        startLoadingAnimation();
+        // Check if page content is already available
+        const isReady = isPageReady(pageName);
         
-        // Simulate network delay for effect (remove in production or adjust)
-        setTimeout(() => {
+        // Only show loading animation if we need to load content
+        if (!isReady && lazyPages[pageName]) {
+            startLoadingAnimation();
+        }
+        
+        // Get the page content (instant if pre-loaded, async if lazy)
+        const content = await getPageContent(pageName);
+        
+        if (content) {
             // Update content
-            if (pages[pageName]) {
-                pageContent.innerHTML = pages[pageName];
-                currentPage = pageName;
-                
-                // Show/hide nav bar based on page
-                if (noNavPages.includes(pageName)) {
-                    navBar.classList.add('hidden');
-                    pageContent.classList.add('no-nav');
-                } else {
-                    navBar.classList.remove('hidden');
-                    pageContent.classList.remove('no-nav');
-                }
-                
-                // Update URL hash
-                window.location.hash = pageName === 'home' ? '' : pageName;
-                
-                // Scroll to top
-                window.scrollTo(0, 0);
+            pageContent.innerHTML = content;
+            currentPage = pageName;
+            
+            // Show/hide nav bar based on page
+            if (noNavPages.includes(pageName)) {
+                navBar.classList.add('hidden');
+                pageContent.classList.add('no-nav');
+            } else {
+                navBar.classList.remove('hidden');
+                pageContent.classList.remove('no-nav');
             }
             
-            // Hide loading screen
-            stopLoadingAnimation();
+            // Update URL hash
+            window.location.hash = pageName === 'home' ? '' : pageName;
             
-            // Setup page-specific functionality
-            if (pageName === 'error') {
-                setupErrorPageHover();
-            } else if (pageName === 'password') {
-                setupPasswordPage();
-            } else if (pageName === 'home') {
-                setupFadeInAnimations();
-            }
-        }, 750); // Show loading for at least 750ms
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+        
+        // Hide loading screen (if it was shown)
+        stopLoadingAnimation();
+        
+        // Setup page-specific functionality
+        if (pageName === 'error') {
+            setupErrorPageHover();
+        } else if (pageName === 'password') {
+            setupPasswordPage();
+        } else if (pageName === 'home') {
+            setupFadeInAnimations();
+        }
+        
+        // Setup module bar links if present
+        setupModuleBarLinks();
+    }
+    
+    // ============================================
+    // Module Bar Link Handler
+    // ============================================
+    
+    function setupModuleBarLinks() {
+        const moduleBarLinks = document.querySelectorAll('.module-bar-link');
+        moduleBarLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const pageName = link.dataset.page;
+                navigateTo(pageName);
+            });
+        });
     }
 
     // Handle nav link clicks
@@ -246,13 +745,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle browser back/forward
     window.addEventListener('hashchange', () => {
         const hash = window.location.hash.slice(1) || 'home';
-        if (hash !== currentPage && pages[hash]) {
+        if (hash !== currentPage && (preloadedPages[hash] || lazyPages[hash])) {
             navigateTo(hash);
         }
     });
 
     // Hide loading screen on initial load
     stopLoadingAnimation();
+    
+    // Check URL hash on initial load and navigate to that page
+    (async function handleInitialHash() {
+        const initialHash = window.location.hash.slice(1);
+        
+        if (initialHash && (preloadedPages[initialHash] || lazyPages[initialHash])) {
+            // Force navigate to the page specified in the URL hash
+            currentPage = ''; // Reset so navigateTo doesn't skip
+            await navigateTo(initialHash, true);
+        } else {
+            // On home page, setup fade-in animations
+            setupFadeInAnimations();
+        }
+    })();
     
     // ============================================
     // Fade-in Animation on Scroll
