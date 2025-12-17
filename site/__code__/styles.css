@@ -718,19 +718,260 @@ body {
    ============================================ */
 
 .module-page {
-    padding: 60px 80px;
+    padding: 50px 60px 100px;
     min-height: calc(100vh - var(--nav-height) - 60px);
+    max-width: 850px;
+    /* Body text color matches unselected module bar tabs (--text-color at 40% opacity) */
+    color: rgba(109, 233, 149, 0.4);
 }
 
 .module-page h1 {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
+    color: var(--text-color);
     margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.module-page h1 code {
+    color: var(--text-color);
+    background: none;
+    font-size: inherit;
 }
 
 .module-page p {
-    font-size: 1.2rem;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    margin-bottom: 14px;
+    color: rgba(109, 233, 149, 0.4);
+}
+
+/* ============================================
+   Documentation Page Styles
+   ============================================ */
+
+.module-page h2 {
+    font-size: 1.4rem;
+    color: var(--text-color);
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.module-page h3 {
+    font-size: 1.1rem;
+    color: rgba(109, 233, 149, 0.7);
+    margin-top: 35px;
+    margin-bottom: 14px;
+    padding-top: 5px;
+}
+
+.module-page h3 code {
+    color: var(--text-color);
+    background: rgba(109, 233, 149, 0.1);
+    padding: 3px 8px;
+    font-size: 1rem;
+}
+
+.module-page h4 {
+    font-size: 1rem;
+    color: rgba(109, 233, 149, 0.6);
+    margin-top: 25px;
+    margin-bottom: 12px;
+}
+
+.module-page h4 code {
+    color: var(--text-color);
+    background: rgba(109, 233, 149, 0.1);
+}
+
+.module-page ul, .module-page ol {
+    margin: 12px 0 16px;
+    padding-left: 22px;
+}
+
+.module-page li {
+    font-size: 0.95rem;
     line-height: 1.7;
-    opacity: 0.8;
+    margin-bottom: 6px;
+    color: rgba(109, 233, 149, 0.4);
+}
+
+/* Nested lists */
+.module-page li ul,
+.module-page li ol {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+.module-page li li {
+    margin-bottom: 4px;
+}
+
+/* Inline code */
+.module-page code {
+    background: rgba(109, 233, 149, 0.12);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.85em;
+    color: var(--text-color);
+}
+
+/* Code blocks */
+.module-page pre {
+    background: rgb(8, 12, 10) !important;
+    border: 1px solid rgba(109, 233, 149, 0.08);
+    border-radius: 6px;
+    padding: 18px 22px;
+    overflow-x: auto;
+    margin: 24px 0;
+}
+
+/* Override Prism theme background */
+.module-page pre[class*="language-"],
+.module-page code[class*="language-"] {
+    background: none !important;
+}
+
+.module-page pre code {
+    background: none !important;
+    padding: 0;
+    border-radius: 0;
+    color: rgba(109, 233, 149, 0.65);
+    font-size: 0.85rem;
+    line-height: 1.65;
+    display: block;
+    white-space: pre;
+}
+
+/* Prism.js syntax highlighting overrides to match green theme */
+.module-page pre code.language-python {
+    color: rgba(109, 233, 149, 0.65);
+}
+
+/* Comments - darker/dimmer */
+.module-page .token.comment,
+.module-page .token.prolog,
+.module-page .token.doctype,
+.module-page .token.cdata {
+    color: rgba(109, 233, 149, 0.3);
+}
+
+/* Strings */
+.module-page .token.string,
+.module-page .token.attr-value {
+    color: rgba(109, 233, 149, 0.75);
+}
+
+/* Keywords (from, import, def, class, if, else, etc.) */
+.module-page .token.keyword {
+    color: rgba(109, 233, 149, 0.85);
+}
+
+/* Function names */
+.module-page .token.function {
+    color: rgba(109, 233, 149, 0.8);
+}
+
+/* Numbers */
+.module-page .token.number {
+    color: rgba(150, 230, 180, 0.8);
+}
+
+/* Operators */
+.module-page .token.operator {
+    color: rgba(109, 233, 149, 0.6);
+    background: none;
+}
+
+/* Punctuation */
+.module-page .token.punctuation {
+    color: rgba(109, 233, 149, 0.5);
+}
+
+/* Built-ins and class names */
+.module-page .token.builtin,
+.module-page .token.class-name {
+    color: rgba(109, 233, 149, 0.85);
+}
+
+/* Boolean and None */
+.module-page .token.boolean,
+.module-page .token.constant {
+    color: rgba(150, 230, 180, 0.75);
+}
+
+/* Horizontal separator */
+.module-page hr {
+    border: none;
+    height: 1px;
+    background: var(--border-color);
+    margin: 45px 0;
+}
+
+.module-page strong {
+    color: rgba(109, 233, 149, 0.7);
+    font-weight: 600;
+}
+
+.module-page em {
+    color: rgba(109, 233, 149, 0.5);
+}
+
+/* Dropdown/Details styling */
+.module-page details {
+    background: rgba(109, 233, 149, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin: 20px 0;
+    padding: 0;
+}
+
+.module-page details summary {
+    padding: 14px 18px;
+    cursor: pointer;
+    font-style: italic;
+    color: rgba(109, 233, 149, 0.5);
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.module-page details summary:hover {
+    color: rgba(109, 233, 149, 0.7);
+}
+
+.module-page details summary code {
+    font-style: normal;
+}
+
+.module-page details[open] summary {
+    border-bottom: 1px solid var(--border-color);
+    color: rgba(109, 233, 149, 0.7);
+}
+
+.module-page details .dropdown-content {
+    padding: 18px 20px;
+}
+
+.module-page details .dropdown-content p:first-child {
+    margin-top: 0;
+}
+
+.module-page details .dropdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Nested lists in dropdowns */
+.module-page details ul {
+    margin: 10px 0;
+}
+
+/* Lists after strong labels */
+.module-page p + ul,
+.module-page p + ol {
+    margin-top: -6px;
 }
 
 /* ============================================
