@@ -19,19 +19,19 @@
         <li>Automatically thread safe</li>
     </ul>
 
-    <h2><code>@timethis</code> - the 1 line function auto-timer</h2>
+    <h2><code>@timethis</code> - 1 line</h2>
     
     <p>The core feature of <code>sktime</code>.</p>
     <p>Automatically times a function every time it is called.</p>
     <ul>
         <li>1 line, zero setup</li>
         <li>thread safe</li>
-        <li>large set of statistics that you can access</li>
+        <li>large set of statistics that you can access to monitor performance</li>
     </ul>
 
 <pre><code class="language-python">from suitkaise import sktime
 
-@sktime.timethis()
+@sktime.timethis() # just this 1 line!
 def my_function():
     # Your code here
     pass
@@ -40,8 +40,12 @@ def my_function():
 for i in range(100):
     my_function()
 
-# get stats
-stats = my_function.timer.get_statistics()</code></pre>
+# get stats via the organized stats namespace
+mean = my_function.timer.stats.mean
+stdev = my_function.timer.stats.stdev
+
+# or get a frozen snapshot
+snapshot = my_function.timer.get_stats()</code></pre>
 
     <p>You can also use the <code>@timethis</code> decorator with a given <code>Timer</code> object.</p>
 
@@ -64,7 +68,8 @@ def MyClass:
 # a bunch of MyClass instances are created and their functions are called
 
 # get stats on my_function and my_function_2 execution times
-stats = t.get_statistics()</code></pre>
+print(t.stats.mean)
+print(t.stats.percentile(95))</code></pre>
 
     <p>You can stack <code>@timethis</code> decorators on the same function.</p>
 
@@ -87,13 +92,13 @@ def my_function_2():
 # ...
 
 # get stats on my_function and my_function_2 execution times
-stats = t.get_statistics()
+print(t.stats.mean)
 
 # get stats only on my_function
-stats = my_function.timer.get_statistics()
+print(my_function.timer.stats.mean)
 
 # get stats only on my_function_2
-stats = my_function_2.timer.get_statistics()</code></pre>
+print(my_function_2.timer.stats.mean)</code></pre>
 
     <hr>
 
@@ -114,8 +119,9 @@ time_after_sleeping = timer.stop() # returns a float</code></pre>
 
     <p>When you call <code>start()</code>, the timer starts recording the time.</p>
     <p>When you call <code>stop()</code>, the timer stops recording the time and returns the difference between the stop and start times as a float.</p>
+    <p>Note: calling <code>start()</code> while timing is already in progress will issue a <code>UserWarning</code>.</p>
 
-    <p>Timing multiple times over</p>
+    <p>Timing multiple times over:</p>
 
 <pre><code class="language-python">from suitkaise import sktime
 
@@ -127,12 +133,28 @@ for i in range(100):
     sktime.sleep(60)
     timer.stop()
 
-mean = timer.mean
-std = timer.stdev
-# ...
+# access stats through the stats namespace
+mean = timer.stats.mean
+std = timer.stats.stdev
+p95 = timer.stats.percentile(95)
 
-# get all stats at once
-stats = timer.get_statistics()</code></pre>
+# or get a frozen snapshot
+snapshot = timer.get_stats()</code></pre>
+
+    <h3><code>discard()</code></h3>
+    
+    <p>Stop timing but do NOT record the measurement. Useful when an error occurs or for warm-up runs.</p>
+
+<pre><code class="language-python">from suitkaise import sktime
+
+timer = sktime.Timer()
+
+timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # Record successful timing
+except Exception:
+    timer.discard()  # Stop but don't pollute stats with failed run</code></pre>
 
     <h3><code>lap()</code></h3>
 
@@ -148,7 +170,8 @@ for i in range(100):
     # stops and instantly starts a new measurement
     timer.lap()
 
-stats = timer.get_statistics()</code></pre>
+# 100 measurements recorded
+print(timer.stats.mean)</code></pre>
 
     <h3><code>pause()</code> and <code>resume()</code></h3>
 
@@ -183,68 +206,65 @@ print(f"Total processing time: {elapsed:.2f}s (excluding user input)")</code></p
 <pre><code class="language-python">from suitkaise import sktime
 
 timer = sktime.Timer()
-timer.add_time(10.0)</code></pre>
+timer.add_time(10.0)
+timer.add_time(15.0)
 
-    <h3><code>get_time()</code></h3>
-    
-    <p>Get a time by index.</p>
-    <p><strong>Arguments:</strong></p>
-    <ul>
-        <li><code>index</code>: 0-based index of the time</li>
-    </ul>
-    <p><strong>Returns:</strong></p>
-    <ul>
-        <li>Time as a float</li>
-    </ul>
-    <p>Will return <code>None</code> if the index is out of bounds.</p>
+print(timer.stats.mean)  # 12.5</code></pre>
 
     <h3><code>reset()</code></h3>
     
     <p>Reset the timer back to its initial state as if it was just created.</p>
 
-    <h3>All <code>Timer</code> statistics</h3>
+    <h3>All <code>Timer</code> statistics (via <code>timer.stats</code>)</h3>
+    
+    <p>All statistics are accessed through the organized <code>stats</code> namespace:</p>
     
     <p><strong>Properties:</strong></p>
     <ul>
-        <li><code>timer.num_times</code> - Number of times recorded</li>
-        <li><code>timer.most_recent</code> - Most recent time</li>
-        <li><code>timer.most_recent_index</code> - Index of most recent time</li>
-        <li><code>timer.result</code> - Most recent time</li>
-        <li><code>timer.get_time(index)</code> - Get time by standard 0-based index</li>
-        <li><code>timer.total_time</code> - Sum of all times</li>
-        <li><code>timer.total_time_paused</code> - Total time spent paused</li>
-        <li><code>timer.mean</code> - Average of all times</li>
-        <li><code>timer.median</code> - Median of all times</li>
-        <li><code>timer.min</code> / <code>timer.fastest_time</code> - Minimum time</li>
-        <li><code>timer.max</code> / <code>timer.slowest_time</code> - Maximum time</li>
-        <li><code>timer.stdev</code> - Standard deviation</li>
-        <li><code>timer.variance</code> - Variance</li>
-        <li><code>timer.slowest_time</code> - Slowest time (same as <code>timer.max</code>)</li>
-        <li><code>timer.fastest_time</code> - Fastest time (same as <code>timer.min</code>)</li>
-        <li><code>timer.slowest_index</code> - Index of slowest time</li>
-        <li><code>timer.fastest_index</code> - Index of fastest time</li>
-        <li><code>timer.original_start_time</code> - Original start time of the timer</li>
+        <li><code>timer.stats.num_times</code> - Number of times recorded</li>
+        <li><code>timer.stats.most_recent</code> - Most recent time</li>
+        <li><code>timer.stats.most_recent_index</code> - Index of most recent time</li>
+        <li><code>timer.stats.result</code> - Most recent time (alias)</li>
+        <li><code>timer.stats.total_time</code> - Sum of all times</li>
+        <li><code>timer.stats.total_time_paused</code> - Total time spent paused</li>
+        <li><code>timer.stats.mean</code> - Average of all times</li>
+        <li><code>timer.stats.median</code> - Median of all times</li>
+        <li><code>timer.stats.min</code> / <code>timer.stats.fastest_time</code> - Minimum time</li>
+        <li><code>timer.stats.max</code> / <code>timer.stats.slowest_time</code> - Maximum time</li>
+        <li><code>timer.stats.stdev</code> - Standard deviation</li>
+        <li><code>timer.stats.variance</code> - Variance</li>
+        <li><code>timer.stats.slowest_index</code> - Index of slowest time</li>
+        <li><code>timer.stats.fastest_index</code> - Index of fastest time</li>
+        <li><code>timer.stats.original_start_time</code> - Original start time of the timer</li>
     </ul>
     
     <p><strong>Methods:</strong></p>
     <ul>
-        <li><code>timer.percentile(percent)</code> - Calculate any percentile (0-100)</li>
+        <li><code>timer.stats.get_time(index)</code> - Get time by standard 0-based index</li>
+        <li><code>timer.stats.percentile(percent)</code> - Calculate any percentile (0-100)</li>
     </ul>
 
 <pre><code class="language-python"># to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.now() - timer.original_start_time</code></pre>
+real_world_time = sktime.now() - timer.stats.original_start_time</code></pre>
 
-    <h3><code>get_statistics()</code></h3>
+    <h3><code>get_statistics()</code> / <code>get_stats()</code></h3>
     
-    <p>Get a dictionary of all the timer statistics.</p>
+    <p>Get a frozen snapshot of all timer statistics. The snapshot won't change even if the timer continues recording.</p>
 
 <pre><code class="language-python">from suitkaise import sktime
 
 timer = sktime.Timer()
 
-# contains all the properties above, as well as 95th and 99th percentile times
-stats = timer.get_statistics()</code></pre>
+# ... record some timings ...
+
+# get a frozen snapshot
+snapshot = timer.get_stats()  # or timer.get_statistics()
+
+# access all the same properties
+print(snapshot.mean)
+print(snapshot.stdev)
+print(snapshot.percentile(95))</code></pre>
 
     <hr>
 
@@ -260,12 +280,12 @@ stats = timer.get_statistics()</code></pre>
 
 <pre><code class="language-python">from suitkaise import sktime
 
-with sktime.TimeThis() as t:
+with sktime.TimeThis() as timer:
     # Your code here
     pass
 
-# get the time that was just recorded
-stats = t.timer.get_time(0)</code></pre>
+# get the time that was just recorded (returns the Timer object)
+print(timer.stats.most_recent)</code></pre>
 
     <p>When using it like this, a new timer is created each time.</p>
     <p>If you want to use the same timer every time that code is ran, you can create a timer and pass it to the context manager.</p>
@@ -277,7 +297,10 @@ timer = sktime.Timer()
 # uses your "timer" every time
 # lets you gather multiple measurements
 with sktime.TimeThis(timer=timer):
-    # Your code here</code></pre>
+    # Your code here
+    pass
+
+print(timer.stats.mean)</code></pre>
 
     <hr>
 
@@ -379,6 +402,7 @@ time_to_complete = sktime.elapsed(start_time, end_time) # 4</code></pre>
     <h2><code>Yawn</code> class</h2>
     
     <p>Sleep controller that sleeps after a specified number of "yawns".</p>
+    <p>Unlike <code>Circuit</code> (which breaks and stops), <code>Yawn</code> sleeps and continues. The counter auto-resets after each sleep.</p>
     <p><strong>Arguments:</strong></p>
     <ul>
         <li><code>sleep_duration</code>: How long to sleep when threshold is reached (<code>float</code>)</li>
@@ -394,12 +418,10 @@ y = sktime.Yawn(sleep_duration=3, yawn_threshold=5)
 
 while something:
     if something_went_wrong():
-        y.yawn()
-        sktime.sleep(0.5)
+        y.yawn()  # After 5 yawns, sleeps for 3 seconds, then auto-resets
     else:
-        do_work() # run your program code
-        sktime.sleep(0.5)</code></pre>
+        do_work() # run your program code</code></pre>
 
-    <p>If something goes wrong 5 times, the program will sleep for 3 seconds.</p>
+    <p>If something goes wrong 5 times, the program will sleep for 3 seconds, then continue (counter resets).</p>
 
 </section>

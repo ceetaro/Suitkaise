@@ -43,8 +43,12 @@ def my_function():
 for i in range(100):
     my_function()
 
-# get stats
-stats = my_function.timer.get_statistics()
+# get stats via the organized stats namespace
+mean = my_function.timer.stats.mean
+stdev = my_function.timer.stats.stdev
+
+# or get a frozen snapshot
+snapshot = my_function.timer.get_stats()
 ```
 
 You can also use the `@timethis` decorator with a given `Timer` object.
@@ -69,7 +73,8 @@ def MyClass:
 # a bunch of MyClass instances are created and their functions are called
 
 # get stats on my_function and my_function_2 execution times
-stats = t.get_statistics()
+print(t.stats.mean)
+print(t.stats.percentile(95))
 ```
 
 You can stack `@timethis` decorators on the same function.
@@ -94,13 +99,13 @@ def my_function_2():
 # ...
 
 # get stats on my_function and my_function_2 execution times
-stats = t.get_statistics()
+print(t.stats.mean)
 
 # get stats only on my_function
-stats = my_function.timer.get_statistics()
+print(my_function.timer.stats.mean)
 
 # get stats only on my_function_2
-stats = my_function_2.timer.get_statistics()
+print(my_function_2.timer.stats.mean)
 ```
 ---
 
@@ -126,7 +131,9 @@ When you call `start()`, the timer starts recording the time.
 
 When you call `stop()`, the timer stops recording the time and returns the difference between the stop and start times as a float.
 
-Timing multiple times over
+Note: calling `start()` while timing is already in progress will issue a `UserWarning` (it creates a nested timing frame).
+
+Timing multiple times over:
 ```python
 from suitkaise import sktime
 
@@ -138,12 +145,30 @@ for i in range(100):
     sktime.sleep(60)
     timer.stop()
 
-mean = timer.mean
-std = timer.stdev
-# ...
+# access stats through the stats namespace
+mean = timer.stats.mean
+std = timer.stats.stdev
+p95 = timer.stats.percentile(95)
 
-# get all stats at once
-stats = timer.get_statistics()
+# or get a frozen snapshot
+snapshot = timer.get_stats()
+```
+
+### `discard()`
+
+Stop timing but do NOT record the measurement. Useful when an error occurs or for warm-up runs.
+
+```python
+from suitkaise import sktime
+
+timer = sktime.Timer()
+
+timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # Record successful timing
+except Exception:
+    timer.discard()  # Stop but don't pollute stats with failed run
 ```
 
 ### `lap()`
@@ -161,7 +186,8 @@ for i in range(100):
     # stops and instantly starts a new measurement
     timer.lap()
 
-stats = timer.get_statistics()
+# 100 measurements recorded
+print(timer.stats.mean)
 ```
 
 ### `pause()` and `resume()`
@@ -201,65 +227,64 @@ from suitkaise import sktime
 
 timer = sktime.Timer()
 timer.add_time(10.0)
+timer.add_time(15.0)
+
+print(timer.stats.mean)  # 12.5
 ```
-
-### `get_time()`
-
-Get a time by index.
-
-Arguments:
-- `index`: 0-based index of the time
-
-Returns:
-- Time as a float
-
-Will return `None` if the index is out of bounds.
 
 ### `reset()`
 
 Reset the timer back to its initial state as if it was just created.
 
-### All `Timer` statistics
+### All `Timer` statistics (via `timer.stats`)
+
+All statistics are accessed through the organized `stats` namespace:
 
 Properties:
-- `timer.num_times` - Number of times recorded
-- `timer.most_recent` - Most recent time
-- `timer.most_recent_index` - Index of most recent time
-- `timer.result` - Most recent time  
-- `timer.get_time(index)` - Get time by standard 0-based index
-- `timer.total_time` - Sum of all times
-- `timer.total_time_paused` - Total time spent paused
-- `timer.mean` - Average of all times
-- `timer.median` - Median of all times
-- `timer.min` / `timer.fastest_time` - Minimum time
-- `timer.max` / `timer.slowest_time` - Maximum time
-- `timer.stdev` - Standard deviation
-- `timer.variance` - Variance
-- `timer.slowest_time` - Slowest time (same as `timer.max`)
-- `timer.fastest_time` - Fastest time (same as `timer.min`)
-- `timer.slowest_index` - Index of slowest time
-- `timer.fastest_index` - Index of fastest time
-- `timer.original_start_time` - Original start time of the timer
+- `timer.stats.num_times` - Number of times recorded
+- `timer.stats.most_recent` - Most recent time
+- `timer.stats.most_recent_index` - Index of most recent time
+- `timer.stats.result` - Most recent time (alias)
+- `timer.stats.total_time` - Sum of all times
+- `timer.stats.total_time_paused` - Total time spent paused
+- `timer.stats.mean` - Average of all times
+- `timer.stats.median` - Median of all times
+- `timer.stats.min` / `timer.stats.fastest_time` - Minimum time
+- `timer.stats.max` / `timer.stats.slowest_time` - Maximum time
+- `timer.stats.stdev` - Standard deviation
+- `timer.stats.variance` - Variance
+- `timer.stats.slowest_index` - Index of slowest time
+- `timer.stats.fastest_index` - Index of fastest time
+- `timer.stats.original_start_time` - Original start time of the timer
 
 Methods:
-- timer.percentile(percent) - Calculate any percentile (0-100)
+- `timer.stats.get_time(index)` - Get time by standard 0-based index
+- `timer.stats.percentile(percent)` - Calculate any percentile (0-100)
+
 ```python
 # to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.now() - timer.original_start_time
+real_world_time = sktime.now() - timer.stats.original_start_time
 ```
 
-### `get_statistics()`
+### `get_statistics()` / `get_stats()`
 
-Get a dictionary of all the timer statistics.
+Get a frozen snapshot of all timer statistics. The snapshot won't change even if the timer continues recording.
 
 ```python
 from suitkaise import sktime
 
 timer = sktime.Timer()
 
-# contains all the properties above, as well as 95th and 99th percentile times
-stats = timer.get_statistics()
+# ... record some timings ...
+
+# get a frozen snapshot
+snapshot = timer.get_stats()  # or timer.get_statistics()
+
+# access all the same properties
+print(snapshot.mean)
+print(snapshot.stdev)
+print(snapshot.percentile(95))
 ```
 
 ---
@@ -277,12 +302,12 @@ The context manager automatically starts the timer when the context is entered a
 ```python
 from suitkaise import sktime
 
-with sktime.TimeThis() as t:
+with sktime.TimeThis() as timer:
     # Your code here
     pass
 
-# get the time that was just recorded
-stats = t.timer.get_time(0)
+# get the time that was just recorded (returns the Timer object)
+print(timer.stats.most_recent)
 ```
 
 When using it like this, a new timer is created each time.
@@ -298,6 +323,9 @@ timer = sktime.Timer()
 # lets you gather multiple measurements
 with sktime.TimeThis(timer=timer):
     # Your code here
+    pass
+
+print(timer.stats.mean)
 ```
 ---
 
@@ -405,6 +433,8 @@ time_to_complete = sktime.elapsed(start_time, end_time) # 4
 
 Sleep controller that sleeps after a specified number of "yawns".
 
+Unlike `Circuit` (which breaks and stops), `Yawn` sleeps and continues. The counter auto-resets after each sleep.
+
 Arguments:
 - `sleep_duration`: How long to sleep when threshold is reached (`float`)
 - `yawn_threshold`: Number of yawns before sleeping (`int`)
@@ -419,17 +449,11 @@ y = sktime.Yawn(sleep_duration=3, yawn_threshold=5)
 
 while something:
     if something_went_wrong():
-        y.yawn()
-        sktime.sleep(0.5)
+        y.yawn()  # After 5 yawns, sleeps for 3 seconds, then auto-resets
     else:
         do_work() # run your program code
-        sktime.sleep(0.5)
 
 ```
-If something goes wrong 5 times, the program will sleep for 3 seconds.
+If something goes wrong 5 times, the program will sleep for 3 seconds, then continue (counter resets).
 
 ---
-
-
-
-

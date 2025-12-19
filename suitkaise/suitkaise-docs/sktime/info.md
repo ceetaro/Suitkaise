@@ -1,331 +1,488 @@
 # How `sktime` actually works
 
-## Table of Contents
+`sktime` has no dependencies outside of the standard library.
 
-1. [Simple Timing Functions](#simple-timing-functions)
-2. [`Yawn` Class](#yawn-class)
-3. [`Timer` Class](#timer-class)
-4. [`TimeThis` Context Manager](#timethis-context-manager)
-5. [`@timethis` Decorator](#timethis-decorator)
-6. [Misc](#misc)
-7. [Internal Architecture](#internal-architecture)
+- uses Unix timestamp (seconds since January 1, 1970)
 
----
+- only calculates times using floats, no datetime objects are used
 
-## Simple Timing Functions
 
 ### `now()` and `get_current_time()`
 
-Both functions do exactly the same thing - just use the one you prefer.
+`now()` and `get_current_time()` are the same function, just with different names.
 
-**How it works:**
-1. Calls internal `_get_current_time()` from `time_ops.py`
-2. `_get_current_time()` calls Python's `time.time()`
-3. Returns current Unix timestamp as a float (seconds since January 1, 1970)
+These call Python's `time.time()` function, and return the current time as a float.
 
-These use real world time, not performance counter time, so you can compare real timestamps that can be converted to human readable time.
+- Use real world time, not performance counter time
 
 ---
 
-### `sleep(seconds)`
+### `sleep()`
 
-Pauses the current thread for a specified amount of time, then returns the current time.
+`sleep()` is an enhanced version of Python's `time.sleep()` function.
 
-**How it works:**
-1. Calls internal `_sleep(seconds)` from `time_ops.py`
-2. `_sleep()` calls Python's `time.sleep(seconds)`
-3. After sleeping, calls `now()` to get current time
-4. Returns the timestamp after sleeping
+It pauses the current thread for a given number of seconds, just like `time.sleep()`, and then returns the current time.
 
-This is useful because you can capture the time after sleeping without needing two lines of code.
+Arguments:
+- `seconds`: Number of seconds to sleep (can be fractional)
+
+Returns:
+- Current time after sleeping
+
+```python
+from suitkaise import sktime
+
+# 2 ways to use `sleep()`
+
+start_time = sktime.now()
+end_time = sktime.sleep(2) # sleeps and returns the current time
+
+# or ...
+
+start_time = sktime.now()
+sktime.sleep(2) # just sleeps, doesn't return
+end_time = sktime.now()
+```
+
+1. calls Python's `time.sleep()` function with the given number of seconds
+2. after sleeping, calls `now()` to get the current time.
+3. returns the current time after sleeping as a float
 
 ---
 
-### `elapsed(time1, time2=None)`
+### `elapsed()`
 
-Calculates how much time has passed between two timestamps. Order doesn't matter - always returns a positive number.
+Calculates how much time has passed between two times. Order doesn't matter - always returns a positive float time.
 
-**How it works:**
-1. Calls internal `_elapsed_time(time1, time2)` from `time_ops.py`
+Arguments:
+- `time1`: First time
+- `time2`: Second time (defaults to current time if `None`)
 
-2. If `time2` is `None`:
-   - Sets `time2` to current time using `time.time()`
+Returns:
+- Positive elapsed time (in seconds) as a float
 
-3. Calculates absolute difference using `math.fabs(time2 - time1)`
+```python
+from suitkaise import sktime
+
+# 2 ways to use `elapsed()`
+
+start_time = sktime.now()
+end_time = sktime.sleep(2)
+
+elapsed = sktime.elapsed(start_time, end_time)
+
+# or ...
+
+start_time = sktime.now()
+sktime.sleep(2)
+elapsed = sktime.elapsed(start_time)
+```
+
+1. If `time2` is `None`, `elapsed()` uses the current time as the end time (calls `time.time()`)
+2. Calculates absolute difference using `math.fabs(time2 - time1)`
    - `math.fabs()` is used instead of `abs()` for best precision with float numbers
+3. Returns the positive difference in seconds as a float
 
-4. Returns the positive difference in seconds
-
-The key feature is using `math.fabs()` which is optimized for floating point absolute values, giving better precision than regular `abs()`.
-
----
-
-## Yawn Class
-
-A sleep controller that only sleeps after being called a certain number of times. Useful for rate limiting or progressive delays.
-
-### Initialization: `Yawn(sleep_duration, yawn_threshold, log_sleep=False)`
-
-**How it works:**
-1. Creates internal `_Yawn` instance from `time_ops.py`
-
-2. `_Yawn.__init__()` stores:
-   - `sleep_duration`: how long to sleep when threshold is reached
-   - `yawn_threshold`: number of yawns needed before sleeping
-   - `log_sleep`: whether to print messages when sleeping
-   - `yawn_count`: counter starting at 0
-   - `total_sleeps`: tracks how many times we've slept (starts at 0)
-   - `_lock`: creates a `threading.RLock()` for thread safety
-
-The lock ensures multiple threads can safely use the same Yawn instance without race conditions.
+`fabs()` is a built-in function in the `math` module that returns the absolute value of a number, and is more precise than `abs()` for floating point numbers.
 
 ---
 
-### `yawn()`
+## `Yawn` Class
 
-Registers a yawn and possibly sleeps.
+The `Yawn` class is a sleep controller that only sleeps after being called a certain number of times.
 
-**How it works:**
+Unlike `Circuit` (which breaks and stops the loop), `Yawn` sleeps and continues. The counter auto-resets after each sleep.
+
+Initialize with:
+- `sleep_duration`: how long to sleep when threshold is reached (float)
+- `yawn_threshold`: number of yawns needed before sleeping (int)
+- `log_sleep`: whether to print messages when sleeping (`bool`, default `False`)
+
+For readability, I recommend using keyword arguments when initializing the `Yawn` class.
+
+```python
+from suitkaise import sktime
+
+y = sktime.Yawn(sleep_duration=2, yawn_threshold=3, log_sleep=True)
+```
+
+1. Creates a `Yawn` instance
+
+2. stores the following attributes:
+    - `sleep_duration`: how long to sleep when threshold is reached (float)
+
+    - `yawn_threshold`: number of yawns needed before sleeping (int)
+
+    - `log_sleep`: whether to print messages when sleeping
+    
+    - `yawn_count`: counter starting at 0
+
+    - `total_sleeps`: tracks how many times we've slept (starts at 0)
+
+    - `_lock`: creates a `threading.RLock()` for thread safety
+
+The lock ensures multiple threads can safely use the same `Yawn` instance without race conditions.
+
+### `Yawn.yawn()`
+
+Registers a yawn and possibly sleeps if the threshold is reached.
+
+Arguments:
+- None
+
+Returns:
+- `True` if sleep occurred, `False` otherwise
+
 1. Acquires the thread lock
-
 2. Increments `yawn_count` by 1
 
 3. Checks if `yawn_count >= yawn_threshold`:
-   - **If yes:**
+   - **If `True`:**
      - If `log_sleep` is True, prints a message about sleeping
      - Calls `time.sleep(sleep_duration)` to actually sleep
      - Resets `yawn_count` to 0
      - Increments `total_sleeps` by 1
      - Returns `True`
-   - **If no:**
+
+   - **If `False`:**
      - Returns `False`
 
 4. Releases the thread lock
 
 The automatic counter reset means you don't have to manually reset it after sleeping.
 
----
-
-### `reset()`
+### `Yawn.reset()`
 
 Resets the yawn counter without sleeping.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- None
+
 1. Acquires the thread lock
-2. Sets `yawn_count` to 0
+2. Resets `yawn_count` to 0
 3. Releases the thread lock
 
 This is useful if you want to restart the counting without waiting for a sleep to happen.
 
----
-
-### `get_stats()`
+### `Yawn.get_stats()`
 
 Returns a dictionary with current yawn statistics.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- Dictionary with:
+  - `current_yawns`: current yawn counter value
+  - `yawn_threshold`: the threshold setting
+  - `total_sleeps`: how many times we've slept so far
+  - `sleep_duration`: how long each sleep lasts
+  - `yawns_until_sleep`: calculated as `yawn_threshold - yawn_count`
+
 1. Acquires the thread lock
-
-2. Creates a dictionary with:
-   - `current_yawns`: current yawn counter value
-   - `yawn_threshold`: the threshold setting
-   - `total_sleeps`: how many times we've slept so far
-   - `sleep_duration`: how long each sleep lasts
-   - `yawns_until_sleep`: calculated as `yawn_threshold - yawn_count`
-
+2. Creates a dictionary with the current values
 3. Releases the thread lock
-
 4. Returns the dictionary
 
 All reads happen under the lock to ensure you get a consistent snapshot of the stats.
 
 ---
 
-## Timer Class
+## `Timer` Class
 
-A sophisticated timer for collecting timing measurements and calculating statistics. Supports pause/resume, lap timing, and can be used across multiple threads.
+The `Timer` is an advanced timer that can be used to time code execution, complete with statistics and pause/resume functionality.
 
-### Initialization: `Timer()`
+It is also the base for the context manager `TimeThis`, the timing decorator `@timethis`, and the `processing` module's `@timesection` decorator.
 
-**How it works:**
-1. Creates internal `_Timer` instance from `time_ops.py`
+No arguments are needed to initialize the `Timer` class.
 
-2. `_Timer.__init__()` initializes:
+```python
+from suitkaise import sktime
+
+t = sktime.Timer()
+```
+
+1. Creates a `Timer` instance
+2. stores the following attributes:
    - `original_start_time`: set to `None` (will be set on first `start()`)
    - `times`: empty list to store all recorded measurements
    - `_paused_durations`: empty list to track pause time for each measurement
-   - `_lock`: creates `threading.RLock()` for thread safety
+   - `_lock`: creates a `threading.RLock()` for thread safety
    - `_sessions`: empty dictionary to track timing sessions per thread (keyed by thread ID)
+   - `_stats_view`: a `TimerStatsView` instance for accessing statistics
 
-The timer uses a session-based architecture where each thread gets its own session, allowing concurrent timing operations.
+Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
 
----
+### `Timer.stats` property
+
+The `stats` property returns a `TimerStatsView` that provides organized access to all timer statistics.
+
+```python
+timer = sktime.Timer()
+# ... record some timings ...
+
+# Access statistics through the stats namespace
+print(timer.stats.mean)
+print(timer.stats.stdev)
+print(timer.stats.percentile(95))
+print(timer.stats.num_times)
+```
+
+The `TimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
 
 ### `Timer.start()`
 
 Starts timing a new measurement.
 
-**How it works:**
-1. Gets or creates a `_TimerSession` for the current thread:
+Arguments:
+- None
+
+Returns:
+- Time (in seconds) when the measurement started, as a float
+
+If called while timing is already in progress, issues a `UserWarning` (it creates a nested timing frame).
+
+1. Checks if there's already an active timing frame for this thread
+   - If yes, issues a `UserWarning`
+
+2. Gets or creates a `TimerSession` for the current thread by calling `_get_or_create_session()`
 
    - Uses `threading.get_ident()` to get current thread ID
 
    - Looks up session in `_sessions` dictionary
 
-   - If not found, creates new `_TimerSession` and stores it
+   - If not found, creates new `TimerSession` and stores it
 
-2. Calls `session.start()` which:
-   - Creates a new "frame" (measurement context) with:
+3. Calls `session.start()` which:
+    - Acquires session lock
 
-     - `start_time`: current time from `perf_counter()` (high-resolution monotonic clock)
-     - `paused`: `False`
-     - `pause_started_at`: `None`
-     - `total_paused`: `0.0`
+    - Creates a new "frame" (measurement context) with:
+        - `start_time`: current time from `perf_counter()`
+        - `paused`: `False`
+        - `pause_started_at`: `None`
+        - `total_paused`: `0.0`
 
-   - Pushes frame onto the session's stack (supports nested timings)
+    - Pushes frame onto the session's stack (supports nested timings)
 
-3. If this is the first start ever, sets `original_start_time` to the start timestamp
-4. Returns the start timestamp
+    - Releases session lock
 
-The use of `perf_counter()` instead of `time.time()` provides more accurate interval measurements because it's not affected by system clock adjustments.
+4. If this is the first start ever, sets `original_start_time` to the start timestamp
 
----
+5. Returns the start timestamp
+
+*What is `perf_counter()` and why is it used?*
+
+Python has two main ways to get the current time:
+
+- `time.time()` — gives you the real-world clock time (like "3:45 PM"). But if your computer's clock gets adjusted (daylight saving, syncing with the internet, etc.), this number can jump forward or backward unexpectedly.
+
+- `time.perf_counter()` — gives you a "stopwatch" time that only counts upward. It doesn't know what time of day it is, but it's extremely precise and never gets adjusted.
+
+For measuring how long code takes to run, `perf_counter()` is the better choice because you want consistent, accurate measurements — not times that might suddenly shift because your computer synced its clock.
+
+*What is a frame and a stack?*
+
+Think of a stack like a stack of plates. You can only add plates to the top, and you can only remove plates from the top.
+
+A **frame** is one "plate" — it represents a single timing measurement that's currently in progress.
+
+A **stack** of frames lets you nest timings inside each other:
+
+```python
+timer.start()          # Frame 1 added to stack
+  # do some work
+  timer.start()        # Frame 2 added on top (warning issued)
+    # do inner work
+  timer.stop()         # Frame 2 removed, returns inner time
+  # do more work
+timer.stop()           # Frame 1 removed, returns total time
+```
+
+Each `start()` pushes a new frame onto the stack. Each `stop()` pops the top frame off and calculates how long that specific measurement took. This lets you measure the total time of something while also measuring individual pieces inside it.
 
 ### `Timer.stop()`
 
-Stops timing and records the measurement.
+Stops timing the current measurement and returns the elapsed time.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- elapsed time (in seconds) as a float
+
 1. Gets the current thread's session
 
 2. Calls `session.stop()` which:
-   - Gets the top frame from the stack
+    - Acquires session lock
 
-   - Calculates elapsed time:
+    - Gets the top frame from the stack
 
-     - Gets current time from `perf_counter()`
-     - If currently paused, adds the current pause duration
-     - Formula: `(end_time - start_time) - (total_paused + current_pause_duration)`
+    - Calculates elapsed time:
+        - Gets current time from `perf_counter()`
+        - If currently paused, adds the current pause duration
+        - Formula: `(end_time - start_time) - (total_paused + current_pause_duration)`
+     
+    - Calculates total pause duration
+    
+    - Pops the frame from the stack
+    
+    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Timer.stop()`)
 
-   - Calculates total pause duration
+    - Releases session lock
 
-   - Pops the frame from the stack
-
-   - Returns tuple of `(elapsed_time, total_paused)`
-
-3. Acquires the manager lock
-
+3. Acquires the `Timer` manager lock
 4. Appends elapsed time to `times` list
-
 5. Appends pause duration to `_paused_durations` list
-
 6. Releases the lock
-
 7. Returns just the elapsed time (unwraps the tuple)
 
 The elapsed time excludes any paused periods, giving you only the total time the timer was running.
 
----
+### `Timer.discard()`
+
+Stops timing but does NOT record the measurement.
+
+Use this when you want to abandon the current timing session without polluting your statistics (e.g., an error occurred, or this was a warm-up run).
+
+Arguments:
+- None
+
+Returns:
+- elapsed time that was discarded (for reference) as a float
+
+1. Gets the current thread's session
+
+2. Calls `session.stop()` which works the same as in `Timer.stop()`
+
+3. Does NOT append to `times` or `_paused_durations` lists
+
+4. Returns the elapsed time (for reference, even though it wasn't recorded)
+
+```python
+timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # Record successful timing
+except Exception:
+    timer.discard()  # Stop but don't record failed timing
+```
 
 ### `Timer.lap()`
 
 Records a lap time without stopping the timer.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- elapsed time (in seconds) as a float
+
 1. Gets the current thread's session
 
 2. Calls `session.lap()` which:
-   - Gets the top frame from the stack
+    - Acquires session lock
 
-   - Calculates elapsed time (same as `stop()`)
+    - Gets the top frame from the stack
 
-   - Calculates total pause duration
+    - Calculates elapsed time just like `session.stop()`
+    
+    - Calculates total pause duration
 
-   - **Restarts the frame** by:
+    - **Restarts the frame** by:
+        - Setting `start_time` to current time
+        - Resetting `total_paused` to `0.0`
+        - Setting `paused` to `False`
+        - Setting `pause_started_at` to `None`
+    
+    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Timer.lap()`)
 
-     - Setting `start_time` to current time
-     - Resetting `total_paused` to `0.0`
-     - Setting `paused` to `False`
-     - Setting `pause_started_at` to `None`
-
-   - Returns tuple of `(elapsed_time, total_paused)`
-
-3. Acquires the manager lock
-
+    - Releases session lock
+    
+3. Acquires the `Timer` manager lock
 4. Appends elapsed time to `times` list
-
 5. Appends pause duration to `_paused_durations` list
-
 6. Releases the lock
+7. Returns just the elapsed time (unwraps the tuple)
 
-7. Returns just the elapsed time
-
-The key difference from `stop()` is the frame stays on the stack and restarts, so timing continues.
-
----
+The key difference from `stop()` is the frame stays on the stack and restarts, so timing continues. It's as if you called `Timer.start()` the instant after the previous `Timer.stop()` call.
 
 ### `Timer.pause()`
 
 Pauses the current timing measurement.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- None
+
 1. Gets the current thread's session
 
 2. Calls `session.pause()` which:
+    - Acquires session lock
 
-   - Gets the top frame from the stack
+    - Gets the top frame from the stack
 
-   - Checks if already paused:
-     - If yes, issues a warning and returns
+    - Checks if already paused:
+        - If yes, issues a `UserWarning` and returns
+        - If no, sets `paused` to `True` and `pause_started_at` to current time
 
-   - Sets `paused` to `True`
-
-   - Records current time in `pause_started_at`
+    - Releases session lock
 
 
 The pause time is tracked but not included in the final elapsed time calculation.
-
----
 
 ### `Timer.resume()`
 
 Resumes a paused timing measurement.
 
-**How it works:**
+Arguments:
+- None
+
+Returns:
+- None
+
 1. Gets the current thread's session
 
 2. Calls `session.resume()` which:
+    - Acquires session lock
 
-   - Gets the top frame from the stack
+    - Gets the top frame from the stack
 
-   - Checks if not paused:
-     - If not paused, issues a warning and returns
+    - Checks if not paused:
+        - If not paused, issues a `UserWarning` and returns
 
-   - Calculates pause duration: `current_time - pause_started_at`
-   - Adds pause duration to `total_paused`
-   - Sets `paused` to `False`
-   - Sets `pause_started_at` to `None`
+    - Calculates pause duration: `current_time - pause_started_at`
+    - Adds pause duration to `total_paused`
+    - Sets `paused` to `False`
+    - Sets `pause_started_at` to `None`
+
+    - Releases session lock
 
 Each pause/resume cycle accumulates in `total_paused`, which is subtracted from the final elapsed time.
 
----
+### `Timer.add_time()`
 
-### `Timer.add_time(time_measurement)`
+Manually adds a pre-measured time to the statistics (a float).
 
-Manually adds a pre-measured time to the statistics.
+Arguments:
+- `elapsed_time`: time to add to statistics (in seconds) as a float
 
-**How it works:**
-1. Acquires the manager lock
-2. Appends `time_measurement` to `times` list
-3. Releases the lock
+Returns:
+- None
 
-This bypasses the start/stop mechanism and directly adds a measurement. Useful for importing times from other sources.
+1. Acquires the `Timer` manager lock
+2. Appends `elapsed_time` to `times` list
+3. Appends `0.0` to `_paused_durations` list
+4. Releases the lock
+5. Returns None
 
----
+### `TimerStatsView` properties (via `timer.stats`)
 
-### `Timer` Properties
-
-All properties work similarly by acquiring the lock and calculating from the `times` list:
+All properties are accessed via `timer.stats` and work by acquiring the lock and calculating from the `times` list:
 
 **`num_times`**: Returns `len(self.times)`
 
@@ -349,9 +506,9 @@ All properties work similarly by acquiring the lock and calculating from the `ti
 
 **`max` / `slowest_time`**: Returns `max(times)` or `None` if empty
 
-**`fastest_time_index`**: Returns the index of the fastest time
+**`fastest_index`**: Returns the index of the fastest time
 
-**`slowest_time_index`**: Returns the index of the slowest time
+**`slowest_index`**: Returns the index of the slowest time
 
 **`stdev`**: Uses `statistics.stdev(times)`, requires at least 2 measurements, returns `None` otherwise
 
@@ -359,83 +516,90 @@ All properties work similarly by acquiring the lock and calculating from the `ti
 
 All property accesses acquire the lock to ensure thread-safe reads.
 
----
+### `TimerStatsView` methods (via `timer.stats`)
 
-### `get_time(index)`
+#### `timer.stats.get_time()`
 
-Gets a specific measurement by index.
+Gets and returns a specific timing measurement by index.
 
-**How it works:**
-1. Acquires the lock
+Arguments:
+- `index`: 0-based index of measurement
+
+Returns:
+- timing measurement (in seconds) as a float or `None` if index is out of range
+
+1. Acquires the `Timer` manager lock
 2. Checks if `0 <= index < len(times)`
 3. If valid, returns `times[index]`
 4. If invalid, returns `None`
 5. Releases the lock
 
----
-
-### `percentile(percent)`
+#### `timer.stats.percentile()`
 
 Calculates a percentile of all measurements.
 
-**How it works:**
-1. Acquires the lock
+Arguments:
+- `percent`: percentile to calculate (between 0 and 100)
 
+Returns:
+- percentile value (in seconds) as a float or `None` if no measurements
+
+1. Acquires the `Timer` manager lock
 2. Checks if `times` is empty - returns `None` if so
-
 3. Validates `percent` is between 0 and 100 - raises `ValueError` if not
-
 4. Sorts the times list
-
 5. Calculates index: `(percent / 100) * (len(sorted_times) - 1)`
-
 6. If index is a whole number:
    - Returns the value at that exact index
-
 7. If index is fractional:
    - Gets values at floor and ceiling indices
    - Performs linear interpolation: `value = lower * (1 - weight) + upper * weight`
    - Where `weight` is the fractional part of the index
-
 8. Releases the lock
-
 9. Returns the percentile value
 
 Linear interpolation provides smooth percentile values between data points.
 
----
+### `Timer.get_statistics()` / `Timer.get_stats()`
 
-### `get_stats()`
+Creates a frozen snapshot of all statistics.
 
-Creates a snapshot of all statistics.
+Arguments:
+- None
 
-**How it works:**
-1. Acquires the lock
+Returns:
+- a `TimerStats` object or `None` if no measurements have been recorded
 
-2. Returns `None` if no times recorded
+1. Acquires the `Timer` manager lock
 
-3. Creates a new `_TimerStats` instance with:
-   - Copy of the `times` list
-   - The `original_start_time`
-   - Copy of the `_paused_durations` list
+2. Returns `None` if no measurements have been recorded
+
+3. Creates a new `TimerStats` object with:
+    - Copy of the `times` list
+    - The `original_start_time`
+    - Copy of the `_paused_durations` list
 
 4. Releases the lock
 
-5. Returns the `_TimerStats` instance
+5. Returns the `TimerStats` object
 
-The `_TimerStats` object calculates and stores all statistics at 
-creation time.
+The `TimerStats` object calculates and stores all statistics at creation time.
 
-Once created, the `_TimerStats` object is a frozen snapshot. You can access all the same properties and methods (like `percentile()`) without acquiring locks, making it fast for repeated access.
+Once created, the `TimerStats` object is a frozen snapshot. You can access all the same properties and methods (like `percentile()`) without acquiring locks, making it fast for repeated access.
 
----
+`get_stats()` is an alias for `get_statistics()`.
 
 ### `Timer.reset()`
 
 Clears all timing data.
 
-**How it works:**
-1. Acquires the lock
+Arguments:
+- None
+
+Returns:
+- None
+
+1. Acquires the `Timer` manager lock
 2. Clears the `times` list
 3. Sets `original_start_time` to `None`
 4. Clears the `_sessions` dictionary (removes all thread sessions)
@@ -446,207 +610,183 @@ This completely resets the timer as if it was just created.
 
 ---
 
-## TimeThis Context Manager
+## `TimerStats` class
+
+A frozen snapshot of timer statistics returned by `Timer.get_statistics()`.
+
+Unlike `timer.stats` (the live `TimerStatsView`), `TimerStats` is immutable and won't change even if the timer continues recording.
+
+All statistics are pre-computed at creation time:
+
+- `times`: List of all recorded timing measurements (copy)
+- `num_times`: Number of timing measurements
+- `original_start_time`: When the first measurement started
+- `most_recent`: Most recent timing
+- `most_recent_index`: Index of most recent timing
+- `total_time`: Sum of all times
+- `total_time_paused`: Total time spent paused
+- `mean`: Average of all times
+- `median`: Median of all times
+- `min` / `max`: Fastest / slowest times
+- `fastest_time` / `slowest_time`: Aliases for min/max
+- `fastest_index` / `slowest_index`: Indices of fastest/slowest
+- `stdev`: Standard deviation
+- `variance`: Variance
+
+Methods:
+- `percentile(percent)`: Calculate any percentile (0-100)
+- `get_time(index)`: Get specific measurement by index
+
+---
+
+## `TimeThis` context manager
 
 A context manager that automatically starts and stops a timer when entering and exiting a code block.
 
-### Initialization: `TimeThis(timer=None)`
+Initialize with:
+- `timer`: an optional `Timer` instance to use
 
-**How it works:**
-1. If `timer` is provided:
-   - Stores the provided `Timer` instance
+If `timer` is provided, the context manager will use the provided `Timer` instance.
 
-2. If `timer` is `None`:
-   - Creates a new `Timer` instance
+Otherwise, it will create a new `Timer` instance, which will only be used for this single timing operation.
 
-3. Stores the timer in `self.timer`
+The context manager returns the `Timer` instance directly:
 
-The context manager can either use an existing timer (to accumulate statistics) or create its own (for one-off measurements).
+```python
+from suitkaise import sktime
 
----
+with sktime.TimeThis() as timer:
+    # code to time
+    pass
 
-### Context Manager Methods
+# Access stats directly on the returned timer
+print(timer.stats.most_recent)
+print(timer.stats.mean)
+```
 
-**`__enter__()`**:
+### methods
+
+#### `TimeThis.__enter__()`
+
+Entry point for the context manager. Starts timing the code block.
+
 1. Calls `self.timer.start()`
-2. Returns `self.timer` (so you can access it with `as`)
+2. Returns the `Timer` instance (`self.timer`)
 
-**`__exit__(exc_type, exc_val, exc_tb)`**:
+#### `TimeThis.__exit__(exc_type, exc_val, exc_tb)`
+
+Exits the context manager. Stops timing the code block.
+
 1. Calls `self.timer.stop()`
-2. Records the measurement
-3. Returns `None` (doesn't suppress exceptions)
+2. Returns `None` (doesn't suppress exceptions)
 
-Even if an exception occurs in the with-block, the timer is stopped and the measurement is recorded.
+If an exception occurs in the code block, it will be raised after the context manager exits.
+
+Even if an exception occurs in the code block, the timer is stopped and the measurement is recorded.
+
+#### pausing, resuming, and lapping
+
+Pausing, resuming, and lapping are all available as methods on the `TimeThis` context manager.
+
+- `pause()`: Pauses the timer
+- `resume()`: Resumes the timer
+- `lap()`: Records a lap time
+
+These work exactly the same as the ones in the `Timer` class.
 
 ---
 
-### Helper Methods
+## `timethis` decorator
 
-**`pause()`**: Calls `self.timer.pause()`
+Decorator that dedicates a `Timer` instance to the function it decorates, timing the function's execution every time it is called.
 
-**`resume()`**: Calls `self.timer.resume()`
+Arguments:
+- `timer_instance`: an optional `Timer` instance to use
 
-**`lap()`**: Calls `self.timer.lap()`
+If `timer_instance` is provided, the decorator will use the provided `Timer` instance.
 
-These allow you to control the timer from within the context block.
+Otherwise, it will create a new `Timer` instance, dedicated to the function it decorates.
 
----
+### Mode 1: Explicit timer (`timer_instance` provided)
 
-## Timethis Decorator
+When you pass a `Timer` to the decorator, it uses that timer directly.
 
-A decorator that automatically times function calls and accumulates statistics.
-
-### `@timethis(timer_instance=None)`
-
-This decorator has two modes depending on whether you provide a timer.
-
-**Mode 1: Auto-created global timer (`timer_instance=None`)**
-
-How it works:
-1. At decoration time (when Python processes the `@timethis()` line):
-
-   - Gets the current frame using `inspect.currentframe()`
-
-   - Extracts the module name from `frame.f_back.f_globals['__name__']`
-
-   - Strips package path to get just the module name
-
-   - Checks `func.__qualname__` to determine if function is in a class:
-     - If contains `.`: function is a class method → `module_ClassName_methodname_timer`
-
-     - If no `.`: function is module-level → `module_functionname_timer`
-
-   - Creates a global dictionary `timethis._global_timers` (thread-safe with lock) if it doesn't exist
-
-   - Creates a new `Timer` with the generated name and stores it in `_global_timers`
-
-   - Calls `_timethis_decorator(timer._timer)` to create the actual decorator
-
-   - Attaches the timer to the wrapper function as `wrapper.timer`
-
-2. At call time (each time the decorated function is called):
-   - Calls `timer.start()`
-   - Executes the function
-   - Calls `timer.stop()` in a `finally` block (always runs, even with exceptions)
-   - Returns the function's result
-
-You can access the auto-created timer via `function_name.timer`.
-
-**Mode 2: Explicit timer (`timer_instance` provided)**
-
-How it works:
 1. At decoration time:
-   - Uses the provided `timer_instance._timer` (internal timer)
-   - Calls `_timethis_decorator(timer._timer)` to create the actual decorator
+    - Receives your provided `Timer` instance
+    - Creates a wrapper function around your original function
 
-2. At call time:
-   - Same as Mode 1 - starts timer, calls function, stops timer
+2. At call time (every time the decorated function runs):
+    - Calls `timer_instance.start()` before the function runs
+    - Runs your original function
+    - Calls `timer_instance.stop()` after the function completes (even if it throws an error)
+    - Returns the function's result
 
-The difference is the timer is shared across multiple functions if you pass the same instance.
+This is useful when you want multiple functions to share the same timer for combined statistics.
 
----
+### Mode 2: Auto-created global function timer
 
-### `_timethis_decorator(timer_instance)`
+When `timer_instance` is `None` (the default), the decorator creates and manages a timer for you.
 
-The internal decorator implementation.
+1. At decoration time:
+    - Uses Python's `inspect` module to figure out where the function is defined
+    - Extracts the module name from `frame.f_back.f_globals.get('__name__')`
+    - If the module name has dots (like `mypackage.submodule`), takes only the last part (`submodule`)
+    
+2. Builds a unique timer name based on the function's location:
+    - Checks `func.__qualname__` to see if the function is inside a class
+    - If inside a class (qualname contains a dot like `MyClass.my_method`):
+        - Timer name becomes `{module}_{ClassName}_{method}_timer`
+    - If at module level (no dot in qualname):
+        - Timer name becomes `{module}_{function}_timer`
 
-**How it works:**
-1. Takes a `_Timer` instance (internal timer)
+3. Creates or retrieves the global timer:
+    - The `timethis` function itself stores a dictionary `_global_timers` and a lock `_timers_lock`
+    - Acquires the lock (thread-safe)
+    - If a timer with this name doesn't exist yet, creates a new `Timer()`
+    - Retrieves the timer from the dictionary
+    - Releases the lock
 
-2. Returns a decorator function
+4. Creates the wrapper function (same as Mode 1)
 
-3. The decorator creates a wrapper using `@wraps(func)`:
-   - Preserves function name, docstring, and metadata
-   - `start()` is called before function execution
-   - Function is executed
-   - `stop()` is called in `finally` block (always runs)
-   - Returns function result
+5. Attaches the timer to the wrapper function:
+    - Sets `wrapper.timer = the_timer`
+    - This lets you access statistics via `your_function.timer.stats.mean`, etc.
 
-The `finally` block ensures timing is always recorded, even if the function raises an exception.
+6. At call time (every time the decorated function runs):
+    - Same as Mode 1: `start()`, run function, `stop()`
 
----
+### Why this design?
 
-## Misc
+The auto-created timer is stored globally (attached to the `timethis` function itself), not recreated each time. This means:
+
+- The timer persists across all calls to the decorated function
+- Statistics accumulate over the lifetime of your program
+- You can access the timer anytime via `your_function.timer`
+- Thread-safe: multiple threads can call the decorated function, and each gets its own timing session
 
 ### `clear_global_timers()`
 
-Clears all auto-created global timers from the `@timethis()` decorator.
+Clears all auto-created global timers.
 
-**How it works:**
-1. Checks if `timethis._timers_lock` and `timethis._global_timers` exist
+1. Checks if `_global_timers` and `_timers_lock` exist on the `timethis` function
+2. If they do:
+    - Acquires the lock
+    - Calls `.clear()` on the `_global_timers` dictionary
+    - Releases the lock
 
-2. If they exist:
-   - Acquires the lock
-   - Gets the `_global_timers` dictionary
-   - Calls `.clear()` on the dictionary (removes all entries)
-   - Releases the lock
-
-This is useful in long-running processes or test suites where you want to release memory or reset statistics.
+This is useful for long-running programs or test environments where you want to start fresh.
 
 ---
 
-## Internal Architecture
-
 ### Thread Safety
 
-All timing classes use `threading.RLock()` (reentrant locks) for thread safety:
-- **Reentrant** means the same thread can acquire the lock multiple times without deadlocking
-- All state modifications happen inside lock context managers
-- Property reads also acquire locks to ensure consistent snapshots
+All timing classes use `threading.RLock()` (reentrant locks) for thread safety.
 
-### Timer Session Architecture
+*What is a reentrant lock?*
 
-The `_Timer` uses a sophisticated session-based system:
+A reentrant lock is a lock that can be acquired by the same thread multiple times without deadlocking.
 
-- Each thread gets its own `_TimerSession` (keyed by thread ID)
-
-- Each session has a stack of "frames" (timing contexts)
-
-- Frames support nested timings (start within a start)
-
-- Sessions use `perf_counter()` for high-resolution monotonic timing
-
-- The main `_Timer` aggregates results from all sessions into the shared `times` list
-
-This architecture allows:
-- Multiple threads to time concurrently without conflicts
-- Nested timing contexts within the same thread
-- All results merged for unified statistics
-
-### Clock Choices
-
-**Wall clock (`time.time()`)**: Used for `now()`, `get_current_time()`, and `elapsed()`
-- Represents actual real-world time
-- Can jump forward/backward with system clock adjustments
-- Used when you need actual timestamps
-
-**Performance counter (`perf_counter()`)**: Used for `Timer` intervals
-- Monotonically increasing (never goes backward)
-- High resolution (nanosecond precision on most systems)
-- Not affected by system clock adjustments
-- Used when you need accurate interval measurements
-
-### Pause/Resume Mechanism
-
-Pausing works by:
-1. Recording the time when pause started
-2. Accumulating pause durations in `total_paused`
-3. Subtracting `total_paused` from the elapsed time calculation
-
-This means:
-- Paused time is tracked but excluded from measurements
-- Multiple pause/resume cycles accumulate correctly
-- Works correctly even if you stop while paused (current pause duration is included)
-
-### Statistics Calculation
-
-Statistics use Python's `statistics` module:
-- `mean()`: arithmetic average
-- `median()`: middle value when sorted
-- `stdev()`: sample standard deviation (requires n ≥ 2)
-- `variance()`: sample variance (requires n ≥ 2)
-
-Percentiles use linear interpolation between data points for smooth results.
+This is useful for thread safety, as it allows the same thread to acquire the lock multiple times from different code or methods.
 
 ### Memory Management
 
@@ -654,13 +794,18 @@ The `Timer` stores all measurements in memory:
 - Each measurement is a single float (8 bytes)
 - Each pause duration is a single float (8 bytes)
 - 1 million measurements ≈ 16 MB of memory
-- Use `reset()` periodically if running indefinitely
+
+Use `reset()` periodically if running indefinitely
 
 ### Error Handling
 
-- Timer operations raise `RuntimeError` if called in wrong state (e.g., `stop()` without `start()`)
+- `Timer.stop()` raises `RuntimeError` if called without `start()`
 
-- Pause/resume issues a `UserWarning` if called in wrong state (e.g., `pause()` when already paused)
+- `Timer.start()` issues a `UserWarning` if called while timing is already in progress
+
+- `Timer.pause()` issues a `UserWarning` if called when already paused
+
+- `Timer.resume()` issues a `UserWarning` if called when not paused
 
 - Percentile calculations raise `ValueError` if percent is not in range 0-100
 

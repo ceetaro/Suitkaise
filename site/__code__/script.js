@@ -72,6 +72,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ============================================
+    // Decorator Line Styling
+    // Makes entire decorator lines white
+    // ============================================
+    
+    function styleDecoratorLines() {
+        // Find all code blocks
+        const codeBlocks = document.querySelectorAll('.module-page pre code');
+        
+        codeBlocks.forEach(codeBlock => {
+            // Split content into lines by looking at the HTML structure
+            const html = codeBlock.innerHTML;
+            const lines = html.split('\n');
+            
+            // Check each line for decorators and mark entire line
+            const processedLines = lines.map(line => {
+                // Check if line contains a decorator token
+                if (line.includes('token decorator') || line.includes('class="decorator"')) {
+                    // Wrap the entire line content in a decorator-line span
+                    return `<span class="decorator-line-wrapper">${line}</span>`;
+                }
+                return line;
+            });
+            
+            codeBlock.innerHTML = processedLines.join('\n');
+        });
+    }
+
+    // ============================================
     // Page Content Storage
     // Core pages are inline (instant)
     // Module pages are fetched at startup
@@ -385,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Run syntax highlighting on code blocks
         if (typeof Prism !== 'undefined') {
             Prism.highlightAll();
+            styleDecoratorLines();
         }
         
         // Setup module bar links if present

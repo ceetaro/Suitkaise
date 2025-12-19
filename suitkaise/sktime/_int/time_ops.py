@@ -48,21 +48,36 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
 
 class Yawn:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sktime
+        
+        # Sleep for 3 seconds after 5 yawns
+        y = sktime.Yawn(sleep_duration=3, yawn_threshold=5)
+        
+        while something:
+            if something_went_wrong():
+                y.yawn()  # After 5 yawns, sleeps for 3 seconds
+            else:
+                do_work()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Sleep controller that sleeps after a specified number of "yawns".
     
     Useful for implementing delays that only trigger after repeated calls,
     such as rate limiting or progressive backoff scenarios.
+    
+    Unlike Circuit (which breaks and stops), Yawn sleeps and continues.
+    The counter auto-resets after each sleep.
+    
+    Args:
+        `sleep_duration`: How long to sleep when threshold is reached (float)
+        `yawn_threshold`: Number of yawns before sleeping (int)
+        `log_sleep`: Whether to print when sleep occurs (bool, default False)
     """
     
     def __init__(self, sleep_duration: float, yawn_threshold: int, log_sleep: bool = False):
-        """
-        Initialize a Yawn controller.
-        
-        Args:
-            sleep_duration: How long to sleep when threshold is reached
-            yawn_threshold: Number of yawns before sleeping
-            log_sleep: Whether to print when sleep occurs
-        """
         self.sleep_duration = sleep_duration
         self.yawn_threshold = yawn_threshold
         self.log_sleep = log_sleep
@@ -72,10 +87,20 @@ class Yawn:
         
     def yawn(self) -> bool:
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            y = sktime.Yawn(sleep_duration=2, yawn_threshold=3)
+            
+            y.yawn()  # yawn_count = 1, returns False
+            y.yawn()  # yawn_count = 2, returns False
+            y.yawn()  # yawn_count = 3, sleeps 2s, resets, returns True
+            ```
+        ────────────────────────────────────────────────────────\n
+
         Register a yawn. Sleep if threshold is reached.
         
         Returns:
-            True if sleep occurred, False otherwise
+            `True` if sleep occurred, `False` otherwise
         """
         with self._lock:
             self.yawn_count += 1
@@ -92,12 +117,38 @@ class Yawn:
             return False
     
     def reset(self) -> None:
-        """Reset the yawn counter without sleeping."""
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            y.reset()  # Resets yawn_count to 0 without sleeping
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Reset the yawn counter without sleeping.
+        """
         with self._lock:
             self.yawn_count = 0
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get statistics about yawn behavior."""
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            stats = y.get_stats()
+            # {
+            #     'current_yawns': 2,
+            #     'yawn_threshold': 5,
+            #     'total_sleeps': 1,
+            #     'sleep_duration': 3.0,
+            #     'yawns_until_sleep': 3
+            # }
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Get statistics about yawn behavior.
+        
+        Returns:
+            Dictionary with current yawn state and configuration
+        """
         with self._lock:
             return {
                 'current_yawns': self.yawn_count,
@@ -109,33 +160,72 @@ class Yawn:
 
 class TimerStats:
     """
-    Statistics about a timer returned by _Timer.get_statistics()
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sktime
+        
+        timer = sktime.Timer()
+        # ... record multiple timings ...
+        
+        # Get frozen snapshot
+        snapshot = timer.get_statistics()
+        
+        print(snapshot.mean)
+        print(snapshot.stdev)
+        print(snapshot.percentile(95))
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Frozen snapshot of timer statistics returned by `Timer.get_statistics()`.
+    
+    This is an immutable snapshot taken at the time `get_statistics()` was called.
+    All values are pre-computed and won't change even if the timer continues recording.
+    
+    For live (always up-to-date) statistics, use `timer.stats` instead.
+    
+    Attributes:
+        `times`: List of all recorded timing measurements
+        `num_times`: Number of timing measurements
+        `mean`: Average of all times
+        `median`: Median of all times
+        `min` / `max`: Fastest / slowest times
+        `stdev`: Standard deviation
+        `variance`: Variance
+        `total_time`: Sum of all times
+        `total_time_paused`: Total time spent paused
     """
     def __init__(self, times: List[float], original_start_time: Optional[float], paused_durations: List[float]):
-        self.times = times
+        self.times = times.copy()  # Make a copy to ensure immutability
 
         self.original_start_time = original_start_time
         self.num_times = len(times)
         self.most_recent = times[-1] if times else None
         self.most_recent_index = len(times) - 1 if times else None
-        self.total_time = sum(times)
-        self.total_time_paused = sum(paused_durations) if times else None
+        self.total_time = sum(times) if times else None
+        self.total_time_paused = sum(paused_durations) if paused_durations else None
         
         self.mean = statistics.mean(times) if times else None
         self.median = statistics.median(times) if times else None
-        self.slowest_lap = times.index(max(times)) if times else None
-        self.fastest_lap = times.index(min(times)) if times else None
+        self.slowest_index = times.index(max(times)) if times else None
+        self.fastest_index = times.index(min(times)) if times else None
         self.slowest_time = max(times) if times else None
         self.fastest_time = min(times) if times else None
         self.min = min(times) if times else None
         self.max = max(times) if times else None
         self.stdev = statistics.stdev(times) if len(times) > 1 else None
         self.variance = statistics.variance(times) if len(times) > 1 else None
-        self.percentile_95 = self.percentile(95)
-        self.percentile_99 = self.percentile(99)
+        # Removed hardcoded percentile_95 and percentile_99 - use percentile() method instead
 
     def percentile(self, percent: float) -> Optional[float]:
-        """Get percentile without acquiring lock."""
+        """
+        Calculate any percentile of the recorded times.
+        
+        Args:
+            percent: Percentile to calculate (0-100)
+            
+        Returns:
+            Percentile value or None if no measurements
+        """
         if not self.times:
             return None
         
@@ -159,17 +249,280 @@ class TimerStats:
     def get_time(self, index: int) -> Optional[float]:
         """Get time by index."""
         return self.times[index] if 0 <= index < len(self.times) else None
+
+
+class TimerStatsView:
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sktime
+        
+        timer = sktime.Timer()
+        timer.start()
+        # ... do work ...
+        timer.stop()
+        
+        # Access live statistics through organized namespace
+        print(timer.stats.mean)
+        print(timer.stats.stdev)
+        print(timer.stats.percentile(95))
+        print(timer.stats.num_times)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Live view of timer statistics accessible via `timer.stats`.
+    
+    This provides organized access to all timer statistics through a dedicated namespace.
+    Unlike `TimerStats` (the frozen snapshot from `get_statistics()`), this view always
+    reflects the current state of the timer.
+    
+    All properties are thread-safe and compute values on access.
+    
+    Properties:
+        `num_times`: Number of recorded measurements
+        `most_recent` / `result`: Most recent timing
+        `total_time`: Sum of all times
+        `total_time_paused`: Total time spent paused
+        `mean`: Average of all times
+        `median`: Median of all times  
+        `min` / `max`: Fastest / slowest times
+        `fastest_time` / `slowest_time`: Aliases for min/max
+        `fastest_index` / `slowest_index`: Indices of fastest/slowest
+        `stdev`: Standard deviation
+        `variance`: Variance
+        
+    Methods:
+        `get_time(index)`: Get specific measurement by index
+        `percentile(percent)`: Calculate any percentile (0-100)
+    """
+    
+    def __init__(self, timer: "Timer"):
+        self._timer = timer
+    
+    @property
+    def num_times(self) -> int:
+        """Number of timing measurements recorded."""
+        with self._timer._lock:
+            return len(self._timer.times)
+    
+    @property
+    def original_start_time(self) -> Optional[float]:
+        """Timestamp when the first measurement started."""
+        with self._timer._lock:
+            return self._timer.original_start_time
+    
+    @property
+    def most_recent(self) -> Optional[float]:
+        """Most recent timing measurement."""
+        with self._timer._lock:
+            return self._timer.times[-1] if self._timer.times else None
+
+    @property
+    def result(self) -> Optional[float]:
+        """Alias for most_recent."""
+        return self.most_recent
+
+    @property
+    def most_recent_index(self) -> Optional[int]:
+        """Index of most recent timing measurement."""
+        with self._timer._lock:
+            return len(self._timer.times) - 1 if self._timer.times else None
+
+    @property
+    def total_time(self) -> Optional[float]:
+        """Total time of all timing measurements."""
+        with self._timer._lock:
+            return sum(self._timer.times) if self._timer.times else None
+
+    @property
+    def total_time_paused(self) -> Optional[float]:
+        """Total time paused across all recorded measurements."""
+        with self._timer._lock:
+            if not self._timer._paused_durations:
+                return None
+            return sum(self._timer._paused_durations)
+    
+    @property
+    def mean(self) -> Optional[float]:
+        """Mean (average) of all timing measurements."""
+        with self._timer._lock:
+            return statistics.mean(self._timer.times) if self._timer.times else None
+    
+    @property
+    def median(self) -> Optional[float]:
+        """Median of all timing measurements."""
+        with self._timer._lock:
+            return statistics.median(self._timer.times) if self._timer.times else None
+    
+    @property
+    def slowest_index(self) -> Optional[int]:
+        """Index of the slowest timing measurement."""
+        with self._timer._lock:
+            return self._timer.times.index(max(self._timer.times)) if self._timer.times else None
+    
+    @property
+    def fastest_index(self) -> Optional[int]:
+        """Index of the fastest timing measurement."""
+        with self._timer._lock:
+            return self._timer.times.index(min(self._timer.times)) if self._timer.times else None
+
+    @property
+    def slowest_time(self) -> Optional[float]:
+        """Time of the slowest timing measurement."""
+        with self._timer._lock:
+            return max(self._timer.times) if self._timer.times else None
+    
+    @property
+    def fastest_time(self) -> Optional[float]:
+        """Time of the fastest timing measurement."""
+        with self._timer._lock:
+            return min(self._timer.times) if self._timer.times else None
+
+    @property
+    def min(self) -> Optional[float]:
+        """Minimum timing measurement (alias for fastest_time)."""
+        return self.fastest_time
+    
+    @property
+    def max(self) -> Optional[float]:
+        """Maximum timing measurement (alias for slowest_time)."""
+        return self.slowest_time
+    
+    @property
+    def stdev(self) -> Optional[float]:
+        """Standard deviation of timing measurements."""
+        with self._timer._lock:
+            if len(self._timer.times) <= 1:
+                return None
+            return statistics.stdev(self._timer.times)
+    
+    @property
+    def variance(self) -> Optional[float]:
+        """Variance of timing measurements."""
+        with self._timer._lock:
+            if len(self._timer.times) <= 1:
+                return None
+            return statistics.variance(self._timer.times)
+    
+    def get_time(self, index: int) -> Optional[float]:
+        """
+        Get timing measurement by index (0-based).
+        
+        Args:
+            index: 0-based index of measurement
+            
+        Returns:
+            Timing measurement or None if index is invalid
+        """
+        with self._timer._lock:
+            if 0 <= index < len(self._timer.times):
+                return self._timer.times[index]
+            return None
+    
+    def percentile(self, percent: float) -> Optional[float]:
+        """
+        Calculate any percentile of timing measurements.
+        
+        Args:
+            percent: Percentile to calculate (0-100)
+            
+        Returns:
+            Percentile value or None if no measurements
+        """
+        with self._timer._lock:
+            if not self._timer.times:
+                return None
+                
+            if not 0 <= percent <= 100:
+                raise ValueError("Percentile must be between 0 and 100")
+            
+            sorted_times = sorted(self._timer.times)
+            index = (percent / 100) * (len(sorted_times) - 1)
+
+            if index == int(index):
+                return sorted_times[int(index)]
+
+            lower_index = int(index)
+            upper_index = lower_index + 1
+            weight = index - lower_index
+            return (sorted_times[lower_index] * (1 - weight) + 
+                    sorted_times[upper_index] * weight)
         
 class Timer:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sktime
+        
+        timer = sktime.Timer()
+        
+        for i in range(100):
+            timer.start()
+            do_work()
+            timer.stop()
+        
+        # Access statistics through timer.stats
+        print(f"Mean: {timer.stats.mean:.3f}s")
+        print(f"Std Dev: {timer.stats.stdev:.3f}s")
+        print(f"95th percentile: {timer.stats.percentile(95):.3f}s")
+        ```
+    ────────────────────────────────────────────────────────
+        ```python
+        # Pause/resume to exclude user input from timing
+        timer = sktime.Timer()
+        timer.start()
+        
+        do_initial_work()
+        
+        timer.pause()
+        user_input = input("Continue? ")  # Not counted in timing
+        timer.resume()
+        
+        do_more_work()
+        elapsed = timer.stop()  # Only counts work, not user input
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Statistical timer for collecting and analyzing execution times.
     
     Provides comprehensive timing statistics including mean, median,
     standard deviation, and percentiles for performance analysis.
+    
+    All statistics are accessed through the `stats` property for clean organization:
+        - `timer.stats.mean`
+        - `timer.stats.stdev`
+        - `timer.stats.percentile(95)`
+    
+    Features:
+        - Thread-safe with per-thread timing sessions
+        - Supports nested timing (stackable frames)
+        - Pause/resume functionality
+        - Discard unwanted measurements
+    
+    Control Methods:
+        `start()`: Start timing
+        `stop()`: Stop and record measurement
+        `discard()`: Stop without recording
+        `lap()`: Record time and continue timing
+        `pause()` / `resume()`: Pause/resume timing
+        `add_time(float)`: Manually add a measurement
+        `reset()`: Clear all measurements
+    
+    Statistics Access:
+        `timer.stats`: Live statistics view (TimerStatsView)
+        `timer.get_statistics()` / `timer.get_stats()`: Frozen snapshot (TimerStats)
     """
     
     def __init__(self):
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            from suitkaise import sktime
+            
+            timer = sktime.Timer()
+            ```
+        ────────────────────────────────────────────────────────\n
+
         Initialize a new concurrent-capable timer.
 
         Supports multiple concurrent timing sessions (one per thread by default),
@@ -189,6 +542,24 @@ class Timer:
 
         # Session management: keyed by thread ident
         self._sessions: Dict[int, "TimerSession"] = {}
+        
+        # Live stats view
+        self._stats_view = TimerStatsView(self)
+    
+    @property
+    def stats(self) -> TimerStatsView:
+        """
+        Access timer statistics through an organized namespace.
+        
+        Returns:
+            TimerStatsView providing access to all statistics
+            
+        Example:
+            timer.stats.mean
+            timer.stats.stdev
+            timer.stats.percentile(95)
+        """
+        return self._stats_view
 
     def _get_or_create_session(self) -> "TimerSession":
 
@@ -200,15 +571,46 @@ class Timer:
                 sess = TimerSession(self)
                 self._sessions[ident] = sess
             return sess
+    
+    def _has_active_frame(self) -> bool:
+        """Check if current thread has an active timing frame."""
+        ident = threading.get_ident()
+        with self._lock:
+            sess = self._sessions.get(ident)
+            if sess is None:
+                return False
+            with sess._lock:
+                return len(sess._frames) > 0
 
         
     def start(self) -> float:
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.start()
+            do_work()
+            elapsed = timer.stop()
+            ```
+        ────────────────────────────────────────────────────────\n
+
         Start timing a new measurement.
         
+        Issues a `UserWarning` if called while timing is already in progress
+        (which creates a nested timing frame).
+        
         Returns:
-            Start timestamp
+            Start timestamp (from `perf_counter()`)
         """
+        # Warn if there's already an active frame (user might not intend nesting)
+        if self._has_active_frame():
+            warnings.warn(
+                "Timer.start() called while timing is already in progress. "
+                "This creates a nested timing frame. Use stop() or discard() first "
+                "if you want to restart timing.",
+                UserWarning,
+                stacklevel=2
+            )
+        
         # Create or get the session for the current thread and start a new frame
         sess = self._get_or_create_session()
         started = sess.start()
@@ -220,13 +622,23 @@ class Timer:
     
     def stop(self) -> float:
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.start()
+            do_work()
+            elapsed = timer.stop()  # Returns elapsed time, records it
+            
+            print(timer.stats.most_recent)  # Same as elapsed
+            ```
+        ────────────────────────────────────────────────────────\n
+
         Stop timing and record the measurement.
         
         Returns:
-            Elapsed time for this measurement
+            Elapsed time for this measurement (in seconds)
             
         Raises:
-            RuntimeError: If timer was not started
+            `RuntimeError`: If timer was not started
         """
         # Stop the current thread's top frame
         sess = self._get_or_create_session()
@@ -237,15 +649,62 @@ class Timer:
             self._paused_durations.append(paused_total)
         return elapsed
 
+    def discard(self) -> float:
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.start()
+            try:
+                result = risky_operation()
+                timer.stop()  # Record successful timing
+            except Exception:
+                timer.discard()  # Don't record failed timing
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Stop timing but do NOT record the measurement.
+        
+        Use this when you want to abandon the current timing session
+        without polluting your statistics (e.g., an error occurred,
+        or this was a warm-up run).
+        
+        Returns:
+            Elapsed time that was discarded (for reference)
+            
+        Raises:
+            `RuntimeError`: If timer was not started
+        """
+        # Stop the current thread's top frame but don't record it
+        sess = self._get_or_create_session()
+        elapsed, _ = sess.stop()
+        # Intentionally NOT appending to self.times or self._paused_durations
+        return elapsed
+
     def lap(self) -> float:
         """
-        Record a lap time.
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.start()
+            
+            for i in range(100):
+                do_work()
+                timer.lap()  # Records time since last lap/start, continues timing
+            
+            # 100 measurements recorded
+            print(timer.stats.mean)
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Record a lap time (stop + start in one call).
+        
+        Records the elapsed time since the last `start()` or `lap()` call,
+        then immediately starts a new timing period.
 
         Returns:
-            Elapsed time for this lap
+            Elapsed time for this lap (in seconds)
 
         Raises:
-            RuntimeError: If timer was not started
+            `RuntimeError`: If timer was not started
         """
         # Lap the current thread's top frame (record and continue)
         sess = self._get_or_create_session()
@@ -256,217 +715,178 @@ class Timer:
             self._paused_durations.append(paused_total)
         return elapsed
 
-    def pause(self):
+    def pause(self) -> None:
         """
-        Pause the current timing measurement.
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.start()
+            do_initial_work()
+            
+            timer.pause()
+            user_input = input("Continue? ")  # Time paused - not counted
+            timer.resume()
+            
+            do_more_work()
+            elapsed = timer.stop()  # Only counts work time
+            ```
+        ────────────────────────────────────────────────────────\n
 
-        Returns:
-            Current elapsed time when paused
+        Pause the current timing measurement.
+        
+        Time spent paused is excluded from the final elapsed time.
+        Issues a `UserWarning` if already paused.
 
         Raises:
-            RuntimeError: If timer is not running
+            `RuntimeError`: If timer is not running
         """
         sess = self._get_or_create_session()
         sess.pause()
 
-    def resume(self):
+    def resume(self) -> None:
         """
-        Resume the current timing measurement.
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.pause()
+            # ... time not counted ...
+            timer.resume()  # Continue timing
+            ```
+        ────────────────────────────────────────────────────────\n
 
-        Returns:
-            Current elapsed time when resumed
+        Resume a paused timing measurement.
+        
+        Issues a `UserWarning` if not currently paused.
 
         Raises:
-            RuntimeError: If timer is not paused
+            `RuntimeError`: If timer is not running
         """
         sess = self._get_or_create_session()
         sess.resume()
     
     def add_time(self, elapsed_time: float) -> None:
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            timer = sktime.Timer()
+            
+            # Add pre-measured times
+            timer.add_time(1.5)
+            timer.add_time(2.3)
+            timer.add_time(1.8)
+            
+            print(timer.stats.mean)  # 1.867
+            ```
+        ────────────────────────────────────────────────────────\n
+
         Manually add a timing measurement.
         
         Args:
-            elapsed_time: Time to add to statistics
+            `elapsed_time`: Time to add to statistics (in seconds)
         """
         with self._lock:
             self.times.append(elapsed_time)
+            self._paused_durations.append(0.0)
     
-    @property
-    def num_times(self) -> int:
-        """Number of timing measurements recorded."""
-        with self._lock:
-            return len(self.times)
-    
-    @property
-    def most_recent(self) -> Optional[float]:
-        """Most recent timing measurement."""
-        with self._lock:
-            return self.times[-1] if self.times else None
-
-    @property
-    def result(self) -> Optional[float]:
-        """Alias for most_recent."""
-        return self.most_recent
-
-    @property
-    def most_recent_index(self) -> Optional[int]:
-        """Index of most recent timing measurement."""
-        with self._lock:
-            return len(self.times) - 1 if self.times else None
-
-    @property
-    def total_time(self) -> Optional[float]:
-        """Total time of all timing measurements."""
-        with self._lock:
-            return sum(self.times) if self.times else None
-
-    @property
-    def total_time_paused(self) -> Optional[float]:
-        """Total time paused across all recorded measurements."""
-        with self._lock:
-            if not self._paused_durations:
-                return None
-            return sum(self._paused_durations)
-    
-    @property
-    def mean(self) -> Optional[float]:
-        """Mean (average) of all timing measurements."""
-        with self._lock:
-            return statistics.mean(self.times) if self.times else None
-    
-    @property
-    def median(self) -> Optional[float]:
-        """Median of all timing measurements."""
-        with self._lock:
-            return statistics.median(self.times) if self.times else None
-    
-    @property
-    def slowest_lap(self) -> Optional[int]:
-        """Index number of the slowest timing measurement."""
-        with self._lock:
-            return self.times.index(max(self.times)) if self.times else None
-    
-    @property
-    def fastest_lap(self) -> Optional[int]:
-        """Index of the fastest timing measurement."""
-        with self._lock:
-            return self.times.index(min(self.times)) if self.times else None
-
-    @property
-    def slowest_time(self) -> Optional[float]:
-        """Time of the slowest timing measurement."""
-        with self._lock:
-            return max(self.times) if self.times else None
-    
-    @property
-    def fastest_time(self) -> Optional[float]:
-        """Time of the fastest timing measurement."""
-        with self._lock:
-            return min(self.times) if self.times else None
-
-    @property
-    def min(self) -> Optional[float]:
-        """Minimum timing measurement."""
-        with self._lock:
-            return min(self.times) if self.times else None
-    
-    @property
-    def max(self) -> Optional[float]:
-        """Maximum timing measurement."""
-        with self._lock:
-            return max(self.times) if self.times else None
-    
-    @property
-    def stdev(self) -> Optional[float]:
-        """Standard deviation of timing measurements."""
-        with self._lock:
-            if len(self.times) <= 1:
-                return None
-            return statistics.stdev(self.times)
-    
-    @property
-    def variance(self) -> Optional[float]:
-        """Variance of timing measurements."""
-        with self._lock:
-            if len(self.times) <= 1:
-                return None
-            return statistics.variance(self.times)
-    
-    def get_time(self, index: int) -> Optional[float]:
-        """
-        Get timing measurement by index (0-based).
-        
-        Args:
-            index: 0-based index of measurement
-            
-        Returns:
-            Timing measurement or None if index is invalid
-        """
-        with self._lock:
-            if 0 <= index < len(self.times):
-                return self.times[index]
-            return None
-    
-    def percentile(self, percent: float) -> Optional[float]:
-        """
-        Get percentile of timing measurements.
-        
-        Args:
-            percent: Percentile to calculate (0-100)
-            
-        Returns:
-            Percentile value or None if no measurements
-        """
-        with self._lock:
-            if not self.times:
-                return None
-                
-            if not 0 <= percent <= 100:
-                raise ValueError("Percentile must be between 0 and 100")
-            sorted_times = sorted(self.times)
-            index = (percent / 100) * (len(sorted_times) - 1)
-
-            if index == int(index):
-                return sorted_times[int(index)]
-
-            lower_index = int(index)
-            upper_index = lower_index + 1
-            weight = index - lower_index
-            return (sorted_times[lower_index] * (1 - weight) + 
-                    sorted_times[upper_index] * weight)
-    
-    def _percentile_unlocked(self, percent: float) -> Optional[float]:
-        """Get percentile without acquiring lock (for internal use)."""
-        if not self.times:
-            return None
-        
-        if not 0 <= percent <= 100:
-            raise ValueError("Percentile must be between 0 and 100")
-        
-        sorted_times = sorted(self.times)
-        index = (percent / 100) * (len(sorted_times) - 1)
-        
-        if index == int(index):
-            return sorted_times[int(index)]
-        else:
-            # Linear interpolation between two values
-            lower_index = int(index)
-            upper_index = lower_index + 1
-            weight = index - lower_index
-            
-            return (sorted_times[lower_index] * (1 - weight) + 
-                   sorted_times[upper_index] * weight)
+    # =========================================================================
+    # Commented-out checkpoint() method - cleaner alternative to lap()
+    # Uncomment if users request this feature in the future.
+    # =========================================================================
+    #
+    # def checkpoint(self) -> Optional[float]:
+    #     """
+    #     Universal timing checkpoint that works whether timing is in progress or not.
+    #     
+    #     If no timing is in progress: starts timing (returns None)
+    #     If timing is in progress: records time since last checkpoint and starts new (returns elapsed time)
+    #     
+    #     This provides a cleaner API than lap() for scenarios where you just want to
+    #     mark points in time without worrying about start/stop state.
+    #     
+    #     Example:
+    #         timer = Timer()
+    #         
+    #         timer.checkpoint()  # Starts timing (returns None)
+    #         do_step_1()
+    #         time_1 = timer.checkpoint()  # Records step 1, starts timing step 2
+    #         do_step_2()
+    #         time_2 = timer.checkpoint()  # Records step 2, starts timing step 3
+    #         do_step_3()
+    #         time_3 = timer.stop()  # Records final step
+    #         
+    #         # All times recorded in timer.stats
+    #     
+    #     Returns:
+    #         Elapsed time since last checkpoint, or None if this was the first call
+    #     """
+    #     if not self._has_active_frame():
+    #         # No active timing - start one
+    #         self.start()
+    #         return None
+    #     else:
+    #         # Active timing - record lap and continue
+    #         return self.lap()
+    #
+    # =========================================================================
     
     def get_statistics(self) -> Optional[TimerStats]:
-        """Get comprehensive timing statistics."""
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            # Get frozen snapshot of statistics
+            snapshot = timer.get_statistics()
+            
+            # Snapshot won't change even if timer continues
+            timer.start()
+            do_more_work()
+            timer.stop()
+            
+            # snapshot still has old values
+            print(snapshot.mean)
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Get a frozen snapshot of all timing statistics.
+        
+        Returns a `TimerStats` object containing all statistics calculated
+        at the moment this method was called. The snapshot is immutable
+        and won't change even if the timer continues recording.
+        
+        For live (always up-to-date) statistics, use `timer.stats` instead.
+        
+        Returns:
+            `TimerStats` snapshot or `None` if no measurements recorded
+        """
         with self._lock:
             if not self.times:
                 return None
             return TimerStats(self.times, self.original_start_time, self._paused_durations)
     
+    def get_stats(self) -> Optional[TimerStats]:
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            snapshot = timer.get_stats()  # Same as get_statistics()
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Alias for `get_statistics()`.
+        
+        Returns:
+            `TimerStats` snapshot or `None` if no measurements recorded
+        """
+        return self.get_statistics()
+    
     def reset(self) -> None:
-        """Clear all timing measurements."""
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            timer.reset()  # Clears all measurements, like a new Timer()
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Clear all timing measurements.
+        
+        Resets the timer to its initial state as if it was just created.
+        """
         with self._lock:
             self.times.clear()
             self.original_start_time = None

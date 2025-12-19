@@ -36,7 +36,7 @@
     </ul>
     <p><strong>Returns:</strong></p>
     <ul>
-        <li>Current time after sleeping</li>
+        <li>Current time after sleeping as a float</li>
     </ul>
 <pre><code class="language-python">from suitkaise import sktime
 
@@ -96,6 +96,7 @@ elapsed = sktime.elapsed(start_time)</code></pre>
 
     <h2><code>Yawn</code> Class</h2>
     <p>The <code>Yawn</code> class is a sleep controller that only sleeps after being called a certain number of times.</p>
+    <p>Unlike <code>Circuit</code> (which breaks and stops the loop), <code>Yawn</code> sleeps and continues. The counter auto-resets after each sleep.</p>
     <p><strong>Initialize with:</strong></p>
     <ul>
         <li><code>sleep_duration</code>: how long to sleep when threshold is reached (float)</li>
@@ -194,16 +195,35 @@ t = sktime.Timer()</code></pre>
                 <li><code>_paused_durations</code>: empty list to track pause time for each measurement</li>
                 <li><code>_lock</code>: creates a <code>threading.RLock()</code> for thread safety</li>
                 <li><code>_sessions</code>: empty dictionary to track timing sessions per thread (keyed by thread ID)</li>
+                <li><code>_stats_view</code>: a <code>TimerStatsView</code> instance for accessing statistics</li>
             </ul>
         </li>
     </ol>
     <p>Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.</p>
 
+    <h3><code>Timer.stats</code> property</h3>
+    <p>The <code>stats</code> property returns a <code>TimerStatsView</code> that provides organized access to all timer statistics.</p>
+<pre><code class="language-python">timer = sktime.Timer()
+# ... record some timings ...
+
+# Access statistics through the stats namespace
+print(timer.stats.mean)
+print(timer.stats.stdev)
+print(timer.stats.percentile(95))
+print(timer.stats.num_times)</code></pre>
+    <p>The <code>TimerStatsView</code> is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.</p>
+
     <h3><code>Timer.start()</code></h3>
     <p>Starts timing a new measurement.</p>
     <p><strong>Arguments:</strong> None</p>
     <p><strong>Returns:</strong> Time (in seconds) when the measurement started, as a float</p>
+    <p>If called while timing is already in progress, issues a <code>UserWarning</code> (it creates a nested timing frame).</p>
     <ol>
+        <li>Checks if there's already an active timing frame for this thread
+            <ul>
+                <li>If yes, issues a <code>UserWarning</code></li>
+            </ul>
+        </li>
         <li>Gets or creates a <code>TimerSession</code> for the current thread by calling <code>_get_or_create_session()</code>
             <ul>
                 <li>Uses <code>threading.get_ident()</code> to get current thread ID</li>
@@ -250,7 +270,7 @@ t = sktime.Timer()</code></pre>
             <p>A <strong>stack</strong> of frames lets you nest timings inside each other:</p>
 <pre><code class="language-python">timer.start()          # Frame 1 added to stack
   # do some work
-  timer.start()        # Frame 2 added on top
+  timer.start()        # Frame 2 added on top (warning issued)
     # do inner work
   timer.stop()         # Frame 2 removed, returns inner time
   # do more work
@@ -289,6 +309,24 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
         <li>Returns just the elapsed time (unwraps the tuple)</li>
     </ol>
     <p>The elapsed time excludes any paused periods, giving you only the total time the timer was running.</p>
+
+    <h3><code>Timer.discard()</code></h3>
+    <p>Stops timing but does NOT record the measurement.</p>
+    <p>Use this when you want to abandon the current timing session without polluting your statistics (e.g., an error occurred, or this was a warm-up run).</p>
+    <p><strong>Arguments:</strong> None</p>
+    <p><strong>Returns:</strong> Elapsed time that was discarded (for reference) as a float</p>
+    <ol>
+        <li>Gets the current thread's session</li>
+        <li>Calls <code>session.stop()</code> which works the same as in <code>Timer.stop()</code></li>
+        <li>Does NOT append to <code>times</code> or <code>_paused_durations</code> lists</li>
+        <li>Returns the elapsed time (for reference, even though it wasn't recorded)</li>
+    </ol>
+<pre><code class="language-python">timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # Record successful timing
+except Exception:
+    timer.discard()  # Stop but don't record failed timing</code></pre>
 
     <h3><code>Timer.lap()</code></h3>
     <p>Records a lap time without stopping the timer.</p>
@@ -334,7 +372,7 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
                 <li>Gets the top frame from the stack</li>
                 <li>Checks if already paused:
                     <ul>
-                        <li>If yes, issues a warning and returns</li>
+                        <li>If yes, issues a <code>UserWarning</code> and returns</li>
                         <li>If no, sets <code>paused</code> to <code>True</code> and <code>pause_started_at</code> to current time</li>
                     </ul>
                 </li>
@@ -356,7 +394,7 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
                 <li>Gets the top frame from the stack</li>
                 <li>Checks if not paused:
                     <ul>
-                        <li>If not paused, issues a warning and returns</li>
+                        <li>If not paused, issues a <code>UserWarning</code> and returns</li>
                     </ul>
                 </li>
                 <li>Calculates pause duration: <code>current_time - pause_started_at</code></li>
@@ -384,8 +422,8 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
         <li>Returns None</li>
     </ol>
 
-    <h3><code>Timer</code> property method statistics</h3>
-    <p>All properties work similarly by acquiring the lock and calculating from the <code>times</code> list:</p>
+    <h3><code>TimerStatsView</code> properties (via <code>timer.stats</code>)</h3>
+    <p>All properties are accessed via <code>timer.stats</code> and work by acquiring the lock and calculating from the <code>times</code> list:</p>
 
     <details>
         <summary>Timer Statistics Properties</summary>
@@ -401,17 +439,17 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
             <p><strong><code>median</code></strong>: Uses <code>statistics.median(times)</code> or <code>None</code> if empty</p>
             <p><strong><code>min</code> / <code>fastest_time</code></strong>: Returns <code>min(times)</code> or <code>None</code> if empty</p>
             <p><strong><code>max</code> / <code>slowest_time</code></strong>: Returns <code>max(times)</code> or <code>None</code> if empty</p>
-            <p><strong><code>fastest_time_index</code></strong>: Returns the index of the fastest time</p>
-            <p><strong><code>slowest_time_index</code></strong>: Returns the index of the slowest time</p>
+            <p><strong><code>fastest_index</code></strong>: Returns the index of the fastest time</p>
+            <p><strong><code>slowest_index</code></strong>: Returns the index of the slowest time</p>
             <p><strong><code>stdev</code></strong>: Uses <code>statistics.stdev(times)</code>, requires at least 2 measurements, returns <code>None</code> otherwise</p>
             <p><strong><code>variance</code></strong>: Uses <code>statistics.variance(times)</code>, requires at least 2 measurements, returns <code>None</code> otherwise</p>
         </div>
     </details>
     <p>All property accesses acquire the lock to ensure thread-safe reads.</p>
 
-    <h3>Other methods</h3>
+    <h3><code>TimerStatsView</code> methods (via <code>timer.stats</code>)</h3>
 
-    <h4><code>Timer.get_time()</code></h4>
+    <h4><code>timer.stats.get_time()</code></h4>
     <p>Gets and returns a specific timing measurement by index.</p>
     <p><strong>Arguments:</strong></p>
     <ul>
@@ -426,7 +464,7 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
         <li>Releases the lock</li>
     </ol>
 
-    <h4><code>Timer.percentile()</code></h4>
+    <h4><code>timer.stats.percentile()</code></h4>
     <p>Calculates a percentile of all measurements.</p>
     <p><strong>Arguments:</strong></p>
     <ul>
@@ -452,8 +490,8 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
     </ol>
     <p>Linear interpolation provides smooth percentile values between data points.</p>
 
-    <h4><code>Timer.get_statistics()</code></h4>
-    <p>Creates a snapshot of all statistics.</p>
+    <h4><code>Timer.get_statistics()</code> / <code>Timer.get_stats()</code></h4>
+    <p>Creates a frozen snapshot of all statistics.</p>
     <p><strong>Arguments:</strong> None</p>
     <p><strong>Returns:</strong> a <code>TimerStats</code> object or <code>None</code> if no measurements have been recorded</p>
     <ol>
@@ -471,6 +509,7 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
     </ol>
     <p>The <code>TimerStats</code> object calculates and stores all statistics at creation time.</p>
     <p>Once created, the <code>TimerStats</code> object is a frozen snapshot. You can access all the same properties and methods (like <code>percentile()</code>) without acquiring locks, making it fast for repeated access.</p>
+    <p><code>get_stats()</code> is an alias for <code>get_statistics()</code>.</p>
 
     <h3><code>Timer.reset()</code></h3>
     <p>Clears all timing data.</p>
@@ -496,13 +535,16 @@ timer.stop()           # Frame 1 removed, returns total time</code></pre>
     </ul>
     <p>If <code>timer</code> is provided, the context manager will use the provided <code>Timer</code> instance.</p>
     <p>Otherwise, it will create a new <code>Timer</code> instance, which will only be used for this single timing operation.</p>
-    <p>You can access this instance like so:</p>
+    <p>The context manager returns the <code>Timer</code> instance directly:</p>
 <pre><code class="language-python">from suitkaise import sktime
 
-with sktime.TimeThis() as t:
+with sktime.TimeThis() as timer:
     # code to time
+    pass
 
-result = t.timer.get_statistics() # or anything else</code></pre>
+# Access stats directly on the returned timer
+print(timer.stats.most_recent)
+print(timer.stats.mean)</code></pre>
 
     <h3>methods</h3>
 
@@ -592,7 +634,7 @@ result = t.timer.get_statistics() # or anything else</code></pre>
         <li>Attaches the timer to the wrapper function:
             <ul>
                 <li>Sets <code>wrapper.timer = the_timer</code></li>
-                <li>This lets you access statistics via <code>your_function.timer.mean</code>, etc.</li>
+                <li>This lets you access statistics via <code>your_function.timer.stats.mean</code>, etc.</li>
             </ul>
         </li>
         <li>At call time (every time the decorated function runs):
@@ -649,8 +691,10 @@ result = t.timer.get_statistics() # or anything else</code></pre>
 
     <h3>Error Handling</h3>
     <ul>
-        <li>Timer operations raise <code>RuntimeError</code> if called in wrong state (e.g., <code>stop()</code> without <code>start()</code>)</li>
-        <li>Pause/resume issues a <code>UserWarning</code> if called in wrong state (e.g., <code>pause()</code> when already paused)</li>
+        <li><code>Timer.stop()</code> raises <code>RuntimeError</code> if called without <code>start()</code></li>
+        <li><code>Timer.start()</code> issues a <code>UserWarning</code> if called while timing is already in progress</li>
+        <li><code>Timer.pause()</code> issues a <code>UserWarning</code> if called when already paused</li>
+        <li><code>Timer.resume()</code> issues a <code>UserWarning</code> if called when not paused</li>
         <li>Percentile calculations raise <code>ValueError</code> if percent is not in range 0-100</li>
         <li>The <code>@timethis</code> decorator always records timing, even if the function raises an exception</li>
     </ul>

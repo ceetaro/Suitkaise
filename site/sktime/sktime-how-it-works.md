@@ -107,6 +107,8 @@ elapsed = sktime.elapsed(start_time)
 
 The `Yawn` class is a sleep controller that only sleeps after being called a certain number of times.
 
+Unlike `suitkaise.Circuit` (which breaks and stops the loop), `Yawn` sleeps and continues. The counter auto-resets after each sleep.
+
 Initialize with:
 - `sleep_duration`: how long to sleep when threshold is reached (float)
 - `yawn_threshold`: number of yawns needed before sleeping (int)
@@ -127,7 +129,7 @@ y = sktime.Yawn(sleep_duration=2, yawn_threshold=3, log_sleep=True)
 
     - `yawn_threshold`: number of yawns needed before sleeping (int)
 
-    - `log_sleep`: whether to prin
+    - `log_sleep`: whether to print messages when sleeping
     
     - `yawn_count`: counter starting at 0
 
@@ -226,8 +228,26 @@ t = sktime.Timer()
    - `_paused_durations`: empty list to track pause time for each measurement
    - `_lock`: creates a `threading.RLock()` for thread safety
    - `_sessions`: empty dictionary to track timing sessions per thread (keyed by thread ID)
+   - `_stats_view`: a `TimerStatsView` instance for accessing statistics
 
 Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
+
+### `Timer.stats` property
+
+The `stats` property returns a `TimerStatsView` that provides organized access to all timer statistics.
+
+```python
+timer = sktime.Timer()
+# ... record some timings ...
+
+# Access statistics through the stats namespace
+print(timer.stats.mean)
+print(timer.stats.stdev)
+print(timer.stats.percentile(95))
+print(timer.stats.num_times)
+```
+
+The `TimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
 
 ### `Timer.start()`
 
@@ -239,7 +259,12 @@ Arguments:
 Returns:
 - Time (in seconds) when the measurement started, as a float
 
-1. Gets or creates a `TimerSession` for the current thread by calling `_get_or_create_session()`
+If called while timing is already in progress, issues a `UserWarning` (it creates a nested timing frame).
+
+1. Checks if there's already an active timing frame for this thread
+   - If yes, issues a `UserWarning`
+
+2. Gets or creates a `TimerSession` for the current thread by calling `_get_or_create_session()`
 
    - Uses `threading.get_ident()` to get current thread ID
 
@@ -247,8 +272,8 @@ Returns:
 
    - If not found, creates new `TimerSession` and stores it
 
-2. Calls `session.start()` which:
-    - Aquires session lock
+3. Calls `session.start()` which:
+    - Acquires session lock
 
     - Creates a new "frame" (measurement context) with:
         - `start_time`: current time from `perf_counter()`
@@ -260,9 +285,9 @@ Returns:
 
     - Releases session lock
 
-3. If this is the first start ever, sets `original_start_time` to the start timestamp
+4. If this is the first start ever, sets `original_start_time` to the start timestamp
 
-4. Returns the start timestamp
+5. Returns the start timestamp
 
 (This section should be a dropdown that users can expand.)
 *What is `perf_counter()` and why is it used?*
@@ -287,7 +312,7 @@ A **stack** of frames lets you nest timings inside each other:
 ```python
 timer.start()          # Frame 1 added to stack
   # do some work
-  timer.start()        # Frame 2 added on top
+  timer.start()        # Frame 2 added on top (warning issued)
     # do inner work
   timer.stop()         # Frame 2 removed, returns inner time
   # do more work
@@ -309,7 +334,7 @@ Returns:
 1. Gets the current thread's session
 
 2. Calls `session.stop()` which:
-    - Aquires session lock
+    - Acquires session lock
 
     - Gets the top frame from the stack
 
@@ -334,6 +359,35 @@ Returns:
 
 The elapsed time excludes any paused periods, giving you only the total time the timer was running.
 
+### `Timer.discard()`
+
+Stops timing but does NOT record the measurement.
+
+Use this when you want to abandon the current timing session without polluting your statistics (e.g., an error occurred, or this was a warm-up run).
+
+Arguments:
+- None
+
+Returns:
+- elapsed time that was discarded (for reference) as a float
+
+1. Gets the current thread's session
+
+2. Calls `session.stop()` which works the same as in `Timer.stop()`
+
+3. Does NOT append to `times` or `_paused_durations` lists
+
+4. Returns the elapsed time (for reference, even though it wasn't recorded)
+
+```python
+timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # Record successful timing
+except Exception:
+    timer.discard()  # Stop but don't record failed timing
+```
+
 ### `Timer.lap()`
 
 Records a lap time without stopping the timer.
@@ -347,7 +401,7 @@ Returns:
 1. Gets the current thread's session
 
 2. Calls `session.lap()` which:
-    - Aquires session lock
+    - Acquires session lock
 
     - Gets the top frame from the stack
 
@@ -386,12 +440,12 @@ Returns:
 1. Gets the current thread's session
 
 2. Calls `session.pause()` which:
-    - Aquires session lock
+    - Acquires session lock
 
     - Gets the top frame from the stack
 
     - Checks if already paused:
-        - If yes, issues a warning and returns
+        - If yes, issues a `UserWarning` and returns
         - If no, sets `paused` to `True` and `pause_started_at` to current time
 
     - Releases session lock
@@ -412,12 +466,12 @@ Returns:
 1. Gets the current thread's session
 
 2. Calls `session.resume()` which:
-    - Aquires session lock
+    - Acquires session lock
 
     - Gets the top frame from the stack
 
     - Checks if not paused:
-        - If not paused, issues a warning and returns
+        - If not paused, issues a `UserWarning` and returns
 
     - Calculates pause duration: `current_time - pause_started_at`
     - Adds pause duration to `total_paused`
@@ -444,9 +498,9 @@ Returns:
 4. Releases the lock
 5. Returns None
 
-### `Timer` property method statistics
+### `TimerStatsView` properties (via `timer.stats`)
 
-All properties work similarly by acquiring the lock and calculating from the `times` list:
+All properties are accessed via `timer.stats` and work by acquiring the lock and calculating from the `times` list:
 
 (This section should be a dropdown that users can expand.)
 **`num_times`**: Returns `len(self.times)`
@@ -471,9 +525,9 @@ All properties work similarly by acquiring the lock and calculating from the `ti
 
 **`max` / `slowest_time`**: Returns `max(times)` or `None` if empty
 
-**`fastest_time_index`**: Returns the index of the fastest time
+**`fastest_index`**: Returns the index of the fastest time
 
-**`slowest_time_index`**: Returns the index of the slowest time
+**`slowest_index`**: Returns the index of the slowest time
 
 **`stdev`**: Uses `statistics.stdev(times)`, requires at least 2 measurements, returns `None` otherwise
 
@@ -482,9 +536,9 @@ All properties work similarly by acquiring the lock and calculating from the `ti
 
 All property accesses acquire the lock to ensure thread-safe reads.
 
-### Other methods
+### `TimerStatsView` methods (via `timer.stats`)
 
-#### `Timer.get_time()`
+#### `timer.stats.get_time()`
 
 Gets and returns a specific timing measurement by index.
 
@@ -500,7 +554,7 @@ Returns:
 4. If invalid, returns `None`
 5. Releases the lock
 
-#### `Timer.percentile()`
+#### `timer.stats.percentile()`
 
 Calculates a percentile of all measurements.
 
@@ -526,9 +580,9 @@ Returns:
 
 Linear interpolation provides smooth percentile values between data points.
 
-#### `Timer.get_statistics()`
+### `Timer.get_statistics()` / `Timer.get_stats()`
 
-Creates a snapshot of all statistics.
+Creates a frozen snapshot of all statistics.
 
 Arguments:
 - None
@@ -552,6 +606,8 @@ Returns:
 The `TimerStats` object calculates and stores all statistics at creation time.
 
 Once created, the `TimerStats` object is a frozen snapshot. You can access all the same properties and methods (like `percentile()`) without acquiring locks, making it fast for repeated access.
+
+`get_stats()` is an alias for `get_statistics()`.
 
 ### `Timer.reset()`
 
@@ -585,15 +641,18 @@ If `timer` is provided, the context manager will use the provided `Timer` instan
 
 Otherwise, it will create a new `Timer` instance, which will only be used for this single timing operation.
 
-You can access this instance like so:
+The context manager returns the `Timer` instance directly:
 
 ```python
 from suitkaise import sktime
 
-with sktime.TimeThis() as t:
+with sktime.TimeThis() as timer:
     # code to time
+    pass
 
-result = t.timer.get_statistics() # or anything else
+# Access stats directly on the returned timer
+print(timer.stats.most_recent)
+print(timer.stats.mean)
 ```
 
 ### methods
@@ -682,7 +741,7 @@ When `timer_instance` is `None` (the default), the decorator creates and manages
 
 5. Attaches the timer to the wrapper function:
     - Sets `wrapper.timer = the_timer`
-    - This lets you access statistics via `your_function.timer.mean`, etc.
+    - This lets you access statistics via `your_function.timer.stats.mean`, etc.
 
 6. At call time (every time the decorated function runs):
     - Same as Mode 1: `start()`, run function, `stop()`
@@ -701,19 +760,6 @@ The auto-created timer is stored globally (attached to the `timethis` function i
 Clears all auto-created global timers.
 
 1. Checks if `_global_timers` and `_timers_lock` exist on the `timethis` function
-2. If they do:
-    - Acquires the lock
-    - Calls `.clear()` on the `_global_timers` dictionary
-    - Releases the lock
-
-This is useful for long-running programs or test environments where you want to start fresh.
-
-### `clear_global_timers()`
-
-Clear all global timers created by the `timethis` decorator.
-
-1. Checks if `_global_timers` and `_timers_lock` exist on the `timethis` function
-
 2. If they do:
     - Acquires the lock
     - Calls `.clear()` on the `_global_timers` dictionary
@@ -746,11 +792,14 @@ Use `reset()` periodically if running indefinitely
 
 ### Error Handling
 
-- Timer operations raise `RuntimeError` if called in wrong state (e.g., `stop()` without `start()`)
+- `Timer.stop()` raises `RuntimeError` if called without `start()`
 
-- Pause/resume issues a `UserWarning` if called in wrong state (e.g., `pause()` when already paused)
+- `Timer.start()` issues a `UserWarning` if called while timing is already in progress
+
+- `Timer.pause()` issues a `UserWarning` if called when already paused
+
+- `Timer.resume()` issues a `UserWarning` if called when not paused
 
 - Percentile calculations raise `ValueError` if percent is not in range 0-100
 
 - The `@timethis` decorator always records timing, even if the function raises an exception
-

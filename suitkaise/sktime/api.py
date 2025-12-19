@@ -26,7 +26,6 @@ try:
         _timethis_decorator,
         _get_current_time,
         _sleep,
-        TimerStats
     )
 except ImportError:
     raise ImportError(

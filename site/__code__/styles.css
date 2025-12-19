@@ -698,7 +698,7 @@ body {
 .module-bar-link {
     color: var(--text-color);
     text-decoration: none;
-    opacity: 0.4;
+    opacity: 0.5;
     font-size: 0.95rem;
     padding: 5px 0;
     transition: opacity 0.2s ease;
@@ -721,20 +721,20 @@ body {
     padding: 50px 60px 100px;
     min-height: calc(100vh - var(--nav-height) - 60px);
     max-width: 850px;
-    /* Body text color matches unselected module bar tabs (--text-color at 40% opacity) */
-    color: rgba(109, 233, 149, 0.4);
+    /* Body text color matches unselected module bar tabs (--text-color at 50% opacity) */
+    color: rgba(109, 233, 149, 0.5);
 }
 
 .module-page h1 {
     font-size: 1.8rem;
-    color: var(--text-color);
+    color: rgb(150, 245, 180);
     margin-bottom: 30px;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
 }
 
 .module-page h1 code {
-    color: var(--text-color);
+    color: rgb(150, 245, 180);
     background: none;
     font-size: inherit;
 }
@@ -743,7 +743,7 @@ body {
     font-size: 0.95rem;
     line-height: 1.75;
     margin-bottom: 14px;
-    color: rgba(109, 233, 149, 0.4);
+    color: rgba(109, 233, 149, 0.5);
 }
 
 /* ============================================
@@ -752,38 +752,44 @@ body {
 
 .module-page h2 {
     font-size: 1.4rem;
-    color: var(--text-color);
+    color: rgb(150, 245, 180);
     margin-top: 0;
     margin-bottom: 20px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border-color);
 }
 
+.module-page h2 code {
+    color: rgb(150, 245, 180);
+    background: rgba(150, 245, 180, 0.1);
+    font-size: inherit;
+}
+
 .module-page h3 {
     font-size: 1.1rem;
-    color: rgba(109, 233, 149, 0.7);
+    color: rgba(150, 245, 180, 0.9);
     margin-top: 35px;
     margin-bottom: 14px;
     padding-top: 5px;
 }
 
 .module-page h3 code {
-    color: var(--text-color);
-    background: rgba(109, 233, 149, 0.1);
+    color: rgb(150, 245, 180);
+    background: rgba(150, 245, 180, 0.1);
     padding: 3px 8px;
     font-size: 1rem;
 }
 
 .module-page h4 {
     font-size: 1rem;
-    color: rgba(109, 233, 149, 0.6);
+    color: rgba(150, 245, 180, 0.85);
     margin-top: 25px;
     margin-bottom: 12px;
 }
 
 .module-page h4 code {
-    color: var(--text-color);
-    background: rgba(109, 233, 149, 0.1);
+    color: rgb(150, 245, 180);
+    background: rgba(150, 245, 180, 0.1);
 }
 
 .module-page ul, .module-page ol {
@@ -795,7 +801,7 @@ body {
     font-size: 0.95rem;
     line-height: 1.7;
     margin-bottom: 6px;
-    color: rgba(109, 233, 149, 0.4);
+    color: rgba(109, 233, 149, 0.5);
 }
 
 /* Nested lists */
@@ -839,7 +845,7 @@ body {
     background: none !important;
     padding: 0;
     border-radius: 0;
-    color: rgba(109, 233, 149, 0.65);
+    color: rgba(109, 233, 149, 0.8);
     font-size: 0.85rem;
     line-height: 1.65;
     display: block;
@@ -848,7 +854,7 @@ body {
 
 /* Prism.js syntax highlighting overrides to match green theme */
 .module-page pre code.language-python {
-    color: rgba(109, 233, 149, 0.65);
+    color: rgba(109, 233, 149, 0.8);
 }
 
 /* Comments - darker/dimmer */
@@ -901,6 +907,12 @@ body {
 .module-page .token.boolean,
 .module-page .token.constant {
     color: rgba(150, 230, 180, 0.75);
+}
+
+/* Decorators - make entire decorator line white */
+.module-page .decorator-line-wrapper,
+.module-page .decorator-line-wrapper * {
+    color: rgba(255, 255, 255, 0.9) !important;
 }
 
 /* Horizontal separator */

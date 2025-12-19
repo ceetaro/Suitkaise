@@ -39,3 +39,7 @@ but should it be accessed like: cm.something ?
 ---
 
 does the yawn class overlap too much with the circuit module? it might be redundant and force more usage of the circuit module.
+
+---
+
+ensure that two timethis decorators (one with a preset timer and one which auto assigns to function) can be placed on the same function
