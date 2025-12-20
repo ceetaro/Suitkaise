@@ -1,25 +1,5 @@
-# `skpath` Concept
+# How to use `skpath`
 
-## Table of Contents
-
-1. [Overview](#1-overview)
-2. [Core Concepts](#2-core-concepts)
-3. [`SKPath` Class and Structure](#3-skpath-class-and-structure)
-4. [Key Features](#4-key-features)
-5. [Project Root Detection With `get_project_root`](#5-project-root-detection-with-get_project_root)
-6. [`@autopath` Decorator](#6-autopath-decorator)
-7. [Why using `skpath` is great](#7-why-using-skpath-is-great)
-8. [Examples](#8-examples)
-9. [Factory Function](#9-factory-function)
-10. [Real Usage Examples](#10-real-usage-examples)
-11. [Function-by-Function Examples](#11-function-by-function-examples)
-12. [Importing `skpath`](#12-importing-skpath)
-
-## 1. Overview
-
-`skpath` provides easy, intuitive path operations that ensure good developer habits and make file paths easier to work with. It's designed as an <u>**easy to use convenience module for everything path related**</u> that provides immediate utility outside of the `suitkaise` umbrella while integrating seamlessly with other `suitkaise` modules.
-
-## 2. Core Concepts
 
 `SKPath` is a special path object that maintains both absolute paths and paths normalized to your project root, providing the best of both worlds for cross-platform compatibility and project organization.
 

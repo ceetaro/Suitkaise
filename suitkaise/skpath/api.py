@@ -1,614 +1,7 @@
-"""
-`skpath` API - Smart Path Operations
-
-This module provides the user-facing API for intelligent path handling with dual-path
-architecture, automatic project root detection, and magical caller detection.
-
-Key Features:
-- `SKPath` objects with absolute and normalized paths
-- Zero-configuration initialization with automatic caller detection
-- Project root detection with sophisticated indicators
-- AutoPath decorator for automatic path conversion
-- Complete project structure analysis
-- Path utilities with cross-module compatibility
-- Smart ambiguous path resolution with helpful error messages
-
-Best Practices for Path Organization:
-1. Use relative paths for clarity: `SKPath('feature1/api.py')` vs `SKPath('feature2/api.py')`
-2. Use unique filenames when possible: `SKPath('feature1_api.py')` vs `SKPath('feature2_api.py')`
-3. Organize files in descriptive directory structures
-4. Avoid bare filenames (like `'config.py'`) when multiple files with the same name exist
-
-Exception Handling:
-- `MultiplePathsError`: Raised when ambiguous filenames are encountered
-- Provides specific recommendations for resolving path ambiguity
-"""
-
-import os
-import inspect
-import fnmatch
-from pathlib import Path
-from typing import Dict, List, Set, Optional, Union, Tuple, Any, Callable, Sequence, Type
-from functools import wraps
 
 
-# Import internal path operations with fallback
-try:
-    from ._int.path_ops import (
-        _get_non_sk_caller_file_path,
-        _get_project_root,
-        _get_cwd,
-        _get_current_dir,
-        _get_module_file_path,
-        _equal_paths,
-        _path_id,
-        _get_all_project_paths,
-        _get_project_structure,
-        _get_formatted_project_tree,
-        _force_project_root,
-        _clear_forced_project_root,
-        _get_forced_project_root,
-        DetectionError,
-        MultiplePathsError
-    )
-except ImportError:
-    raise ImportError(
-        "Internal path operations could not be imported. "
-        "Ensure that the internal path operations module is available."
-    )
 
-class SKPath:
-    """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise.skpath import SKPath
-        
-        # no args automatically gets caller file path
-        path = SKPath()
-
-        # arg creates SKPath from string (Path objects work too)
-        path = SKPath("a/path/goes/here")
-        ```
-    ────────────────────────────────────────────────────────\n
-
-    A smart path object that maintains both an absolute path and 
-    a path normalized (relative) to the project root.
-    
-    `SKPath` is a class with properties that expose two path views:
-    
-    - `ap`: Absolute filesystem path (string), with separators normalized (all `/`)
-    - `np`: Normalized path including your project root name (string). If the file is
-      outside any detected project root, `np` is the empty string `''`.
-    
-    Key Behavioral Notes:
-    - Each `SKPath` instance captures its project root at creation time
-    - Calling `force_project_root()` affects only NEW instances
-    - The `np` property returns the project-root-prefixed path (e.g., `MyProj/src/app.py`)
-      when inside the project; it returns `''` (empty string) when outside
-    - All path operations remain consistent with the instance's original root
-    
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise.skpath import SKPath
-        
-        # no args automatically gets caller file path
-        path = SKPath()
-        
-        abspath = path.ap
-        normpath = path.np
-        
-        # or...
-        abspath = SKPath().ap
-        normpath = SKPath().np
-        
-        # example ap: /Users/johndoe/Documents/MyProj/src/main.py
-        # example np: MyProj/src/main.py (auto-detected MyProj as root)
-        # example np: '' (empty string) if the path is outside the project root
-        ```
-    ────────────────────────────────────────────────────────\n
-
-        ```python
-        # Available Properties and Methods:
-        from suitkaise.skpath import SKPath
-        
-        path = SKPath("a/path/goes/here")
-        
-        # get the absolute path
-        abs_path = path.ap
-        
-        # get the normalized path
-        norm_path = path.np
-        
-        # get the root
-        root = path.root
-        
-        # get the final component of the path
-        file_name = path.name
-        
-        # get the parent directory of the final component
-        parent_dir = path.parent
-        
-        # get the final component without the suffix
-        file_stem = path.stem
-        
-        # get the suffix
-        file_suffix = path.suffix
-        
-        # get all suffixes
-        file_suffixes = path.suffixes
-        
-        # get the path parts as a tuple
-        path_parts = path.parts
-        
-        # check if the path exists
-        path_exists = path.exists
-        
-        # check if the path is a file
-        is_file = path.is_file
-        
-        # check if the path is a directory
-        is_dir = path.is_dir
-        
-        # check if the path is absolute
-        is_absolute = path.is_absolute
-        
-        # check if the path is a symlink
-        is_symlink = path.is_symlink
-        
-        # get the stat information for the path
-        stat = path.stat
-        
-        # get the lstat information for the path
-        lstat = path.lstat
-        
-        # iterate over the directory contents
-        for item in path.iterdir:
-            print(item)
-        
-        # get the dict view of the path
-        path_dict = path.as_dict
-        
-        # get the path ID (md5 hash of the path) (32 chars)
-        path_id = path.id
-        
-        # get the short path ID (8 chars)
-        path_id_short = path.id_short
-        
-        # find all paths matching a pattern
-        matching_paths = path.glob("*.txt")
-        
-        # recursively find all paths matching a pattern
-        matching_paths = path.rglob("*.txt")
-        
-        # get the relative path to another path
-        relative_path = path.relative_to(other_path)
-        
-        # get the path with a different name
-        new_path = path.with_new_name("new_name.txt")
-        
-        # get the path with only a different stem
-        new_path = path.with_new_stem("new_stem")
-        
-        # get the path with only a different suffix
-        new_path = path.with_new_suffix(".txt")
-        
-        # get the path as a string (uses absolute path for standard library compatibility)
-        path_str = str(path)
-        
-        # get the path as a repr string
-        path_repr = repr(path)
-        
-        # check if the path is equal to another path (can also use `equalpaths`)
-        # works with any combination of strings, Path objects, and SKPath objects
-        is_equal = path == other_path
-        
-        # get a hash of the path
-        path_hash = hash(path)
-        
-        # supports truediv for path joining (SKPath / "other/path")
-        
-        # supports os.fspath() for things like `with open(SKPath) as f:`
-        ```
-    ────────────────────────────────────────────────────────
-    """
-    
-    def __init__(self, path: Optional[Union[str, Path, 'SKPath']] = None, 
-                 project_root: Optional[Union[str, Path, 'SKPath']] = None):
-        """
-        Initialize an `SKPath` object with automatic caller detection.
-        
-        Args:
-            `path`: The path to wrap (if `None`, auto-detects caller's file)
-            `project_root`: Project root path (auto-detected if `None`)
-            
-        Raises:
-            `DetectionError`: If `path` is `None` and caller detection fails
-            `FileNotFoundError`: If provided `path` doesn't exist under project root
-            `MultiplePathsError`: If ambiguous filename matches multiple files
-        """
-        # Handle zero-argument magic initialization
-        if path is None:
-            try:
-                caller_file = _get_non_sk_caller_file_path()
-                if caller_file is None:
-                    raise DetectionError("caller file path", "SKPath initialization")
-            except RuntimeError:
-                raise DetectionError("caller file path", "SKPath initialization")
-            self._absolute_path = caller_file
-            self._original_path_input = None
-        else:
-            # Store original path input for reference and debugging
-            self._original_path_input = path
-
-            if isinstance(path, SKPath):
-                path = str(path)
-            
-            # Handle path resolution with project root awareness
-            path_obj = Path(path)
-            if not path_obj.is_absolute():
-                # For relative paths, we need to handle them intelligently
-                # First, get project root to resolve relative to it
-                temp_resolved = path_obj.resolve()  # Temporary resolution from CWD
-                temp_project_root = project_root
-                if temp_project_root is None:
-                    temp_project_root = _get_project_root(temp_resolved.parent if temp_resolved.is_file() else temp_resolved)
-                else:
-                    temp_project_root = Path(temp_project_root).resolve()
-                
-                # Try to resolve relative path within project root
-                if temp_project_root:
-                    self._absolute_path = self._resolve_relative_path(path_obj, temp_project_root)
-                else:
-                    # Fallback to current directory resolution if no project root found
-                    self._absolute_path = path_obj.resolve()
-            else:
-                self._absolute_path = path_obj.resolve()
-        
-        # Auto-detect or use provided project root
-        if project_root is None:
-            self._project_root = _get_project_root(self._absolute_path.parent if self._absolute_path.is_file() else self._absolute_path)
-        else:
-            self._project_root = Path(project_root).resolve()
-        
-        # Calculate normalized path
-        self._normalized_path = self._calculate_normalized_path()
-
-    def _resolve_relative_path(self, path_obj: Path, project_root: Path) -> Path:
-        """
-        Resolve a relative path intelligently within the project root.
-        
-        This method handles ambiguous relative paths by:
-        1. First trying direct resolution from project root
-        2. If that fails, searching for the file under project root
-        3. Raising clear errors for ambiguous cases
-        
-        Args:
-            `path_obj`: The relative `Path` object to resolve
-            `project_root`: The project root to resolve relative to
-            
-        Returns:
-            Absolute `Path` object
-            
-        Raises:
-            `FileNotFoundError`: If `path` doesn't exist under project root
-            `ValueError`: If multiple matches found (ambiguous path)
-        """
-        # Strategy 1: Try direct resolution from project root
-        direct_path = project_root / path_obj
-        if direct_path.exists():
-            return direct_path.resolve()
-        
-        # Strategy 2: If direct resolution fails, search under project root
-        # This handles cases like SKPath("data.txt") when data.txt could be in multiple subdirs
-        filename = path_obj.name
-        
-        # Only search if it's just a filename (no directory components)
-        if len(path_obj.parts) == 1:
-            matches = []
-            try:
-                # Search for file under project root
-                for match in project_root.rglob(filename):
-                    # Only include files, not directories
-                    if match.is_file():
-                        matches.append(match)
-                
-                if len(matches) == 0:
-                    # No matches found - file doesn't exist under project root
-                    raise FileNotFoundError(
-                        f"Path '{path_obj}' not found under project root '{project_root}'. "
-                        f"Make sure the file exists or provide a more specific path."
-                    )
-                elif len(matches) == 1:
-                    # Exactly one match - perfect!
-                    return matches[0].resolve()
-                else:
-                    # Multiple matches - ambiguous!
-                    raise MultiplePathsError(filename, matches, project_root)
-            except (OSError, PermissionError):
-                # Fall back to original behavior if we can't search
-                return path_obj.resolve()
-        
-        # For paths with directory components, fall back to original behavior
-        return path_obj.resolve()
-
-    def _calculate_normalized_path(self) -> Optional[str]:
-        """
-        Calculate the normalized path relative to project root.
-        
-        Returns:
-            `str`: Relative path from project root, or `None` if path is outside project root
-        """
-        if self._project_root is None:
-            # If we can't find project root, no normalized path available
-            return ''
-        
-        try:
-            # Build root-prefixed normalized path
-            root_name = self._project_root.name
-            try:
-                relative_path = self._absolute_path.relative_to(self._project_root)
-                rel_str = str(relative_path).replace('\\', '/')
-                if rel_str == '.':
-                    return root_name
-                return f"{root_name}/{rel_str}"
-            except ValueError:
-                # Path is not under project root - return empty string
-                return ''
-        except Exception:
-            # Be conservative on unexpected errors
-            return ''
-        
-    @property
-    def ap(self) -> str:
-        """Absolute path - the full system path."""
-        # Normalize separators to forward slashes for cross-OS consistency
-        return str(self._absolute_path).replace('\\', '/')
-    
-    @property
-    def np(self) -> Optional[str]:
-        """
-        Normalized path - path relative to project root.
-        
-        Returns:
-            `str`: Project-root-prefixed path (e.g., `'MyProj/src/main.py'`)
-            `''`: Empty string if path is outside the project root or root unknown
-        """
-        return self._normalized_path
-    
-    @property
-    def root(self) -> Optional['SKPath']:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            skpath1 = SKPath("file.txt")  # Uses current project root
-
-            force_project_root("/new/root")
-
-            skpath2 = SKPath("file.txt")  # Uses new project root
-
-            skpath1.root != skpath2.root  # True - different roots
-            ```
-        ────────────────────────────────────────────────────────\n
-
-        The project root directory for this `SKPath` instance.
-        
-        Important: Each `SKPath` instance captures the project root at creation time.
-        If `force_project_root()` is called after creating an `SKPath`, 
-        existing instances will continue to use their original project root.
-
-        Returns:
-            `SKPath`: The project root directory, or `None` if no root detected
-        """
-        if self._project_root is None:
-            return None
-        return SKPath(self._project_root)
-    
-    @property
-    def path_object(self) -> Path:
-        """Get the underlying Path object for advanced operations."""
-        return self._absolute_path
-    
-    @property
-    def original_str(self) -> Optional[str]:
-        """Get the original path input that was provided to `SKPath` constructor."""
-        return None if self._original_path_input is None else str(self._original_path_input)
-
-    @property
-    def original_repr(self) -> Optional[str]:
-        """Get the representation of the original path input that was provided to `SKPath` constructor."""
-        return repr(self._original_path_input) if self._original_path_input is not None else None
-    
-    @property
-    def name(self) -> str:
-        """The final component of the path."""
-        return self._absolute_path.name
-    
-    @property
-    def stem(self) -> str:
-        """The final component without suffix."""
-        return self._absolute_path.stem
-    
-    @property
-    def suffix(self) -> str:
-        """The file extension. If multiple, only the last one."""
-        return self._absolute_path.suffix
-    
-    @property
-    def suffixes(self) -> List[str]:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            path = SKPath("archive.tar.gz")
-
-            path.suffixes # result: ['.tar', '.gz']
-
-            path.suffix  # Only the last one: '.gz'
-            ```
-        ────────────────────────────────────────────────────────\n
-
-        All suffixes of the path as a list.
-        
-        Useful for files with multiple extensions like `'file.tar.gz'`.
-        
-        Returns:
-            List of all suffixes in order (e.g., [`'.tar'`, `'.gz'`])
-        """
-        return self._absolute_path.suffixes
-    
-    @property
-    def parent(self) -> 'SKPath':
-        """The parent directory as an `SKPath`."""
-        return SKPath(self._absolute_path.parent, self._project_root)
-    
-    @property
-    def parents(self) -> List['SKPath']:
-        """All parent directories as `SKPath` objects."""
-        return [SKPath(parent, self._project_root) for parent in self._absolute_path.parents]
-    
-    @property
-    def parts(self) -> Tuple[str, ...]:
-        """The path components as a tuple."""
-        return self._absolute_path.parts
-    
-    @property
-    def exists(self) -> bool:
-        """Check if the path exists."""
-        return self._absolute_path.exists()
-    
-    @property
-    def is_file(self) -> bool:
-        """Check if the path is a file."""
-        return self._absolute_path.is_file()
-    
-    @property
-    def is_dir(self) -> bool:
-        """Check if the path is a directory."""
-        return self._absolute_path.is_dir()
-    
-    @property
-    def is_absolute(self) -> bool:
-        """Check if the path is absolute."""
-        return self._absolute_path.is_absolute()
-    
-    @property
-    def is_symlink(self) -> bool:
-        """Check if the path is a symbolic link."""
-        return self._absolute_path.is_symlink()
-    
-    @property
-    def stat(self):
-        """Get stat information for the path."""
-        return self._absolute_path.stat()
-    
-    @property
-    def lstat(self):
-        """Get lstat information for the path."""
-        return self._absolute_path.lstat()
-    
-    @property
-    def iterdir(self) -> List['SKPath']:
-        """Iterate over directory contents as `SKPath` objects."""
-        if not self.is_dir:
-            raise NotADirectoryError(f"{self} is not a directory")
-        return [SKPath(item, self._project_root) for item in self._absolute_path.iterdir()]
-
-    @property
-    def as_dict(self) -> Dict[str, Optional[str]]:
-        """Return the dual-path structure as a dictionary."""
-        return {
-            "ap": self.ap,
-            "np": self.np
-        }
-
-    @property
-    def id(self) -> str:
-        """
-        Return the path ID based on absolute path.
-        
-        Each unique absolute path gets a unique ID, ensuring that multiple
-        `SKPath` objects pointing to the same file will have the same ID,
-        regardless of how they were created (relative vs absolute input).
-        
-        Returns:
-            32-character MD5-based path identifier
-        """
-        return path_id(self)
-
-    @property
-    def id_short(self) -> str:
-        """
-        Return the short path ID based on absolute path.
-        
-        Shortened version of the full path ID for display purposes.
-        
-        Returns:
-            8-character shortened path identifier
-        """
-        return path_id_short(self)
-    
-    def glob(self, pattern: str) -> List['SKPath']:
-        """Find all paths matching the pattern."""
-        return [SKPath(match, self._project_root) for match in self._absolute_path.glob(pattern)]
-    
-    def rglob(self, pattern: str) -> List['SKPath']:
-        """Recursively find all paths matching the pattern."""
-        return [SKPath(match, self._project_root) for match in self._absolute_path.rglob(pattern)]
-    
-    def relative_to(self, other: Union[str, Path, 'SKPath']) -> 'SKPath':
-        """Return relative path to another path."""
-        other_sp = SKPath(other)
-        try:
-            rel = self._absolute_path.relative_to(Path(other_sp))
-        except Exception as e:
-            raise ValueError(f"Path {self._absolute_path} is not relative to {Path(other_sp)}: {e}")
-        return SKPath(rel, self._project_root)
-    
-    def with_new_name(self, name: str) -> 'SKPath':
-        """Return a new `SKPath` with different name."""
-        return SKPath(self._absolute_path.with_name(name), self._project_root)
-    
-    def with_new_stem(self, stem: str) -> 'SKPath':
-        """Return a new `SKPath` with different stem."""
-        return SKPath(self._absolute_path.with_stem(stem), self._project_root)
-    
-    def with_new_suffix(self, suffix: str) -> 'SKPath':
-        """Return a new `SKPath` with different suffix."""
-        return SKPath(self._absolute_path.with_suffix(suffix), self._project_root)
-    
-    def __str__(self) -> str:
-        """String conversion returns absolute path for compatibility."""
-        return self.ap
-
-    def __repr__(self) -> str:
-        """Detailed representation showing both paths and original input."""
-        if self._original_path_input:
-            return f"SKPath(input='{str(self._original_path_input)}', ap='{self.ap}', np='{self.np}')"
-        else:
-            return f"SKPath(ap='{self.ap}', np='{self.np}')"
-    
-    def __eq__(self, other) -> bool:
-        """Compare `SKPath` objects based on their absolute paths."""
-        return equalpaths(self, other)
-    
-    def __hash__(self) -> int:
-        """Hash based on absolute path for use in `sets`/`dicts`."""
-        return hash(self._absolute_path)
-    
-    def __truediv__(self, other) -> 'SKPath':
-        """Support path joining with `/` operator."""
-        return SKPath(self._absolute_path / other, self._project_root)
-    
-    def __fspath__(self) -> str:
-        """Support for `os.fspath()`."""
-        return str(self._absolute_path)
-    
-
-# Type alias for valid path objects (which are strings, Path objects, or SKPath objects)
-AnyPath = Union[str, Path, SKPath]
-
-# ============================================================================
-# Convenience Functions - Direct access to path operations
-# ============================================================================
+# NOTE: wrap everything with SKPath here if importing from somewhere else
 
 def get_project_root(expected_name: Optional[str] = None) -> Optional[SKPath]:
     """
@@ -634,7 +27,7 @@ def get_project_root(expected_name: Optional[str] = None) -> Optional[SKPath]:
         `SKPath` object pointing to project root, or `None` if not found
         
     Raises:
-        `DetectionError`: If project root detection fails completely
+        `PathDetectionError`: If project root detection fails completely
 
     ────────────────────────────────────────────────────────
         ```python
@@ -667,12 +60,7 @@ def get_project_root(expected_name: Optional[str] = None) -> Optional[SKPath]:
         - Environment files: `.env`, `.env.local`, etc.
         - Package initializer: `__init__.py`
     """
-    result = _get_project_root(expected_name=expected_name)
-    if result is None:
-        if expected_name is None:
-            raise DetectionError("project root", "get_project_root function call")
-        return None
-    return SKPath(result)
+
 
 def get_caller_path() -> SKPath:
     """
@@ -696,7 +84,7 @@ def get_caller_path() -> SKPath:
         `SKPath` object for the calling file
         
     Raises:
-        `DetectionError`: If caller detection fails
+        `PathDetectionError`: If caller detection fails
 
     ────────────────────────────────────────────────────────
         ```python
@@ -716,9 +104,9 @@ def get_caller_path() -> SKPath:
     try:
         caller_file = _get_non_sk_caller_file_path()
         if caller_file is None:
-            raise DetectionError("caller file path", "get_caller_path function call")
+            raise PathDetectionError("caller file path", "get_caller_path function call")
     except RuntimeError:
-        raise DetectionError("caller file path", "get_caller_path function call")
+        raise PathDetectionError("caller file path", "get_caller_path function call")
     return SKPath(caller_file)
 
 def get_module_path(obj: Any) -> Optional[SKPath]:
@@ -817,6 +205,58 @@ def get_module_path(obj: Any) -> Optional[SKPath]:
         return None
     return SKPath(module_file)
 
+# combine with this cleanly 
+
+# def _get_module_file_path(obj: Any) -> Optional[Path]:
+#     """
+#     Get the file path of the module for an object or module name.
+    
+#     Args:
+#         obj: Object to inspect, or module name string, or module object
+        
+#     Returns:
+#         Path to the module file, or None if not found
+#     """
+#     try:
+#         # Case 1: obj is a string (module name)
+#         if isinstance(obj, str):
+#             try:
+#                 # Try to import the module by name
+#                 import importlib
+#                 module = importlib.import_module(obj)
+#                 if hasattr(module, '__file__') and module.__file__:
+#                     return Path(module.__file__).resolve()
+#             except (ImportError, ModuleNotFoundError):
+#                 # Module doesn't exist or can't be imported
+#                 return None
+        
+#         # Case 2: obj is a Path object (not a module, return None)
+#         elif isinstance(obj, Path):
+#             return None
+        
+#         # Case 3: obj is already a module object
+#         elif hasattr(obj, '__file__'):
+#             if obj.__file__:
+#                 return Path(obj.__file__).resolve()
+        
+#         # Case 4: obj is any other object - get its module
+#         elif hasattr(obj, '__module__'):
+#             module = inspect.getmodule(obj)
+#             if module and hasattr(module, '__file__') and module.__file__:
+#                 return Path(module.__file__).resolve()
+        
+#         # Case 5: Try inspect.getmodule directly
+#         else:
+#             module = inspect.getmodule(obj)
+#             if module and hasattr(module, '__file__') and module.__file__:
+#                 return Path(module.__file__).resolve()
+                
+#     except (OSError, ValueError, AttributeError):
+#         # Handle any path resolution or module access errors
+#         pass
+    
+#     return None
+
 def get_current_dir() -> SKPath:
     """
     ────────────────────────────────────────────────────────
@@ -872,21 +312,10 @@ def get_cwd() -> SKPath:
         ```
     ────────────────────────────────────────────────────────
     """
-    return SKPath(_get_cwd())
+    return SKPath(Path.cwd())
 
 def equalpaths(path1: Union[str, Path, SKPath], path2: Union[str, Path, SKPath]) -> bool:
     """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise import skpath
-        
-        path1 = "/home/user/project/data/file.txt"
-        path2 = Path("data/file.txt")  # note: pathlib import isn't needed for equalpaths to work
-        
-        paths_equal = skpath.equalpaths(path1, path2)
-        ```
-    ────────────────────────────────────────────────────────\n
-
     Intelligent path comparison with project-aware semantics.
     
     Compares normalized project-relative paths first (`SKPath.np`) for
@@ -949,25 +378,28 @@ def equalpaths(path1: Union[str, Path, SKPath], path2: Union[str, Path, SKPath])
         return False
 
 
-def path_id(path: Union[str, Path, SKPath], short: bool = False) -> str:
+def id(path: Union[str, Path, SKPath], *, length: int = 32) -> str:
     """
     ────────────────────────────────────────────────────────
         ```python
         from suitkaise import skpath
         
-        short_id = skpath.path_id_short(filepath)
+        # Full 32-character ID
+        full_id = skpath.id(filepath)
+        
+        # Short 8-character ID
+        short_id = skpath.id(filepath, length=8)
         ```
     ────────────────────────────────────────────────────────\n
 
-    Reproducible path fingerprint with consistent hashing (full md5 hex hash - 32 characters).
+    Reproducible path fingerprint with consistent hashing.
     
-    Provides error handling, consistent ID always using absolute paths,
-    and automatic hashing and hexdigest generation. Same path will always
-    generate the same ID across runs and platforms.
+    Generates an MD5 hash of the absolute path, truncated to the specified length.
+    Same path will always generate the same ID across runs and platforms.
     
     Args:
         `path`: Path to generate ID for
-        `short`: If `True`, return a shortened version of the ID
+        `length`: Length of the hash to return (1-32, default 32)
         
     Returns:
         Reproducible string ID for the path
@@ -976,11 +408,9 @@ def path_id(path: Union[str, Path, SKPath], short: bool = False) -> str:
         ```python
         # Real use case: Creating unique cache keys for processed files
         
-        # auto converts to SKPath object
         @skpath.autopath()
-        def process_image(image_path: skpath.AnyPath):
-
-            cache_key = image_path.id_short
+        def process_image(image_path: SKPath):
+            cache_key = skpath.id(image_path, length=8)
             cache_file = image_path.root / "cache" / f"processed_{cache_key}.jpg"
             
             if cache_file.exists():
@@ -990,60 +420,47 @@ def path_id(path: Union[str, Path, SKPath], short: bool = False) -> str:
         ```
     ────────────────────────────────────────────────────────
     """
-    path_str = str(path) if isinstance(path, SKPath) else str(path)
-    return _path_id(path_str, short=short)
 
-def path_id_short(path: Union[str, Path, SKPath]) -> str:
-    """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise import skpath
-        
-        short_id = skpath.path_id_short(filepath)
-        ```
-    ────────────────────────────────────────────────────────\n
-
-    Short reproducible path fingerprint (8 characters from md5 hash).
+# def _path_id(path: Union[str, Path], short: bool = False) -> str:
+#     """
+#     Generate a reproducible ID for a path.
     
-    Provides error handling, consistent ID always using absolute paths,
-    and automatic hashing. Same path will always generate the same ID
-    across runs and platforms. Convenient for cache keys and short identifiers.
-    
-    Args:
-        `path`: Path to generate ID for
+#     Args:
+#         path: Path to generate ID for
+#         short: If True, return a shortened version of the ID
+#         - full id is 32 characters long
+#         - short id is 8 characters long
         
-    Returns:
-        Short reproducible string ID for the path
-
-    ────────────────────────────────────────────────────────
-        ```python
-        # Real use case: Creating cache keys for processed files
-        
-        # auto converts to SKPath object
-        @skpath.autopath()
-        def process_thumbnails(image_path: skpath.AnyPath):
-
-            cache_key = image_path.id_short  # 8 character ID
-            cache_file = image_path.root / "cache" / f"thumb_{cache_key}.jpg"
-            
-            if cache_file.exists():
-                return cache_file  # Already processed
-            
-            # Generate thumbnail and save to cache...
-        ```
-    ────────────────────────────────────────────────────────\n
+#     Returns:
+#         Reproducible string ID for the path
+#     """
+#     abs_path = str(Path(path).resolve())
     
-    Note:
-        This is equivalent to `path_id(path, short=True)`. Same path will always
-        generate the same ID across runs and platforms.
-    """
-    return path_id(path, short=True)
+#     # Create hash
+#     hash_obj = hashlib.md5(abs_path.encode())
+#     hash_str = hash_obj.hexdigest()
+    
+#     # Create readable ID from path components
+#     path_parts = Path(abs_path).parts
+#     if short:
+#         # Use only filename and short hash
+#         filename = Path(abs_path).stem.replace('.', '_')
+#         short_hash = hash_str[:8]
+#         return f"{filename}_{short_hash}"
+#     else:
+#         # Use path components and full hash
+#         safe_parts = [part.replace('.', '_').replace('-', '_') for part in path_parts[-3:]]
+#         readable = '_'.join(safe_parts)
+#         # create an id that is 32 characters long
+#         return f"{readable}_{hash_str}"
 
 def get_project_paths(
-    custom_root: Optional[Union[str, Path]] = None,
-    except_paths: Optional[Union[str, List[str]]] = None,
-    as_str: bool = False,
-    ignore: bool = True) -> Sequence[Union[SKPath, str]]:
+    *,
+    root: Optional[Union[str, Path]] = None,
+    exclude: Optional[Union[str, List[str]]] = None,
+    as_strings: bool = False,
+    use_ignore_files: bool = True
+) -> Sequence[Union[SKPath, str]]:
     """
     ────────────────────────────────────────────────────────
         ```python
@@ -1059,30 +476,30 @@ def get_project_paths(
     unless overridden. Provides memory-efficient options and customizable filtering.
     
     Args:
-        `custom_root`: Custom root directory (defaults to detected project root)
-        `except_paths`: Paths to exclude from results
-        `as_str`: Return string paths instead of `SKPath` objects (memory efficiency)
-        `ignore`: Respect .*ignore files (default True)
+        `root`: Custom root directory (defaults to detected project root)
+        `exclude`: Paths to exclude from results
+        `as_strings`: Return string paths instead of `SKPath` objects (memory efficiency)
+        `use_ignore_files`: Respect .*ignore files (default True)
         
     Returns:
-        List of paths in the project (`SKPath`s or strings based on `as_str`)
+        List of paths in the project (`SKPath`s or strings based on `as_strings`)
 
     ────────────────────────────────────────────────────────
         ```python
         # get all project paths, except paths starting with this/one/path/i/dont/want
         
-        # - custom_root allows you to start from subdirectories (default is auto-detected project root)
-        # - ignore=False will include all paths, including .gitignore, .dockerignore, and .skignore paths (default is True)
-        # - as_str=True will return a list of strings instead of SKPath objects (default is False)
-        # - except_paths is a list of paths to exclude from the results (default is None)
+        # - root allows you to start from subdirectories (default is auto-detected project root)
+        # - use_ignore_files=False will include all paths, including .gitignore paths (default is True)
+        # - as_strings=True will return a list of strings instead of SKPath objects (default is False)
+        # - exclude is a list of paths to exclude from the results (default is None)
         
-        proj_path_list = skpath.get_project_paths(except_paths="this/one/path/i/dont/want")
+        proj_path_list = skpath.get_project_paths(exclude="this/one/path/i/dont/want")
         
         # as abspath strings instead of skpaths
-        proj_path_list = skpath.get_project_paths(except_paths="this/one/path/i/dont/want", as_str=True)
+        proj_path_list = skpath.get_project_paths(exclude="unwanted", as_strings=True)
         
-        # including all .gitignore, .dockerignore, and .skignore paths
-        proj_path_list = skpath.get_project_paths(except_paths="this/one/path/i/dont/want", ignore=False)
+        # including all normally-ignored paths
+        proj_path_list = skpath.get_project_paths(use_ignore_files=False)
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -1102,7 +519,7 @@ def get_project_paths(
         ```python
         # Memory efficient version with strings
         def find_large_files():
-            all_paths = skpath.get_project_paths(as_str=True)
+            all_paths = skpath.get_project_paths(as_strings=True)
             large_files = []
             
             for path_str in all_paths:
@@ -1116,34 +533,35 @@ def get_project_paths(
     Note:
         Includes smart optimizations:
         - Automatic `.*ignore` parsing - No manual ignore logic needed
-        - Selective exclusion - `except_paths` parameter for custom filtering  
-        - Memory efficiency - `as_str=True` option to avoid creating `SKPath` objects when not needed
-        - Customizable root - `custom_root` parameter to use a set root instead of auto-detecting
+        - Selective exclusion - `exclude` parameter for custom filtering  
+        - Memory efficiency - `as_strings=True` option to avoid creating `SKPath` objects when not needed
+        - Customizable root - `root` parameter to use a set root instead of auto-detecting
     """
     # Get raw paths from internal function
-    if custom_root is not None:
-        custom_root = Path(custom_root).resolve()
+    resolved_root = Path(root).resolve() if root is not None else None
     raw = _get_all_project_paths(
-        except_paths=except_paths,
-        as_str=True,  # Always get strings first
-        ignore=ignore,
-        force_root=custom_root if custom_root is not None else None
+        exclude=exclude,
+        as_strings=True,  # Always get strings first
+        use_ignore_files=use_ignore_files,
+        root=resolved_root
     )
     raw_paths: List[str] = [str(p) for p in raw]
     
-    if as_str:
+    if as_strings:
         return raw_paths
     else:
-        if custom_root is not None:
-            return [SKPath(path, custom_root) for path in raw_paths]
+        if resolved_root is not None:
+            return [SKPath(path, resolved_root) for path in raw_paths]
         else:
             return [SKPath(path) for path in raw_paths]
     
 
 def get_project_structure(
-    custom_root: Optional[Union[str, Path]] = None,
-    except_paths: Optional[Union[str, List[str]]] = None,
-    ignore: bool = True) -> Dict:
+    *,
+    root: Optional[Union[str, Path]] = None,
+    exclude: Optional[Union[str, List[str]]] = None,
+    use_ignore_files: bool = True
+) -> Dict:
     """
     ────────────────────────────────────────────────────────
         ```python
@@ -1160,9 +578,9 @@ def get_project_structure(
     UI components, data analysis, or programmatic project exploration.
     
     Args:
-        `custom_root`: Custom root directory (defaults to detected project root)
-        `except_paths`: Paths to exclude from results
-        `ignore`: Respect .*ignore files (default True)
+        `root`: Custom root directory (defaults to detected project root)
+        `exclude`: Paths to exclude from results
+        `use_ignore_files`: Respect .*ignore files (default True)
         
     Returns:
         Nested dictionary representing directory structure
@@ -1171,9 +589,9 @@ def get_project_structure(
         ```python
         # get a nested dictionary representing your project structure
         
-        # - custom_root allows you to start from subdirectories (default is auto-detected project root)
-        # - ignore=False will include all paths, including .gitignore, .dockerignore, and .skignore paths (default is True)
-        # - except_paths is a list of paths to exclude from the results (default is None)
+        # - root allows you to start from subdirectories (default is auto-detected project root)
+        # - use_ignore_files=False will include all normally-ignored paths (default is True)
+        # - exclude is a list of paths to exclude from the results (default is None)
         
         proj_structure = skpath.get_project_structure()
         ```
@@ -1213,21 +631,24 @@ def get_project_structure(
     Note:
         Includes smart optimizations shared with other project analysis functions:
         - Automatic `.*ignore` parsing - No manual ignore logic needed
-        - Selective exclusion - `except_paths` parameter for custom filtering  
-        - Customizable root - `custom_root` parameter to use a set root instead of auto-detecting
+        - Selective exclusion - `exclude` parameter for custom filtering  
+        - Customizable root - `root` parameter to use a set root instead of auto-detecting
     """
     return _get_project_structure(
-        custom_root if custom_root is not None else None,
-        except_paths, ignore
+        root=root,
+        exclude=exclude,
+        use_ignore_files=use_ignore_files
     )
 
 
 def get_formatted_project_tree(
-    custom_root: Optional[Union[str, Path]] = None,
-    max_depth: int = 3,
-    show_files: bool = True,
-    except_paths: Optional[Union[str, List[str]]] = None,
-    ignore: bool = True) -> str:
+    *,
+    root: Optional[Union[str, Path]] = None,
+    depth: int = 3,
+    include_files: bool = True,
+    exclude: Optional[Union[str, List[str]]] = None,
+    use_ignore_files: bool = True
+) -> str:
     """
     ────────────────────────────────────────────────────────
         ```python
@@ -1245,11 +666,11 @@ def get_formatted_project_tree(
     unless overridden. Perfect for documentation, debugging, or terminal display.
     
     Args:
-        `custom_root`: Custom root directory (defaults to detected project root)
-        `max_depth`: Maximum depth to display (prevents huge output)
-        `show_files`: Whether to show files or just directories
-        `except_paths`: Paths to exclude from results
-        `ignore`: Respect `.*ignore` files (default `True`)
+        `root`: Custom root directory (defaults to detected project root)
+        `depth`: Maximum depth to display (prevents huge output)
+        `include_files`: Whether to show files or just directories
+        `exclude`: Paths to exclude from results
+        `use_ignore_files`: Respect `.*ignore` files (default `True`)
 
     Returns:
         Formatted string representing directory structure
@@ -1262,8 +683,8 @@ def get_formatted_project_tree(
             \"\"\"Generate markdown documentation with project structure.\"\"\"
 
             tree = skpath.get_formatted_project_tree(
-                show_files=False,  # Just directories for overview
-                max_depth=3
+                include_files=False,  # Just directories for overview
+                depth=3
             )
             
             tree_section = f"Project Structure:\n{tree}"
@@ -1289,14 +710,26 @@ def get_formatted_project_tree(
     Note:
         Includes smart optimizations shared with other project analysis functions:
         - Automatic `.*ignore` parsing - No manual ignore logic needed
-        - Selective exclusion - `except_paths` parameter for custom filtering  
-        - Customizable root - `custom_root` parameter to use a set root instead of auto-detecting
-        - Depth limiting with `max_depth` to prevent huge output
+        - Selective exclusion - `exclude` parameter for custom filtering  
+        - Customizable root - `root` parameter to use a set root instead of auto-detecting
+        - Depth limiting with `depth` to prevent huge output
     """
     return _get_formatted_project_tree(
-        custom_root if custom_root is not None else None, 
-        max_depth, show_files, except_paths, ignore
+        root=root,
+        depth=depth,
+        include_files=include_files,
+        exclude=exclude,
+        use_ignore_files=use_ignore_files
     )
+
+
+
+
+
+
+
+
+
 
 def force_project_root(root: Union[str, Path, SKPath]) -> None:
     """
@@ -1363,8 +796,25 @@ def force_project_root(root: Union[str, Path, SKPath]) -> None:
         ```
     ────────────────────────────────────────────────────────
     """
-    path_str = str(SKPath(root))
-    _force_project_root(path_str)
+
+# implement this here and make sure everything works as expected
+
+# def _force_project_root(path: Union[str, Path]) -> None:
+#     """
+#     Force the project root to a specific path globally.
+    
+#     Args:
+#         path: Path to use as project root
+#     """
+#     _global_detector.force_project_root(path)
+#     # Clear cache when forcing a new root
+#     with _cache_lock:
+#         # Save current auto-detected root before overriding
+#         global _previous_auto_root, _previous_auto_cache_key
+#         _previous_auto_root = _project_root_cache['root']
+#         _previous_auto_cache_key = _project_root_cache['cache_key']
+#         _project_root_cache['cache_key'] = None
+#         _project_root_cache['root'] = None
 
 
 def clear_forced_project_root() -> None:
@@ -1383,7 +833,20 @@ def clear_forced_project_root() -> None:
     Clear any forced project root, returning to auto-detection.
     
     """
-    _clear_forced_project_root()
+# def _clear_forced_project_root() -> None:
+#     """Clear any forced project root, returning to auto-detection."""
+#     _global_detector.clear_forced_root()
+#     # Restore previous auto-detected root if available; otherwise clear
+#     with _cache_lock:
+#         global _previous_auto_root, _previous_auto_cache_key
+#         if _previous_auto_root is not None and _previous_auto_cache_key is not None:
+#             _project_root_cache['cache_key'] = _previous_auto_cache_key
+#             _project_root_cache['root'] = _previous_auto_root
+#         else:
+#             _project_root_cache['cache_key'] = None
+#             _project_root_cache['root'] = None
+#         _previous_auto_root = None
+#         _previous_auto_cache_key = None
 
 
 def get_forced_project_root() -> Optional[SKPath]:
@@ -1407,6 +870,10 @@ def get_forced_project_root() -> Optional[SKPath]:
     """
     forced = _get_forced_project_root()
     return None if forced is None else SKPath(forced)
+
+# def _get_forced_project_root() -> Optional[Path]:
+#     """Get the currently forced project root, if any."""
+#     return _global_detector.get_forced_root()
 
 
 class ForceRoot:
@@ -1452,196 +919,7 @@ class ForceRoot:
     def __repr__(self):
         return f"ForceRoot(root={self.path})"
 
-# ============================================================================
-# AutoPath Decorator - Automatic Path Conversion Magic
-# ============================================================================
 
-def autopath(autofill: bool = False, 
-             defaultpath: Optional[Union[str, Path, SKPath]] = None):
-    """
-    ────────────────────────────────────────────────────────
-        ```python
-        # standard autopath functionality
-
-        @autopath()
-        def process_file(path: skpath.AnyPath = None):
-            if not path:
-                raise ValueError("No path provided")
-        
-            # we can use path.np without checking type because autopath turns everything into SKPaths
-            print(f"Processing {path.np}...")
-            # do some processing of the file...
-        
-        # later...
-        
-        # relative path will convert to an SKPath automatically before being used
-        process_file("my/relative/path")
-        ```
-    ────────────────────────────────────────────────────────
-        ```python
-        # standard autopath functionality, but function doesn't accept SKPath type!
-
-        @autopath()
-        def process_file(path: str = None): # only accepts strings!
-            print(f"Processing {path}...")
-            # do some processing of the file...
-        
-        # later...
-        
-        # relative path will convert only to an absolute path string instead!
-        process_file("my/relative/path")
-        ```
-    ────────────────────────────────────────────────────────\n
-    Decorator that automatically converts path parameters to appropriate types.
-    
-    This decorator provides super easy path handling by:
-    1. Converting valid path strings to `SKPath` objects (if function accepts them)
-    2. Converting `SKPath` objects to strings (if function only accepts strings)
-    3. Auto-filling missing paths with caller location or default
-    4. Handling type compatibility automatically
-    
-    Args:
-        `autofill`: If `True`, use caller file path when path parameter is `None`
-        `defaultpath`: Default path to use when path parameter is `None`
-        
-    Returns:
-        Decorated function with automatic path conversion
-        
-    ────────────────────────────────────────────────────────
-        ```python
-        # using defaultpath to set a default path
-
-        @autopath(defaultpath="my/default/path")
-        def save_to_file(data: Any = None, path: skpath.AnyPath = None) -> bool:
-            # save data to file with given path...
-        
-        # later...
-        
-        # user forgets to add path, or just wants to save all data to same file
-        saved_to_file = save_to_file(data, path=None) # -> still saves to my/default/path!
-        ```
-    ────────────────────────────────────────────────────────\n
-
-        ```python
-        # automatically fill with caller file path
-
-        @autopath(autofill=True)
-        def process_file(path: skpath.AnyPath = None):
-            print(f"Processing {path.np}...")
-            # do some processing of the file...
-        
-        # later...
-        
-        # relative path will convert to an SKPath automatically before being used
-        process_file() # uses caller file path because we are autofilling
-        
-        # NOTE: autofill WILL be ignored if defaultpath is used and has a valid path value!
-        
-        # autofill WILL be ignored below!
-        @autopath(autofill=True, defaultpath="a/valid/path/or/skpath_dict")
-        ```
-    ────────────────────────────────────────────────────────
-    """
-    def decorator(func: Callable) -> Callable:
-        # Get function signature for parameter inspection
-        sig = inspect.signature(func)
-        
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Bind arguments to get parameter names and values
-            bound_args = sig.bind_partial(*args, **kwargs)
-            bound_args.apply_defaults()
-            
-            # Find parameters with 'path' in the name
-            path_params = [name for name in bound_args.arguments.keys() if 'path' in name.lower()]
-            
-            for param_name in path_params:
-                param_value = bound_args.arguments[param_name]
-                param_annotation = sig.parameters[param_name].annotation
-                
-                # Handle None values with autofill/defaultpath
-                if param_value is None:
-                    if defaultpath is not None:
-                        # Use default path (overrides autofill)
-                        param_value = defaultpath
-                    elif autofill:
-                        # Use caller's file location
-                        try:
-                            caller_file = _get_non_sk_caller_file_path()
-                            if caller_file:
-                                param_value = caller_file
-                        except:
-                            pass  # Leave as None if auto-detection fails
-                
-                # Skip if still None
-                if param_value is None:
-                    continue
-                
-                # Determine priority type for conversion based on annotation
-                # Priority: SKPath > Path > str (SKPath default for no annotation)
-                def get_annotation_types(annotation):
-                    """Extract types from annotation, handling Union types"""
-                    if annotation == inspect.Parameter.empty:
-                        return []
-                    elif hasattr(annotation, '__origin__') and hasattr(annotation, '__args__'):
-                        # Union type like str | SKPath or Union[str, Path]
-                        return list(annotation.__args__)
-                    else:
-                        # Single type
-                        return [annotation]
-                
-                annotation_types = get_annotation_types(param_annotation)
-                
-                # Determine target type based on priority: SKPath > Path > str
-                if not annotation_types:
-                    # No annotation - default to SKPath
-                    target_type = SKPath
-                elif SKPath in annotation_types:
-                    # SKPath is available - use it
-                    target_type = SKPath
-                elif Path in annotation_types:
-                    # Path is available - use it
-                    target_type = Path
-                elif str in annotation_types:
-                    # Only str is available - use it
-                    target_type = str
-                else:
-                    # No compatible types, skip conversion
-                    continue
-                
-                # Convert based on current type and target type
-                if isinstance(param_value, (str, Path, SKPath)):
-                    # Validate it looks like a path
-                    path_str = str(param_value)
-                    looks_like_path = (
-                        '/' in path_str or '\\' in path_str or  # Has path separators
-                        '.' in path_str or                      # Has extension or relative reference
-                        path_str in ['.', '..'] or              # Special path references
-                        (isinstance(param_value, Path) and param_value.is_absolute()) or  # Absolute Path
-                        (isinstance(param_value, SKPath) and param_value.is_absolute)  # Absolute SKPath
-                    )
-                    
-                    if looks_like_path:
-                        try:
-                            # Convert to target type
-                            if target_type == SKPath:
-                                if not isinstance(param_value, SKPath):
-                                    bound_args.arguments[param_name] = SKPath(param_value)
-                            elif target_type == Path:
-                                if not isinstance(param_value, Path):
-                                    bound_args.arguments[param_name] = Path(param_value).resolve()
-                            elif target_type == str:
-                                if not isinstance(param_value, str):
-                                    bound_args.arguments[param_name] = str(Path(param_value).resolve())
-                        except (OSError, ValueError):
-                            # Not a valid path, leave as-is
-                            pass
-            
-            # Call function with converted arguments
-            return func(*bound_args.args, **bound_args.kwargs)
-        
-        return wrapper
-    return decorator
 
 # ============================================================================
 # Factory Functions
@@ -1697,8 +975,7 @@ __all__ = [
     'get_current_dir',
     'get_cwd',
     'equalpaths',
-    'path_id',
-    'path_id_short',
+    'id',
     'get_project_paths',
     'get_project_structure',
     'get_formatted_project_tree',
