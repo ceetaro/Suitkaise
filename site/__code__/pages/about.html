@@ -1,0 +1,342 @@
+<section class="module-page about-page">
+    <h1>About <code>suitkaise</code></h1>
+
+    <p><code>suitkaise</code> is a Python code library.</p>
+
+    <details>
+        <summary>Installation and technical info</summary>
+        <p>To install <code>suitkaise</code>, run this in your terminal:</p>
+<pre><code class="language-bash">pip install suitkaise</code></pre>
+        <p><code>suitkaise</code> is currently version <code>0.2.4</code>.</p>
+
+        <details>
+            <summary><code>README</code></summary>
+            <h3>Suitkaise</h3>
+            <p>Making things easier for developers of all skill levels to develop complex applications.</p>
+            
+            <h4>Installation</h4>
+<pre><code class="language-bash">pip install suitkaise</code></pre>
+
+            <h4>Info</h4>
+            <p>Supported Python versions: 3.11 and above</p>
+            <p>Currently, <code>suitkaise</code> is version <code>0.2.4</code>.</p>
+            <p>All files and code in this repository is licensed under the MIT License.</p>
+            <p><code>suitkaise</code> contains the following modules:</p>
+            <ul>
+                <li>cerial: serialization engine</li>
+                <li>circuit: flow control</li>
+                <li>processing: multiprocessing/subprocesses</li>
+                <li>skpath: path utilities</li>
+                <li>sktime: timing utilities</li>
+            </ul>
+
+            <h4>Documentation</h4>
+            <p>All documentation is available for download:</p>
+<pre><code class="language-python">from suitkaise import docs
+
+docs.download("path/where/you/want/them/to/go")
+
+# auto send them to project root
+docs.download()</code></pre>
+            <p>To send them outside of your project root, use the <code>Permission</code> class:</p>
+<pre><code class="language-python">from suitkaise import docs, Permission
+
+with Permission():
+    docs.download("Users/joe/Documents")</code></pre>
+            <p>You can also view more at <a href="https://suitkaise.info">suitkaise.info</a>.</p>
+        </details>
+
+        <details>
+            <summary><code>suitkaise</code> is licensed under the MIT License. View license here.</summary>
+            <p><strong>MIT License</strong></p>
+            <p>Copyright (c) 2025 Casey Eddings</p>
+            <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+            <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+            <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+        </details>
+    </details>
+
+    <p><code>suitkaise</code> is for developers of all skill levels, and was created with 3 main goals in mind:</p>
+    <ol>
+        <li>To bridge the knowledge gap for inexperienced developers to create professional level programs</li>
+        <li>To make things easier and faster for all developers.</li>
+        <li>Change the world</li>
+    </ol>
+
+    <p>There are many things in Python that are difficult or nuanced for beginners, and many more that are just annoying, overwhelming, and time consuming for all developers.</p>
+    <p>I have taken a few of the most foundational and useful parts of Python and made them faster, clearer, and easier to use.</p>
+    <p>Every module I have made started as a "dream API".</p>
+    <p><em>"If it could just be like this..."</em></p>
+    <p><em>"If it worked like this..."</em></p>
+    <p><em>"I would use this so much more if it looked like this..."</em></p>
+    <p>I created things that I wished worked like the concepts I wrote, and then went backwards to actually make it work.</p>
+    <p>I'm not a fan of trying to explain why without specifics, so I'm just going to list a bunch of annoying things that I've had to deal with over time and how <code>suitkaise</code> solves them.</p>
+
+    <details>
+        <summary>Multiprocessing</summary>
+        <p>Multiprocessing is a powerful tool, but it is also a pain in the ass to set up.</p>
+        <p>Many users aren't just plugging the same function into multiple processes to make things go faster.</p>
+        <p>They might be using multiple subprocesses to make software run smoother, manage UI, gather real time data, manage resources or databases, and more.</p>
+        <p>These are all much more involved than just creating a processing pool to work with a single function that has different inputs. They require things like:</p>
+        <ul>
+            <li>Error handling</li>
+            <li>Detailed logging and debugging</li>
+            <li>Cross process communication</li>
+            <li>Thoughtful lifecycle management</li>
+            <li>and more</li>
+        </ul>
+        <p>Trying to do all of this manually for each individual scenario is overwhelming and time consuming.</p>
+        <p>So, I turned processing into one class.</p>
+        <p>Inherit from the special <code>Process</code> class to create your own custom processes.</p>
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self, num_loops: int):
+        self.counter = 0
+
+        # run N times
+        self.config.num_loops = num_loops
+
+
+    def __preloop__(self):
+
+        # here, you can setup before the main part
+        # connect to databases
+        # make API calls
+        # read files
+
+
+    def __loop__(self):
+
+        # this is the main part
+        # you can just write your code here
+        # it repeats for you, no need to write looping code
+
+
+    def __postloop__(self):
+
+        # this is where you clean up your work
+        # close connections
+        # add results to attributes
+
+    
+    def __onfinish__(self):
+
+        # this is when you clean up the process
+        # calculate summaries
+        # save results to files
+        # send emails
+
+
+    def __result__(self):
+
+        # this returns the result of the process
+        # don't have to worry about confusing returns
+        # store your results as instance attributes
+        # and return them here
+
+
+    def __error__(self):
+
+        # this is __result__() when an error occurs</code></pre>
+        <p>Everything is separated into pieces that make much more sense.</p>
+        <p>Everything is encapsulated into a single class.</p>
+        <p>You can start the process with one line.</p>
+<pre><code class="language-python">p = MyProcess(num_loops=10)
+
+# start the process
+p.start()
+
+# wait for the process to finish
+p.wait()
+
+# access the result
+result = p.result</code></pre>
+        <a href="#processing" class="learn-more-link arrow-right nav-link" data-page="processing">
+            learn more <span class="arrow">⟶</span>
+        </a>
+    </details>
+
+    <details>
+        <summary>Can't pickle</summary>
+        <p>When you try to pickle an object, you might get an error like this:</p>
+<pre><code>TypeError: can't pickle your object, hahahahaha!</code></pre>
+        <p>So many essential objects in Python are not pickleable, even if you use custom picklers like <code>cloudpickle</code> or <code>dill</code>.</p>
+        <p>Your thread locks don't pickle.</p>
+        <p>Your database connections don't pickle.</p>
+        <p>Your functions don't pickle.</p>
+        <p>Your loggers don't pickle.</p>
+        <p>Your class objects don't pickle.</p>
+        <p>Solution: use <code>cerial</code> to serialize your objects.</p>
+        <p>I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.</p>
+        <p>But being able to serialize "anything" is a steep challenge. I needed a rival, an enemy, a final boss to defeat. One that, after winning, would let me say "I think I can serialize anything now."</p>
+        <p>So, I created the <code>WorstPossibleObject</code>.</p>
+        <p>5 levels of nested classes.</p>
+        <p>Every collection type placed in each level at random, nested with random objects.</p>
+        <p>Objects including complex classes, loggers, functions, and more, that nothing else serializes.</p>
+        <p>Every object initialized at least once on every level.</p>
+        <p>Basically, "how can I make this as bad as possible?"</p>
+        <p>Then, I created an engine to beat it.</p>
+        <p>And battled it thousands of times, forcing the engine to successfully serialize it and deserialize it multiple times per battle. Not a single error was allowed to occur.</p>
+        <p>Once the engine won, I felt confident that I could serialize anything.</p>
+        <p>But even if I can't, I have written a special way for you to.</p>
+        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code>cerial</code>, before it uses the default handling.</p>
+        <p>You can use them to override the default serialization and deserialization behavior for your own objects.</p>
+        <p>As a bonus, <code>cerial</code> processes dataclasses 2x faster than <code>cloudpickle</code>, the fastest serializer for dataclasses.</p>
+        <a href="#cerial" class="learn-more-link arrow-right nav-link" data-page="cerial">
+            learn more <span class="arrow">⟶</span>
+        </a>
+    </details>
+
+    <details>
+        <summary>My filepaths don't work when I run my project on something else.</summary>
+        <p>Do you ever pull a repo from your Windows PC at work and it doesn't work on your Mac at home?</p>
+        <p>Or, maybe your laptop at home is also Windows, but the project is placed in a different directory than the one you use at work.</p>
+        <p>And then everything breaks.</p>
+        <p>Solution: use <code>SKPath</code>.</p>
+        <p><code>SKPaths</code> automatically detect your project root using a custom detection system, and calculate a path relative to your project root.</p>
+        <p>This way, as long as you have the same project, the paths will still work, regardless of where you are.</p>
+        <p>No need to convert paths between operating systems.</p>
+        <p>No need to worry about where your project is located.</p>
+        <p>No needing to manually convert paths to work correctly everywhere.</p>
+        <p>Cross-platform compatibility.</p>
+    </details>
+
+    <details>
+        <summary>I'm newer to programming and I'm having trouble organizing my <code>while</code> loop code in a way that makes sense to me.</summary>
+        <p>Try using <code>Circuit</code> to manage your loops.</p>
+        <ul>
+            <li>cleaner code</li>
+            <li>easy to think about</li>
+            <li>automatic error handling</li>
+        </ul>
+<pre><code class="language-python">from suitkaise import Circuit
+
+results = []
+circ = Circuit(shorts=3)
+
+while circ.flowing:
+    result = risky_operation()
+
+    if result:
+        results.append(result)
+    
+    else:
+        circ.short()</code></pre>
+    </details>
+
+    <details>
+        <summary>I hate having to write code to time things.</summary>
+<pre><code class="language-python">from suitkaise import sktime
+
+# automatically times the function every time it is called
+@sktime.timethis()
+def my_function():
+    # Your real code here
+    r_int = random.randint(0, 100)
+    sktime.sleep(r_int)
+
+# run my_function many times
+for i in range(100):
+    my_function()
+
+# get stats
+mean = my_function.timer.stats.mean
+stdev = my_function.timer.stats.stdev</code></pre>
+<pre><code class="language-python">from suitkaise import sktime
+
+with sktime.TimeThis() as timer:
+
+    r_int = random.randint(0, 100)
+    sktime.sleep(r_int)
+
+most_recent = timer.stats.most_recent
+first_time = timer.get_time(0)</code></pre>
+    </details>
+
+    <details>
+        <summary>Something is lagging severely and I don't know what.</summary>
+        <p>Just add <code>sktime.timethis()</code> to each function you want to time.</p>
+<pre><code class="language-python">from suitkaise import sktime
+
+@sktime.timethis()
+def potential_lagger_1():
+    # Your real code here
+    pass
+
+@sktime.timethis()
+def potential_lagger_2():
+    # Your real code here
+    pass
+
+@sktime.timethis()
+def potential_lagger_3():
+    # Your real code here
+    pass
+
+# your program runs...
+
+# get stats
+mean_1 = potential_lagger_1.timer.stats.mean
+mean_2 = potential_lagger_2.timer.stats.mean
+mean_3 = potential_lagger_3.timer.stats.mean
+
+print(f"Potential lagger 1: {mean_1:.3f}s")
+print(f"Potential lagger 2: {mean_2:.3f}s")
+print(f"Potential lagger 3: {mean_3:.3f}s")</code></pre>
+    </details>
+
+    <details>
+        <summary>Some of my team uses <code>pathlib</code> and some use strings, and I am tired of converting back and forth.</summary>
+        <p>And I don't want to use <code>pathlib.Path.resolve()</code> every single time.</p>
+        <p>Use <code>skpath.autopath()</code> to automatically convert paths to whatever the function accepts.</p>
+<pre><code class="language-python">from suitkaise import skpath
+
+@skpath.autopath()
+def my_function(path: str):
+    
+    # all Paths are converted to strings
+    # all strings are left as is
+
+@skpath.autopath()
+def my_function_2(path: Path)
+
+    # all strings are converted to Paths
+    # all Paths are left as is</code></pre>
+    </details>
+
+    <hr>
+
+    <h2>Using <code>suitkaise</code> with AI</h2>
+
+    <p>Currently (since I have no motion), AI agents like ChatGPT that you use with something like Cursor are not trained to use <code>suitkaise</code>.</p>
+    <p>Even with AI, using <code>suitkaise</code> benefits you.</p>
+    <p>Why? Because I tried to have AI do all of these kinds of things for me and it failed miserably (I still say Please and Thank You, don't worry).</p>
+    <p>However, there are 2 ways to let AI use <code>suitkaise</code>:</p>
+    <p><strong>1. Have it search this page!</strong> Copy this into your prompt:</p>
+<pre><code>I would like you to understand and use the suitkaise modules in my project. It is installable using pip install suitkaise.
+
+Can you go to the website (suitkaise.info) and look at the "how to use" section for each module?</code></pre>
+
+    <p><strong>2. Download the official docs and place them in your project.</strong></p>
+    <p>Run this as python code in your terminal:</p>
+<pre><code class="language-python">from suitkaise import docs
+
+docs.download("path/where/you/want/them/to/go")
+
+# auto send them to project root
+docs.download()</code></pre>
+    <p>In order for the docs to install outside of your project root:</p>
+<pre><code class="language-python">from suitkaise import docs, Permission
+
+with Permission():
+    docs.download("Users/joe/Documents")</code></pre>
+    <p>They will appear as a folder in the specified directory.</p>
+
+    <hr>
+
+    <h3>Has <code>suitkaise</code> solved your problem? We want to know!</h3>
+    <p>That's the whole point of <code>suitkaise</code>, so yeah, let us know at suitkaise@suitkaise.info.</p>
+
+</section>

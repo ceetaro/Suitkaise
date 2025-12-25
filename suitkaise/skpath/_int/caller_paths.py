@@ -1,111 +1,196 @@
-# Get the actual suitkaise module base path for robust checking
-_SUITKAISE_BASE_PATH = # TODO
+"""
+SKPath Caller Path Detection
 
-def _get_non_sk_caller_file_path() -> Optional[Path]:
+Utilities for detecting the caller's file path by inspecting the call stack.
+Skips all suitkaise module files to find the "real" caller.
+"""
+
+from __future__ import annotations
+
+import inspect
+import sys
+import threading
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+from .exceptions import PathDetectionError
+from .id_utils import normalize_separators
+
+# Thread-safe lock
+_caller_lock = threading.RLock()
+
+# Suitkaise package path (detected once, cached)
+_suitkaise_path: str | None = None
+
+
+def _get_suitkaise_path() -> str:
+    """Get the suitkaise package path for filtering stack frames."""
+    global _suitkaise_path
+    
+    with _caller_lock:
+        if _suitkaise_path is None:
+            # Get the path to the suitkaise package
+            current_file = Path(__file__).resolve()
+            # Go up from _int/caller_paths.py to suitkaise/
+            _suitkaise_path = normalize_separators(
+                str(current_file.parent.parent.parent)
+            )
+        return _suitkaise_path
+
+
+def _is_suitkaise_frame(frame_info: inspect.FrameInfo) -> bool:
+    """Check if a frame is from within the suitkaise package."""
+    filename = normalize_separators(frame_info.filename)
+    suitkaise_path = _get_suitkaise_path()
+    return filename.startswith(suitkaise_path)
+
+
+def get_caller_frame(skip_frames: int = 0) -> inspect.FrameInfo | None:
     """
-    Get the path of the file that called this function, skipping all suitkaise module files.
+    Get the frame info of the first caller outside suitkaise.
     
-    This function walks up the call stack until it finds a file that's not part of the
-    suitkaise package, returning the first non-suitkaise file it encounters.
-    
+    Args:
+        skip_frames: Additional frames to skip beyond suitkaise frames
+        
     Returns:
-        Path to the first non-suitkaise calling file, or None if not found
+        FrameInfo of the caller, or None if not found
     """
-    frame = inspect.currentframe()
-    try:
-        # Start from the caller's frame
-        if frame is None:
-            return None
-        caller_frame = frame.f_back
+    stack = inspect.stack()
+    
+    # Skip internal frames and find first external caller
+    external_frame_count = 0
+    
+    for frame_info in stack:
+        if _is_suitkaise_frame(frame_info):
+            continue
         
-        # Keep going up the stack until we find a frame that's not from suitkaise
-        while caller_frame is not None:
-            caller_path = caller_frame.f_globals.get('__file__')
-            
-            if caller_path:
-                try:
-                    normalized_caller_path = Path(caller_path).resolve().absolute()
-                except (OSError, ValueError):
-                    # If we can't normalize this path, skip it
-                    caller_frame = caller_frame.f_back
-                    continue
-                
-                # Check if this file is part of the suitkaise package
-                if not _is_suitkaise_module(normalized_caller_path):
-                    return normalized_caller_path
-            
-            caller_frame = caller_frame.f_back
+        # Skip built-in/frozen modules
+        if frame_info.filename.startswith("<"):
+            continue
         
-        # Fallback if we can't find a non-suitkaise file
+        # Found an external frame
+        if external_frame_count >= skip_frames:
+            return frame_info
+        
+        external_frame_count += 1
+    
+    return None
+
+
+def get_caller_path_raw(skip_frames: int = 0) -> Path | None:
+    """
+    Get the file path of the caller outside suitkaise.
+    
+    Args:
+        skip_frames: Additional frames to skip
+        
+    Returns:
+        Path to the caller's file, or None if not found
+    """
+    frame_info = get_caller_frame(skip_frames)
+    
+    if frame_info is None:
         return None
-    finally:
-        del frame
+    
+    return Path(frame_info.filename).resolve()
 
 
-def _is_suitkaise_module(file_path: Path) -> bool:
+def detect_caller_path(skip_frames: int = 0) -> Path:
     """
-    Robustly check if a file path belongs to the suitkaise library.
+    Detect the caller's file path.
     
     Args:
-        file_path: Path to check
+        skip_frames: Additional frames to skip
         
     Returns:
-        True if the file is part of suitkaise library
+        Path to the caller's file
+        
+    Raises:
+        PathDetectionError: If caller cannot be detected
     """
-    try:
-        # Resolve both paths to handle symlinks and relative paths
-        file_resolved = file_path.resolve()
-        suitkaise_resolved = _SUITKAISE_BASE_PATH.resolve()
+    path = get_caller_path_raw(skip_frames)
+    
+    if path is None:
+        raise PathDetectionError(
+            "Could not detect caller file path. "
+            "This may happen when called from an interactive shell or compiled code."
+        )
+    
+    return path
+
+
+def detect_current_dir(skip_frames: int = 0) -> Path:
+    """
+    Detect the directory containing the caller's file.
+    
+    Args:
+        skip_frames: Additional frames to skip
         
-        # Check if file is under suitkaise directory
-        try:
-            file_resolved.relative_to(suitkaise_resolved)
-            return True
-        except ValueError:
-            # Not under suitkaise directory
-            pass
+    Returns:
+        Path to the caller's directory
         
-        # Additional check: look at common installation patterns
-        file_str = str(file_resolved)
-        if any(part in file_str for part in ['/suitkaise/', '\\suitkaise\\', 'site-packages/suitkaise']):
-            return True
+    Raises:
+        PathDetectionError: If caller cannot be detected
+    """
+    caller_path = detect_caller_path(skip_frames)
+    return caller_path.parent
+
+
+def get_module_file_path(obj: Any) -> Path | None:
+    """
+    Get the file path of the module where an object is defined.
+    
+    Args:
+        obj: Object to inspect. Can be:
+            - A module object
+            - A module name string
+            - Any object with __module__ attribute
             
-        return False
-        
-    except (OSError, ValueError):
-        # If we can't resolve paths, fall back to simple string check
-        return 'suitkaise' in str(file_path)
-
-
-def _get_caller_file_path(frames_to_skip: int = 2) -> Path:
-    """
-    Get the direct file path of the module that called this function.
-
-    Mainly for testing suitkaise itself.
-    
-    Args:
-        frames_to_skip: Number of frames to skip in the call stack
-        
     Returns:
-        Path to the calling file
+        Path to the module file, or None if not found
+        
+    Raises:
+        ImportError: If obj is a module name string that cannot be imported
     """
-    frame = inspect.currentframe()
-    try:
-        # Skip the specified number of frames to get the caller's frame
-        for _ in range(frames_to_skip):
-            if frame is not None:
-                frame = frame.f_back
-        
-        if frame is None:
-            raise RuntimeError("No caller frame found")
-        
-        # Get the file path from the caller's frame
-        caller_path = frame.f_globals.get('__file__')
-        
-        if not caller_path:
-            raise RuntimeError("Caller frame does not have a file path")
-        
-        # Normalize and return the path
-        return Path(caller_path).resolve().absolute()
-    finally:
-        del frame
+    module: ModuleType | None = None
+    
+    # Handle module name strings
+    if isinstance(obj, str):
+        if obj in sys.modules:
+            module = sys.modules[obj]
+        else:
+            # Try to import it
+            import importlib
+            module = importlib.import_module(obj)
+    
+    # Handle module objects
+    elif isinstance(obj, ModuleType):
+        module = obj
+    
+    # Handle objects with __module__ attribute
+    elif hasattr(obj, "__module__"):
+        module_name = obj.__module__
+        if module_name in sys.modules:
+            module = sys.modules[module_name]
+    
+    if module is None:
+        return None
+    
+    # Get the file from the module
+    module_file = getattr(module, "__file__", None)
+    
+    if module_file is None:
+        return None
+    
+    return Path(module_file).resolve()
+
+
+def get_cwd_path() -> Path:
+    """
+    Get the current working directory as a Path.
+    
+    Returns:
+        Current working directory as Path
+    """
+    return Path.cwd().resolve()

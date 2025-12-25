@@ -1,22 +1,87 @@
 """
 SKPath - Smart Path Operations for Suitkaise
 
-This module provides intelligent path handling with dual-path architecture,
-automatic project root detection, and magical caller detection.
+Enhanced path functionality with automatic project root detection,
+cross-platform path normalization, and powerful path utilities.
 
-Key Features:
-- SKPath objects with absolute and normalized paths  
-- Zero-configuration initialization with automatic caller detection
-- AutoPath decorator for automatic path conversion
-- Complete project structure analysis
-- Path utilities with cross-module compatibility
+Usage:
+    from suitkaise import skpath
+    from suitkaise.skpath import SKPath, AnyPath, autopath
+    
+    # Create SKPath from caller's file
+    path = SKPath()
+    
+    # Create from string or Path
+    path = SKPath("myproject/feature/file.txt")
+    
+    # Use the decorator for automatic type conversion
+    @autopath()
+    def process(path: AnyPath):
+        return path.id
 """
 
-# Import all API functions and classes
-from .api import *
-from .api import __all__
+from .api import (
+    # Core class
+    SKPath,
+    
+    # Types
+    AnyPath,
+    
+    # Decorator
+    autopath,
+    
+    # Exceptions
+    PathDetectionError,
+    
+    # Root management
+    CustomRoot,
+    set_custom_root,
+    get_custom_root,
+    clear_custom_root,
+    get_project_root,
+    
+    # Path functions
+    get_caller_path,
+    get_current_dir,
+    get_cwd,
+    get_module_path,
+    get_id,
+    
+    # Project functions
+    get_project_paths,
+    get_project_structure,
+    get_formatted_project_tree,
+)
 
-# Module-level convenience - expose the main class at module level
-# This allows: import suitkaise.skpath; then use skpath.SKPath() to get a SKPath object, for example.
-__version__ = "0.1.2"
-__author__ = "Suitkaise Development Team"
+__all__ = [
+    # Core class
+    "SKPath",
+    
+    # Types
+    "AnyPath",
+    
+    # Decorator
+    "autopath",
+    
+    # Exceptions
+    "PathDetectionError",
+    
+    # Root management
+    "CustomRoot",
+    "set_custom_root",
+    "get_custom_root",
+    "clear_custom_root",
+    "get_project_root",
+    
+    # Path functions
+    "get_caller_path",
+    "get_current_dir",
+    "get_cwd",
+    "get_module_path",
+    "get_id",
+    
+    # Project functions
+    "get_project_paths",
+    "get_project_structure",
+    "get_formatted_project_tree",
+]

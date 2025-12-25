@@ -1,231 +1,348 @@
-# ============================================================================
-# AutoPath Decorator - Automatic Path Conversion
-# ============================================================================
+"""
+SKPath Autopath Decorator
 
-def _get_annotation_types(annotation) -> List[type]:
+Automatic path type conversion based on function parameter annotations.
+Converts inputs to match the declared type: SKPath, Path, or str.
+"""
+
+from __future__ import annotations
+
+import functools
+import inspect
+import sys
+import threading
+import types
+from collections.abc import Callable, Iterable
+from pathlib import Path
+from typing import Any, TypeVar, Union, get_args, get_origin
+
+from .caller_paths import get_caller_path_raw
+from .skpath import SKPath
+
+# Thread-safe lock
+_autopath_lock = threading.RLock()
+
+# Type variable for decorated function
+F = TypeVar("F", bound=Callable[..., Any])
+
+# Types that are considered "path-like"
+PATH_TYPES: frozenset[type] = frozenset({str, Path, SKPath})
+
+
+def _is_skpath_type(t: Any) -> bool:
+    """Check if a type is SKPath (handles forward references)."""
+    if t is SKPath:
+        return True
+    # Handle forward reference strings
+    if isinstance(t, str) and t == "SKPath":
+        return True
+    # Handle typing.ForwardRef
+    if hasattr(t, "__forward_arg__") and t.__forward_arg__ == "SKPath":
+        return True
+    return False
+
+
+def _is_path_type(t: Any) -> bool:
+    """Check if a type is Path."""
+    return t is Path
+
+
+def _is_str_type(t: Any) -> bool:
+    """Check if a type is str."""
+    return t is str
+
+
+def _is_union_type(origin: Any) -> bool:
+    """Check if an origin type is a Union (typing.Union or types.UnionType)."""
+    if origin is Union:
+        return True
+    # Python 3.10+ uses types.UnionType for X | Y syntax
+    if sys.version_info >= (3, 10) and origin is types.UnionType:
+        return True
+    return False
+
+
+def _get_base_type_from_annotation(annotation: Any) -> type | None:
     """
-    Extract types from a type annotation, handling Union types.
+    Extract the target path type from a type annotation.
     
-    Args:
-        annotation: The type annotation to extract types from
-        
     Returns:
-        List of types from the annotation
+        - SKPath if annotation is SKPath or AnyPath (Union containing SKPath)
+        - Path if annotation is Path
+        - str if annotation is str
+        - None if annotation is not a path type
     """
-    if annotation == inspect.Parameter.empty:
-        return []
-    elif hasattr(annotation, '__origin__') and hasattr(annotation, '__args__'):
-        # Union type like str | SKPath or Union[str, Path]
-        return list(annotation.__args__)
-    else:
-        # Single type
-        return [annotation]
-
-
-def _get_target_type(annotation_types: List[type]) -> Optional[type]:
-    """
-    Determine the target type for conversion based on annotation types.
-    
-    Priority order: SKPath > Path > str
-    
-    Args:
-        annotation_types: List of types from the parameter annotation
-        
-    Returns:
-        Target type for conversion, or None if no path-like type found
-    """
-    if not annotation_types:
-        # No annotation - no conversion
-        return None
-    elif SKPath in annotation_types:
+    # Direct type match
+    if _is_skpath_type(annotation):
         return SKPath
-    elif Path in annotation_types:
+    if _is_path_type(annotation):
         return Path
-    elif str in annotation_types:
+    if _is_str_type(annotation):
         return str
+    
+    # Handle Union types (e.g., AnyPath = str | Path | SKPath)
+    # Supports both typing.Union and Python 3.10+ X | Y syntax
+    origin = get_origin(annotation)
+    if _is_union_type(origin):
+        args = get_args(annotation)
+        # If SKPath is in the union, target SKPath (richest type)
+        if any(_is_skpath_type(arg) for arg in args):
+            return SKPath
+        if any(_is_path_type(arg) for arg in args):
+            return Path
+        if any(_is_str_type(arg) for arg in args):
+            return str
+    
+    return None
+
+
+def _get_iterable_element_type(annotation: Any) -> tuple[type | None, type | None]:
+    """
+    Check if annotation is an iterable of path types.
+    
+    Returns:
+        (container_type, element_type) or (None, None) if not a path iterable
+    """
+    origin = get_origin(annotation)
+    
+    # Check for common iterables (get_origin returns lowercase in 3.9+)
+    if origin is list:
+        container = list
+    elif origin is tuple:
+        container = tuple
+    elif origin is set:
+        container = set
+    elif origin is frozenset:
+        container = frozenset
+    elif origin is Iterable:
+        container = list  # Convert to list for general Iterable
     else:
-        return None
+        return None, None
+    
+    # Get the element type
+    args = get_args(annotation)
+    if not args:
+        return None, None
+    
+    # For tuple, handle tuple[X, ...] and tuple[X, Y, Z]
+    element_type = args[0]
+    
+    # Get the base path type from element
+    base_type = _get_base_type_from_annotation(element_type)
+    if base_type is not None:
+        return container, base_type
+    
+    return None, None
 
 
-def _convert_to_target_type(
-    value: Union[str, Path, SKPath], 
+def _convert_value(
+    value: Any,
     target_type: type,
     param_name: str,
-    debug: bool = False
-) -> Union[str, Path, SKPath]:
+    debug: bool,
+) -> Any:
     """
-    Convert a path value to the target type.
+    Convert a value to the target path type.
     
     Args:
-        value: The value to convert
-        target_type: The type to convert to
-        param_name: Name of the parameter (for debug output)
-        debug: Whether to print debug information
+        value: Value to convert
+        target_type: Target type (SKPath, Path, or str)
+        param_name: Parameter name (for debug output)
+        debug: Whether to print debug messages
         
     Returns:
         Converted value
-        
-    Raises:
-        TypeError: If the value cannot be converted
     """
+    if value is None:
+        return None
+    
     original_type = type(value).__name__
-    original_value = str(value)
     
-    if target_type == SKPath:
+    # Convert to target type
+    if target_type is SKPath:
         if isinstance(value, SKPath):
-            return value  # Already correct type
-        result = SKPath(value)
-    elif target_type == Path:
+            result = value
+        elif isinstance(value, (str, Path)):
+            result = SKPath(value)
+        else:
+            return value  # Can't convert, return as-is
+            
+    elif target_type is Path:
         if isinstance(value, Path):
-            return value  # Already correct type
-        if isinstance(value, SKPath):
-            result = value.path_object
+            result = value
+        elif isinstance(value, SKPath):
+            result = Path(value.ap)
+        elif isinstance(value, str):
+            result = Path(value)
         else:
-            result = Path(value).resolve()
-    elif target_type == str:
+            return value
+            
+    elif target_type is str:
         if isinstance(value, str):
-            return value  # Already correct type
-        if isinstance(value, SKPath):
+            result = value  # Don't normalize strings passed to str params
+        elif isinstance(value, SKPath):
             result = value.ap
+        elif isinstance(value, Path):
+            result = str(value)
         else:
-            result = str(Path(value).resolve())
+            return value
     else:
-        raise TypeError(f"Unsupported target type: {target_type}")
+        return value
     
-    # Debug output only when conversion actually happened
-    if debug:
-        print(f"[autopath] '{param_name}': {original_type}({original_value!r}) → {type(result).__name__}({str(result)!r})")
+    if debug and type(value) != type(result):
+        print(f"@autopath: Converted {param_name}: {original_type} → {target_type.__name__}")
     
     return result
 
 
-def autopath(*, use_caller: bool = False, default: Optional[AnyPath] = None, debug: bool = False):
+def _convert_iterable(
+    value: Any,
+    container_type: type,
+    element_type: type,
+    param_name: str,
+    debug: bool,
+) -> Any:
     """
-    ────────────────────────────────────────────────────────
-        ```python
-        # Type-based automatic conversion
+    Convert an iterable of values to the target types.
+    """
+    if value is None:
+        return None
+    
+    try:
+        converted = [
+            _convert_value(item, element_type, f"{param_name}[{i}]", debug)
+            for i, item in enumerate(value)
+        ]
+        return container_type(converted)
+    except (TypeError, ValueError):
+        return value
 
-        @autopath()
-        def process_file(path: SKPath):
-            # strings and Path objects are automatically converted to SKPath
-            print(f"Processing {path.np}...")
-        
-        process_file("my/relative/path")  # string → SKPath
-        process_file(Path("other/path"))  # Path → SKPath
-        ```
-    ────────────────────────────────────────────────────────
-        ```python
-        # Works with str-only functions too
 
-        @autopath()
-        def legacy_func(path: str):
-            # SKPath and Path objects are converted to absolute path strings
-            print(f"Processing {path}...")
-        
-        legacy_func(SKPath("my/path"))  # SKPath → str
-        legacy_func(Path("other/path")) # Path → str
-        ```
-    ────────────────────────────────────────────────────────\n
+def autopath(
+    use_caller: bool = False,
+    debug: bool = False,
+) -> Callable[[F], F]:
+    """
     Decorator that automatically converts path parameters based on type annotations.
     
-    Conversion rules (based on parameter's type annotation):
-    1. If param accepts `SKPath` (or `AnyPath`): convert `str`/`Path` → `SKPath`
-    2. If param accepts `Path` (but not `SKPath`): convert `str`/`SKPath` → `Path`
-    3. If param accepts `str` (but not `Path`/`SKPath`): convert `Path`/`SKPath` → `str`
+    Converts inputs to match the declared type:
+    - Parameters annotated as AnyPath or SKPath → converted to SKPath
+    - Parameters annotated as Path → converted to Path
+    - Parameters annotated as str → converted to str (no separator normalization)
     
-    Parameters without path-related type annotations are left unchanged.
+    Also handles iterables: list[AnyPath], tuple[Path, ...], set[SKPath], etc.
     
     Args:
-        `use_caller`: If `True`, use caller file path when path parameter is `None`
-        `default`: Default path to use when path parameter is `None`
-        `debug`: If `True`, print conversion info when a conversion is made
+        use_caller: If True, parameters that accept SKPath or Path will use
+                   the caller's file path if no value was provided
+        debug: If True, print messages when conversions occur
         
     Returns:
-        Decorated function with automatic path conversion
+        Decorated function
         
-    ────────────────────────────────────────────────────────
-        ```python
-        # Using default path
-
-        @autopath(default="output/results.txt")
-        def save_data(data, path: SKPath = None):
-            # If path is None, uses the default
-            with open(path, 'w') as f:
-                f.write(data)
-        
-        save_data("hello")  # saves to output/results.txt
-        ```
-    ────────────────────────────────────────────────────────
-        ```python
-        # Using caller file path
-
+    Usage:
+        @autopath()
+        def process(path: AnyPath):
+            # path is guaranteed to be an SKPath
+            return path.id
+            
         @autopath(use_caller=True)
-        def log_here(message: str, path: SKPath = None):
-            # If path is None, uses the caller's file path
-            print(f"Logging to {path.np}: {message}")
+        def log_from(path: AnyPath):
+            # path defaults to caller's file if not provided
+            print(f"Logging from: {path.np}")
+    """
+    
+    def decorator(func: F) -> F:
+        sig = inspect.signature(func)
+        type_hints = {}
         
-        log_here("test")  # path = caller's file location
-        ```
-    ────────────────────────────────────────────────────────
-        ```python
-        # Debug mode shows conversions
-
-        @autopath(debug=True)
-        def process(path: SKPath):
+        # Get type hints, handling forward references
+        try:
+            type_hints = func.__annotations__.copy()
+        except AttributeError:
             pass
         
-        process("my/file.txt")
-        # Prints: [autopath] 'path': str('my/file.txt') → SKPath('/abs/path/my/file.txt')
-        ```
-    ────────────────────────────────────────────────────────
-    """
-    def decorator(func: Callable) -> Callable:
-        sig = inspect.signature(func)
+        # Analyze parameters
+        param_info: dict[str, dict[str, Any]] = {}
         
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Bind arguments to get parameter names and values
-            bound_args = sig.bind_partial(*args, **kwargs)
-            bound_args.apply_defaults()
+        for param_name, param in sig.parameters.items():
+            if param_name in ("self", "cls"):
+                continue
             
-            for param_name, param_value in list(bound_args.arguments.items()):
-                param_info = sig.parameters[param_name]
-                annotation_types = _get_annotation_types(param_info.annotation)
-                target_type = _get_target_type(annotation_types)
+            annotation = type_hints.get(param_name, param.annotation)
+            if annotation is inspect.Parameter.empty:
+                continue
+            
+            # Check for direct path type
+            base_type = _get_base_type_from_annotation(annotation)
+            if base_type is not None:
+                param_info[param_name] = {
+                    "type": "single",
+                    "target_type": base_type,
+                    "has_default": param.default is not inspect.Parameter.empty,
+                }
+                continue
+            
+            # Check for iterable of path types
+            container_type, element_type = _get_iterable_element_type(annotation)
+            if container_type is not None:
+                param_info[param_name] = {
+                    "type": "iterable",
+                    "container_type": container_type,
+                    "element_type": element_type,
+                    "has_default": param.default is not inspect.Parameter.empty,
+                }
+        
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Get the caller's path if use_caller is enabled
+            caller_path: Path | None = None
+            if use_caller:
+                caller_path = get_caller_path_raw(skip_frames=1)
+            
+            # Convert args to kwargs for easier processing
+            bound = sig.bind_partial(*args, **kwargs)
+            
+            # Process each parameter
+            for param_name, info in param_info.items():
+                value = bound.arguments.get(param_name)
                 
-                # Skip if no path-related type annotation
-                if target_type is None:
+                # Handle use_caller for missing values
+                if value is None and use_caller and caller_path is not None:
+                    if info["type"] == "single":
+                        target = info["target_type"]
+                        if target in (SKPath, Path):
+                            value = caller_path
+                            bound.arguments[param_name] = value
+                            if debug:
+                                print(f"@autopath: Using caller path for {param_name}")
+                
+                # Skip if still None
+                if value is None:
                     continue
                 
-                # Handle None values with use_caller/default
-                if param_value is None:
-                    if default is not None:
-                        param_value = default
-                    elif use_caller:
-                        try:
-                            caller_file = _get_non_sk_caller_file_path()
-                            if caller_file:
-                                param_value = caller_file
-                        except Exception:
-                            pass  # Leave as None if detection fails
-                
-                # Skip if still None or not a path-like type
-                if param_value is None:
-                    continue
-                if not isinstance(param_value, (str, Path, SKPath)):
-                    continue
-                
-                # Convert to target type
-                try:
-                    bound_args.arguments[param_name] = _convert_to_target_type(
-                        param_value, target_type, param_name, debug
+                # Convert based on type
+                if info["type"] == "single":
+                    converted = _convert_value(
+                        value,
+                        info["target_type"],
+                        param_name,
+                        debug,
                     )
-                except (OSError, ValueError, TypeError) as e:
-                    raise TypeError(
-                        f"Failed to convert parameter '{param_name}' to {target_type.__name__}: {e}"
-                    ) from e
+                    bound.arguments[param_name] = converted
+                    
+                elif info["type"] == "iterable":
+                    converted = _convert_iterable(
+                        value,
+                        info["container_type"],
+                        info["element_type"],
+                        param_name,
+                        debug,
+                    )
+                    bound.arguments[param_name] = converted
             
-            return func(*bound_args.args, **bound_args.kwargs)
+            return func(*bound.args, **bound.kwargs)
         
-        return wrapper
+        return wrapper  # type: ignore
+    
     return decorator

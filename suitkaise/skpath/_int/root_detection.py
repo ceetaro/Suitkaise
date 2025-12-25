@@ -1,533 +1,330 @@
+"""
+SKPath Root Detection
 
-from .skpath import SKPath
+Automatic project root detection with custom root override support.
+Thread-safe with RLock for all shared state.
+"""
+
+from __future__ import annotations
+
+import os
+import threading
+from pathlib import Path
+
+from .exceptions import PathDetectionError
+from .id_utils import normalize_separators
+
+# Thread-safe locks
+_root_lock = threading.RLock()
+_cache_lock = threading.RLock()
+
+# Module-level state
+_custom_root: Path | None = None
+_cached_root: Path | None = None
+_cached_root_source: Path | None = None  # The path used to detect the cached root
 
 
-# Project indicators configuration
-PROJECT_INDICATORS = {
-    "common_ospaths": {
-        "macOS": {
-            "Applications",
-            "Library", 
-            "System/.",
-            "Users/.",
-            "Documents"
-        },
-        "windows": {
-            "Program Files",
-            "Program Files (x86)",
-            "Users/.",
-            "Documents"
-        },
-        "linux": {
-            "usr",
-            "var", 
-            "etc",
-            "home/.",
-            "opt"
-        }
-    },
-    "file_groups": {
-        "license": {
-            "LICENSE",
-            "LICENSE.*",
-            "LICENCE", 
-            "LICENCE.*",
-            "license",
-            "license.*",
-            "licence",
-            "licence.*",
-        },
-        "readme": {
-            "README",
-            "README.*",
-            "readme",
-            "readme.*"
-        },
-        "requirements": {
-            "requirements",
-            "requirements.*",
-            "requirements-*"
-        },
-        "env": {
-            ".env",
-            ".env.*"
-        },
-        "examples": {
-            "example",
-            "examples", 
-            "example.*",
-            "examples.*"
-        }
-    },
-    "dir_groups": {
-        "test": {
-            "test",
-            "tests",
-            "test.*",
-            "tests.*"
-        },
-        "doc": {
-            "doc",
-            "docs",
-            "documents",
-            "documentation*"
-        },
-        "data": {
-            "data",
-            "dataset",
-            "datasets",
-            "data.*",
-            "dataset.*", 
-            "datasets.*"
-        },
-        "app": {
-            "app",
-            "apps",
-            "application",
-            "applications",
-            "app.*",
-            "apps.*",
-            "application.*",
-            "applications.*"
-        },
-        "env": {
-            "env",
-            "venv",
-            "venv*",
-            "env*",
-            ".env",
-            ".env.*"
-        },
-        "git": {
-            ".git",
-            ".git*",
-            ".github",
-            ".gitlab"
-        },
-        "source": {
-            "src",
-            "source",
-            "src.*",
-            "source.*"
-        },
-        "cache": {
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache"
-        },
-        "examples": {
-            "example",
-            "examples",
-            "example.*", 
-            "examples.*"
-        }
-    },
-    "common_proj_root_files": {
-        "necessary": {
-            "@file_groups.license",
-            "@file_groups.readme", 
-            "@file_groups.requirements"
-        },
-        "indicators": {
-            "setup.py",
-            "setup.cfg",
-            "pyproject.toml",
-            "tox.ini",
-            "@file_groups.env",
-            ".gitignore",
-            ".dockerignore",
-            "__init__.py"
-        },
-        "weak_indicators": {
-            "Makefile",
-            "docker-compose.*",
-            "Dockerfile",
-            "@file_groups.examples",
-            "pyrightconfig.json"
-        }
-    },
-    "common_proj_root_dirs": {
-        "strong_indicators": {
-            "@dir_groups.app",
-            "@dir_groups.data",
-            "@dir_groups.doc", 
-            "@dir_groups.test"
-        },
-        "indicators": {
-            "@dir_groups.git",
-            "@dir_groups.source",
-            "@dir_groups.cache",
-            "@dir_groups.examples",
-            "@dir_groups.env",
-            ".idea",
-            "dist",
-            "build",
-            ".vscode",
-            "*.egg-info"
-        }
-    }
-}
+# ============================================================================
+# Project Root Indicators
+# ============================================================================
 
-class _IndicatorExpander:
+# Definitive indicators - if found, this IS the project root
+DEFINITIVE_INDICATORS = frozenset({
+    "setup.sk",      # Suitkaise custom marker (highest priority)
+    "setup.py",
+    "setup.cfg",
+    "pyproject.toml",
+})
+
+# Strong indicators - likely project root
+STRONG_INDICATORS = frozenset({
+    ".gitignore",
+    ".git",
+})
+
+# License files (case-insensitive matching)
+LICENSE_PATTERNS = frozenset({
+    "license",
+    "license.txt",
+    "license.md",
+    "licence",
+    "licence.txt",
+    "licence.md",
+})
+
+# README files (case-insensitive matching)
+README_PATTERNS = frozenset({
+    "readme",
+    "readme.md",
+    "readme.txt",
+    "readme.rst",
+})
+
+# Requirements files
+REQUIREMENTS_PATTERNS = frozenset({
+    "requirements.txt",
+    "requirements.pip",
+    "requirements-dev.txt",
+    "requirements-test.txt",
+})
+
+
+# ============================================================================
+# Custom Root Management
+# ============================================================================
+
+def set_custom_root(path: str | Path) -> None:
     """
-    Expands group references and patterns in project indicators.
+    Set a custom project root, overriding automatic detection.
     
-    Handles:
-    - @file_groups.license -> expands to actual patterns
-    - *.txt -> wildcard pattern matching
-    - Pattern normalization and validation
+    Thread-safe operation.
+    
+    Args:
+        path: Path to use as project root
+        
+    Raises:
+        PathDetectionError: If path doesn't exist or isn't a directory
     """
+    global _custom_root
     
-    def __init__(self, indicators: Optional[Dict] = None):
-        """
-        Initialize the indicator expander.
-        
-        Args:
-            indicators: Project indicators dictionary (defaults to PROJECT_INDICATORS)
-        """
-        self.indicators = indicators or PROJECT_INDICATORS
+    if isinstance(path, str):
+        path = Path(path)
     
-    def expand_reference(self, reference: str) -> Set[str]:
-        """
-        Expand a group reference like @file_groups.license into actual patterns.
-        
-        Args:
-            reference: Reference string (e.g., "@file_groups.license")
-            
-        Returns:
-            Set of patterns that the reference expands to
-        """
-        if not reference.startswith('@'):
-            # Not a reference, return as-is
-            return {reference}
-        
-        # Parse the reference: @file_groups.license -> ["file_groups", "license"]
-        ref_parts = reference[1:].split('.')
-        
-        if len(ref_parts) != 2:
-            # Invalid reference format, return as-is
-            return {reference}
-        
-        group_type, group_name = ref_parts
-        
-        # Look up the group in indicators
-        if group_type in self.indicators and group_name in self.indicators[group_type]:
-            return set(self.indicators[group_type][group_name])
-        
-        # Reference not found, return as-is
-        return {reference}
+    path = path.resolve()
     
-    def expand_pattern_set(self, pattern_set: Set[str]) -> Set[str]:
-        """
-        Expand all references in a set of patterns.
-        
-        Args:
-            pattern_set: Set of patterns that may contain references
-            
-        Returns:
-            Set of expanded patterns with all references resolved
-        """
-        expanded = set()
-        
-        for pattern in pattern_set:
-            expanded.update(self.expand_reference(pattern))
-        
-        return expanded
+    if not path.exists():
+        raise PathDetectionError(f"Custom root path does not exist: {path}")
     
-    def match_pattern(self, filename: str, pattern: str) -> bool:
-        """
-        Check if a filename matches a pattern (supports wildcards).
-        
-        Args:
-            filename: Name of file to check
-            pattern: Pattern to match against (may contain * and ?)
-            
-        Returns:
-            True if filename matches pattern
-        """
-        # Case-insensitive matching
-        return fnmatch.fnmatch(filename.lower(), pattern.lower())
+    if not path.is_dir():
+        raise PathDetectionError(f"Custom root path is not a directory: {path}")
     
-    def find_matches(self, filenames: Set[str], patterns: Set[str]) -> Set[str]:
-        """
-        Find which filenames match any of the given patterns.
-        
-        Args:
-            filenames: Set of filenames to check
-            patterns: Set of patterns to match against
-            
-        Returns:
-            Set of filenames that matched at least one pattern
-        """
-        # Expand all references in patterns first
-        expanded_patterns = self.expand_pattern_set(patterns)
-        
-        matches = set()
-        for filename in filenames:
-            for pattern in expanded_patterns:
-                if self.match_pattern(filename, pattern):
-                    matches.add(filename)
-                    break  # Found a match, move to next filename
-        
-        return matches
+    with _root_lock:
+        _custom_root = path
 
 
-class _ProjectRootDetector:
+def get_custom_root() -> str | None:
     """
-    Sophisticated project root detection using configurable indicators.
+    Get the currently set custom root, if any.
     
-    Uses a two-phase approach:
-    1. Check for necessary files (required to be considered a project root)
-    2. Score based on other indicators to determine confidence
+    Returns:
+        Custom root path as string with normalized separators, or None
     """
-
-    def __init__(self, indicators: Optional[Dict] = None, confidence_threshold: float = 0.5):
-        """
-        Initialize the project root detector.
-        
-        Args:
-            indicators: Project indicators configuration
-            confidence_threshold: Minimum confidence score for non-necessary indicators
-        """
-        self.indicators = indicators or PROJECT_INDICATORS
-        self.expander = _IndicatorExpander(self.indicators)
-        self.confidence_threshold = confidence_threshold
-        self._forced_root = None  # Override for project root
-        self._lock = threading.RLock()  # Thread-safe access to forced root
-        
-        # Scoring weights for different indicator types (after necessary check passes)
-        self.weights = {
-            'indicators': 0.3,       # Strong indicators (setup.py, .gitignore, etc.)
-            'weak_indicators': 0.1,  # Weak indicators (Makefile, etc.)
-            'strong_indicators': 0.4, # Strong directory indicators
-            'dir_indicators': 0.2    # Regular directory indicators
-        }
-
-    def force_project_root(self, path: Union[str, Path]) -> None:
-        """
-        Force the project root to a specific path.
-        
-        Args:
-            path: Path to use as project root
-        """
-        forced_path = Path(path).resolve()
-        if not forced_path.exists():
-            raise FileNotFoundError(f"Forced project root path does not exist: {forced_path}")
-        if not forced_path.is_dir():
-            raise NotADirectoryError(f"Forced project root is not a directory: {forced_path}")
-        
-        with self._lock:
-            self._forced_root = forced_path
-    
-    def clear_forced_root(self) -> None:
-        """Clear any forced project root, returning to auto-detection."""
-        with self._lock:
-            self._forced_root = None
-    
-    def get_forced_root(self) -> Optional[Path]:
-        """Get the currently forced project root, if any."""
-        with self._lock:
-            return self._forced_root
-
-    def _check_necessary_files(self, files: Set[str]) -> Tuple[bool, Set[str]]:
-        """
-        Check if directory contains necessary files for a project root.
-        
-        Args:
-            files: Set of filenames in the directory
-            
-        Returns:
-            Tuple of (has_necessary_files, missing_categories)
-        """
-        file_config = self.indicators['common_proj_root_files']
-        necessary_patterns = file_config.get('necessary', set())
-        
-        missing_categories = set()
-        
-        for pattern in necessary_patterns:
-            matches = self.expander.find_matches(files, {pattern})
-            if not matches:
-                # Extract category name from @file_groups.license -> license
-                if pattern.startswith('@file_groups.'):
-                    category = pattern.split('.')[-1]
-                    missing_categories.add(category)
-                else:
-                    missing_categories.add(pattern)
-        
-        has_all_necessary = len(missing_categories) == 0
-        return has_all_necessary, missing_categories
-    
-    def _scan_directory(self, path: Path) -> Tuple[float, Dict]:
-        """
-        Scan a directory and calculate its project root confidence score.
-        
-        Args:
-            path: Directory path to scan
-            
-        Returns:
-            Tuple of (confidence_score, scan_details)
-        """
-        if not path.is_dir():
-            return 0.0, {'error': 'Not a directory'}
-        
-        try:
-            # Get directory contents
-            items = list(path.iterdir())
-            files = {item.name for item in items if item.is_file()}
-            directories = {item.name for item in items if item.is_dir()}
-            
-            details = {
-                'files': files,
-                'directories': directories,
-                'matches': {},
-                'scores': {},
-                'necessary_files_present': False,
-                'missing_necessary': set()
-            }
-            
-            # Phase 1: Check necessary files
-            has_necessary, missing = self._check_necessary_files(files)
-            details['necessary_files_present'] = has_necessary
-            details['missing_necessary'] = missing
-            
-            if not has_necessary:
-                # Cannot be a project root without necessary files
-                details['total_score'] = 0.0
-                details['rejection_reason'] = f"Missing necessary files: {missing}"
-                return 0.0, details
-            
-            # Phase 2: Score based on other indicators
-            score = 0.0
-            file_config = self.indicators['common_proj_root_files']
-            
-            # Score file indicators (excluding necessary)
-            for category, patterns in file_config.items():
-                if category == 'necessary':
-                    continue  # Already checked
-                
-                matches = self.expander.find_matches(files, patterns)
-                category_score = len(matches) * self.weights.get(category, 0.1)
-                
-                details['matches'][f'file_{category}'] = matches
-                details['scores'][f'file_{category}'] = category_score
-                score += category_score
-            
-            # Score directory indicators  
-            dir_config = self.indicators['common_proj_root_dirs']
-            for category, patterns in dir_config.items():
-                matches = self.expander.find_matches(directories, patterns)
-                weight_key = 'dir_indicators' if category == 'indicators' else 'strong_indicators'
-                category_score = len(matches) * self.weights.get(weight_key, 0.1)
-                
-                details['matches'][f'dir_{category}'] = matches
-                details['scores'][f'dir_{category}'] = category_score
-                score += category_score
-            
-            details['total_score'] = min(score, 1.0)  # Cap at 1.0
-            return details['total_score'], details
-            
-        except (PermissionError, OSError) as e:
-            return 0.0, {'error': f'Cannot read directory: {e}'}
-
-def find_project_root(self, start_path: Optional[Union[str, Path]] = None,
-                         expected_name: Optional[str] = None) -> Optional[Path]:
-        """
-        Find the project root by walking up the directory tree.
-        
-        Args:
-            start_path: Starting path (defaults to auto-detected caller)
-            expected_name: Expected project name (must match if provided)
-            
-        Returns:
-            Path to project root if found with sufficient confidence
-        """
-        # Check for forced root first
-        with self._lock:
-            forced_root = self._forced_root
-        
-        if forced_root is not None:
-            # Validate expected name if provided
-            if expected_name is None or forced_root.name.lower() == expected_name.lower():
-                return forced_root
-            else:
-                return None  # Forced root doesn't match expected name
-        
-        # Auto-detection mode
-        if start_path is None:
-            caller_file = _get_non_sk_caller_file_path()
-            if caller_file:
-                start_path = caller_file.parent
-            else:
-                start_path = Path.cwd()
-        else:
-            start_path = Path(start_path).resolve()
-        
-        best_candidate = None
-        best_score = 0.0
-        best_details = {}
-        
-        current = start_path
-        
-        # Walk up directory tree
-        while True:
-            score, details = self._scan_directory(current)
-            
-            # Check expected name if provided
-            name_matches = (expected_name is None or 
-                          current.name.lower() == expected_name.lower())
-            
-            if score > best_score and name_matches:
-                best_candidate = current
-                best_score = score
-                best_details = details
-            
-            # Early exit for very confident matches
-            if score >= 0.9 and name_matches:
-                break
-            
-            # Move to parent
-            parent = current.parent
-            if parent == current:  # Reached filesystem root
-                break
-            current = parent
-        
-        # Return only if confidence threshold is met
-        if best_score >= self.confidence_threshold:
-            return best_candidate
-        
+    with _root_lock:
+        if _custom_root is not None:
+            return normalize_separators(str(_custom_root))
         return None
 
 
-class _ProjectRootCache(TypedDict):
-    root: Optional[Path]
-    cache_key: Optional[str]
+def clear_custom_root() -> None:
+    """
+    Clear the custom project root, reverting to automatic detection.
+    
+    Thread-safe operation.
+    """
+    global _custom_root
+    
+    with _root_lock:
+        _custom_root = None
 
 
-class _IgnorePatternsCache(TypedDict):
-    patterns: Optional[Set[str]]
-    cache_key: Optional[str]
-    timestamp: float
+class CustomRoot:
+    """
+    Context manager for temporarily setting a custom project root.
+    
+    Thread-safe - uses RLock so can be nested from same thread.
+    
+    Usage:
+        with CustomRoot("/path/to/project"):
+            # All SKPath operations use this root
+            path = SKPath("feature/file.txt")
+    """
+    
+    def __init__(self, path: str | Path):
+        self._path = path
+        self._previous_root: Path | None = None
+    
+    def __enter__(self) -> "CustomRoot":
+        global _custom_root
+        
+        with _root_lock:
+            self._previous_root = _custom_root
+        
+        set_custom_root(self._path)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        global _custom_root
+        
+        with _root_lock:
+            _custom_root = self._previous_root
+        
+        return None  # Don't suppress exceptions
 
-    # Global detector instance for convenience functions
-_global_detector = _ProjectRootDetector()
 
-# Global cache for project root detection
-_project_root_cache: _ProjectRootCache = {
-    'root': None,
-    'cache_key': None,
-}
+# ============================================================================
+# Root Detection
+# ============================================================================
 
-# Store previous auto-detected cache to restore after clearing a forced root
-_previous_auto_root: Optional[Path] = None
-_previous_auto_cache_key: Optional[str] = None
+def _has_indicator(directory: Path) -> bool:
+    """Check if directory has any project root indicators."""
+    try:
+        contents = {item.name for item in directory.iterdir()}
+        contents_lower = {item.lower() for item in contents}
+    except (PermissionError, OSError):
+        return False
+    
+    # Check definitive indicators
+    if contents & DEFINITIVE_INDICATORS:
+        return True
+    
+    # Check strong indicators
+    if contents & STRONG_INDICATORS:
+        return True
+    
+    # Check license files (case-insensitive)
+    if contents_lower & LICENSE_PATTERNS:
+        return True
+    
+    # Check README files (case-insensitive)
+    if contents_lower & README_PATTERNS:
+        return True
+    
+    # Check requirements files
+    if contents_lower & REQUIREMENTS_PATTERNS:
+        return True
+    
+    return False
 
-# Global cache for ignore file patterns
-_ignore_patterns_cache: _IgnorePatternsCache = {
-    'patterns': None,
-    'cache_key': None,
-    'timestamp': 0.0,
-}
 
-# Thread-safe lock for both caches
-_cache_lock = threading.RLock()
+def _find_root_from_path(start_path: Path) -> Path | None:
+    """
+    Walk up from start_path to find project root.
+    
+    Priority:
+    1. setup.sk (highest priority - Suitkaise marker)
+    2. Other definitive indicators
+    3. Strong indicators
+    
+    Args:
+        start_path: Path to start searching from
+        
+    Returns:
+        Project root Path, or None if not found
+    """
+    current = start_path.resolve()
+    
+    # If it's a file, start from its parent
+    if current.is_file():
+        current = current.parent
+    
+    # First pass: look for setup.sk specifically (highest priority)
+    check_path = current
+    while check_path != check_path.parent:
+        setup_sk = check_path / "setup.sk"
+        if setup_sk.exists():
+            return check_path
+        check_path = check_path.parent
+    
+    # Second pass: look for any indicator
+    check_path = current
+    best_root: Path | None = None
+    
+    while check_path != check_path.parent:
+        if _has_indicator(check_path):
+            best_root = check_path
+            # Don't break - keep going up to find the outermost root
+            # This handles nested projects correctly
+        check_path = check_path.parent
+    
+    # Check filesystem root
+    if _has_indicator(check_path):
+        best_root = check_path
+    
+    return best_root
 
+
+def detect_project_root(
+    from_path: str | Path | None = None,
+    expected_name: str | None = None,
+) -> Path:
+    """
+    Detect the project root directory.
+    
+    Priority:
+    1. Custom root (if set via set_custom_root())
+    2. Walk up from from_path looking for indicators
+    3. Walk up from current working directory
+    
+    Args:
+        from_path: Path to start detection from (default: cwd)
+        expected_name: If provided, detected root must have this name
+        
+    Returns:
+        Project root as Path
+        
+    Raises:
+        PathDetectionError: If root cannot be detected or doesn't match expected_name
+    """
+    global _cached_root, _cached_root_source
+    
+    # Check custom root first
+    with _root_lock:
+        if _custom_root is not None:
+            if expected_name and _custom_root.name != expected_name:
+                raise PathDetectionError(
+                    f"Custom root '{_custom_root.name}' doesn't match expected name '{expected_name}'"
+                )
+            return _custom_root
+    
+    # Determine start path
+    if from_path is not None:
+        if isinstance(from_path, str):
+            start_path = Path(from_path).resolve()
+        else:
+            start_path = from_path.resolve()
+    else:
+        start_path = Path.cwd()
+    
+    # Check cache
+    with _cache_lock:
+        if _cached_root is not None and _cached_root_source is not None:
+            # Cache hit if we're searching from within the same project
+            try:
+                start_path.relative_to(_cached_root)
+                if expected_name is None or _cached_root.name == expected_name:
+                    return _cached_root
+            except ValueError:
+                pass  # Not relative to cached root, need to detect again
+    
+    # Detect root
+    root = _find_root_from_path(start_path)
+    
+    if root is None:
+        raise PathDetectionError(
+            f"Could not detect project root from path: {start_path}"
+        )
+    
+    if expected_name and root.name != expected_name:
+        raise PathDetectionError(
+            f"Detected root '{root.name}' doesn't match expected name '{expected_name}'"
+        )
+    
+    # Cache the result
+    with _cache_lock:
+        _cached_root = root
+        _cached_root_source = start_path
+    
+    return root
+
+
+def clear_root_cache() -> None:
+    """
+    Clear the cached project root.
+    
+    Useful for testing or when project structure changes.
+    """
+    global _cached_root, _cached_root_source
+    
+    with _cache_lock:
+        _cached_root = None
+        _cached_root_source = None

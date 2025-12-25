@@ -83,7 +83,7 @@ from suitkaise.sktime import *
 # dont worry about these for now.
 SUITKAISE_SPECIFIC_TYPES = [
     # skpath
-    SKPath, AnyPath, ForceRoot,
+    SKPath, AnyPath, CustomRoot,
     # do i need to import functions to test if they are serializable? 
     # or are they handled by cerial function handler
 

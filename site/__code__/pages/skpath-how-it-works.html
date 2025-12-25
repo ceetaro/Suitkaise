@@ -10,6 +10,690 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>how it works</h1>
-    <p>Skpath module - how it works content coming soon...</p>
+    <h1>How <code>skpath</code> actually works</h1>
+
+    <p><code>skpath</code> has no dependencies outside of the standard library.</p>
+
+    <ul>
+        <li>uses forward slashes (<code>/</code>) for all paths internally, regardless of operating system</li>
+        <li>automatically detects project root by walking up directories looking for indicator files</li>
+        <li>all shared state is thread-safe using <code>threading.RLock()</code></li>
+    </ul>
+
+    <hr>
+
+    <h2><code>SKPath</code> class</h2>
+
+    <p>The <code>SKPath</code> class is an enhanced path object that wraps Python's <code>pathlib.Path</code> while adding project-aware normalization.</p>
+
+    <p>Initialize with:</p>
+    <ul>
+        <li><code>path</code>: a string, <code>Path</code>, <code>SKPath</code>, or <code>None</code> (uses caller's file path)</li>
+    </ul>
+
+<pre><code class="language-python">from suitkaise.skpath import SKPath
+
+# From string
+path = SKPath("myproject/feature/file.txt")
+
+# From Path
+path = SKPath(Path("myproject/feature/file.txt"))
+
+# From caller's file (no argument)
+path = SKPath()
+
+# From encoded ID
+path = SKPath(encoded_id_string)</code></pre>
+
+    <h3><code>SKPath.__init__()</code></h3>
+
+    <ol>
+        <li>If <code>path</code> is <code>None</code>:
+            <ul>
+                <li>Inspects the call stack using <code>inspect.stack()</code></li>
+                <li>Skips all frames from within the suitkaise package</li>
+                <li>Returns the file path of the first external caller</li>
+                <li>Raises <code>PathDetectionError</code> if no external caller found</li>
+            </ul>
+        </li>
+        <li>If <code>path</code> is an <code>SKPath</code>:
+            <ul>
+                <li>Copies all cached values (<code>_path</code>, <code>_root</code>, <code>_ap</code>, <code>_np</code>, <code>_id</code>, <code>_hash</code>)</li>
+                <li>This is efficient because computed values are preserved</li>
+            </ul>
+        </li>
+        <li>If <code>path</code> is a <code>Path</code>:
+            <ul>
+                <li>Calls <code>.resolve()</code> to get the absolute path</li>
+                <li>Stores as <code>_path</code></li>
+            </ul>
+        </li>
+        <li>If <code>path</code> is a <code>str</code>:
+            <ul>
+                <li>Calls <code>_resolve_string_path()</code> which:
+                    <ul>
+                        <li>If it contains <code>/</code> or <code>\</code> → treats as path</li>
+                        <li>If it exists on disk → treats as path</li>
+                        <li>If it looks like base64url (no separators, valid chars) → tries to decode as ID</li>
+                        <li>Falls back to treating as path</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>Core Properties</h3>
+
+    <h4><code>SKPath.ap</code> (absolute path)</h4>
+
+    <p>Returns the absolute path with normalized separators (<code>/</code>).</p>
+
+    <ol>
+        <li>Checks if <code>_ap</code> is cached</li>
+        <li>If not cached:
+            <ul>
+                <li>Converts <code>_path</code> to string</li>
+                <li>Replaces all <code>\</code> with <code>/</code></li>
+                <li>Caches the result</li>
+            </ul>
+        </li>
+        <li>Returns the cached value</li>
+    </ol>
+
+    <p>Always available, even for paths outside the project root.</p>
+
+    <h4><code>SKPath.np</code> (normalized path)</h4>
+
+    <p>Returns the path relative to the project root.</p>
+
+    <ol>
+        <li>Checks if <code>_np</code> is cached</li>
+        <li>If not cached:
+            <ul>
+                <li>Gets the project root via <code>root_path</code> property</li>
+                <li>Calculates <code>_path.relative_to(root)</code></li>
+                <li>Normalizes separators to <code>/</code></li>
+                <li>If path is outside root, returns empty string <code>""</code></li>
+                <li>Caches the result</li>
+            </ul>
+        </li>
+        <li>Returns the cached value</li>
+    </ol>
+
+    <p>Returns <code>""</code> (empty string) if the path is outside the project root.</p>
+
+    <h4><code>SKPath.id</code> (encoded ID)</h4>
+
+    <p>Returns a reversible base64url-encoded ID for the path.</p>
+
+    <ol>
+        <li>Checks if <code>_id</code> is cached</li>
+        <li>If not cached:
+            <ul>
+                <li>Uses <code>np</code> if available, otherwise uses <code>ap</code></li>
+                <li>Encodes using <code>base64.urlsafe_b64encode()</code></li>
+                <li>Strips padding (<code>=</code>) for cleaner IDs</li>
+                <li>Caches the result</li>
+            </ul>
+        </li>
+        <li>Returns the cached value</li>
+    </ol>
+
+    <p>The ID can be used to reconstruct the path later: <code>SKPath(encoded_id)</code></p>
+
+    <h4><code>SKPath.root</code> and <code>SKPath.root_path</code></h4>
+
+    <p><code>root</code> returns the project root as a string with normalized separators.</p>
+    <p><code>root_path</code> returns the project root as a <code>Path</code> object.</p>
+
+    <ol>
+        <li>Checks if <code>_root</code> is cached</li>
+        <li>If not cached:
+            <ul>
+                <li>Calls <code>detect_project_root(from_path=self._path)</code></li>
+                <li>Caches the result</li>
+            </ul>
+        </li>
+        <li>Returns the cached value</li>
+    </ol>
+
+    <h3><code>__hash__</code> and <code>__eq__</code></h3>
+
+    <h4><code>SKPath.__hash__()</code></h4>
+
+    <p>Returns an integer hash for use in sets and dict keys.</p>
+
+    <ol>
+        <li>Checks if <code>_hash</code> is cached</li>
+        <li>If not cached:
+            <ul>
+                <li>Uses <code>np</code> if available, otherwise uses <code>ap</code></li>
+                <li>Computes MD5 hash of the normalized path string</li>
+                <li>Converts first 16 hex characters to integer</li>
+                <li>Caches the result</li>
+            </ul>
+        </li>
+        <li>Returns the cached value</li>
+    </ol>
+
+    <p>MD5 is used (not the encoded ID) because:</p>
+    <ul>
+        <li>Fixed length output</li>
+        <li>Fast computation</li>
+        <li>Returns an integer (required for <code>__hash__</code>)</li>
+    </ul>
+
+    <h4><code>SKPath.__eq__(other)</code></h4>
+
+    <p>Compares two paths for equality.</p>
+
+    <ol>
+        <li>If <code>other</code> is <code>None</code>, returns <code>False</code></li>
+        <li>Converts <code>other</code> to <code>SKPath</code> if it's a string or <code>Path</code></li>
+        <li>Compares <code>np</code> first:
+            <ul>
+                <li>If both have non-empty <code>np</code> and they match → return <code>True</code></li>
+            </ul>
+        </li>
+        <li>Falls back to comparing <code>ap</code>:
+            <ul>
+                <li>If <code>ap</code> values match → return <code>True</code></li>
+            </ul>
+        </li>
+        <li>Returns <code>False</code> otherwise</li>
+    </ol>
+
+    <p>The fallback to <code>ap</code> handles paths outside the project root (where <code>np</code> is empty).</p>
+
+    <h3><code>__fspath__</code> and <code>__str__</code></h3>
+
+    <h4><code>SKPath.__fspath__()</code></h4>
+
+    <p>Returns the path for <code>os.fspath()</code> compatibility (used by <code>open()</code>, etc.).</p>
+
+    <ol>
+        <li>Gets <code>ap</code> (absolute path with forward slashes)</li>
+        <li>If on Windows (<code>os.sep == "\\"</code>):
+            <ul>
+                <li>Converts <code>/</code> back to <code>\</code> for OS compatibility</li>
+            </ul>
+        </li>
+        <li>Returns the OS-native path string</li>
+    </ol>
+
+    <h4><code>SKPath.__str__()</code></h4>
+
+    <p>Returns <code>ap</code> (absolute path with normalized separators).</p>
+    <p>This means <code>str(skpath)</code> always gives you a cross-platform compatible path string.</p>
+
+    <h3><code>__truediv__</code> (path joining)</h3>
+
+    <p>Supports the <code>/</code> operator for joining paths.</p>
+
+<pre><code class="language-python">child = path / "subdir" / "file.txt"</code></pre>
+
+    <ol>
+        <li>If <code>other</code> is an <code>SKPath</code>:
+            <ul>
+                <li>Uses just the name if it's an absolute path</li>
+                <li>Uses the full path otherwise</li>
+            </ul>
+        </li>
+        <li>Creates new <code>SKPath</code> from <code>self._path / other_str</code></li>
+    </ol>
+
+    <hr>
+
+    <h2>Root Detection</h2>
+
+    <p>The root detection system finds your project's root directory automatically.</p>
+
+    <h3>Detection Priority</h3>
+
+    <ol>
+        <li><strong>Custom root</strong> — if set via <code>set_custom_root()</code>, always used</li>
+        <li><strong>setup.sk file</strong> — highest priority indicator (Suitkaise marker)</li>
+        <li><strong>Standard indicators</strong> — walks up looking for project files</li>
+    </ol>
+
+    <h3>Indicator Files</h3>
+
+    <p><strong>Definitive Indicators</strong> (if found, this IS the root):</p>
+    <ul>
+        <li><code>setup.sk</code></li>
+        <li><code>setup.py</code></li>
+        <li><code>setup.cfg</code></li>
+        <li><code>pyproject.toml</code></li>
+    </ul>
+
+    <p><strong>Strong Indicators</strong>:</p>
+    <ul>
+        <li><code>.gitignore</code></li>
+        <li><code>.git</code></li>
+    </ul>
+
+    <p><strong>Pattern Indicators</strong> (case-insensitive):</p>
+    <ul>
+        <li>License files: <code>LICENSE</code>, <code>LICENSE.txt</code>, <code>license.md</code>, etc.</li>
+        <li>README files: <code>README</code>, <code>README.md</code>, <code>readme.txt</code>, etc.</li>
+        <li>Requirements: <code>requirements.txt</code>, <code>requirements.pip</code>, etc.</li>
+    </ul>
+
+    <h3><code>detect_project_root()</code></h3>
+
+    <p><strong>Arguments:</strong></p>
+    <ul>
+        <li><code>from_path</code>: Path to start searching from (default: current working directory)</li>
+        <li><code>expected_name</code>: If provided, detected root must have this name</li>
+    </ul>
+
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>Path</code> object pointing to project root</li>
+    </ul>
+
+    <ol>
+        <li>Checks for custom root:
+            <ul>
+                <li>If set and matches <code>expected_name</code> (or no name required) → return it</li>
+                <li>If set but doesn't match → raise <code>PathDetectionError</code></li>
+            </ul>
+        </li>
+        <li>Checks cache:
+            <ul>
+                <li>If we've detected a root before and <code>from_path</code> is within it → return cached</li>
+            </ul>
+        </li>
+        <li>First pass — looks for <code>setup.sk</code>:
+            <ul>
+                <li>Walks up from <code>from_path</code> to filesystem root</li>
+                <li>If <code>setup.sk</code> found → return that directory immediately</li>
+            </ul>
+        </li>
+        <li>Second pass — looks for any indicator:
+            <ul>
+                <li>Walks up from <code>from_path</code></li>
+                <li>Tracks the "best" root found (outermost directory with indicators)</li>
+                <li>This handles nested projects correctly</li>
+            </ul>
+        </li>
+        <li>If no root found → raise <code>PathDetectionError</code></li>
+        <li>Caches the result for future calls</li>
+    </ol>
+
+    <h3>Custom Root Management</h3>
+
+    <h4><code>set_custom_root(path)</code></h4>
+
+    <p>Sets a custom project root, overriding automatic detection.</p>
+
+    <ol>
+        <li>Converts to <code>Path</code> if string</li>
+        <li>Calls <code>.resolve()</code> for absolute path</li>
+        <li>Validates path exists and is a directory</li>
+        <li>Acquires lock and stores in <code>_custom_root</code></li>
+    </ol>
+
+    <p>Thread-safe operation.</p>
+
+    <h4><code>get_custom_root()</code></h4>
+
+    <p>Returns the current custom root as a string (or <code>None</code>).</p>
+
+    <h4><code>clear_custom_root()</code></h4>
+
+    <p>Clears the custom root, reverting to automatic detection.</p>
+
+    <h3><code>CustomRoot</code> Context Manager</h3>
+
+    <p>Temporarily sets a custom root for a code block.</p>
+
+<pre><code class="language-python">with CustomRoot("/path/to/project"):
+    # All SKPath operations use this root
+    path = SKPath("feature/file.txt")
+# Original root restored</code></pre>
+
+    <ol>
+        <li><code>__enter__</code>:
+            <ul>
+                <li>Saves the current <code>_custom_root</code></li>
+                <li>Calls <code>set_custom_root()</code> with new path</li>
+            </ul>
+        </li>
+        <li><code>__exit__</code>:
+            <ul>
+                <li>Restores the previous <code>_custom_root</code></li>
+            </ul>
+        </li>
+    </ol>
+
+    <p>Uses <code>RLock</code> so it can be nested from the same thread.</p>
+
+    <hr>
+
+    <h2><code>@autopath</code> Decorator</h2>
+
+    <p>The <code>@autopath</code> decorator automatically converts path parameters based on their type annotations.</p>
+
+    <h3>How It Works</h3>
+
+    <p><strong>At decoration time:</strong></p>
+    <ol>
+        <li>Analyzes the function's signature and type annotations</li>
+        <li>For each parameter, determines:
+            <ul>
+                <li>Is it a path type? (<code>str</code>, <code>Path</code>, <code>SKPath</code>, or <code>AnyPath</code>)</li>
+                <li>Is it an iterable of path types? (<code>list[AnyPath]</code>, etc.)</li>
+                <li>What's the target type to convert to?</li>
+            </ul>
+        </li>
+    </ol>
+
+    <p><strong>At call time:</strong></p>
+    <ol>
+        <li>If <code>use_caller=True</code> and a path parameter is missing:
+            <ul>
+                <li>Inspects call stack to find caller's file</li>
+                <li>Uses that as the default value</li>
+            </ul>
+        </li>
+        <li>For each path parameter:
+            <ul>
+                <li>Converts the value to match the annotation type</li>
+            </ul>
+        </li>
+        <li>Calls the original function with converted values</li>
+    </ol>
+
+    <h3>Type Conversion Priority</h3>
+
+    <p>When determining what type to convert to, <code>@autopath</code> picks the "richest" type:</p>
+
+    <ol>
+        <li><strong>SKPath</strong> — if <code>SKPath</code> is in the annotation (including <code>AnyPath</code>)</li>
+        <li><strong>Path</strong> — if <code>Path</code> is in the annotation (but not <code>SKPath</code>)</li>
+        <li><strong>str</strong> — if only <code>str</code> is in the annotation</li>
+    </ol>
+
+    <p>Examples:</p>
+    <ul>
+        <li><code>path: AnyPath</code> → converts to <code>SKPath</code></li>
+        <li><code>path: SKPath</code> → converts to <code>SKPath</code></li>
+        <li><code>path: Path</code> → converts to <code>Path</code></li>
+        <li><code>path: str</code> → converts to <code>str</code></li>
+        <li><code>path: Path | SKPath</code> → converts to <code>SKPath</code></li>
+        <li><code>path: str | Path</code> → converts to <code>Path</code></li>
+    </ul>
+
+    <h3>Iterable Handling</h3>
+
+    <p>Works with common iterables:</p>
+    <ul>
+        <li><code>list[AnyPath]</code> → each element converted</li>
+        <li><code>tuple[Path, ...]</code> → each element converted</li>
+        <li><code>set[SKPath]</code> → each element converted</li>
+    </ul>
+
+    <p>The container type is preserved (list → list, tuple → tuple, etc.).</p>
+
+    <h3><code>use_caller</code> Option</h3>
+
+    <p>When <code>use_caller=True</code>:</p>
+    <ol>
+        <li>Gets the caller's file path by inspecting the stack</li>
+        <li>For parameters that accept <code>SKPath</code> or <code>Path</code> and have no value:
+            <ul>
+                <li>Uses the caller's file path as the default</li>
+            </ul>
+        </li>
+    </ol>
+
+    <p>This lets you write functions like:</p>
+
+<pre><code class="language-python">@autopath(use_caller=True)
+def log_from(path: AnyPath):
+    print(f"Log from: {path.np}")
+
+log_from()  # Uses caller's file automatically</code></pre>
+
+    <h3><code>debug</code> Option</h3>
+
+    <p>When <code>debug=True</code>:</p>
+    <ul>
+        <li>Prints a message for each conversion</li>
+        <li>Format: <code>"@autopath: Converted {param}: {from_type} → {to_type}"</code></li>
+    </ul>
+
+    <hr>
+
+    <h2>Caller Detection</h2>
+
+    <p>The caller detection system finds the file path of the code that called a function.</p>
+
+    <h3><code>get_caller_path()</code> / <code>detect_caller_path()</code></h3>
+
+    <ol>
+        <li>Calls <code>inspect.stack()</code> to get the call stack</li>
+        <li>Iterates through frames</li>
+        <li>Skips all frames from within the suitkaise package:
+            <ul>
+                <li>Determines suitkaise path at import time</li>
+                <li>Compares each frame's filename</li>
+            </ul>
+        </li>
+        <li>Skips built-in/frozen modules (filenames starting with <code>&lt;</code>)</li>
+        <li>Returns the first external frame's filename as a <code>Path</code></li>
+        <li>Raises <code>PathDetectionError</code> if no external caller found</li>
+    </ol>
+
+    <p>The suitkaise package path is cached at module load time for efficiency.</p>
+
+    <h3><code>get_module_path(obj)</code></h3>
+
+    <p>Gets the file path where an object is defined.</p>
+
+    <ol>
+        <li>If <code>obj</code> is a string:
+            <ul>
+                <li>Looks up in <code>sys.modules</code></li>
+                <li>If not found, tries <code>importlib.import_module()</code></li>
+            </ul>
+        </li>
+        <li>If <code>obj</code> is a module:
+            <ul>
+                <li>Uses it directly</li>
+            </ul>
+        </li>
+        <li>If <code>obj</code> has <code>__module__</code> attribute:
+            <ul>
+                <li>Looks up that module name in <code>sys.modules</code></li>
+            </ul>
+        </li>
+        <li>Gets <code>__file__</code> from the module</li>
+        <li>Returns as <code>Path</code>, or <code>None</code> if not found</li>
+    </ol>
+
+    <hr>
+
+    <h2>ID Encoding/Decoding</h2>
+
+    <h3><code>encode_path_id(path_str)</code></h3>
+
+    <ol>
+        <li>Normalizes separators to <code>/</code></li>
+        <li>Encodes to bytes using UTF-8</li>
+        <li>Base64url encodes (<code>urlsafe_b64encode</code>)</li>
+        <li>Strips padding (<code>=</code>) for cleaner IDs</li>
+        <li>Returns as string</li>
+    </ol>
+
+    <h3><code>decode_path_id(encoded_id)</code></h3>
+
+    <ol>
+        <li>Adds back padding if needed</li>
+        <li>Base64url decodes</li>
+        <li>Decodes bytes to string using UTF-8</li>
+        <li>Returns the path string (or <code>None</code> if decoding fails)</li>
+    </ol>
+
+    <h3><code>is_valid_encoded_id(s)</code></h3>
+
+    <p>Heuristic check for whether a string looks like an encoded ID:</p>
+    <ul>
+        <li>Not empty</li>
+        <li>No path separators (<code>/</code> or <code>\</code>)</li>
+        <li>No spaces</li>
+        <li>All characters are valid base64url (<code>A-Za-z0-9-_=</code>)</li>
+    </ul>
+
+    <hr>
+
+    <h2>Project Utilities</h2>
+
+    <h3><code>get_project_paths()</code></h3>
+
+    <p>Returns all paths in the project.</p>
+
+    <ol>
+        <li>Resolves root (custom or auto-detected)</li>
+        <li>Collects ignore patterns from <code>.*ignore</code> files</li>
+        <li>Walks directory tree with <code>os.walk()</code></li>
+        <li>For each file/directory:
+            <ul>
+                <li>Checks against exclude list</li>
+                <li>Checks against ignore patterns</li>
+                <li>Adds to results (as <code>SKPath</code> or string)</li>
+            </ul>
+        </li>
+        <li>Returns the list</li>
+    </ol>
+
+    <h3>Ignore File Parsing</h3>
+
+    <p>Supports gitignore-style patterns:</p>
+    <ul>
+        <li>Comments (<code>#</code>)</li>
+        <li>Directory patterns (<code>dir/</code>)</li>
+        <li>Wildcard patterns (<code>*.txt</code>)</li>
+        <li>Path patterns (<code>src/*.py</code>)</li>
+    </ul>
+
+    <p>Reads all files ending in <code>ignore</code> (<code>.gitignore</code>, <code>.cursorignore</code>, etc.).</p>
+
+    <h3><code>get_project_structure()</code></h3>
+
+    <p>Returns a nested dict representing the project hierarchy.</p>
+
+    <ol>
+        <li>Gets all paths using <code>get_project_paths()</code></li>
+        <li>For each path:
+            <ul>
+                <li>Splits into parts</li>
+                <li>Builds nested dict structure</li>
+            </ul>
+        </li>
+        <li>Returns the structure</li>
+    </ol>
+
+    <h3><code>get_formatted_project_tree()</code></h3>
+
+    <p>Returns a visual tree string.</p>
+
+    <ol>
+        <li>Resolves root and ignore patterns</li>
+        <li>Recursively formats using tree characters:
+            <ul>
+                <li><code>├──</code> for non-last items</li>
+                <li><code>└──</code> for last items</li>
+                <li><code>│   </code> for continuation lines</li>
+                <li><code>    </code> for spacing after last items</li>
+            </ul>
+        </li>
+        <li>Respects <code>depth</code> limit</li>
+        <li>Optionally includes/excludes files</li>
+    </ol>
+
+    <hr>
+
+    <h2>Thread Safety</h2>
+
+    <p>All shared state uses <code>threading.RLock()</code> (reentrant locks):</p>
+
+    <ul>
+        <li><code>_root_lock</code> — protects custom root state</li>
+        <li><code>_cache_lock</code> — protects root detection cache</li>
+        <li><code>_caller_lock</code> — protects suitkaise path cache</li>
+        <li><code>_autopath_lock</code> — available for future use</li>
+        <li><code>_project_lock</code> — available for future use</li>
+    </ul>
+
+    <details>
+        <summary>What is a reentrant lock?</summary>
+        <p>A reentrant lock can be acquired multiple times by the same thread without deadlocking. This is important because:</p>
+        <ul>
+            <li>SKPath operations often call other SKPath operations</li>
+            <li>The same thread might need to acquire a lock it already holds</li>
+            <li>Regular locks would deadlock in this situation</li>
+        </ul>
+    </details>
+
+    <hr>
+
+    <h2>Memory and Caching</h2>
+
+    <h3>SKPath Caching</h3>
+
+    <p>Each <code>SKPath</code> instance caches computed values:</p>
+    <ul>
+        <li><code>_ap</code> — computed on first access to <code>ap</code></li>
+        <li><code>_np</code> — computed on first access to <code>np</code></li>
+        <li><code>_id</code> — computed on first access to <code>id</code></li>
+        <li><code>_hash</code> — computed on first access to <code>__hash__</code></li>
+        <li><code>_root</code> — computed on first access to <code>root_path</code></li>
+    </ul>
+
+    <p>This means repeated access to properties is fast (no recomputation).</p>
+
+    <h3>Root Detection Caching</h3>
+
+    <p>The detected project root is cached at module level:</p>
+    <ul>
+        <li><code>_cached_root</code> — the detected root</li>
+        <li><code>_cached_root_source</code> — the path used for detection</li>
+    </ul>
+
+    <p>Cache is invalidated when:</p>
+    <ul>
+        <li>A new path outside the cached root is used</li>
+        <li><code>clear_root_cache()</code> is called</li>
+    </ul>
+
+    <h3>Suitkaise Path Caching</h3>
+
+    <p>The suitkaise package path (for caller detection) is computed once at first use and cached for the lifetime of the process.</p>
+
+    <hr>
+
+    <h2>Error Handling</h2>
+
+    <h3><code>PathDetectionError</code></h3>
+
+    <p>Raised when:</p>
+    <ul>
+        <li>Project root cannot be detected</li>
+        <li>Caller file cannot be determined</li>
+        <li>Custom root path doesn't exist or isn't a directory</li>
+        <li>A string cannot be interpreted as a path or valid encoded ID</li>
+        <li>Expected root name doesn't match detected root</li>
+    </ul>
+
+    <h3>Silent Failures</h3>
+
+    <p>Some operations return <code>None</code> instead of raising:</p>
+    <ul>
+        <li><code>get_module_path()</code> — returns <code>None</code> if module has no <code>__file__</code></li>
+        <li><code>decode_path_id()</code> — returns <code>None</code> if decoding fails</li>
+        <li>Properties like <code>np</code> — return <code>""</code> if outside project root</li>
+    </ul>
+
 </section>

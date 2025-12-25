@@ -963,6 +963,26 @@ body {
     color: rgba(109, 233, 149, 0.7);
 }
 
+/* Padding for all content inside open details (except summary) */
+.module-page details[open] > *:not(summary) {
+    margin-left: 18px;
+    margin-right: 18px;
+}
+
+.module-page details[open] > *:not(summary):first-of-type {
+    margin-top: 18px;
+}
+
+.module-page details[open] > *:not(summary):last-child {
+    margin-bottom: 18px;
+}
+
+/* Pre/code blocks need to offset the margin with negative values */
+.module-page details[open] > pre {
+    margin-left: 18px;
+    margin-right: 18px;
+}
+
 .module-page details .dropdown-content {
     padding: 18px 20px;
 }
@@ -984,6 +1004,57 @@ body {
 .module-page p + ul,
 .module-page p + ol {
     margin-top: -6px;
+}
+
+/* ============================================
+   About Page - Mint Colored Text
+   ============================================ */
+
+.about-page {
+    color: rgba(140, 230, 190, 0.8);
+}
+
+.about-page p {
+    color: rgba(140, 230, 190, 0.8);
+}
+
+.about-page li {
+    color: rgba(140, 230, 190, 0.8);
+}
+
+.about-page h1,
+.about-page h2,
+.about-page h3,
+.about-page h4 {
+    color: rgb(160, 240, 200);
+}
+
+.about-page details summary {
+    color: rgba(140, 230, 190, 0.7);
+}
+
+.about-page details summary:hover {
+    color: rgba(160, 240, 200, 0.9);
+}
+
+.about-page details[open] summary {
+    color: rgba(160, 240, 200, 0.9);
+}
+
+.about-page em {
+    color: rgba(150, 235, 195, 0.75);
+}
+
+.about-page strong {
+    color: rgba(160, 240, 200, 0.85);
+}
+
+.about-page .learn-more-link {
+    color: rgba(140, 230, 190, 0.55);
+}
+
+.about-page .learn-more-link:hover {
+    color: rgba(160, 240, 200, 0.8);
 }
 
 /* ============================================

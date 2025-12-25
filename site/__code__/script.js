@@ -109,16 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Core pages that are always inline (small, essential)
     const corePages = {
         home: document.getElementById('pageContent').innerHTML,
-        about: `
-            <section class="page-section">
-                <div class="page-header">
-                    <h1>About Suitkaise</h1>
-                </div>
-                <div class="page-body">
-                    <p>About page content coming soon...</p>
-                </div>
-            </section>
-        `,
         donate: `
             <section class="page-section">
                 <div class="page-header">
@@ -154,6 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Module pages to fetch at startup (stored in pages/ folder)
     const modulePagesList = [
+        // Site pages
+        'about',
         // Processing
         'processing', 'processing-how-it-works', 'processing-examples', 'processing-why',
         // Cerial
@@ -279,12 +271,112 @@ document.addEventListener('DOMContentLoaded', () => {
     // SHA-256 hash (password is not visible in code)
     const PASSWORD_HASH = '360b845c061f5bd1bb34217b1d4fb53d814730194407e00d7a21d80e9db8088e';
     
-    async function hashPassword(password) {
+    // Pure JavaScript SHA-256 implementation (works in all contexts, including file://)
+    function sha256(message) {
+        // Convert string to bytes
         const encoder = new TextEncoder();
-        const data = encoder.encode(password.toLowerCase().trim());
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        const msgBytes = encoder.encode(message);
+        
+        // Constants
+        const K = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        ];
+        
+        // Initial hash values
+        let H0 = 0x6a09e667, H1 = 0xbb67ae85, H2 = 0x3c6ef372, H3 = 0xa54ff53a;
+        let H4 = 0x510e527f, H5 = 0x9b05688c, H6 = 0x1f83d9ab, H7 = 0x5be0cd19;
+        
+        // Helper functions
+        const rotr = (n, x) => (x >>> n) | (x << (32 - n));
+        const ch = (x, y, z) => (x & y) ^ (~x & z);
+        const maj = (x, y, z) => (x & y) ^ (x & z) ^ (y & z);
+        const sigma0 = x => rotr(2, x) ^ rotr(13, x) ^ rotr(22, x);
+        const sigma1 = x => rotr(6, x) ^ rotr(11, x) ^ rotr(25, x);
+        const gamma0 = x => rotr(7, x) ^ rotr(18, x) ^ (x >>> 3);
+        const gamma1 = x => rotr(17, x) ^ rotr(19, x) ^ (x >>> 10);
+        
+        // Pre-processing: create padded message
+        const msgLen = msgBytes.length;
+        const bitLen = msgLen * 8;
+        
+        // Calculate padded length (must be multiple of 64 bytes / 512 bits)
+        // Need: msgLen + 1 (0x80) + padding + 8 (length) = multiple of 64
+        const totalLen = Math.ceil((msgLen + 9) / 64) * 64;
+        const padded = new Uint8Array(totalLen);
+        padded.set(msgBytes);
+        padded[msgLen] = 0x80;
+        
+        // Append length in bits as 64-bit big-endian (we only use lower 32 bits for simplicity)
+        const lenView = new DataView(padded.buffer);
+        lenView.setUint32(totalLen - 4, bitLen, false);
+        
+        // Process each 64-byte (512-bit) chunk
+        for (let chunkStart = 0; chunkStart < totalLen; chunkStart += 64) {
+            const W = new Uint32Array(64);
+            
+            // Break chunk into sixteen 32-bit big-endian words
+            for (let t = 0; t < 16; t++) {
+                const offset = chunkStart + t * 4;
+                W[t] = (padded[offset] << 24) | (padded[offset + 1] << 16) | 
+                       (padded[offset + 2] << 8) | padded[offset + 3];
+            }
+            
+            // Extend to 64 words
+            for (let t = 16; t < 64; t++) {
+                W[t] = (gamma1(W[t - 2]) + W[t - 7] + gamma0(W[t - 15]) + W[t - 16]) >>> 0;
+            }
+            
+            // Initialize working variables
+            let a = H0, b = H1, c = H2, d = H3, e = H4, f = H5, g = H6, h = H7;
+            
+            // Main loop
+            for (let t = 0; t < 64; t++) {
+                const T1 = (h + sigma1(e) + ch(e, f, g) + K[t] + W[t]) >>> 0;
+                const T2 = (sigma0(a) + maj(a, b, c)) >>> 0;
+                h = g; g = f; f = e;
+                e = (d + T1) >>> 0;
+                d = c; c = b; b = a;
+                a = (T1 + T2) >>> 0;
+            }
+            
+            // Add to hash
+            H0 = (H0 + a) >>> 0; H1 = (H1 + b) >>> 0;
+            H2 = (H2 + c) >>> 0; H3 = (H3 + d) >>> 0;
+            H4 = (H4 + e) >>> 0; H5 = (H5 + f) >>> 0;
+            H6 = (H6 + g) >>> 0; H7 = (H7 + h) >>> 0;
+        }
+        
+        // Convert to hex string
+        const toHex = n => n.toString(16).padStart(8, '0');
+        return toHex(H0) + toHex(H1) + toHex(H2) + toHex(H3) + 
+               toHex(H4) + toHex(H5) + toHex(H6) + toHex(H7);
+    }
+    
+    async function hashPassword(password) {
+        const processed = password.toLowerCase().trim();
+        
+        // Try Web Crypto API first (faster, but requires secure context)
+        if (typeof crypto !== 'undefined' && crypto.subtle) {
+            try {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(processed);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (e) {
+                // Fall through to pure JS implementation
+            }
+        }
+        
+        // Fallback to pure JavaScript implementation
+        return sha256(processed);
     }
     
     function setupPasswordPage() {
@@ -293,13 +385,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (passwordInput) {
             passwordInput.addEventListener('keydown', async (e) => {
                 if (e.key === 'Enter') {
-                    const inputHash = await hashPassword(passwordInput.value);
-                    if (inputHash === PASSWORD_HASH) {
-                        // Correct password - store in session and go to home
-                        sessionStorage.setItem('suitkaise_authenticated', 'true');
-                        navigateTo('home');
-                    } else {
-                        // Incorrect password - shake the input
+                    e.preventDefault();
+                    
+                    try {
+                        const inputHash = await hashPassword(passwordInput.value);
+                        if (inputHash === PASSWORD_HASH) {
+                            // Correct password - store in session and go to home
+                            sessionStorage.setItem('suitkaise_authenticated', 'true');
+                            navigateTo('home');
+                        } else {
+                            // Incorrect password - shake the input
+                            passwordInput.classList.add('shake');
+                            passwordInput.value = '';
+                            setTimeout(() => {
+                                passwordInput.classList.remove('shake');
+                            }, 400);
+                        }
+                    } catch (error) {
+                        console.error('Password check failed:', error);
+                        // Still shake on error to indicate failure
                         passwordInput.classList.add('shake');
                         passwordInput.value = '';
                         setTimeout(() => {
