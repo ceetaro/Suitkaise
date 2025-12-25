@@ -10,25 +10,22 @@
 ### Circuit Class
 - Circuit breaker pattern implementation
 - Short counting and threshold management
-- State tracking (flowing vs broken)
 - Optional sleep on circuit break
 
 ### State Management
-- `flowing` property - circuit operational status
 - `broken` property - circuit failure status
 - `times_shorted` counter - failure tracking
 - Automatic state transitions
 
 ### Control Methods
 - `short()` - increment failure count, break if threshold reached
-- `break()` - immediately break circuit
+- `trip()` - immediately break circuit
 - Sleep parameter support for both methods
 
 ## Integration Points
 - **Loop Control**: While loop management and flow control
 - **Error Handling**: Graceful failure management
 - **Resource Management**: Memory, CPU, and resource monitoring
-- **XProcess**: Process failure threshold management
 
 ## Use Cases
 - Error threshold management

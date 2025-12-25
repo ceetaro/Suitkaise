@@ -18,7 +18,7 @@ class Circuit:
         # Create a circuit that breaks after 5 shorts
         breaker = circuit.Circuit(shorts=5, break_sleep=0.5)
         
-        while breaker.flowing:
+        while not breaker.broken:
             try:
                 result = risky_operation()
             except SomeError:
@@ -36,7 +36,6 @@ class Circuit:
         break_sleep: Default sleep duration (seconds) when circuit breaks
         
     Attributes:
-        flowing: True if circuit is operational (not broken)
         broken: True if circuit has exceeded limits
         times_shorted: Number of times circuit has been shorted
     
@@ -49,7 +48,7 @@ class Circuit:
         api_circuit = circuit.Circuit(shorts=3, break_sleep=1.0)
         
         def fetch_with_retry(url):
-            while api_circuit.flowing:
+            while not api_circuit.broken:
                 try:
                     response = requests.get(url, timeout=5)
                     response.raise_for_status()
@@ -72,7 +71,6 @@ class Circuit:
         """
         self.shorts = shorts
         self.break_sleep = break_sleep
-        self.flowing = True
         self.broken = False
         self.times_shorted = 0
 
@@ -134,9 +132,8 @@ class Circuit:
 
         Reset the circuit to operational state.
         
-        Clears the broken flag, restores flowing, and resets the short counter.
+        Clears the broken flag and resets the short counter.
         """
-        self.flowing = True
         self.broken = False
         self.times_shorted = 0
     
@@ -147,7 +144,6 @@ class Circuit:
         Args:
             sleep_duration: How long to sleep after breaking (seconds)
         """
-        self.flowing = False
         self.broken = True
         self.times_shorted = 0
         

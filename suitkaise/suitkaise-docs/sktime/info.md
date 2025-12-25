@@ -7,13 +7,11 @@
 - only calculates times using floats, no datetime objects are used
 
 
-### `now()` and `get_current_time()`
+### `time()`
 
-`now()` and `get_current_time()` are the same function, just with different names.
+Calls Python's `time.time()` function, and returns the current time as a float.
 
-These call Python's `time.time()` function, and return the current time as a float.
-
-- Use real world time, not performance counter time
+- Uses real world time, not performance counter time
 
 ---
 
@@ -34,18 +32,18 @@ from suitkaise import sktime
 
 # 2 ways to use `sleep()`
 
-start_time = sktime.now()
+start_time = sktime.time()
 end_time = sktime.sleep(2) # sleeps and returns the current time
 
 # or ...
 
-start_time = sktime.now()
+start_time = sktime.time()
 sktime.sleep(2) # just sleeps, doesn't return
-end_time = sktime.now()
+end_time = sktime.time()
 ```
 
 1. calls Python's `time.sleep()` function with the given number of seconds
-2. after sleeping, calls `now()` to get the current time.
+2. after sleeping, calls `time()` to get the current time.
 3. returns the current time after sleeping as a float
 
 ---
@@ -66,19 +64,19 @@ from suitkaise import sktime
 
 # 2 ways to use `elapsed()`
 
-start_time = sktime.now()
+start_time = sktime.time()
 end_time = sktime.sleep(2)
 
 elapsed = sktime.elapsed(start_time, end_time)
 
 # or ...
 
-start_time = sktime.now()
+start_time = sktime.time()
 sktime.sleep(2)
 elapsed = sktime.elapsed(start_time)
 ```
 
-1. If `time2` is `None`, `elapsed()` uses the current time as the end time (calls `time.time()`)
+1. If `time2` is `None`, `elapsed()` uses the current time as the end time (calls `sktime.time()`)
 2. Calculates absolute difference using `math.fabs(time2 - time1)`
    - `math.fabs()` is used instead of `abs()` for best precision with float numbers
 3. Returns the positive difference in seconds as a float

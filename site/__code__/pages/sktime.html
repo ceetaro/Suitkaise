@@ -246,7 +246,7 @@ print(timer.stats.mean)  # 12.5</code></pre>
 
 <pre><code class="language-python"># to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.now() - timer.stats.original_start_time</code></pre>
+real_world_time = sktime.time() - timer.stats.original_start_time</code></pre>
 
     <h3><code>get_statistics()</code> / <code>get_stats()</code></h3>
     
@@ -304,14 +304,14 @@ print(timer.stats.mean)</code></pre>
 
     <hr>
 
-    <h2><code>now()</code> and <code>get_current_time()</code></h2>
+    <h2><code>time()</code></h2>
     
-    <p><code>now()</code> and <code>get_current_time()</code> use <code>time.time()</code>.</p>
-    <p>They are simply here so you don't have to import <code>time</code> as well as <code>sktime</code>.</p>
+    <p><code>time()</code> uses <code>time.time()</code>.</p>
+    <p>It is simply here so you don't have to import <code>time</code> as well as <code>sktime</code>.</p>
 
 <pre><code class="language-python">from suitkaise import sktime
 
-current_timestamp = sktime.now()</code></pre>
+current_timestamp = sktime.time()</code></pre>
 
     <hr>
 
@@ -382,7 +382,7 @@ except TypeError: # 7
 
 <pre><code class="language-python">from suitkaise import sktime # 1
 
-start_time = sktime.now() # 2
+start_time = sktime.time() # 2
 
 # ... do work ...
 
@@ -392,8 +392,8 @@ time_to_complete = sktime.elapsed(start_time) # 3</code></pre>
 <pre><code class="language-python"># or give 2 times
 from suitkaise import sktime # 1
 
-start_time = sktime.now() # 2
-end_time = sktime.now() + 60 # 3
+start_time = sktime.time() # 2
+end_time = sktime.time() + 60 # 3
 
 time_to_complete = sktime.elapsed(start_time, end_time) # 4</code></pre>
 

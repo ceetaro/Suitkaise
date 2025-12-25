@@ -39,7 +39,7 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
         Absolute difference between timestamps in seconds
     """
     if time2 is None:
-        # Use wall clock to remain compatible with sktime.now()/get_current_time()
+        # Use wall clock to remain compatible with sktime.time()
         time2 = time.time()
     
     # Return absolute difference so order doesn't matter

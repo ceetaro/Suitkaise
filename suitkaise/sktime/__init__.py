@@ -5,7 +5,7 @@ This module provides intuitive timing functionality with statistical analysis,
 sophisticated timing classes, and convenient decorators for performance measurement.
 
 Key Features:
-- Simple timing functions (now, sleep, elapsed)
+- Simple timing functions (time, sleep, elapsed)
 - Yawn class for threshold-based delayed sleep operations
 - Timer for statistical timing analysis with pause/resume and lap functionality
 - TimeThis context manager for convenient timing of code blocks

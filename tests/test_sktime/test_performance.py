@@ -26,18 +26,15 @@ def _print_result(name: str, value: float, unit: str = "s") -> None:
 
 
 @pytest.mark.benchmark
-def test_perf_now_and_get_current_time_vs_time_time():
+def test_perf_time_vs_time_time():
     avg_time_time = _measure_avg_seconds(lambda: time.time())
-    avg_now = _measure_avg_seconds(lambda: sktime.now())
-    avg_get_current = _measure_avg_seconds(lambda: sktime.get_current_time())
+    avg_sktime_time = _measure_avg_seconds(lambda: sktime.time())
 
     _print_result("time.time() avg call", avg_time_time)
-    _print_result("sktime.now() avg call", avg_now)
-    _print_result("sktime.get_current_time() avg call", avg_get_current)
+    _print_result("sktime.time() avg call", avg_sktime_time)
 
     # Overhead should be near-equal; allow generous factor for CI noise
-    assert avg_now / (avg_time_time or 1e-12) < 3.0
-    assert avg_get_current / (avg_time_time or 1e-12) < 3.0
+    assert avg_sktime_time / (avg_time_time or 1e-12) < 3.0
 
 
 @pytest.mark.benchmark
@@ -47,7 +44,7 @@ def test_perf_elapsed_vs_manual():
         t1 = time.time(); t2 = time.time(); _ = abs(t2 - t1)
 
     def sk_elapsed_two_arg():
-        t1 = sktime.now(); t2 = sktime.now(); _ = sktime.elapsed(t1, t2)
+        t1 = sktime.time(); t2 = sktime.time(); _ = sktime.elapsed(t1, t2)
 
     avg_manual = _measure_avg_seconds(manual_two_arg)
     avg_sktime = _measure_avg_seconds(sk_elapsed_two_arg)
@@ -131,7 +128,7 @@ def test_perf_yawn_no_sleep_overhead():
 if __name__ == "__main__":
     print(_color("SKTime Benchmarks", "35"))
     start = perf_counter()
-    test_perf_now_and_get_current_time_vs_time_time()  # type: ignore
+    test_perf_time_vs_time_time()  # type: ignore
     test_perf_elapsed_vs_manual()  # type: ignore
     test_perf_timer_start_stop_noop()  # type: ignore
     test_perf_timer_lap_noop()  # type: ignore

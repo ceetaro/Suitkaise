@@ -5,7 +5,7 @@ This module provides user-friendly timing functionality with statistical analysi
 sophisticated timing classes, and convenient decorators for performance measurement.
 
 Key Features:
-- Simple timing functions (now, sleep, elapsed)
+- Simple timing functions (time, sleep, elapsed)
 - Yawn class for delayed sleep operations  
 - Timer for statistical timing analysis, pause and resume, context manager and decorator
 
@@ -38,42 +38,22 @@ except ImportError:
 # Simple Timing Functions
 # ============================================================================
 
-def now() -> float:
+def time() -> float:
     """
     ────────────────────────────────────────────────────────
         ```python
         from suitkaise import sktime
         
-        start_time = sktime.now()
+        start_time = sktime.time()
         ```
     ────────────────────────────────────────────────────────\n
 
-    Get current Unix timestamp. Same as `get_current_time()`. 
+    Get current Unix timestamp.
     
     Equivalent to `time.time()`.
     
     Returns:
         Current Unix timestamp as a float
-    """
-    return _get_current_time()
-
-
-def get_current_time() -> float:
-    """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise import sktime
-        
-        start_time = sktime.get_current_time()
-        ```
-    ────────────────────────────────────────────────────────\n
-
-    Get current Unix timestamp. Same as `now()`. 
-    
-    Equivalent to `time.time()`.
-    
-    Returns:
-        Current Unix timestamp as float
     """
     return _get_current_time()
 
@@ -84,12 +64,12 @@ def sleep(seconds: float) -> float:
         ```python
         from suitkaise import sktime
 
-        start_time = sktime.now()
+        start_time = sktime.time()
         
         # sleep for 2 seconds
         sktime.sleep(2)
 
-        end_time = sktime.now()
+        end_time = sktime.time()
 
         # elapsed time should be about 2 seconds
         elapsed_time = end_time - start_time
@@ -98,7 +78,7 @@ def sleep(seconds: float) -> float:
         ```python
         from suitkaise import sktime
         
-        start_time = sktime.now()
+        start_time = sktime.time()
         
         end_time = sktime.sleep(2)
         ```
@@ -118,7 +98,7 @@ def sleep(seconds: float) -> float:
     """
     _sleep(seconds)
 
-    return now()
+    return time()
 
 
 def elapsed(time1: float, time2: Optional[float] = None) -> float:
@@ -127,16 +107,16 @@ def elapsed(time1: float, time2: Optional[float] = None) -> float:
         ```python
         from suitkaise import sktime
         
-        start_time = sktime.now()
+        start_time = sktime.time()
         
         sktime.sleep(2)
         
         elapsed = sktime.elapsed(start_time) # end time automatically set to current time
         
         # with 2 times
-        start_time = sktime.now() # 100
+        start_time = sktime.time() # 100
         sktime.sleep(2)
-        end_time = sktime.now() # 102
+        end_time = sktime.time() # 102
         
         elapsed1 = sktime.elapsed(start_time, end_time)  # |100 - 102| = 2
         elapsed2 = sktime.elapsed(end_time, start_time)  # |102 - 100| = 2
@@ -501,8 +481,7 @@ def clear_global_timers() -> None:
 
 __all__ = [
     # Simple timing functions
-    'now',
-    'get_current_time', 
+    'time',
     'sleep',
     'elapsed',
     

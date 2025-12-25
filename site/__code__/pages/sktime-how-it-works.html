@@ -18,11 +18,10 @@
         <li>Only calculates times using floats, no datetime objects are used</li>
     </ul>
 
-    <h3><code>now()</code> and <code>get_current_time()</code></h3>
-    <p><code>now()</code> and <code>get_current_time()</code> are the same function, just with different names.</p>
-    <p>These call Python's <code>time.time()</code> function, and return the current time as a float.</p>
+    <h3><code>time()</code></h3>
+    <p>Calls Python's <code>time.time()</code> function, and returns the current time as a float.</p>
     <ul>
-        <li>Use real world time, not performance counter time</li>
+        <li>Uses real world time, not performance counter time</li>
     </ul>
 
     <hr>
@@ -42,17 +41,17 @@
 
 # 2 ways to use sleep()
 
-start_time = sktime.now()
+start_time = sktime.time()
 end_time = sktime.sleep(2) # sleeps and returns the current time
 
 # or ...
 
-start_time = sktime.now()
+start_time = sktime.time()
 sktime.sleep(2) # just sleeps, doesn't return
-end_time = sktime.now()</code></pre>
+end_time = sktime.time()</code></pre>
     <ol>
         <li>Calls Python's <code>time.sleep()</code> function with the given number of seconds</li>
-        <li>After sleeping, calls <code>now()</code> to get the current time</li>
+        <li>After sleeping, calls <code>time()</code> to get the current time</li>
         <li>Returns the current time after sleeping as a float</li>
     </ol>
 
@@ -73,18 +72,18 @@ end_time = sktime.now()</code></pre>
 
 # 2 ways to use elapsed()
 
-start_time = sktime.now()
+start_time = sktime.time()
 end_time = sktime.sleep(2)
 
 elapsed = sktime.elapsed(start_time, end_time)
 
 # or ...
 
-start_time = sktime.now()
+start_time = sktime.time()
 sktime.sleep(2)
 elapsed = sktime.elapsed(start_time)</code></pre>
     <ol>
-        <li>If <code>time2</code> is <code>None</code>, <code>elapsed()</code> uses the current time as the end time (calls <code>time.time()</code>)</li>
+        <li>If <code>time2</code> is <code>None</code>, <code>elapsed()</code> uses the current time as the end time (calls <code>sktime.time()</code>)</li>
         <li>Calculates absolute difference using <code>math.fabs(time2 - time1)</code>
             <ul><li><code>math.fabs()</code> is used instead of <code>abs()</code> for best precision with float numbers</li></ul>
         </li>

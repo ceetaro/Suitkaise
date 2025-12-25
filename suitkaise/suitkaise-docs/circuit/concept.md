@@ -17,7 +17,6 @@ The Circuit class provides a clean, intuitive way to handle failure thresholds a
 - **Sleep on break**: Optional sleep when circuit breaks
 
 ### Flow Control
-- **Flowing state**: Circuit is operational (`circ.flowing` = True)
 - **Broken state**: Circuit has exceeded limits (`circ.broken` = True)
 - **Manual breaking**: Force circuit break with `circ.trip()`
 - **Short counting**: Track number of shorts with `circ.times_shorted`
@@ -37,7 +36,7 @@ from suitkaise import Circuit
 
 circ = Circuit(shorts=4, break_sleep=0.5)  # Break after 4 shorts, sleep 0.5 seconds after breaking
 
-while circ.flowing:
+while not circ.broken:
     try:
         risky_operation()
     except Exception:
@@ -52,7 +51,7 @@ while circ.flowing:
 while program.running:
     circ = Circuit(100)
     
-    while circ.flowing:
+    while not circ.broken:
         memory_usage = get_memory_usage()
         
         if memory_usage > max_threshold:
@@ -81,7 +80,6 @@ for item in large_dataset:
 ## State Management
 
 ### Circuit States
-- **Flowing**: `circ.flowing` returns True, operations continue
 - **Broken**: `circ.broken` returns True, operations should stop
 - **Short count**: `circ.times_shorted` tracks failure count
 
@@ -110,7 +108,7 @@ index = 0
 circ = Circuit(shorts=4, break_sleep=0.5)
 
 # while we have a flowing circuit
-while circ.flowing:
+while not circ.broken:
     current_obj = objs_to_check[index]
 
     for item in current_obj.items():
@@ -142,7 +140,7 @@ while circ.flowing:
 while program.running:
     circ = Circuit(100, 0.1)
 
-    while circ.flowing:
+    while not circ.broken:
         current_mem_usage = mem_mgr.get_current_usage()
 
         if current_mem_usage > max_mem_threshold:
@@ -154,7 +152,7 @@ while program.running:
             circ.short(0.05)
             print(f"Shorted circuit {circ.times_shorted} times.")
 
-        # if circ.broken (or "if not circ.flowing")
+        # if circ.broken
         if circ.broken:
             print("Pausing execution because memory usage exceeds max threshold.")
             break
@@ -173,7 +171,7 @@ def process_risky_data(data_items):
     successful_items = []
     
     for item in data_items:
-        if not circ.flowing:
+        if circ.broken:
             print("Circuit broken, stopping processing")
             break
             
@@ -200,7 +198,7 @@ def smart_retry_loop(operation, max_attempts=10):
     circ = Circuit(shorts=3)  # Allow 3 failures before giving up
     attempt = 0
     
-    while circ.flowing and attempt < max_attempts:
+    while not circ.broken and attempt < max_attempts:
         try:
             result = operation()
             return result  # Success!

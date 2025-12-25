@@ -249,7 +249,7 @@ Methods:
 ```python
 # to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.now() - timer.stats.original_start_time
+real_world_time = sktime.time() - timer.stats.original_start_time
 ```
 
 ### `get_statistics()` / `get_stats()`
@@ -314,16 +314,16 @@ print(timer.stats.mean)
 ```
 ---
 
-## `now()` and `get_current_time()`
+## `time()`
 
-`now()` and `get_current_time()` use `time.time()`. 
+`time()` uses `time.time()`. 
 
-They are simply here so you don't have to import `time` as well as `sktime`.
+It is simply here so you don't have to import `time` as well as `sktime`.
 
 ```python
 from suitkaise import sktime
 
-current_timestamp = sktime.now()
+current_timestamp = sktime.time()
 ```
 
 ---
@@ -394,7 +394,7 @@ with `sktime`: ***3-4 lines***
 ```python
 from suitkaise import sktime # 1
 
-start_time = sktime.now() # 2
+start_time = sktime.time() # 2
 
 # ... do work ...
 
@@ -406,8 +406,8 @@ time_to_complete = sktime.elapsed(start_time) # 3
 # or give 2 times
 from suitkaise import sktime # 1
 
-start_time = sktime.now() # 2
-end_time = sktime.now() + 60 # 3
+start_time = sktime.time() # 2
+end_time = sktime.time() + 60 # 3
 
 time_to_complete = sktime.elapsed(start_time, end_time) # 4
 ```
