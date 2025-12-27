@@ -10,6 +10,155 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>how to use</h1>
-    <p>Circuit module - how to use content coming soon...</p>
+    <h1>How to use <code>circuit</code></h1>
+    
+    <p><code>circuit</code> is here as a simple, easy to use module to improve your code readability and quality of life in certain situations.</p>
+    <p>Perfect for things like resource usage monitoring.</p>
+    <p>Clearer than just using <code>while True:</code> with <code>break</code> statements everywhere.</p>
+
+    <h3>Difference between <code>Circuit</code> and <code>sktime.Yawn</code></h3>
+    <ul>
+        <li><code>Circuit</code> needs to be manually <code>reset()</code> after it has tripped.</li>
+        <li><code>Yawn</code> automatically resets after each sleep.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Basic Usage</h2>
+
+<pre><code class="language-python">from suitkaise import circuit
+
+circ = circuit.Circuit(num_shorts_to_trip=4, sleep_time_after_trip=0.5)
+
+while not circ.broken:
+    try:
+        something_that_might_fail()
+
+    except Exception:
+        circ.short()</code></pre>
+
+    <hr>
+
+    <h2><code>Circuit</code> class</h2>
+
+    <p>A "circuit breaker" that trips and can stop execution after a certain number of <code>short()</code> calls (failures), or immediately if you call <code>trip()</code>.</p>
+    
+    <p><strong>Arguments:</strong></p>
+    <ul>
+        <li><code>num_shorts_to_trip</code>: Maximum number of shorts before the circuit trips (<code>int</code>)</li>
+        <li><code>sleep_time_after_trip</code>: Sleep duration in seconds when circuit trips (<code>float</code>, default <code>0.0</code>)</li>
+    </ul>
+
+    <h3>Properties</h3>
+    <ul>
+        <li><code>broken</code> — <code>True</code> if the circuit has tripped, <code>False</code> otherwise</li>
+        <li><code>times_shorted</code> — Number of times <code>short()</code> has been called since last trip</li>
+        <li><code>total_failures</code> — Lifetime count of all failures (never resets)</li>
+    </ul>
+
+    <h3><code>short()</code></h3>
+    <p>Increment the failure count. If the limit is reached, the circuit trips.</p>
+    <ul>
+        <li><code>custom_sleep</code>: Optional override for sleep duration if this short causes a trip</li>
+    </ul>
+
+    <h3><code>trip()</code></h3>
+    <p>Immediately trip the circuit, bypassing short counting.</p>
+    <ul>
+        <li><code>custom_sleep</code>: Optional override for sleep duration</li>
+    </ul>
+
+    <h3><code>reset()</code></h3>
+    <p>Reset the circuit to operational state. Clears <code>broken</code> and <code>times_shorted</code>.</p>
+    <p>Note: <code>total_failures</code> is <strong>not</strong> reset.</p>
+
+    <hr>
+
+    <h2>Example: Object Filtering</h2>
+
+<pre><code class="language-python">from suitkaise import circuit
+
+objs_to_check = [dict1, dict2, dict3, dict4, dict5]  # a bunch of dicts
+index = 0
+
+# create a Circuit object
+circ = circuit.Circuit(num_shorts_to_trip=4, sleep_time_after_trip=0.5)
+
+# while we have a flowing circuit
+while not circ.broken:
+    current_obj = objs_to_check[index]
+
+    for item in current_obj.items():
+        # we should only add up to 3 LargeSizedObjs total across all dicts
+        if isinstance(item, LargeSizedObj):
+            # short the circuit. if this circuit shorts 4 times, it will trip
+            circ.short()
+        if isinstance(item, ComplexObject):
+            # immediately trip the circuit
+            circ.trip()
+
+        # if the circuit has tripped
+        if circ.broken:
+            break
+
+    # check if circuit has tripped
+    if circ.broken:
+        pass
+    else:
+        dicts_with_valid_items.append(current_obj)
+    index += 1</code></pre>
+
+    <hr>
+
+    <h2>Example: Memory Monitoring</h2>
+
+<pre><code class="language-python"># sleeping after a circuit trip
+
+while program.running:
+    circ = circuit.Circuit(num_shorts_to_trip=100, sleep_time_after_trip=0.1)
+
+    while not circ.broken:
+        current_mem_usage = mem_mgr.get_current_usage()
+
+        if current_mem_usage > max_mem_threshold:
+            # will sleep execution for 5 seconds when trip() is called
+            circ.trip(custom_sleep=5)
+
+        if current_mem_usage > recc_mem_threshold:
+            # will sleep execution for 0.05 seconds instead of default 0.1 if this short causes a trip
+            circ.short(custom_sleep=0.05)
+            print(f"Shorted circuit {circ.times_shorted} times. Total failures: {circ.total_failures}")
+
+        # if circ.broken
+        if circ.broken:
+            print("Pausing execution because memory usage exceeds max threshold.")
+            break
+        
+        # do actual work
+        do_memory_intensive_work()</code></pre>
+
+    <hr>
+
+    <h2>Thread Safety</h2>
+    <p><code>Circuit</code> is thread-safe. All property access and state modifications are protected by an internal <code>threading.RLock()</code>.</p>
+
+<pre><code class="language-python">import threading
+from suitkaise import circuit
+
+breaker = circuit.Circuit(num_shorts_to_trip=5)
+
+def worker():
+    while not breaker.broken:  # Thread-safe read
+        try:
+            do_work()
+        except Error:
+            breaker.short()  # Thread-safe modification
+
+# Multiple threads can share the same breaker
+threads = [threading.Thread(target=worker) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()</code></pre>
+
 </section>

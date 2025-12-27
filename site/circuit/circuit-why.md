@@ -8,11 +8,12 @@ what problems it solves
 
 text = "
 
-Genuinely, I created this purely as a support module for the other modules.
+This is a super simple module that I added in.
 
 Here is why:
 
 - cleaner code
+- thread safety
 - easier to think about
 - readable
 - adds error handling 

@@ -10,6 +10,60 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>why</h1>
-    <p>Circuit module - why content coming soon...</p>
+    <h1>Why <code>circuit</code>?</h1>
+    
+    <p>This is a super simple module that I added in.</p>
+    
+    <p>Here is why:</p>
+    
+    <ul>
+        <li><strong>Cleaner code</strong> — no more <code>while True:</code> with scattered <code>break</code> statements</li>
+        <li><strong>Easier to think about</strong> — the circuit breaker pattern is intuitive</li>
+        <li><strong>Readable</strong> — <code>while not circ.broken:</code> clearly communicates intent</li>
+        <li><strong>Error handling</strong> — count failures and exit gracefully</li>
+        <li><strong>Optional sleep</strong> — add cooldown periods after failure thresholds</li>
+        <li><strong>Thread-safe</strong> — share a circuit across multiple threads</li>
+    </ul>
+    
+    <p>It is purely for quality of life! Cheers</p>
+
+    <hr>
+
+    <h2>Before and After</h2>
+
+    <h3>Without <code>circuit</code></h3>
+
+<pre><code class="language-python"># Manual failure counting
+failures = 0
+max_failures = 5
+
+while True:
+    try:
+        result = risky_operation()
+        break  # Success, exit loop
+    except SomeError:
+        failures += 1
+        if failures >= max_failures:
+            print("Too many failures, giving up")
+            break
+        time.sleep(0.5)  # Manual sleep</code></pre>
+
+    <h3>With <code>circuit</code></h3>
+
+<pre><code class="language-python">from suitkaise import circuit
+
+circ = circuit.Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.5)
+
+while not circ.broken:
+    try:
+        result = risky_operation()
+        break  # Success, exit loop
+    except SomeError:
+        circ.short()  # Count failure, sleep if limit reached
+
+if circ.broken:
+    print("Too many failures, giving up")</code></pre>
+
+    <p>The <code>circuit</code> version is clearer about what's happening and handles the sleep automatically.</p>
+
 </section>
