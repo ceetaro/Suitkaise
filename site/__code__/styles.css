@@ -688,6 +688,26 @@ body {
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
     font-size: 1rem;
     opacity: 0.6;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    color: var(--text-color);
+}
+
+.module-bar-title:hover {
+    opacity: 0.8;
+}
+
+.module-bar-title.highlight-active {
+    opacity: 1;
+    color: rgb(255, 215, 100);
+}
+
+.module-bar-title.highlight-active:hover {
+    border-color: rgba(255, 215, 100, 0.4);
 }
 
 .module-bar-nav {
@@ -868,51 +888,45 @@ body {
 /* Strings */
 .module-page .token.string,
 .module-page .token.attr-value {
-    color: rgba(109, 233, 149, 0.75);
+    color: rgba(140, 245, 175, 0.85);
 }
 
 /* Keywords (from, import, def, class, if, else, etc.) */
 .module-page .token.keyword {
-    color: rgba(109, 233, 149, 0.85);
+    color: rgba(140, 245, 175, 0.95);
 }
 
 /* Function names */
 .module-page .token.function {
-    color: rgba(109, 233, 149, 0.8);
+    color: rgba(140, 245, 175, 0.9);
 }
 
 /* Numbers */
 .module-page .token.number {
-    color: rgba(150, 230, 180, 0.8);
+    color: rgba(170, 245, 200, 0.9);
 }
 
 /* Operators */
 .module-page .token.operator {
-    color: rgba(109, 233, 149, 0.6);
+    color: rgba(140, 245, 175, 0.7);
     background: none;
 }
 
 /* Punctuation */
 .module-page .token.punctuation {
-    color: rgba(109, 233, 149, 0.5);
+    color: rgba(140, 245, 175, 0.6);
 }
 
 /* Built-ins and class names */
 .module-page .token.builtin,
 .module-page .token.class-name {
-    color: rgba(109, 233, 149, 0.85);
+    color: rgba(140, 245, 175, 0.95);
 }
 
 /* Boolean and None */
 .module-page .token.boolean,
 .module-page .token.constant {
-    color: rgba(150, 230, 180, 0.75);
-}
-
-/* Decorators - make entire decorator line white */
-.module-page .decorator-line-wrapper,
-.module-page .decorator-line-wrapper * {
-    color: rgba(255, 255, 255, 0.9) !important;
+    color: rgba(170, 245, 200, 0.85);
 }
 
 /* Horizontal separator */
@@ -930,6 +944,25 @@ body {
 
 .module-page em {
     color: rgba(109, 233, 149, 0.5);
+}
+
+.module-page h3 em {
+    color: rgb(255, 215, 100);
+}
+
+/* Pulsing line count comments */
+@keyframes pulse-brightness {
+    0%, 100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.line-count {
+    color: rgb(255, 215, 100) !important;
+    animation: pulse-brightness 2s ease-in-out infinite;
 }
 
 /* Dropdown/Details styling */
@@ -1055,6 +1088,31 @@ body {
 
 .about-page .learn-more-link:hover {
     color: rgba(160, 240, 200, 0.8);
+}
+
+/* API highlight - module API names like SKPath, Timer, Circuit, etc. */
+.api-highlight,
+.module-page .api-highlight,
+.module-page pre .api-highlight,
+.module-page pre code .api-highlight,
+.module-page code .api-highlight,
+.about-page .api-highlight,
+.about-page pre .api-highlight,
+.about-page pre code .api-highlight,
+pre code .api-highlight {
+    transition: color 0.2s ease;
+}
+
+/* When highlight is active */
+.highlight-active .api-highlight,
+.module-page.highlight-active .api-highlight,
+.module-page.highlight-active pre .api-highlight,
+.module-page.highlight-active pre code .api-highlight,
+.module-page.highlight-active code .api-highlight,
+.about-page.highlight-active .api-highlight,
+.about-page.highlight-active pre .api-highlight,
+.about-page.highlight-active pre code .api-highlight {
+    color: rgb(255, 215, 100) !important;
 }
 
 /* ============================================

@@ -98,6 +98,427 @@ document.addEventListener('DOMContentLoaded', () => {
             codeBlock.innerHTML = processedLines.join('\n');
         });
     }
+    
+    function styleLineCountComments() {
+        // Find all comment tokens in code blocks
+        const comments = document.querySelectorAll('.module-page pre code .token.comment');
+        
+        comments.forEach(comment => {
+            const text = comment.textContent;
+            // Match "# N" pattern (e.g., "# 1", "# 2", etc.)
+            if (/^#\s*\d+$/.test(text.trim())) {
+                comment.classList.add('line-count');
+            }
+        });
+    }
+
+    // Global state for API highlight toggle
+    let apiHighlightEnabled = true;
+    
+    function toggleAPIHighlight() {
+        apiHighlightEnabled = !apiHighlightEnabled;
+        
+        // Update module bar title
+        const moduleBarTitle = document.querySelector('.module-bar-title');
+        if (moduleBarTitle) {
+            if (apiHighlightEnabled) {
+                moduleBarTitle.classList.add('highlight-active');
+            } else {
+                moduleBarTitle.classList.remove('highlight-active');
+            }
+        }
+        
+        // Update module page content
+        const modulePage = document.querySelector('.module-page, .about-page');
+        if (modulePage) {
+            if (apiHighlightEnabled) {
+                modulePage.classList.add('highlight-active');
+            } else {
+                modulePage.classList.remove('highlight-active');
+            }
+        }
+    }
+    
+    function setupModuleBarToggle() {
+        const moduleBarTitle = document.querySelector('.module-bar-title');
+        if (moduleBarTitle) {
+            // Set initial state
+            if (apiHighlightEnabled) {
+                moduleBarTitle.classList.add('highlight-active');
+            }
+            
+            // Add click listener
+            moduleBarTitle.addEventListener('click', toggleAPIHighlight);
+        }
+        
+        // Set initial state on module page
+        const modulePage = document.querySelector('.module-page, .about-page');
+        if (modulePage && apiHighlightEnabled) {
+            modulePage.classList.add('highlight-active');
+        }
+    }
+
+    function styleAPIHighlights() {
+        // API identifiers to highlight
+        const apiModules = new Set(['suitkaise', 'sktime', 'skpath', 'circuit', 'cerial', 'processing', 'docs']);
+        const apiClasses = new Set(['SKPath', 'Timer', 'TimeThis', 'Yawn', 'Circuit', 'Process', 'CustomRoot', 'AnyPath', 'Permission']);
+        const apiMethods = new Set(['timethis', 'autopath', 'sleep', 'time', 'elapsed', 'get_stats', 'get_statistics']);
+        
+        // Overrides: properties that should highlight word.property.chain patterns
+        // These only activate if their associated decorator is found in the code block
+        const overrideConfig = {
+            'timer': '@sktime.timethis'  // timer property only highlights if @sktime.timethis decorator exists
+        };
+        
+        // Find all code blocks
+        const codeBlocks = document.querySelectorAll('.module-page pre code, .about-page pre code');
+        
+        codeBlocks.forEach(codeBlock => {
+            // Track variables assigned to API objects in this block
+            const apiVariables = new Set();
+            
+            // Get the text content to analyze for variable assignments
+            const textContent = codeBlock.textContent;
+            
+            // Determine which overrides are active based on decorators found in code block
+            const activeOverrides = new Set();
+            for (const [property, requiredDecorator] of Object.entries(overrideConfig)) {
+                if (textContent.includes(requiredDecorator)) {
+                    activeOverrides.add(property);
+                }
+            }
+            
+            // Find variable assignments like: varname = sktime.Timer()
+            const assignmentPatterns = [
+                /(\w+)\s*=\s*(?:sktime|skpath|circuit|cerial|processing)\.\w+/g,
+                /(\w+)\s*=\s*(?:Timer|TimeThis|Yawn|SKPath|Circuit|Process|CustomRoot|AnyPath|Permission)\s*\(/g,
+                /with\s+(?:sktime|skpath|circuit|cerial|processing)\.\w+[^:]*\s+as\s+(\w+)/g,
+            ];
+            
+            assignmentPatterns.forEach(pattern => {
+                let match;
+                while ((match = pattern.exec(textContent)) !== null) {
+                    if (match[1]) apiVariables.add(match[1]);
+                }
+            });
+            
+            // If @sktime.timethis is found, find functions decorated with it and add word.timer patterns
+            // Pattern: @sktime.timethis followed by def function_name
+            if (activeOverrides.has('timer')) {
+                // Find function names decorated with @sktime.timethis
+                const decoratorPattern = /@sktime\.timethis[^\n]*\s*def\s+(\w+)/g;
+                let match;
+                while ((match = decoratorPattern.exec(textContent)) !== null) {
+                    if (match[1]) apiVariables.add(match[1]);
+                }
+                
+                // Also find word.timer patterns directly (for cases like my_function.timer.stats)
+                const timerAccessPattern = /(\w+)\.timer(?:\.|\s|$)/g;
+                while ((match = timerAccessPattern.exec(textContent)) !== null) {
+                    if (match[1]) apiVariables.add(match[1]);
+                }
+            }
+            
+            // Walk through all text nodes and wrap API identifiers
+            const walker = document.createTreeWalker(
+                codeBlock,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            const nodesToProcess = [];
+            let node;
+            while (node = walker.nextNode()) {
+                // Skip if inside a comment span
+                let parent = node.parentElement;
+                let isComment = false;
+                while (parent && parent !== codeBlock) {
+                    if (parent.classList && parent.classList.contains('comment')) {
+                        isComment = true;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+                if (!isComment && node.textContent.trim()) {
+                    nodesToProcess.push(node);
+                }
+            }
+            
+            nodesToProcess.forEach(textNode => {
+                const text = textNode.textContent;
+                
+                // Build regex pattern for all API identifiers
+                const allIdentifiers = [
+                    ...apiModules,
+                    ...apiClasses, 
+                    ...apiMethods,
+                    ...apiVariables,
+                    ...activeOverrides  // Add active override properties (like 'timer') as identifiers
+                ];
+                
+                // Check if this text contains any API identifiers
+                let hasMatch = false;
+                for (const id of allIdentifiers) {
+                    if (text.includes(id)) {
+                        hasMatch = true;
+                        break;
+                    }
+                }
+                // Also check for @ decorator
+                if (text.includes('@')) hasMatch = true;
+                // Also check for active override patterns (e.g., "timer" only if @sktime.timethis was found)
+                for (const id of activeOverrides) {
+                    if (text.toLowerCase().includes(id)) {
+                        hasMatch = true;
+                        break;
+                    }
+                }
+                
+                if (!hasMatch) return;
+                
+                // Create pattern to match identifiers
+                const identifierPattern = allIdentifiers
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .join('|');
+                
+                // Build overrides pattern for active overrides only
+                const overridesPattern = [...activeOverrides]
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .join('|');
+                
+                // Match patterns:
+                // 1. Decorators: @identifier.method()
+                // 2. Module.something chains: sktime.Timer(), skpath.get_project_root()
+                // 3. Standalone classes: SKPath(), Timer()
+                // 4. Variables with chains: t.stats.mean, circ.flowing
+                // 5. Override patterns: word.timer.chain... (1 word before, all words after connected by dots)
+                let regexPattern = `(@(?:${identifierPattern})(?:\\.\\w+)*(?:\\(\\))?)|` +  // decorators with empty ()
+                    `\\b(${identifierPattern})(?:\\.\\w+)*(\\(\\))?`;  // identifiers with chains and optional ()
+                
+                // Add override pattern only if there are active overrides
+                if (activeOverrides.size > 0) {
+                    regexPattern = `(@(?:${identifierPattern})(?:\\.\\w+)*(?:\\(\\))?)|` +  // decorators with empty ()
+                        `(\\b\\w+)\\.(${overridesPattern})(?:\\.\\w+)*(\\(\\))?|` +  // override: word.timer.chain...()
+                        `\\b(${identifierPattern})(?:\\.\\w+)*(\\(\\))?`;  // identifiers with chains and optional ()
+                }
+                
+                const regex = new RegExp(regexPattern, 'gi');
+                
+                const parts = [];
+                let lastIndex = 0;
+                let match;
+                
+                while ((match = regex.exec(text)) !== null) {
+                    // Add text before match
+                    if (match.index > lastIndex) {
+                        parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
+                    }
+                    
+                    // Create highlighted span for match
+                    const span = document.createElement('span');
+                    span.className = 'api-highlight';
+                    span.textContent = match[0];
+                    parts.push(span);
+                    
+                    lastIndex = regex.lastIndex;
+                }
+                
+                // Add remaining text
+                if (lastIndex < text.length) {
+                    parts.push(document.createTextNode(text.slice(lastIndex)));
+                }
+                
+                // Replace text node with parts if we found matches
+                if (parts.length > 0 && lastIndex > 0) {
+                    const parent = textNode.parentNode;
+                    parts.forEach(part => parent.insertBefore(part, textNode));
+                    parent.removeChild(textNode);
+                }
+            });
+            
+            // Second pass: extend api-highlight to include adjacent "()" 
+            // This handles cases where Prism split the parens into separate tokens
+            const highlights = codeBlock.querySelectorAll('.api-highlight');
+            highlights.forEach(highlight => {
+                let nextSibling = highlight.nextSibling;
+                
+                // Skip whitespace text nodes
+                while (nextSibling && nextSibling.nodeType === Node.TEXT_NODE && !nextSibling.textContent.trim()) {
+                    nextSibling = nextSibling.nextSibling;
+                }
+                
+                // Check if next element is "(" or "()"
+                if (nextSibling) {
+                    let textToAdd = '';
+                    let nodesToRemove = [];
+                    
+                    // Handle text node with "(" or "()"
+                    if (nextSibling.nodeType === Node.TEXT_NODE) {
+                        const text = nextSibling.textContent;
+                        if (text.startsWith('()')) {
+                            textToAdd = '()';
+                            if (text === '()') {
+                                nodesToRemove.push(nextSibling);
+                            } else {
+                                nextSibling.textContent = text.slice(2);
+                            }
+                        } else if (text.startsWith('(')) {
+                            // Look for closing )
+                            if (text === '(') {
+                                const afterOpen = nextSibling.nextSibling;
+                                if (afterOpen && afterOpen.nodeType === Node.TEXT_NODE && afterOpen.textContent.startsWith(')')) {
+                                    textToAdd = '()';
+                                    nodesToRemove.push(nextSibling);
+                                    if (afterOpen.textContent === ')') {
+                                        nodesToRemove.push(afterOpen);
+                                    } else {
+                                        afterOpen.textContent = afterOpen.textContent.slice(1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Handle span element containing "(" or "()" (Prism punctuation token)
+                    else if (nextSibling.nodeType === Node.ELEMENT_NODE) {
+                        const text = nextSibling.textContent;
+                        if (text === '()' || text === '(') {
+                            if (text === '()') {
+                                textToAdd = '()';
+                                nodesToRemove.push(nextSibling);
+                            } else if (text === '(') {
+                                // Look for closing ) in next sibling
+                                const afterOpen = nextSibling.nextSibling;
+                                if (afterOpen) {
+                                    const afterText = afterOpen.textContent;
+                                    if (afterText === ')' || afterText.startsWith(')')) {
+                                        textToAdd = '()';
+                                        nodesToRemove.push(nextSibling);
+                                        if (afterText === ')') {
+                                            nodesToRemove.push(afterOpen);
+                                        } else if (afterOpen.nodeType === Node.TEXT_NODE) {
+                                            afterOpen.textContent = afterText.slice(1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Extend the highlight
+                    if (textToAdd) {
+                        highlight.textContent += textToAdd;
+                        nodesToRemove.forEach(n => n.parentNode.removeChild(n));
+                    }
+                }
+            });
+            
+            // Third pass: merge api-highlight chains connected by dots
+            // This handles cases like my_function.timer.stats.mean where Prism splits them
+            // Only merges if the chain contains 'timer' (when activeOverrides has 'timer')
+            if (activeOverrides.has('timer')) {
+                let merged = true;
+                while (merged) {
+                    merged = false;
+                    const currentHighlights = codeBlock.querySelectorAll('.api-highlight');
+                    for (const highlight of currentHighlights) {
+                        // Only process highlights that contain 'timer' in their chain
+                        const highlightText = highlight.textContent.toLowerCase();
+                        const hasTimer = highlightText.includes('timer') || 
+                                        highlightText.includes('.timer') ||
+                                        (highlight.previousSibling && highlight.previousSibling.textContent === '.' &&
+                                         highlight.previousSibling.previousSibling && 
+                                         highlight.previousSibling.previousSibling.textContent &&
+                                         highlight.previousSibling.previousSibling.textContent.toLowerCase().includes('timer'));
+                        
+                        if (!highlightText.includes('timer')) {
+                            // Check if this highlight is part of a timer chain
+                            let prev = highlight.previousSibling;
+                            let isPartOfTimerChain = false;
+                            while (prev) {
+                                if (prev.classList && prev.classList.contains('api-highlight') && 
+                                    prev.textContent.toLowerCase().includes('timer')) {
+                                    isPartOfTimerChain = true;
+                                    break;
+                                }
+                                prev = prev.previousSibling;
+                            }
+                            if (!isPartOfTimerChain) continue;
+                        }
+                        
+                        let nextNode = highlight.nextSibling;
+                        
+                        // Check for pattern: highlight -> "." -> (highlight or word)
+                        if (nextNode) {
+                            // Check if next is a dot (text node or punctuation span)
+                            let isDot = false;
+                            let dotNode = null;
+                            if (nextNode.nodeType === Node.TEXT_NODE && nextNode.textContent.startsWith('.')) {
+                                isDot = true;
+                                dotNode = nextNode;
+                            } else if (nextNode.nodeType === Node.ELEMENT_NODE && nextNode.textContent === '.') {
+                                isDot = true;
+                                dotNode = nextNode;
+                            }
+                            
+                            if (isDot) {
+                                let afterDot = dotNode.nextSibling;
+                                
+                                // Handle case where dot and next word are in same text node
+                                if (dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent.length > 1) {
+                                    const restAfterDot = dotNode.textContent.slice(1);
+                                    // Only match alphanumeric + underscore for identifiers
+                                    const wordMatch = restAfterDot.match(/^([a-zA-Z_][a-zA-Z0-9_]*)(.*)/);
+                                    if (wordMatch) {
+                                        highlight.textContent += '.' + wordMatch[1];
+                                        if (wordMatch[2]) {
+                                            dotNode.textContent = wordMatch[2];
+                                        } else {
+                                            dotNode.parentNode.removeChild(dotNode);
+                                        }
+                                        merged = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (afterDot && afterDot.classList && afterDot.classList.contains('api-highlight')) {
+                                    // Merge: highlight + "." + highlight
+                                    highlight.textContent += '.' + afterDot.textContent;
+                                    dotNode.parentNode.removeChild(dotNode);
+                                    afterDot.parentNode.removeChild(afterDot);
+                                    merged = true;
+                                    break;
+                                } else if (afterDot && afterDot.nodeType === Node.TEXT_NODE && /^[a-zA-Z_]/.test(afterDot.textContent)) {
+                                    // Absorb the identifier (alphanumeric + underscore)
+                                    const wordMatch = afterDot.textContent.match(/^([a-zA-Z_][a-zA-Z0-9_]*)(.*)/s);
+                                    if (wordMatch) {
+                                        const word = wordMatch[1];
+                                        const rest = wordMatch[2];
+                                        highlight.textContent += '.' + word;
+                                        dotNode.parentNode.removeChild(dotNode);
+                                        if (rest) {
+                                            afterDot.textContent = rest;
+                                        } else {
+                                            afterDot.parentNode.removeChild(afterDot);
+                                        }
+                                        merged = true;
+                                        break;
+                                    }
+                                } else if (afterDot && afterDot.nodeType === Node.ELEMENT_NODE && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(afterDot.textContent)) {
+                                    // Absorb identifier from element (like a Prism token)
+                                    highlight.textContent += '.' + afterDot.textContent;
+                                    dotNode.parentNode.removeChild(dotNode);
+                                    afterDot.parentNode.removeChild(afterDot);
+                                    merged = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 
     // ============================================
     // Page Content Storage
@@ -518,10 +939,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof Prism !== 'undefined') {
             Prism.highlightAll();
             styleDecoratorLines();
+            styleLineCountComments();
+            styleAPIHighlights();
         }
         
         // Setup module bar links if present
         setupModuleBarLinks();
+        
+        // Setup module bar title toggle for API highlighting
+        setupModuleBarToggle();
     }
     
     // ============================================

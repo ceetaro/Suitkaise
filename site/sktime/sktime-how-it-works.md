@@ -151,14 +151,14 @@ Returns:
 2. Increments `yawn_count` by 1
 
 3. Checks if `yawn_count >= yawn_threshold`:
-   - **If `True`:**
+   - *If `True`:*
      - If `log_sleep` is True, prints a message about sleeping
      - Calls `time.sleep(sleep_duration)` to actually sleep
      - Resets `yawn_count` to 0
      - Increments `total_sleeps` by 1
      - Returns `True`
 
-   - **If `False`:**
+   - *If `False`:*
      - Returns `False`
 
 4. Releases the thread lock
