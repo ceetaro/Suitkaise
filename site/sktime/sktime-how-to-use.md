@@ -43,9 +43,9 @@ def my_function():
 for i in range(100):
     my_function()
 
-# get stats via the organized stats namespace
-mean = my_function.timer.stats.mean
-stdev = my_function.timer.stats.stdev
+# get stats directly on the timer
+mean = my_function.timer.mean
+stdev = my_function.timer.stdev
 
 # or get a frozen snapshot
 snapshot = my_function.timer.get_stats()
@@ -73,8 +73,8 @@ def MyClass:
 # a bunch of MyClass instances are created and their functions are called
 
 # get stats on my_function and my_function_2 execution times
-print(t.stats.mean)
-print(t.stats.percentile(95))
+print(t.mean)
+print(t.percentile(95))
 ```
 
 You can stack `@timethis` decorators on the same function.
@@ -99,13 +99,13 @@ def my_function_2():
 # ...
 
 # get stats on my_function and my_function_2 execution times
-print(t.stats.mean)
+print(t.mean)
 
 # get stats only on my_function
-print(my_function.timer.stats.mean)
+print(my_function.timer.mean)
 
 # get stats only on my_function_2
-print(my_function_2.timer.stats.mean)
+print(my_function_2.timer.mean)
 ```
 ---
 
@@ -145,10 +145,10 @@ for i in range(100):
     sktime.sleep(60)
     timer.stop()
 
-# access stats through the stats namespace
-mean = timer.stats.mean
-std = timer.stats.stdev
-p95 = timer.stats.percentile(95)
+# access stats directly on the timer
+mean = timer.mean
+std = timer.stdev
+p95 = timer.percentile(95)
 
 # or get a frozen snapshot
 snapshot = timer.get_stats()
@@ -186,8 +186,30 @@ for i in range(100):
     # stops and instantly starts a new measurement
     timer.lap()
 
+# stop the timer without recording a 101st measurement
+timer.discard()
+
 # 100 measurements recorded
-print(timer.stats.mean)
+print(timer.mean)
+```
+
+or...
+
+```python
+from suitkaise import sktime
+
+timer = sktime.Timer()
+
+with sktime.TimeThis(timer):
+    for i in range(100):
+
+        my_function()
+
+        # stops and instantly starts a new measurement
+        timer.lap()
+
+# 100 measurements recorded
+print(timer.mean)
 ```
 
 ### `pause()` and `resume()`
@@ -229,42 +251,42 @@ timer = sktime.Timer()
 timer.add_time(10.0)
 timer.add_time(15.0)
 
-print(timer.stats.mean)  # 12.5
+print(timer.mean)  # 12.5
 ```
 
 ### `reset()`
 
 Reset the timer back to its initial state as if it was just created.
 
-### All `Timer` statistics (via `timer.stats`)
+### All `Timer` statistics
 
-All statistics are accessed through the organized `stats` namespace:
+All statistics are accessed directly on the timer:
 
 Properties:
-- `timer.stats.num_times` - Number of times recorded
-- `timer.stats.most_recent` - Most recent time
-- `timer.stats.most_recent_index` - Index of most recent time
-- `timer.stats.result` - Most recent time (alias)
-- `timer.stats.total_time` - Sum of all times
-- `timer.stats.total_time_paused` - Total time spent paused
-- `timer.stats.mean` - Average of all times
-- `timer.stats.median` - Median of all times
-- `timer.stats.min` / `timer.stats.fastest_time` - Minimum time
-- `timer.stats.max` / `timer.stats.slowest_time` - Maximum time
-- `timer.stats.stdev` - Standard deviation
-- `timer.stats.variance` - Variance
-- `timer.stats.slowest_index` - Index of slowest time
-- `timer.stats.fastest_index` - Index of fastest time
-- `timer.stats.original_start_time` - Original start time of the timer
+- `timer.num_times` - Number of times recorded
+- `timer.most_recent` - Most recent time
+- `timer.most_recent_index` - Index of most recent time
+- `timer.result` - Most recent time (alias)
+- `timer.total_time` - Sum of all times
+- `timer.total_time_paused` - Total time spent paused
+- `timer.mean` - Average of all times
+- `timer.median` - Median of all times
+- `timer.min` / `timer.fastest_time` - Minimum time
+- `timer.max` / `timer.slowest_time` - Maximum time
+- `timer.stdev` - Standard deviation
+- `timer.variance` - Variance
+- `timer.slowest_index` - Index of slowest time
+- `timer.fastest_index` - Index of fastest time
+- `timer.original_start_time` - Original start time of the timer
 
 Methods:
-- `timer.stats.get_time(index)` - Get time by standard 0-based index
-- `timer.stats.percentile(percent)` - Calculate any percentile (0-100)
+- `timer.get_time(index)` - Get time by standard 0-based index
+- `timer.percentile(percent)` - Calculate any percentile (0-100)
 
 ```python
 # to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.time() - timer.stats.original_start_time
+real_world_time = sktime.time() - timer.original_start_time
 ```
 
 ### `get_statistics()` / `get_stats()`
@@ -307,7 +329,7 @@ with sktime.TimeThis() as timer:
     pass
 
 # get the time that was just recorded (returns the Timer object)
-print(timer.stats.most_recent)
+print(timer.most_recent)
 ```
 
 When using it like this, a new timer is created each time.
@@ -325,7 +347,7 @@ with sktime.TimeThis(timer=timer):
     # Your code here
     pass
 
-print(timer.stats.mean)
+print(timer.mean)
 ```
 ---
 

@@ -196,7 +196,12 @@ The `AnyPath` type is a union of `str`, `Path`, and `SKPath`. You can use this t
 
 ## `@autopath` Decorator
 
-Converts path parameters based on type annotations.
+Automatically converts paths to the types that a function expects.
+
+- Paths get normalized through `SKPath` first
+- Converts before passing, avoiding `TypeErrors`
+- Works with iterables
+- `SKPath`, `Path`, and `str` can be used interchangeably
 
 ```python
 from suitkaise.skpath import autopath, AnyPath, SKPath
@@ -235,11 +240,42 @@ def i_like_pathlib(pathlib_path: Path):
 # convert SKPaths and Paths to strings
 @autopath()
 def i_like_strings(string_path: str):
-    # SKPaths and Paths are converted to strings (absolute path)
+
+    # All inputs are normalized: "./data\\file.txt" → "/abs/path/data/file.txt"
+
     return string_path.upper()  # it's a regular string now
 ```
 
-NOTE: `@autopath` will NOT normalize separators to `/` if a user passes in a string to a parameter annotated as `str`. Normalization only occurs when converting to `SKPath`.
+### `only`
+
+Tells `@autopath` to only focus on given parameters. 
+
+Use this for performance when you have `str` or `list[str]` parameters that aren't actually file paths.
+
+When not using `only`, all parameters accepting `SKPath`, `Path`, or `str` will be normalized and converted.
+
+When using `only`, ONLY the parameters specified will do this.
+
+```python
+from suitkaise.skpath import autopath
+
+@autopath(only="file_path")
+def process_with_data(file_path: str, names: list[str], ids: list[str]):
+
+    # Only file_path is normalized
+    # names and ids are passed through unchanged (much faster!)
+    return file_path
+```
+
+```python
+# Multiple parameters
+@autopath(only=["input_path", "output_path"])
+def copy_file(input_path: str, output_path: str, metadata: list[str]):
+
+    # input_path and output_path are normalized
+    # metadata is left unchanged
+    ...
+```
 
 ### `use_caller`
 
@@ -280,7 +316,7 @@ process_file("myproject/feature1/file.txt")
 
 ### `debug`
 
-If `debug` is `True`, `@autopath` will output a message when a conversion is made.
+If `debug` is `True`, `@autopath` will output a message when a conversion is made or a path string is normalized.
 
 ```python
 from suitkaise.skpath import autopath, AnyPath
@@ -290,8 +326,11 @@ def process_file(path: AnyPath):
     return path.id
 ```
 
-For example, if a string got converted to a SKPath, it would output:
+Output when a string got converted to a SKPath:
 `"@autopath: Converted path: str → SKPath"`
+
+Output when a string was normalized:
+`"@autopath: Normalized path: './file.txt' → '/abs/path/file.txt'"`
 
 ## Functions
 

@@ -194,23 +194,22 @@ t = sktime.Timer()</code></pre>
                 <li><code>_paused_durations</code>: empty list to track pause time for each measurement</li>
                 <li><code>_lock</code>: creates a <code>threading.RLock()</code> for thread safety</li>
                 <li><code>_sessions</code>: empty dictionary to track timing sessions per thread (keyed by thread ID)</li>
-                <li><code>_stats_view</code>: a <code>TimerStatsView</code> instance for accessing statistics</li>
-            </ul>
+                </ul>
         </li>
     </ol>
     <p>Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.</p>
 
-    <h3><code>Timer.stats</code> property</h3>
-    <p>The <code>stats</code> property returns a <code>TimerStatsView</code> that provides organized access to all timer statistics.</p>
+    <h3>Statistics properties and methods</h3>
+    <p>All statistics are accessed directly on the timer as properties and methods.</p>
 <pre><code class="language-python">timer = sktime.Timer()
 # ... record some timings ...
 
-# Access statistics through the stats namespace
-print(timer.stats.mean)
-print(timer.stats.stdev)
-print(timer.stats.percentile(95))
-print(timer.stats.num_times)</code></pre>
-    <p>The <code>TimerStatsView</code> is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.</p>
+# Access statistics directly on the timer
+print(timer.mean)
+print(timer.stdev)
+print(timer.percentile(95))
+print(timer.num_times)</code></pre>
+    <p>All statistics are live - they always reflect the current state of the timer. All property accesses are thread-safe.</p>
 
     <h3><code>Timer.start()</code></h3>
     <p>Starts timing a new measurement.</p>
@@ -421,8 +420,8 @@ except Exception:
         <li>Returns None</li>
     </ol>
 
-    <h3><code>TimerStatsView</code> properties (via <code>timer.stats</code>)</h3>
-    <p>All properties are accessed via <code>timer.stats</code> and work by acquiring the lock and calculating from the <code>times</code> list:</p>
+    <h3><code>Timer</code> statistics properties</h3>
+    <p>All statistics are accessed directly on the timer and work by acquiring the lock and calculating from the <code>times</code> list:</p>
 
     <details>
         <summary>Timer Statistics Properties</summary>
@@ -446,9 +445,9 @@ except Exception:
     </details>
     <p>All property accesses acquire the lock to ensure thread-safe reads.</p>
 
-    <h3><code>TimerStatsView</code> methods (via <code>timer.stats</code>)</h3>
+    <h3><code>Timer</code> statistics methods</h3>
 
-    <h4><code>timer.stats.get_time()</code></h4>
+    <h4><code>timer.get_time()</code></h4>
     <p>Gets and returns a specific timing measurement by index.</p>
     <p><strong>Arguments:</strong></p>
     <ul>
@@ -463,7 +462,7 @@ except Exception:
         <li>Releases the lock</li>
     </ol>
 
-    <h4><code>timer.stats.percentile()</code></h4>
+    <h4><code>timer.percentile()</code></h4>
     <p>Calculates a percentile of all measurements.</p>
     <p><strong>Arguments:</strong></p>
     <ul>
@@ -542,8 +541,8 @@ with sktime.TimeThis() as timer:
     pass
 
 # Access stats directly on the returned timer
-print(timer.stats.most_recent)
-print(timer.stats.mean)</code></pre>
+print(timer.most_recent)
+print(timer.mean)</code></pre>
 
     <h3>methods</h3>
 
@@ -633,7 +632,7 @@ print(timer.stats.mean)</code></pre>
         <li>Attaches the timer to the wrapper function:
             <ul>
                 <li>Sets <code>wrapper.timer = the_timer</code></li>
-                <li>This lets you access statistics via <code>your_function.timer.stats.mean</code>, etc.</li>
+                <li>This lets you access statistics via <code>your_function.timer.mean</code>, etc.</li>
             </ul>
         </li>
         <li>At call time (every time the decorated function runs):

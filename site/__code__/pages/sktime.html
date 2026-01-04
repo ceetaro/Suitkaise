@@ -40,9 +40,9 @@ def my_function():
 for i in range(100):
     my_function()
 
-# get stats via the organized stats namespace
-mean = my_function.timer.stats.mean
-stdev = my_function.timer.stats.stdev
+# get live stats
+mean = my_function.timer.mean
+stdev = my_function.timer.stdev
 
 # or get a frozen snapshot
 snapshot = my_function.timer.get_stats()</code></pre>
@@ -68,8 +68,8 @@ def MyClass:
 # a bunch of MyClass instances are created and their functions are called
 
 # get stats on my_function and my_function_2 execution times
-print(t.stats.mean)
-print(t.stats.percentile(95))</code></pre>
+print(t.mean)
+print(t.percentile(95))</code></pre>
 
     <p>You can stack <code>@timethis</code> decorators on the same function.</p>
 
@@ -92,20 +92,20 @@ def my_function_2():
 # ...
 
 # get stats on my_function and my_function_2 execution times
-print(t.stats.mean)
+print(t.mean)
 
 # get stats only on my_function
-print(my_function.timer.stats.mean)
+print(my_function.timer.mean)
 
 # get stats only on my_function_2
-print(my_function_2.timer.stats.mean)</code></pre>
+print(my_function_2.timer.mean)</code></pre>
 
     <hr>
 
     <h2><code>Timer</code> class</h2>
     
     <p>Class that allows you to easily time parts of your code.</p>
-    <p>Powers the <code>@timethis</code> decorator and the <code>TimeThis</code> context manager (below)</p>
+    <p>Powers the <code>@timethis</code> decorator (above) and the <code>TimeThis</code> context manager (below)</p>
 
     <h3><code>start()</code> and <code>stop()</code></h3>
 
@@ -134,9 +134,9 @@ for i in range(100):
     timer.stop()
 
 # access stats through the stats namespace
-mean = timer.stats.mean
-std = timer.stats.stdev
-p95 = timer.stats.percentile(95)
+mean = timer.mean
+std = timer.stdev
+p95 = timer.percentile(95)
 
 # or get a frozen snapshot
 snapshot = timer.get_stats()</code></pre>
@@ -170,8 +170,27 @@ for i in range(100):
     # stops and instantly starts a new measurement
     timer.lap()
 
+# stop the timer without recording a 101st measurement
+timer.discard()
+
 # 100 measurements recorded
-print(timer.stats.mean)</code></pre>
+print(timer.mean)</code></pre>
+
+<pre><code class="language-python"># or use the context manager
+from suitkaise import sktime
+
+timer = sktime.Timer()
+
+with sktime.TimeThis(timer):
+    for i in range(100):
+
+        my_function()
+
+        # stops and instantly starts a new measurement
+        timer.lap()
+
+# 100 measurements recorded
+print(timer.mean)</code></pre>
 
     <h3><code>pause()</code> and <code>resume()</code></h3>
 
@@ -187,14 +206,14 @@ current_file = unzip_and_load_file("Users/joe/Documents/large_file.zip")
 timer.pause()
 
 # time user takes to answer won't be counted - we are paused!
-user_choice = input(f"Process {current_file} now? (y/n): ")  
+user_choice = input(f"scan {current_file} now? (y/n): ")  
 
 # Resume once input is received
 timer.resume()
 
 # Process the file
 if user_choice.lower().strip() == 'y':
-    process_loaded_file()
+    scan_loaded_file()
 
 elapsed = timer.stop()  # Records measurement in statistics
 print(f"Total processing time: {elapsed:.2f}s (excluding user input)")</code></pre>
@@ -209,44 +228,44 @@ timer = sktime.Timer()
 timer.add_time(10.0)
 timer.add_time(15.0)
 
-print(timer.stats.mean)  # 12.5</code></pre>
+print(timer.mean)  # 12.5</code></pre>
 
     <h3><code>reset()</code></h3>
     
     <p>Reset the timer back to its initial state as if it was just created.</p>
 
-    <h3>All <code>Timer</code> statistics (via <code>timer.stats</code>)</h3>
+    <h3>All <code>Timer</code> statistics</h3>
     
     <p>All statistics are accessed through the organized <code>stats</code> namespace:</p>
     
     <p><strong>Properties:</strong></p>
     <ul>
-        <li><code>timer.stats.num_times</code> - Number of times recorded</li>
-        <li><code>timer.stats.most_recent</code> - Most recent time</li>
-        <li><code>timer.stats.most_recent_index</code> - Index of most recent time</li>
-        <li><code>timer.stats.result</code> - Most recent time (alias)</li>
-        <li><code>timer.stats.total_time</code> - Sum of all times</li>
-        <li><code>timer.stats.total_time_paused</code> - Total time spent paused</li>
-        <li><code>timer.stats.mean</code> - Average of all times</li>
-        <li><code>timer.stats.median</code> - Median of all times</li>
-        <li><code>timer.stats.min</code> / <code>timer.stats.fastest_time</code> - Minimum time</li>
-        <li><code>timer.stats.max</code> / <code>timer.stats.slowest_time</code> - Maximum time</li>
-        <li><code>timer.stats.stdev</code> - Standard deviation</li>
-        <li><code>timer.stats.variance</code> - Variance</li>
-        <li><code>timer.stats.slowest_index</code> - Index of slowest time</li>
-        <li><code>timer.stats.fastest_index</code> - Index of fastest time</li>
-        <li><code>timer.stats.original_start_time</code> - Original start time of the timer</li>
+        <li><code>timer.num_times</code> - Number of times recorded</li>
+        <li><code>timer.most_recent</code> - Most recent time</li>
+        <li><code>timer.most_recent_index</code> - Index of most recent time</li>
+        <li><code>timer.result</code> - Most recent time (alias)</li>
+        <li><code>timer.total_time</code> - Sum of all times</li>
+        <li><code>timer.total_time_paused</code> - Total time spent paused</li>
+        <li><code>timer.mean</code> - Average of all times</li>
+        <li><code>timer.median</code> - Median of all times</li>
+        <li><code>timer.min</code> / <code>timer.fastest_time</code> - Minimum time</li>
+        <li><code>timer.max</code> / <code>timer.slowest_time</code> - Maximum time</li>
+        <li><code>timer.stdev</code> - Standard deviation</li>
+        <li><code>timer.variance</code> - Variance</li>
+        <li><code>timer.slowest_index</code> - Index of slowest time</li>
+        <li><code>timer.fastest_index</code> - Index of fastest time</li>
+        <li><code>timer.original_start_time</code> - Original start time of the timer</li>
     </ul>
     
     <p><strong>Methods:</strong></p>
     <ul>
-        <li><code>timer.stats.get_time(index)</code> - Get time by standard 0-based index</li>
-        <li><code>timer.stats.percentile(percent)</code> - Calculate any percentile (0-100)</li>
+        <li><code>timer.get_time(index)</code> - Get time by standard 0-based index</li>
+        <li><code>timer.percentile(percent)</code> - Calculate any percentile (0-100)</li>
     </ul>
 
 <pre><code class="language-python"># to get the real world time passed since the timer started, you can use:
 
-real_world_time = sktime.time() - timer.stats.original_start_time</code></pre>
+real_world_time = sktime.time() - timer.original_start_time</code></pre>
 
     <h3><code>get_statistics()</code> / <code>get_stats()</code></h3>
     
@@ -285,7 +304,7 @@ with sktime.TimeThis() as timer:
     pass
 
 # get the time that was just recorded (returns the Timer object)
-print(timer.stats.most_recent)</code></pre>
+print(timer.most_recent)</code></pre>
 
     <p>When using it like this, a new timer is created each time.</p>
     <p>If you want to use the same timer every time that code is ran, you can create a timer and pass it to the context manager.</p>
@@ -300,7 +319,7 @@ with sktime.TimeThis(timer=timer):
     # Your code here
     pass
 
-print(timer.stats.mean)</code></pre>
+print(timer.mean)</code></pre>
 
     <hr>
 

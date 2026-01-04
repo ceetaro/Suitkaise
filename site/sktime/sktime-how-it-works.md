@@ -239,10 +239,10 @@ timer = sktime.Timer()
 # ... record some timings ...
 
 # Access statistics through the stats namespace
-print(timer.stats.mean)
-print(timer.stats.stdev)
-print(timer.stats.percentile(95))
-print(timer.stats.num_times)
+print(timer.mean)
+print(timer.stdev)
+print(timer.percentile(95))
+print(timer.num_times)
 ```
 
 The `TimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
@@ -496,9 +496,9 @@ Returns:
 4. Releases the lock
 5. Returns None
 
-### `TimerStatsView` properties (via `timer.stats`)
+### `Timer` statistics properties
 
-All properties are accessed via `timer.stats` and work by acquiring the lock and calculating from the `times` list:
+All statistics are accessed directly on the timer and work by acquiring the lock and calculating from the `times` list:
 
 (This section should be a dropdown that users can expand.)
 **`num_times`**: Returns `len(self.times)`
@@ -534,9 +534,9 @@ All properties are accessed via `timer.stats` and work by acquiring the lock and
 
 All property accesses acquire the lock to ensure thread-safe reads.
 
-### `TimerStatsView` methods (via `timer.stats`)
+### `Timer` statistics methods
 
-#### `timer.stats.get_time()`
+#### `timer.get_time()`
 
 Gets and returns a specific timing measurement by index.
 
@@ -552,7 +552,7 @@ Returns:
 4. If invalid, returns `None`
 5. Releases the lock
 
-#### `timer.stats.percentile()`
+#### `timer.percentile()`
 
 Calculates a percentile of all measurements.
 
@@ -649,8 +649,8 @@ with sktime.TimeThis() as timer:
     pass
 
 # Access stats directly on the returned timer
-print(timer.stats.most_recent)
-print(timer.stats.mean)
+print(timer.most_recent)
+print(timer.mean)
 ```
 
 ### methods
@@ -739,7 +739,7 @@ When `timer_instance` is `None` (the default), the decorator creates and manages
 
 5. Attaches the timer to the wrapper function:
     - Sets `wrapper.timer = the_timer`
-    - This lets you access statistics via `your_function.timer.stats.mean`, etc.
+    - This lets you access statistics via `your_function.timer.mean`, etc.
 
 6. At call time (every time the decorated function runs):
     - Same as Mode 1: `start()`, run function, `stop()`

@@ -381,8 +381,8 @@ for i in range(100):
     my_function()
 
 # get stats
-mean = my_function.timer.stats.mean
-stdev = my_function.timer.stats.stdev
+mean = my_function.timer.mean
+stdev = my_function.timer.stdev
 ```
 
 ```python
@@ -393,7 +393,7 @@ with sktime.TimeThis() as timer:
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
 
-most_recent = timer.stats.most_recent
+most_recent = timer.most_recent
 first_time = timer.get_time(0)
 ```
 
@@ -422,9 +422,9 @@ def potential_lagger_3():
 # your program runs...
 
 # get stats
-mean_1 = potential_lagger_1.timer.stats.mean
-mean_2 = potential_lagger_2.timer.stats.mean
-mean_3 = potential_lagger_3.timer.stats.mean
+mean_1 = potential_lagger_1.timer.mean
+mean_2 = potential_lagger_2.timer.mean
+mean_3 = potential_lagger_3.timer.mean
 
 print(f"Potential lagger 1: {mean_1:.3f}s")
 print(f"Potential lagger 2: {mean_2:.3f}s")

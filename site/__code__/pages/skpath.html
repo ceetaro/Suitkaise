@@ -12,7 +12,7 @@
 <section class="module-page">
     <h1>How to use <code>skpath</code></h1>
 
-    <p><code>skpath</code> makes file paths much easier to work with.</p>
+    <p><code>skpath</code> makes file paths much easier to work with.</p><br>
 
     <h2><code>SKPath</code> class</h2>
 
@@ -301,7 +301,7 @@ current_root = skpath.get_custom_root()
 
 skpath.clear_custom_root()</code></pre>
 
-    <h5>Context Manager</h5>
+    <p><code>CustomRoot</code> Context Manager</p>
 
 <pre><code class="language-python">from suitkaise import skpath
 
@@ -323,7 +323,14 @@ path = SKPath(id)</code></pre>
 
     <h2><code>@autopath</code> Decorator</h2>
 
-    <p>Converts path parameters based on type annotations.</p>
+    <p>Automatically converts paths to the types that a function expects.</p>
+    
+    <ul>
+        <li>Paths get normalized through <code>SKPath</code> first</li>
+        <li>Converts before passing, avoiding <code>TypeErrors</code></li>
+        <li>Works with iterables</li>
+        <li><code>SKPath</code>, <code>Path</code>, and <code>str</code> can be used interchangeably</li>
+    </ul>
 
 <pre><code class="language-python">from suitkaise.skpath import autopath, AnyPath, SKPath
 
@@ -354,10 +361,37 @@ def i_like_pathlib(pathlib_path: Path):
 <pre><code class="language-python"># convert SKPaths and Paths to strings
 @autopath()
 def i_like_strings(string_path: str):
-    # SKPaths and Paths are converted to strings (absolute path)
+
+    # All inputs are normalized: "./data\\file.txt" → "/abs/path/data/file.txt"
+
     return string_path.upper()  # it's a regular string now</code></pre>
 
-    <p><strong>NOTE</strong>: <code>@autopath</code> will NOT normalize separators to <code>/</code> if a user passes in a string to a parameter annotated as <code>str</code>. Normalization only occurs when converting to <code>SKPath</code>.</p>
+    <h3><code>only</code></h3>
+
+    <p>Tells <code>@autopath</code> to only focus on given parameters.</p>
+    
+    <p>Use this for performance when you have <code>str</code> or <code>list[str]</code> parameters that aren't actually file paths.</p>
+    
+    <p>When not using <code>only</code>, all parameters accepting <code>SKPath</code>, <code>Path</code>, or <code>str</code> will be normalized and converted.</p>
+    
+    <p>When using <code>only</code>, ONLY the parameters specified will do this.</p>
+
+<pre><code class="language-python">from suitkaise.skpath import autopath
+
+@autopath(only="file_path")
+def process_with_data(file_path: str, names: list[str], ids: list[str]):
+
+    # Only file_path is normalized
+    # names and ids are passed through unchanged (much faster!)
+    return file_path</code></pre>
+
+<pre><code class="language-python"># Multiple parameters
+@autopath(only=["input_path", "output_path"])
+def copy_file(input_path: str, output_path: str, metadata: list[str]):
+
+    # input_path and output_path are normalized
+    # metadata is left unchanged
+    ...</code></pre>
 
     <h3><code>use_caller</code></h3>
 
@@ -391,7 +425,7 @@ process_file("myproject/feature1/file.txt")</code></pre>
 
     <h3><code>debug</code></h3>
 
-    <p>If <code>debug</code> is <code>True</code>, <code>@autopath</code> will output a message when a conversion is made.</p>
+    <p>If <code>debug</code> is <code>True</code>, <code>@autopath</code> will output a message when a conversion is made or a path string is normalized.</p>
 
 <pre><code class="language-python">from suitkaise.skpath import autopath, AnyPath
 
@@ -399,7 +433,8 @@ process_file("myproject/feature1/file.txt")</code></pre>
 def process_file(path: AnyPath):
     return path.id</code></pre>
 
-    <p>For example, if a string got converted to a SKPath, it would output: <code>"@autopath: Converted path: str → SKPath"</code></p>
+    <p>Output when a string got converted to a SKPath: <code>"@autopath: Converted path: str → SKPath"</code></p>
+    <p>Output when a string was normalized: <code>"@autopath: Normalized path: './file.txt' → '/abs/path/file.txt'"</code></p>
 
     <h2>Functions</h2>
 

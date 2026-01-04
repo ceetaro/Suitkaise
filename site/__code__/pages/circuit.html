@@ -26,9 +26,9 @@
 
     <h2>Basic Usage</h2>
 
-<pre><code class="language-python">from suitkaise import circuit
+<pre><code class="language-python">from suitkaise.circuit import Circuit
 
-circ = circuit.Circuit(num_shorts_to_trip=4, sleep_time_after_trip=0.5)
+circ = Circuit(num_shorts_to_trip=4, sleep_time_after_trip=0.5)
 
 while not circ.broken:
     try:
@@ -39,7 +39,7 @@ while not circ.broken:
 
     <hr>
 
-    <h2><code>Circuit</code> class</h2>
+    <h2><code>Circuit</code></h2>
 
     <p>A "circuit breaker" that trips and can stop execution after a certain number of <code>short()</code> calls (failures), or immediately if you call <code>trip()</code>.</p>
     

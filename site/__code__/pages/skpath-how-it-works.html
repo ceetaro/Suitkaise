@@ -373,7 +373,7 @@ path = SKPath(encoded_id_string)</code></pre>
 
     <h2><code>@autopath</code> Decorator</h2>
 
-    <p>The <code>@autopath</code> decorator automatically converts path parameters based on their type annotations.</p>
+    <p>The <code>@autopath</code> decorator automatically normalizes paths and converts them to the types that a function expects.</p>
 
     <h3>How It Works</h3>
 
@@ -387,6 +387,7 @@ path = SKPath(encoded_id_string)</code></pre>
                 <li>What's the target type to convert to?</li>
             </ul>
         </li>
+        <li>If <code>only</code> is specified, filters to only those parameter names</li>
     </ol>
 
     <p><strong>At call time:</strong></p>
@@ -399,20 +400,36 @@ path = SKPath(encoded_id_string)</code></pre>
         </li>
         <li>For each path parameter:
             <ul>
-                <li>Converts the value to match the annotation type</li>
+                <li>Normalizes the value through SKPath (resolves path, normalizes separators)</li>
+                <li>Converts to the target type</li>
             </ul>
         </li>
         <li>Calls the original function with converted values</li>
     </ol>
 
+    <h3>Path Normalization</h3>
+
+    <p>All path-like inputs flow through SKPath before conversion to the target type:</p>
+
+    <p><code>input → SKPath → best target type</code></p>
+
+    <p>This ensures:</p>
+    <ul>
+        <li>Resolved absolute paths</li>
+        <li>Normalized separators (always <code>/</code>)</li>
+        <li>Cross-platform consistency</li>
+    </ul>
+
+    <p>For example, <code>"./data\\file.txt"</code> becomes <code>"/abs/path/data/file.txt"</code>.</p>
+
     <h3>Type Conversion Priority</h3>
 
-    <p>When determining what type to convert to, <code>@autopath</code> picks the "richest" type:</p>
+    <p>When determining what type to convert to, <code>@autopath</code> picks the "best" type:</p>
 
     <ol>
-        <li><strong>SKPath</strong> — if <code>SKPath</code> is in the annotation (including <code>AnyPath</code>)</li>
-        <li><strong>Path</strong> — if <code>Path</code> is in the annotation (but not <code>SKPath</code>)</li>
-        <li><strong>str</strong> — if only <code>str</code> is in the annotation</li>
+        <li><code>SKPath</code> — if <code>SKPath</code> is in the annotation (including <code>AnyPath</code>)</li>
+        <li><code>Path</code> — if <code>Path</code> is in the annotation (but not <code>SKPath</code>)</li>
+        <li><code>str</code> — if only <code>str</code> is in the annotation</li>
     </ol>
 
     <p>Examples:</p>
@@ -420,7 +437,7 @@ path = SKPath(encoded_id_string)</code></pre>
         <li><code>path: AnyPath</code> → converts to <code>SKPath</code></li>
         <li><code>path: SKPath</code> → converts to <code>SKPath</code></li>
         <li><code>path: Path</code> → converts to <code>Path</code></li>
-        <li><code>path: str</code> → converts to <code>str</code></li>
+        <li><code>path: str</code> → converts to <code>str</code> (normalized absolute path)</li>
         <li><code>path: Path | SKPath</code> → converts to <code>SKPath</code></li>
         <li><code>path: str | Path</code> → converts to <code>Path</code></li>
     </ul>
@@ -435,6 +452,26 @@ path = SKPath(encoded_id_string)</code></pre>
     </ul>
 
     <p>The container type is preserved (list → list, tuple → tuple, etc.).</p>
+
+    <h3><code>only</code> Option</h3>
+
+    <p>Restricts normalization to specific parameters. Use this when you have <code>str</code> or <code>list[str]</code> parameters that aren't actually file paths.</p>
+
+<pre><code class="language-python">@autopath(only="file_path")
+def process(file_path: str, names: list[str]):
+    # Only file_path is normalized
+    # names is passed through unchanged</code></pre>
+
+<pre><code class="language-python">@autopath(only=["input", "output"])
+def copy(input: str, output: str, tags: list[str]):
+    # input and output are normalized
+    # tags is left unchanged</code></pre>
+
+    <h3>Performance Benchmarks</h3>
+
+    <p><code>@autopath</code> costs about 17-18 microseconds per path.</p>
+    
+    <p>When you have a large collection of strings that aren't paths, using <code>only</code> to only work on the correct parameters will increase performance.</p>
 
     <h3><code>use_caller</code> Option</h3>
 
@@ -460,8 +497,9 @@ log_from()  # Uses caller's file automatically</code></pre>
 
     <p>When <code>debug=True</code>:</p>
     <ul>
-        <li>Prints a message for each conversion</li>
+        <li>Prints a message for each conversion or normalization</li>
         <li>Format: <code>"@autopath: Converted {param}: {from_type} → {to_type}"</code></li>
+        <li>For normalization: <code>"@autopath: Normalized {param}: '{old}' → '{new}'"</code></li>
     </ul>
 
     <hr>

@@ -21,7 +21,7 @@ optional sleep — add cooldown periods after failure thresholds
 
 It is purely for your quality of life! Cheers
 
-Without circuit - *8 lines*
+Without `circuit` - *8 lines*
 (start of dropdown)
 ```python
 # count failures manually
@@ -46,7 +46,7 @@ if failures >= max_failures: # 8
 (end of dropdown)
 
 
-With circuit - *4 lines*
+With `circuit` - *4 lines*
 
 - clearer
 - no variables to track

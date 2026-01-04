@@ -162,7 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // API identifiers to highlight
         const apiModules = new Set(['suitkaise', 'sktime', 'skpath', 'circuit', 'cerial', 'processing', 'docs']);
         const apiClasses = new Set(['SKPath', 'Timer', 'TimeThis', 'Yawn', 'Circuit', 'Process', 'CustomRoot', 'AnyPath', 'Permission']);
-        const apiMethods = new Set(['timethis', 'autopath', 'sleep', 'time', 'elapsed', 'get_stats', 'get_statistics']);
+        // Note: 'time' and 'sleep' are NOT included here because they conflict with time.time() and time.sleep()
+        // They still get highlighted as part of sktime.time() chains since 'sktime' is in apiModules
+        const apiMethods = new Set(['timethis', 'autopath', 'elapsed', 'get_stats', 'get_statistics']);
         
         // Overrides: properties that should highlight word.property.chain patterns
         // These only activate if their associated decorator is found in the code block
@@ -202,22 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // If @sktime.timethis is found, find functions decorated with it and add word.timer patterns
-            // Pattern: @sktime.timethis followed by def function_name
-            if (activeOverrides.has('timer')) {
-                // Find function names decorated with @sktime.timethis
-                const decoratorPattern = /@sktime\.timethis[^\n]*\s*def\s+(\w+)/g;
-                let match;
-                while ((match = decoratorPattern.exec(textContent)) !== null) {
-                    if (match[1]) apiVariables.add(match[1]);
-                }
-                
-                // Also find word.timer patterns directly (for cases like my_function.timer.stats)
-                const timerAccessPattern = /(\w+)\.timer(?:\.|\s|$)/g;
-                while ((match = timerAccessPattern.exec(textContent)) !== null) {
-                    if (match[1]) apiVariables.add(match[1]);
-                }
-            }
+            // Note: We don't add function names to apiVariables just because they use .timer
+            // The word before .timer (like my_function) is NOT an API identifier
+            // Instead, we handle this in the merge pass by working backwards from 'timer'
             
             // Walk through all text nodes and wrap API identifiers
             const walker = document.createTreeWalker(
@@ -291,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 1. Decorators: @identifier.method()
                 // 2. Module.something chains: sktime.Timer(), skpath.get_project_root()
                 // 3. Standalone classes: SKPath(), Timer()
-                // 4. Variables with chains: t.stats.mean, circ.flowing
+                // 4. Variables with chains: t.mean, timer.stdev, circ.flowing
                 // 5. Override patterns: word.timer.chain... (1 word before, all words after connected by dots)
                 let regexPattern = `(@(?:${identifierPattern})(?:\\.\\w+)*(?:\\(\\))?)|` +  // decorators with empty ()
                     `\\b(${identifierPattern})(?:\\.\\w+)*(\\(\\))?`;  // identifiers with chains and optional ()
@@ -414,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // Third pass: merge api-highlight chains connected by dots
-            // This handles cases like my_function.timer.stats.mean where Prism splits them
+            // This handles cases like my_function.timer.mean where Prism splits them
             // Only merges if the chain contains 'timer' (when activeOverrides has 'timer')
             if (activeOverrides.has('timer')) {
                 let merged = true;
@@ -422,31 +411,57 @@ document.addEventListener('DOMContentLoaded', () => {
                     merged = false;
                     const currentHighlights = codeBlock.querySelectorAll('.api-highlight');
                     for (const highlight of currentHighlights) {
-                        // Only process highlights that contain 'timer' in their chain
-                        const highlightText = highlight.textContent.toLowerCase();
-                        const hasTimer = highlightText.includes('timer') || 
-                                        highlightText.includes('.timer') ||
-                                        (highlight.previousSibling && highlight.previousSibling.textContent === '.' &&
-                                         highlight.previousSibling.previousSibling && 
-                                         highlight.previousSibling.previousSibling.textContent &&
-                                         highlight.previousSibling.previousSibling.textContent.toLowerCase().includes('timer'));
+                        let nextNode = highlight.nextSibling;
                         
-                        if (!highlightText.includes('timer')) {
-                            // Check if this highlight is part of a timer chain
-                            let prev = highlight.previousSibling;
-                            let isPartOfTimerChain = false;
-                            while (prev) {
-                                if (prev.classList && prev.classList.contains('api-highlight') && 
-                                    prev.textContent.toLowerCase().includes('timer')) {
-                                    isPartOfTimerChain = true;
-                                    break;
+                        // Check if next is a dot, and if what comes after contains 'timer' or 'timethis'
+                        // This allows merging my_function + . + timer, or @sktime + . + timethis
+                        let shouldProcess = false;
+                        const highlightText = highlight.textContent.toLowerCase();
+                        const timerKeywords = ['timer', 'timethis'];
+                        
+                        const containsTimerKeyword = (text) => timerKeywords.some(kw => text.includes(kw));
+                        
+                        if (containsTimerKeyword(highlightText)) {
+                            // This highlight contains timer/timethis, process it
+                            shouldProcess = true;
+                        } else {
+                            // Check if what comes after the dot contains timer/timethis
+                            let dotNode = nextNode;
+                            if (dotNode) {
+                                let isDot = (dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent.startsWith('.')) ||
+                                           (dotNode.nodeType === Node.ELEMENT_NODE && dotNode.textContent === '.');
+                                if (isDot) {
+                                    let afterDot = dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent.length > 1 
+                                        ? null  // dot and word in same node, check the text
+                                        : dotNode.nextSibling;
+                                    
+                                    // Check if after dot contains timer/timethis
+                                    if (dotNode.nodeType === Node.TEXT_NODE && containsTimerKeyword(dotNode.textContent.toLowerCase())) {
+                                        shouldProcess = true;
+                                    } else if (afterDot && afterDot.textContent && containsTimerKeyword(afterDot.textContent.toLowerCase())) {
+                                        shouldProcess = true;
+                                    } else if (afterDot && afterDot.classList && afterDot.classList.contains('api-highlight') &&
+                                               containsTimerKeyword(afterDot.textContent.toLowerCase())) {
+                                        shouldProcess = true;
+                                    }
                                 }
-                                prev = prev.previousSibling;
                             }
-                            if (!isPartOfTimerChain) continue;
+                            
+                            // Also check if this highlight is part of an existing timer chain
+                            if (!shouldProcess) {
+                                let prev = highlight.previousSibling;
+                                while (prev) {
+                                    if (prev.classList && prev.classList.contains('api-highlight') && 
+                                        containsTimerKeyword(prev.textContent.toLowerCase())) {
+                                        shouldProcess = true;
+                                        break;
+                                    }
+                                    prev = prev.previousSibling;
+                                }
+                            }
                         }
                         
-                        let nextNode = highlight.nextSibling;
+                        if (!shouldProcess) continue;
                         
                         // Check for pattern: highlight -> "." -> (highlight or word)
                         if (nextNode) {
@@ -512,6 +527,166 @@ document.addEventListener('DOMContentLoaded', () => {
                                     merged = true;
                                     break;
                                 }
+                            }
+                        }
+                    }
+                }
+                
+                // Fourth pass: work BACKWARDS from 'timer' highlights to absorb word.timer patterns
+                // This handles my_function.timer where my_function is not an API identifier
+                merged = true;
+                while (merged) {
+                    merged = false;
+                    const timerHighlights = codeBlock.querySelectorAll('.api-highlight');
+                    for (const highlight of timerHighlights) {
+                        const highlightText = highlight.textContent.toLowerCase();
+                        // Only process if this starts with 'timer' (not already merged with something before)
+                        if (!highlightText.startsWith('timer')) continue;
+                        
+                        let prevNode = highlight.previousSibling;
+                        
+                        // Check for pattern: word -> "." -> timer
+                        if (prevNode) {
+                            let isDot = false;
+                            let dotNode = null;
+                            
+                            if (prevNode.nodeType === Node.TEXT_NODE && prevNode.textContent === '.') {
+                                isDot = true;
+                                dotNode = prevNode;
+                            } else if (prevNode.nodeType === Node.ELEMENT_NODE && prevNode.textContent === '.') {
+                                isDot = true;
+                                dotNode = prevNode;
+                            } else if (prevNode.nodeType === Node.TEXT_NODE && prevNode.textContent.endsWith('.')) {
+                                // Dot is at end of text node
+                                isDot = true;
+                                dotNode = prevNode;
+                            }
+                            
+                            if (isDot) {
+                                let beforeDot = dotNode === prevNode && dotNode.textContent === '.' 
+                                    ? dotNode.previousSibling 
+                                    : null;
+                                
+                                // Handle case where dot is at end of text node with word before it
+                                if (dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent.endsWith('.') && dotNode.textContent.length > 1) {
+                                    const textBeforeDot = dotNode.textContent.slice(0, -1);
+                                    const wordMatch = textBeforeDot.match(/([a-zA-Z_][a-zA-Z0-9_]*)$/);
+                                    if (wordMatch) {
+                                        const word = wordMatch[1];
+                                        const rest = textBeforeDot.slice(0, -word.length);
+                                        highlight.textContent = word + '.' + highlight.textContent;
+                                        if (rest) {
+                                            dotNode.textContent = rest;
+                                        } else {
+                                            dotNode.parentNode.removeChild(dotNode);
+                                        }
+                                        merged = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (beforeDot && beforeDot.nodeType === Node.TEXT_NODE && /[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeDot.textContent)) {
+                                    // Absorb the identifier before the dot
+                                    const wordMatch = beforeDot.textContent.match(/([a-zA-Z_][a-zA-Z0-9_]*)$/);
+                                    if (wordMatch) {
+                                        const word = wordMatch[0];
+                                        const rest = beforeDot.textContent.slice(0, -word.length);
+                                        highlight.textContent = word + '.' + highlight.textContent;
+                                        dotNode.parentNode.removeChild(dotNode);
+                                        if (rest) {
+                                            beforeDot.textContent = rest;
+                                        } else {
+                                            beforeDot.parentNode.removeChild(beforeDot);
+                                        }
+                                        merged = true;
+                                        break;
+                                    }
+                                } else if (beforeDot && beforeDot.nodeType === Node.ELEMENT_NODE && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(beforeDot.textContent)) {
+                                    // Absorb identifier from element (like a Prism token)
+                                    highlight.textContent = beforeDot.textContent + '.' + highlight.textContent;
+                                    dotNode.parentNode.removeChild(dotNode);
+                                    beforeDot.parentNode.removeChild(beforeDot);
+                                    merged = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Fifth pass: merge ALL api-highlight chains with following dot chains
+            // This handles cases like circ.broken, circ.short() where circ is an API variable
+            let generalMerged = true;
+            while (generalMerged) {
+                generalMerged = false;
+                const allHighlights = codeBlock.querySelectorAll('.api-highlight');
+                for (const highlight of allHighlights) {
+                    let nextNode = highlight.nextSibling;
+                    
+                    if (nextNode) {
+                        // Check if next is a dot
+                        let isDot = false;
+                        let dotNode = null;
+                        if (nextNode.nodeType === Node.TEXT_NODE && nextNode.textContent.startsWith('.')) {
+                            isDot = true;
+                            dotNode = nextNode;
+                        } else if (nextNode.nodeType === Node.ELEMENT_NODE && nextNode.textContent === '.') {
+                            isDot = true;
+                            dotNode = nextNode;
+                        }
+                        
+                        if (isDot) {
+                            let afterDot = dotNode.nextSibling;
+                            
+                            // Handle case where dot and next word are in same text node
+                            if (dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent.length > 1) {
+                                const restAfterDot = dotNode.textContent.slice(1);
+                                const wordMatch = restAfterDot.match(/^([a-zA-Z_][a-zA-Z0-9_]*)(.*)/);
+                                if (wordMatch) {
+                                    highlight.textContent += '.' + wordMatch[1];
+                                    if (wordMatch[2]) {
+                                        dotNode.textContent = wordMatch[2];
+                                    } else {
+                                        dotNode.parentNode.removeChild(dotNode);
+                                    }
+                                    generalMerged = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Merge with another api-highlight
+                            if (afterDot && afterDot.classList && afterDot.classList.contains('api-highlight')) {
+                                highlight.textContent += '.' + afterDot.textContent;
+                                dotNode.parentNode.removeChild(dotNode);
+                                afterDot.parentNode.removeChild(afterDot);
+                                generalMerged = true;
+                                break;
+                            } 
+                            // Absorb word from text node
+                            else if (afterDot && afterDot.nodeType === Node.TEXT_NODE && /^[a-zA-Z_]/.test(afterDot.textContent)) {
+                                const wordMatch = afterDot.textContent.match(/^([a-zA-Z_][a-zA-Z0-9_]*)(.*)/s);
+                                if (wordMatch) {
+                                    const word = wordMatch[1];
+                                    const rest = wordMatch[2];
+                                    highlight.textContent += '.' + word;
+                                    dotNode.parentNode.removeChild(dotNode);
+                                    if (rest) {
+                                        afterDot.textContent = rest;
+                                    } else {
+                                        afterDot.parentNode.removeChild(afterDot);
+                                    }
+                                    generalMerged = true;
+                                    break;
+                                }
+                            }
+                            // Absorb word from element (like a Prism token)
+                            else if (afterDot && afterDot.nodeType === Node.ELEMENT_NODE && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(afterDot.textContent)) {
+                                highlight.textContent += '.' + afterDot.textContent;
+                                dotNode.parentNode.removeChild(dotNode);
+                                afterDot.parentNode.removeChild(afterDot);
+                                generalMerged = true;
+                                break;
                             }
                         }
                     }
@@ -887,9 +1062,31 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Pages that should hide the nav bar
     const noNavPages = ['password', 'error'];
+    
+    // Module names for scroll position memory
+    const moduleNames = ['skpath', 'sktime', 'circuit', 'cerial', 'processing'];
+    
+    // Store scroll positions per module
+    const moduleScrollPositions = {};
+    
+    // Extract module name from page name
+    function getModuleName(pageName) {
+        for (const mod of moduleNames) {
+            if (pageName === mod || pageName.startsWith(mod + '-')) {
+                return mod;
+            }
+        }
+        return null;
+    }
 
     async function navigateTo(pageName, force = false) {
         if (!force && pageName === currentPage) return;
+        
+        // Save scroll position for current module before navigating
+        const currentModule = getModuleName(currentPage);
+        if (currentModule) {
+            moduleScrollPositions[currentModule] = window.scrollY;
+        }
         
         // Check if page content is already available
         const isReady = isPageReady(pageName);
@@ -903,6 +1100,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const content = await getPageContent(pageName);
         
         if (content) {
+            // Cleanup scroll opacity from previous page
+            cleanupScrollOpacity();
+            
             // Update content
             pageContent.innerHTML = content;
             currentPage = pageName;
@@ -919,8 +1119,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update URL hash
             window.location.hash = pageName === 'home' ? '' : pageName;
             
-            // Scroll to top
-            window.scrollTo(0, 0);
+            // Restore scroll position if navigating within same module, otherwise scroll to top
+            const newModule = getModuleName(pageName);
+            if (newModule && newModule === currentModule && moduleScrollPositions[newModule] !== undefined) {
+                window.scrollTo(0, moduleScrollPositions[newModule]);
+            } else {
+                window.scrollTo(0, 0);
+            }
         }
         
         // Hide loading screen (if it was shown)
@@ -948,6 +1153,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Setup module bar title toggle for API highlighting
         setupModuleBarToggle();
+        
+        // Setup scroll-based opacity for module pages
+        setupScrollOpacity();
     }
     
     // ============================================
@@ -999,6 +1207,233 @@ document.addEventListener('DOMContentLoaded', () => {
             setupFadeInAnimations();
         }
     })();
+    
+    // ============================================
+    // Section-based Scroll Effects for Module Pages
+    // Groups content into logical sections and highlights the active one
+    // ============================================
+    
+    function setupScrollOpacity() {
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        if (!modulePage) return;
+        
+        // Group elements into logical sections:
+        // - h2 starts a major section (includes everything until next h2)
+        // - h3/h4/h5 starts a subsection within the current major section
+        // - Code blocks (pre) are part of their parent section
+        // - Text/lists belong to the most recent header
+        
+        const allElements = Array.from(modulePage.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, pre, details, hr'));
+        if (allElements.length === 0) return;
+        
+        const sections = [];
+        let currentSection = null;
+        
+        // Helper to check if current section only has headers (no content yet)
+        function sectionHasOnlyHeaders(section) {
+            if (!section) return false;
+            return section.elements.every(el => /^h[1-6]$/i.test(el.tagName));
+        }
+        
+        allElements.forEach(el => {
+            const tagName = el.tagName.toLowerCase();
+            
+            // Skip li elements inside details (they're part of the details group)
+            if (tagName === 'li' && el.closest('details')) return;
+            
+            // Headers (h2-h6)
+            if (/^h[2-6]$/.test(tagName)) {
+                // If current section only has headers, add this header to it
+                // This groups consecutive headers together
+                if (sectionHasOnlyHeaders(currentSection)) {
+                    currentSection.elements.push(el);
+                } else {
+                    // Current section has content, so save it and start new
+                    if (currentSection && currentSection.elements.length > 0) {
+                        sections.push(currentSection);
+                    }
+                    currentSection = { 
+                        elements: [el]
+                    };
+                }
+            }
+            // hr creates a visual break - save current section
+            else if (tagName === 'hr') {
+                if (currentSection && currentSection.elements.length > 0) {
+                    sections.push(currentSection);
+                }
+                currentSection = null;
+            }
+            // Everything else (p, li, pre, details, h1) belongs to current section
+            else {
+                if (!currentSection) {
+                    currentSection = { elements: [] };
+                }
+                currentSection.elements.push(el);
+            }
+        });
+        
+        // Don't forget the last section
+        if (currentSection && currentSection.elements.length > 0) {
+            sections.push(currentSection);
+        }
+        
+        // Debug: log sections
+        console.log(`Found ${sections.length} sections:`, sections.map(s => ({
+            firstElement: s.elements[0]?.tagName + ': ' + s.elements[0]?.textContent?.slice(0, 30),
+            elementCount: s.elements.length
+        })));
+        
+        function updateSections() {
+            const viewportHeight = window.innerHeight;
+            const navHeight = 80;
+            const contentTop = navHeight;
+            const contentBottom = viewportHeight;
+            const contentHeight = contentBottom - contentTop;
+            
+            // Define the "safe zone" - middle 70% (exclude top/bottom 15%)
+            const safeZoneTop = contentTop + contentHeight * 0.15;
+            const safeZoneBottom = contentTop + contentHeight * 0.85;
+            
+            // Calculate visibility info for each section
+            const sectionInfo = sections.map((section, index) => {
+                if (section.elements.length === 0) {
+                    return { index, isFullyVisible: false, isInSafeZone: false, isVisible: false };
+                }
+                
+                // Get bounding box of entire section (first to last element)
+                const firstEl = section.elements[0];
+                const lastEl = section.elements[section.elements.length - 1];
+                const firstRect = firstEl.getBoundingClientRect();
+                const lastRect = lastEl.getBoundingClientRect();
+                
+                const sectionTop = firstRect.top;
+                const sectionBottom = lastRect.bottom;
+                
+                // Is section at least partially visible?
+                const isVisible = sectionBottom > contentTop && sectionTop < contentBottom;
+                
+                // Is section fully visible (entirely within viewport)?
+                const isFullyVisible = sectionTop >= contentTop && sectionBottom <= contentBottom;
+                
+                // Is section in the safe zone (not in top/bottom 15%)?
+                // Section is in safe zone if its bounds are within the middle 70%
+                const isInSafeZone = sectionTop >= safeZoneTop && sectionBottom <= safeZoneBottom;
+                
+                return { index, isFullyVisible, isInSafeZone, isVisible };
+            });
+            
+            // Determine which sections should be highlighted
+            const activeIndices = new Set();
+            
+            // Rule 1: Any section fully visible AND in safe zone is highlighted
+            sectionInfo.forEach(info => {
+                if (info.isFullyVisible && info.isInSafeZone) {
+                    activeIndices.add(info.index);
+                }
+            });
+            
+            // Rule 2: First section is always highlighted if visible,
+            // UNLESS another section (index > 0) is highlighted
+            const firstSectionInfo = sectionInfo[0];
+            const hasOtherHighlighted = [...activeIndices].some(idx => idx > 0);
+            
+            if (firstSectionInfo && firstSectionInfo.isVisible && !hasOtherHighlighted) {
+                activeIndices.add(0);
+            }
+            
+            // If nothing is highlighted, highlight the most visible section
+            if (activeIndices.size === 0) {
+                let bestIndex = -1;
+                let bestVisibility = 0;
+                
+                sectionInfo.forEach(info => {
+                    if (info.isVisible) {
+                        // Calculate how much of section is visible
+                        const section = sections[info.index];
+                        const firstRect = section.elements[0].getBoundingClientRect();
+                        const lastRect = section.elements[section.elements.length - 1].getBoundingClientRect();
+                        const visibleTop = Math.max(firstRect.top, contentTop);
+                        const visibleBottom = Math.min(lastRect.bottom, contentBottom);
+                        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+                        
+                        if (visibleHeight > bestVisibility) {
+                            bestVisibility = visibleHeight;
+                            bestIndex = info.index;
+                        }
+                    }
+                });
+                
+                if (bestIndex >= 0) {
+                    activeIndices.add(bestIndex);
+                }
+            }
+            
+            // Rule 3: Connect first section to second section
+            // If either is highlighted, both are highlighted
+            if (sections.length >= 2) {
+                if (activeIndices.has(0) || activeIndices.has(1)) {
+                    if (sectionInfo[0]?.isVisible) activeIndices.add(0);
+                    if (sectionInfo[1]?.isVisible) activeIndices.add(1);
+                }
+            }
+            
+            // Rule 4: Connect last section to second-to-last section
+            // If either is highlighted, both are highlighted
+            const lastIdx = sections.length - 1;
+            const secondLastIdx = sections.length - 2;
+            if (sections.length >= 2 && secondLastIdx >= 0) {
+                if (activeIndices.has(lastIdx) || activeIndices.has(secondLastIdx)) {
+                    if (sectionInfo[lastIdx]?.isVisible) activeIndices.add(lastIdx);
+                    if (sectionInfo[secondLastIdx]?.isVisible) activeIndices.add(secondLastIdx);
+                }
+            }
+            
+            // Apply styles based on active sections
+            sections.forEach((section, index) => {
+                const isActive = activeIndices.has(index);
+                
+                section.elements.forEach(el => {
+                    if (isActive) {
+                        el.style.opacity = 1;
+                    } else {
+                        el.style.opacity = 0.3;
+                    }
+                });
+            });
+        }
+        
+        // Update on scroll
+        let ticking = false;
+        function onScroll() {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    updateSections();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }
+        
+        // Initial update
+        updateSections();
+        
+        // Listen for scroll
+        window.addEventListener('scroll', onScroll, { passive: true });
+        
+        // Store cleanup function for when navigating away
+        modulePage._scrollOpacityCleanup = () => {
+            window.removeEventListener('scroll', onScroll);
+        };
+    }
+    
+    // Cleanup scroll opacity when navigating to a new page
+    function cleanupScrollOpacity() {
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        if (modulePage && modulePage._scrollOpacityCleanup) {
+            modulePage._scrollOpacityCleanup();
+        }
+    }
     
     // ============================================
     // Fade-in Animation on Scroll

@@ -169,19 +169,19 @@ def test_timer_start_stop_and_basic_stats():
     sktime.sleep(SLEEP_SHORT)
     elapsed = timer.stop()
 
-    assert timer.stats.num_times == 1
+    assert timer.num_times == 1
     _assert_between(elapsed, SLEEP_SHORT - TOL, 0.1)
-    assert timer.stats.most_recent is not None
-    assert timer.stats.result == timer.stats.most_recent
-    assert timer.stats.total_time == pytest.approx(timer.stats.most_recent, rel=0.2, abs=0.2)
-    assert timer.stats.mean == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.median == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.fastest_time == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.slowest_time == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.min == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.max == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.get_time(0) == pytest.approx(timer.stats.most_recent)
-    assert timer.stats.percentile(50) == pytest.approx(timer.stats.most_recent)
+    assert timer.most_recent is not None
+    assert timer.result == timer.most_recent
+    assert timer.total_time == pytest.approx(timer.most_recent, rel=0.2, abs=0.2)
+    assert timer.mean == pytest.approx(timer.most_recent)
+    assert timer.median == pytest.approx(timer.most_recent)
+    assert timer.fastest_time == pytest.approx(timer.most_recent)
+    assert timer.slowest_time == pytest.approx(timer.most_recent)
+    assert timer.min == pytest.approx(timer.most_recent)
+    assert timer.max == pytest.approx(timer.most_recent)
+    assert timer.get_time(0) == pytest.approx(timer.most_recent)
+    assert timer.percentile(50) == pytest.approx(timer.most_recent)
 
 
 def test_timer_pause_resume_excludes_paused_time():
@@ -198,7 +198,7 @@ def test_timer_pause_resume_excludes_paused_time():
     # Should be roughly SLEEP_SHORT + SLEEP_SHORT
     _assert_between(elapsed, (2 * SLEEP_SHORT) - TOL, 0.2)
     # total_time_paused now tracks strict accumulated paused duration
-    ttp = timer.stats.total_time_paused
+    ttp = timer.total_time_paused
     assert ttp is not None and ttp >= (paused_for - 0.005)
 
 
@@ -210,26 +210,26 @@ def test_timer_lap_and_stop_records_two_times():
     sktime.sleep(SLEEP_SHORT)
     lap2 = timer.stop()
 
-    assert timer.stats.num_times == 2
+    assert timer.num_times == 2
     _assert_between(lap1, SLEEP_SHORT - TOL, 0.1)
     _assert_between(lap2, SLEEP_SHORT - TOL, 0.1)
-    assert timer.stats.slowest_index in (0, 1)
-    assert timer.stats.fastest_index in (0, 1)
+    assert timer.slowest_index in (0, 1)
+    assert timer.fastest_index in (0, 1)
 
 
 def test_timer_add_time_and_reset():
     timer = sktime.Timer()
     timer.add_time(0.01)
     timer.add_time(0.02)
-    assert timer.stats.num_times == 2
-    assert timer.stats.mean is not None and timer.stats.mean > 0
+    assert timer.num_times == 2
+    assert timer.mean is not None and timer.mean > 0
     stats = timer.get_statistics()
     assert stats is not None and stats.num_times == 2
 
     timer.reset()
-    assert timer.stats.num_times == 0
-    assert timer.stats.most_recent is None
-    assert timer.stats.total_time is None
+    assert timer.num_times == 0
+    assert timer.most_recent is None
+    assert timer.total_time is None
     assert timer.get_statistics() is None
 
 
@@ -259,17 +259,17 @@ def test_timer_thread_safety_sessions():
     with ThreadPoolExecutor(max_workers=3) as ex:
         ex.map(run, durations)
 
-    assert timer.stats.num_times == len(durations)
-    assert timer.stats.fastest_time is not None and timer.stats.slowest_time is not None
-    assert timer.stats.fastest_time <= timer.stats.slowest_time
+    assert timer.num_times == len(durations)
+    assert timer.fastest_time is not None and timer.slowest_time is not None
+    assert timer.fastest_time <= timer.slowest_time
 
 
 # TimeThis
 def test_timethis_context_without_explicit_timer():
     with sktime.TimeThis() as t:
         sktime.sleep(SLEEP_SHORT)
-    assert t.stats.num_times == 1
-    assert t.stats.most_recent is not None and t.stats.most_recent >= (SLEEP_SHORT - TOL)
+    assert t.num_times == 1
+    assert t.most_recent is not None and t.most_recent >= (SLEEP_SHORT - TOL)
 
 
 def test_timethis_context_with_explicit_timer_pause_resume_and_lap():
@@ -285,8 +285,8 @@ def test_timethis_context_with_explicit_timer_pause_resume_and_lap():
         sktime.sleep(SLEEP_SHORT)
         # implicit stop on exit
 
-    assert shared.stats.num_times == 2  # one lap + final
-    assert shared.stats.total_time is not None and shared.stats.total_time > 0
+    assert shared.num_times == 2  # one lap + final
+    assert shared.total_time is not None and shared.total_time > 0
 
 
 # @timethis
@@ -300,8 +300,8 @@ def test_decorator_with_explicit_timer():
     for _ in range(5):
         op()
 
-    assert acc.stats.num_times == 5
-    assert acc.stats.mean is not None and acc.stats.mean >= (SLEEP_SHORT - TOL)
+    assert acc.num_times == 5
+    assert acc.mean is not None and acc.mean >= (SLEEP_SHORT - TOL)
 
 
 def test_decorator_auto_global_and_stacking():
@@ -316,31 +316,31 @@ def test_decorator_auto_global_and_stacking():
         op2()
 
     # explicit timer collected
-    assert shared.stats.num_times == 3
+    assert shared.num_times == 3
     # auto timer attached to wrapper
     assert hasattr(op2, "timer")
     auto_timer = getattr(op2, "timer")
     assert isinstance(auto_timer, sktime.Timer)
-    assert auto_timer.stats.num_times == 3
+    assert auto_timer.num_times == 3
 
 
 # Additional edge cases
 def test_timer_initial_state_and_invalid_access():
     """Fresh Timer has None properties; invalid get_time returns None; percentile input validated."""
     timer = sktime.Timer()
-    assert timer.stats.num_times == 0
-    assert timer.stats.most_recent is None
-    assert timer.stats.total_time is None
-    assert timer.stats.mean is None
-    assert timer.stats.median is None
-    assert timer.stats.fastest_time is None
-    assert timer.stats.slowest_time is None
-    assert timer.stats.get_time(0) is None
-    assert timer.stats.get_time(-1) is None
+    assert timer.num_times == 0
+    assert timer.most_recent is None
+    assert timer.total_time is None
+    assert timer.mean is None
+    assert timer.median is None
+    assert timer.fastest_time is None
+    assert timer.slowest_time is None
+    assert timer.get_time(0) is None
+    assert timer.get_time(-1) is None
     # empty timer returns None for percentile, even for invalid inputs
-    assert timer.stats.percentile(50) is None
-    assert timer.stats.percentile(-1) is None
-    assert timer.stats.percentile(101) is None
+    assert timer.percentile(50) is None
+    assert timer.percentile(-1) is None
+    assert timer.percentile(101) is None
 
 
 def test_timer_statistics_snapshot_immutability():
@@ -361,7 +361,7 @@ def test_timer_statistics_snapshot_immutability():
     assert stats.num_times == snap_count
     assert stats.mean == snap_mean
     # But timer has more measurements now
-    assert timer.stats.num_times == 6
+    assert timer.num_times == 6
 
 
 def test_timer_percentile_invalid_with_data():
@@ -369,9 +369,9 @@ def test_timer_percentile_invalid_with_data():
     for _ in range(3):
         timer.start(); sktime.sleep(SLEEP_SHORT); timer.stop()
     with pytest.raises(ValueError):
-        timer.stats.percentile(-1)
+        timer.percentile(-1)
     with pytest.raises(ValueError):
-        timer.stats.percentile(101)
+        timer.percentile(101)
 
 
 def test_decorator_explicit_timer_multithreaded_accumulates_counts():
@@ -386,7 +386,7 @@ def test_decorator_explicit_timer_multithreaded_accumulates_counts():
     with ThreadPoolExecutor(max_workers=4) as ex:
         list(ex.map(lambda _: work(), range(n)))
 
-    assert acc.stats.num_times == n
+    assert acc.num_times == n
 
 
 def test_timethis_context_records_on_exception():
@@ -396,7 +396,7 @@ def test_timethis_context_records_on_exception():
         with sktime.TimeThis(shared):
             sktime.sleep(SLEEP_SHORT)
             raise RuntimeError("boom")
-    assert shared.stats.num_times == 1
+    assert shared.num_times == 1
 
 
 def test_decorator_auto_global_independent_per_function_and_classmethod():
@@ -416,8 +416,8 @@ def test_decorator_auto_global_independent_per_function_and_classmethod():
     t2 = getattr(f2, "timer", None)
     assert isinstance(t1, sktime.Timer) and isinstance(t2, sktime.Timer)
     assert t1 is not t2
-    assert t1.stats.num_times == 2
-    assert t2.stats.num_times == 2
+    assert t1.num_times == 2
+    assert t2.num_times == 2
 
     class C:
         @sktime.timethis()
@@ -429,7 +429,7 @@ def test_decorator_auto_global_independent_per_function_and_classmethod():
     # Access function object attribute via class
     mt = getattr(C.method, "timer", None)
     assert isinstance(mt, sktime.Timer)
-    assert mt.stats.num_times == 2
+    assert mt.num_times == 2
 
 
 def test_clear_global_timers_resets_registry():
@@ -441,7 +441,7 @@ def test_clear_global_timers_resets_registry():
     f(); f()
     t_before = getattr(f, "timer", None)
     assert isinstance(t_before, sktime.Timer)
-    assert t_before.stats.num_times == 2
+    assert t_before.num_times == 2
 
     # Clear registry (access via getattr to satisfy static typing)
     cg = getattr(sktime, "clear_global_timers")
@@ -455,7 +455,7 @@ def test_clear_global_timers_resets_registry():
     g(); g()
     t_after = getattr(g, "timer", None)
     assert isinstance(t_after, sktime.Timer)
-    assert t_after.stats.num_times == 2
+    assert t_after.num_times == 2
 
 
 def test_decorator_auto_global_in_processes_smoke():
@@ -481,8 +481,8 @@ def test_timer_stress_multi_thread_many_iterations():
     for t in threads: t.start()
     for t in threads: t.join()
 
-    assert timer.stats.num_times == 50
-    assert timer.stats.mean is not None and timer.stats.mean > 0
+    assert timer.num_times == 50
+    assert timer.mean is not None and timer.mean > 0
 
 
 def test_yawn_logs_only_on_threshold(capsys):

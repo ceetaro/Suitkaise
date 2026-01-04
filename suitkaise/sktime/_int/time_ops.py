@@ -181,7 +181,7 @@ class TimerStats:
     This is an immutable snapshot taken at the time `get_statistics()` was called.
     All values are pre-computed and won't change even if the timer continues recording.
     
-    For live (always up-to-date) statistics, use `timer.stats` instead.
+    For live (always up-to-date) statistics, access properties directly.
     
     Attributes:
         `times`: List of all recorded timing measurements
@@ -251,203 +251,6 @@ class TimerStats:
         return self.times[index] if 0 <= index < len(self.times) else None
 
 
-class TimerStatsView:
-    """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise import sktime
-        
-        timer = sktime.Timer()
-        timer.start()
-        # ... do work ...
-        timer.stop()
-        
-        # Access live statistics through organized namespace
-        print(timer.stats.mean)
-        print(timer.stats.stdev)
-        print(timer.stats.percentile(95))
-        print(timer.stats.num_times)
-        ```
-    ────────────────────────────────────────────────────────\n
-
-    Live view of timer statistics accessible via `timer.stats`.
-    
-    This provides organized access to all timer statistics through a dedicated namespace.
-    Unlike `TimerStats` (the frozen snapshot from `get_statistics()`), this view always
-    reflects the current state of the timer.
-    
-    All properties are thread-safe and compute values on access.
-    
-    Properties:
-        `num_times`: Number of recorded measurements
-        `most_recent` / `result`: Most recent timing
-        `total_time`: Sum of all times
-        `total_time_paused`: Total time spent paused
-        `mean`: Average of all times
-        `median`: Median of all times  
-        `min` / `max`: Fastest / slowest times
-        `fastest_time` / `slowest_time`: Aliases for min/max
-        `fastest_index` / `slowest_index`: Indices of fastest/slowest
-        `stdev`: Standard deviation
-        `variance`: Variance
-        
-    Methods:
-        `get_time(index)`: Get specific measurement by index
-        `percentile(percent)`: Calculate any percentile (0-100)
-    """
-    
-    def __init__(self, timer: "Timer"):
-        self._timer = timer
-    
-    @property
-    def num_times(self) -> int:
-        """Number of timing measurements recorded."""
-        with self._timer._lock:
-            return len(self._timer.times)
-    
-    @property
-    def original_start_time(self) -> Optional[float]:
-        """Timestamp when the first measurement started."""
-        with self._timer._lock:
-            return self._timer.original_start_time
-    
-    @property
-    def most_recent(self) -> Optional[float]:
-        """Most recent timing measurement."""
-        with self._timer._lock:
-            return self._timer.times[-1] if self._timer.times else None
-
-    @property
-    def result(self) -> Optional[float]:
-        """Alias for most_recent."""
-        return self.most_recent
-
-    @property
-    def most_recent_index(self) -> Optional[int]:
-        """Index of most recent timing measurement."""
-        with self._timer._lock:
-            return len(self._timer.times) - 1 if self._timer.times else None
-
-    @property
-    def total_time(self) -> Optional[float]:
-        """Total time of all timing measurements."""
-        with self._timer._lock:
-            return sum(self._timer.times) if self._timer.times else None
-
-    @property
-    def total_time_paused(self) -> Optional[float]:
-        """Total time paused across all recorded measurements."""
-        with self._timer._lock:
-            if not self._timer._paused_durations:
-                return None
-            return sum(self._timer._paused_durations)
-    
-    @property
-    def mean(self) -> Optional[float]:
-        """Mean (average) of all timing measurements."""
-        with self._timer._lock:
-            return statistics.mean(self._timer.times) if self._timer.times else None
-    
-    @property
-    def median(self) -> Optional[float]:
-        """Median of all timing measurements."""
-        with self._timer._lock:
-            return statistics.median(self._timer.times) if self._timer.times else None
-    
-    @property
-    def slowest_index(self) -> Optional[int]:
-        """Index of the slowest timing measurement."""
-        with self._timer._lock:
-            return self._timer.times.index(max(self._timer.times)) if self._timer.times else None
-    
-    @property
-    def fastest_index(self) -> Optional[int]:
-        """Index of the fastest timing measurement."""
-        with self._timer._lock:
-            return self._timer.times.index(min(self._timer.times)) if self._timer.times else None
-
-    @property
-    def slowest_time(self) -> Optional[float]:
-        """Time of the slowest timing measurement."""
-        with self._timer._lock:
-            return max(self._timer.times) if self._timer.times else None
-    
-    @property
-    def fastest_time(self) -> Optional[float]:
-        """Time of the fastest timing measurement."""
-        with self._timer._lock:
-            return min(self._timer.times) if self._timer.times else None
-
-    @property
-    def min(self) -> Optional[float]:
-        """Minimum timing measurement (alias for fastest_time)."""
-        return self.fastest_time
-    
-    @property
-    def max(self) -> Optional[float]:
-        """Maximum timing measurement (alias for slowest_time)."""
-        return self.slowest_time
-    
-    @property
-    def stdev(self) -> Optional[float]:
-        """Standard deviation of timing measurements."""
-        with self._timer._lock:
-            if len(self._timer.times) <= 1:
-                return None
-            return statistics.stdev(self._timer.times)
-    
-    @property
-    def variance(self) -> Optional[float]:
-        """Variance of timing measurements."""
-        with self._timer._lock:
-            if len(self._timer.times) <= 1:
-                return None
-            return statistics.variance(self._timer.times)
-    
-    def get_time(self, index: int) -> Optional[float]:
-        """
-        Get timing measurement by index (0-based).
-        
-        Args:
-            index: 0-based index of measurement
-            
-        Returns:
-            Timing measurement or None if index is invalid
-        """
-        with self._timer._lock:
-            if 0 <= index < len(self._timer.times):
-                return self._timer.times[index]
-            return None
-    
-    def percentile(self, percent: float) -> Optional[float]:
-        """
-        Calculate any percentile of timing measurements.
-        
-        Args:
-            percent: Percentile to calculate (0-100)
-            
-        Returns:
-            Percentile value or None if no measurements
-        """
-        with self._timer._lock:
-            if not self._timer.times:
-                return None
-                
-            if not 0 <= percent <= 100:
-                raise ValueError("Percentile must be between 0 and 100")
-            
-            sorted_times = sorted(self._timer.times)
-            index = (percent / 100) * (len(sorted_times) - 1)
-
-            if index == int(index):
-                return sorted_times[int(index)]
-
-            lower_index = int(index)
-            upper_index = lower_index + 1
-            weight = index - lower_index
-            return (sorted_times[lower_index] * (1 - weight) + 
-                    sorted_times[upper_index] * weight)
-        
 class Timer:
     """
     ────────────────────────────────────────────────────────
@@ -461,10 +264,10 @@ class Timer:
             do_work()
             timer.stop()
         
-        # Access statistics through timer.stats
-        print(f"Mean: {timer.stats.mean:.3f}s")
-        print(f"Std Dev: {timer.stats.stdev:.3f}s")
-        print(f"95th percentile: {timer.stats.percentile(95):.3f}s")
+        # Access statistics directly on the timer
+        print(f"Mean: {timer.mean:.3f}s")
+        print(f"Std Dev: {timer.stdev:.3f}s")
+        print(f"95th percentile: {timer.percentile(95):.3f}s")
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -488,10 +291,10 @@ class Timer:
     Provides comprehensive timing statistics including mean, median,
     standard deviation, and percentiles for performance analysis.
     
-    All statistics are accessed through the `stats` property for clean organization:
-        - `timer.stats.mean`
-        - `timer.stats.stdev`
-        - `timer.stats.percentile(95)`
+    All statistics are accessed directly on the timer:
+        - `timer.mean`
+        - `timer.stdev`
+        - `timer.percentile(95)`
     
     Features:
         - Thread-safe with per-thread timing sessions
@@ -508,9 +311,23 @@ class Timer:
         `add_time(float)`: Manually add a measurement
         `reset()`: Clear all measurements
     
-    Statistics Access:
-        `timer.stats`: Live statistics view (TimerStatsView)
-        `timer.get_statistics()` / `timer.get_stats()`: Frozen snapshot (TimerStats)
+    Statistics Properties:
+        `num_times`: Number of recorded measurements
+        `most_recent` / `result`: Most recent timing
+        `total_time`: Sum of all times
+        `total_time_paused`: Total time spent paused
+        `mean`: Average of all times
+        `median`: Median of all times  
+        `min` / `max`: Fastest / slowest times
+        `fastest_time` / `slowest_time`: Aliases for min/max
+        `fastest_index` / `slowest_index`: Indices of fastest/slowest
+        `stdev`: Standard deviation
+        `variance`: Variance
+        
+    Statistics Methods:
+        `get_time(index)`: Get specific measurement by index
+        `percentile(percent)`: Calculate any percentile (0-100)
+        `get_statistics()` / `get_stats()`: Frozen snapshot (TimerStats)
     """
     
     def __init__(self):
@@ -543,23 +360,156 @@ class Timer:
         # Session management: keyed by thread ident
         self._sessions: Dict[int, "TimerSession"] = {}
         
-        # Live stats view
-        self._stats_view = TimerStatsView(self)
+    # =========================================================================
+    # Statistics Properties (live, always up-to-date)
+    # =========================================================================
     
     @property
-    def stats(self) -> TimerStatsView:
+    def num_times(self) -> int:
+        """Number of timing measurements recorded."""
+        with self._lock:
+            return len(self.times)
+    
+    @property
+    def most_recent(self) -> Optional[float]:
+        """Most recent timing measurement."""
+        with self._lock:
+            return self.times[-1] if self.times else None
+
+    @property
+    def result(self) -> Optional[float]:
+        """Alias for most_recent."""
+        return self.most_recent
+
+    @property
+    def most_recent_index(self) -> Optional[int]:
+        """Index of most recent timing measurement."""
+        with self._lock:
+            return len(self.times) - 1 if self.times else None
+
+    @property
+    def total_time(self) -> Optional[float]:
+        """Total time of all timing measurements."""
+        with self._lock:
+            return sum(self.times) if self.times else None
+
+    @property
+    def total_time_paused(self) -> Optional[float]:
+        """Total time paused across all recorded measurements."""
+        with self._lock:
+            if not self._paused_durations:
+                return None
+            return sum(self._paused_durations)
+    
+    @property
+    def mean(self) -> Optional[float]:
+        """Mean (average) of all timing measurements."""
+        with self._lock:
+            return statistics.mean(self.times) if self.times else None
+    
+    @property
+    def median(self) -> Optional[float]:
+        """Median of all timing measurements."""
+        with self._lock:
+            return statistics.median(self.times) if self.times else None
+    
+    @property
+    def slowest_index(self) -> Optional[int]:
+        """Index of the slowest timing measurement."""
+        with self._lock:
+            return self.times.index(max(self.times)) if self.times else None
+    
+    @property
+    def fastest_index(self) -> Optional[int]:
+        """Index of the fastest timing measurement."""
+        with self._lock:
+            return self.times.index(min(self.times)) if self.times else None
+
+    @property
+    def slowest_time(self) -> Optional[float]:
+        """Time of the slowest timing measurement."""
+        with self._lock:
+            return max(self.times) if self.times else None
+    
+    @property
+    def fastest_time(self) -> Optional[float]:
+        """Time of the fastest timing measurement."""
+        with self._lock:
+            return min(self.times) if self.times else None
+
+    @property
+    def min(self) -> Optional[float]:
+        """Minimum timing measurement (alias for fastest_time)."""
+        return self.fastest_time
+    
+    @property
+    def max(self) -> Optional[float]:
+        """Maximum timing measurement (alias for slowest_time)."""
+        return self.slowest_time
+    
+    @property
+    def stdev(self) -> Optional[float]:
+        """Standard deviation of timing measurements."""
+        with self._lock:
+            if len(self.times) <= 1:
+                return None
+            return statistics.stdev(self.times)
+    
+    @property
+    def variance(self) -> Optional[float]:
+        """Variance of timing measurements."""
+        with self._lock:
+            if len(self.times) <= 1:
+                return None
+            return statistics.variance(self.times)
+    
+    def get_time(self, index: int) -> Optional[float]:
         """
-        Access timer statistics through an organized namespace.
+        Get timing measurement by index (0-based).
         
-        Returns:
-            TimerStatsView providing access to all statistics
+        Args:
+            index: 0-based index of measurement
             
-        Example:
-            timer.stats.mean
-            timer.stats.stdev
-            timer.stats.percentile(95)
+        Returns:
+            Timing measurement or None if index is invalid
         """
-        return self._stats_view
+        with self._lock:
+            if 0 <= index < len(self.times):
+                return self.times[index]
+            return None
+    
+    def percentile(self, percent: float) -> Optional[float]:
+        """
+        Calculate any percentile of timing measurements.
+        
+        Args:
+            percent: Percentile to calculate (0-100)
+            
+        Returns:
+            Percentile value or None if no measurements
+        """
+        with self._lock:
+            if not self.times:
+                return None
+                
+            if not 0 <= percent <= 100:
+                raise ValueError("Percentile must be between 0 and 100")
+            
+            sorted_times = sorted(self.times)
+            index = (percent / 100) * (len(sorted_times) - 1)
+
+            if index == int(index):
+                return sorted_times[int(index)]
+
+            lower_index = int(index)
+            upper_index = lower_index + 1
+            weight = index - lower_index
+            return (sorted_times[lower_index] * (1 - weight) + 
+                    sorted_times[upper_index] * weight)
+
+    # =========================================================================
+    # Internal Session Management
+    # =========================================================================
 
     def _get_or_create_session(self) -> "TimerSession":
 
@@ -628,7 +578,7 @@ class Timer:
             do_work()
             elapsed = timer.stop()  # Returns elapsed time, records it
             
-            print(timer.stats.most_recent)  # Same as elapsed
+            print(timer.most_recent)  # Same as elapsed
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -691,7 +641,7 @@ class Timer:
                 timer.lap()  # Records time since last lap/start, continues timing
             
             # 100 measurements recorded
-            print(timer.stats.mean)
+            print(timer.mean)
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -773,7 +723,7 @@ class Timer:
             timer.add_time(2.3)
             timer.add_time(1.8)
             
-            print(timer.stats.mean)  # 1.867
+            print(timer.mean)  # 1.867
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -786,46 +736,6 @@ class Timer:
             self.times.append(elapsed_time)
             self._paused_durations.append(0.0)
     
-    # =========================================================================
-    # Commented-out checkpoint() method - cleaner alternative to lap()
-    # Uncomment if users request this feature in the future.
-    # =========================================================================
-    #
-    # def checkpoint(self) -> Optional[float]:
-    #     """
-    #     Universal timing checkpoint that works whether timing is in progress or not.
-    #     
-    #     If no timing is in progress: starts timing (returns None)
-    #     If timing is in progress: records time since last checkpoint and starts new (returns elapsed time)
-    #     
-    #     This provides a cleaner API than lap() for scenarios where you just want to
-    #     mark points in time without worrying about start/stop state.
-    #     
-    #     Example:
-    #         timer = Timer()
-    #         
-    #         timer.checkpoint()  # Starts timing (returns None)
-    #         do_step_1()
-    #         time_1 = timer.checkpoint()  # Records step 1, starts timing step 2
-    #         do_step_2()
-    #         time_2 = timer.checkpoint()  # Records step 2, starts timing step 3
-    #         do_step_3()
-    #         time_3 = timer.stop()  # Records final step
-    #         
-    #         # All times recorded in timer.stats
-    #     
-    #     Returns:
-    #         Elapsed time since last checkpoint, or None if this was the first call
-    #     """
-    #     if not self._has_active_frame():
-    #         # No active timing - start one
-    #         self.start()
-    #         return None
-    #     else:
-    #         # Active timing - record lap and continue
-    #         return self.lap()
-    #
-    # =========================================================================
     
     def get_statistics(self) -> Optional[TimerStats]:
         """
@@ -850,7 +760,7 @@ class Timer:
         at the moment this method was called. The snapshot is immutable
         and won't change even if the timer continues recording.
         
-        For live (always up-to-date) statistics, use `timer.stats` instead.
+        For live (always up-to-date) statistics, access properties directly on the timer.
         
         Returns:
             `TimerStats` snapshot or `None` if no measurements recorded

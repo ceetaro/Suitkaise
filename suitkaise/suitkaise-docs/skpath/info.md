@@ -276,7 +276,7 @@ Uses `RLock` so it can be nested from the same thread.
 
 ## `@autopath` Decorator
 
-The `@autopath` decorator automatically converts path parameters based on their type annotations.
+The `@autopath` decorator automatically normalizes paths and converts them to the types that a function expects.
 
 ### How It Works
 
@@ -286,18 +286,35 @@ At decoration time:
    - Is it a path type? (`str`, `Path`, `SKPath`, or `AnyPath`)
    - Is it an iterable of path types? (`list[AnyPath]`, etc.)
    - What's the target type to convert to?
+3. If `only` is specified, filters to only those parameter names
 
 At call time:
 1. If `use_caller=True` and a path parameter is missing:
    - Inspects call stack to find caller's file
    - Uses that as the default value
 2. For each path parameter:
-   - Converts the value to match the annotation type
+   - Normalizes the value through SKPath (resolves path, normalizes separators)
+   - Converts to the target type
 3. Calls the original function with converted values
+
+### Path Normalization
+
+All path-like inputs flow through SKPath before conversion to the target type:
+
+```
+input → SKPath → best target type
+```
+
+This ensures:
+- Resolved absolute paths
+- Normalized separators (always `/`)
+- Cross-platform consistency
+
+For example, `"./data\\file.txt"` becomes `"/abs/path/data/file.txt"`.
 
 ### Type Conversion Priority
 
-When determining what type to convert to, `@autopath` picks the "richest" type:
+When determining what type to convert to, `@autopath` picks the "best" type:
 
 1. `SKPath` — if `SKPath` is in the annotation (including `AnyPath`)
 2. `Path` — if `Path` is in the annotation (but not `SKPath`)
@@ -307,7 +324,7 @@ Examples:
 - `path: AnyPath` → converts to `SKPath`
 - `path: SKPath` → converts to `SKPath`
 - `path: Path` → converts to `Path`
-- `path: str` → converts to `str`
+- `path: str` → converts to `str` (normalized absolute path)
 - `path: Path | SKPath` → converts to `SKPath`
 - `path: str | Path` → converts to `Path`
 
@@ -319,6 +336,30 @@ Works with common iterables:
 - `set[SKPath]` → each element converted
 
 The container type is preserved (list → list, tuple → tuple, etc.).
+
+### `only` Option
+
+Restricts normalization to specific parameters. Use this when you have `str` or `list[str]` parameters that aren't actually file paths.
+
+```python
+@autopath(only="file_path")
+def process(file_path: str, names: list[str]):
+    # Only file_path is normalized
+    # names is passed through unchanged
+```
+
+```python
+@autopath(only=["input", "output"])
+def copy(input: str, output: str, tags: list[str]):
+    # input and output are normalized
+    # tags is left unchanged
+```
+
+### Performance Benchmarks
+
+`@autopath` costs about 17-18 microseconds per path. 
+
+When you have a large collection of strings that aren't paths, using `only` to only work on the correct parameters will increase performance.
 
 ### `use_caller` Option
 
@@ -340,8 +381,9 @@ log_from()  # Uses caller's file automatically
 ### `debug` Option
 
 When `debug=True`:
-- Prints a message for each conversion
+- Prints a message for each conversion or normalization
 - Format: `"@autopath: Converted {param}: {from_type} → {to_type}"`
+- For same-type normalization: `"@autopath: Normalized {param}: '{old}' → '{new}'"`
 
 ---
 

@@ -144,6 +144,12 @@ def _convert_value(
     """
     Convert a value to the target path type.
     
+    All path-like inputs (str, Path) are first normalized through SKPath,
+    then converted to the target type. This ensures consistent path handling:
+    - Resolved absolute paths
+    - Normalized separators (always /)
+    - Cross-platform consistency
+    
     Args:
         value: Value to convert
         target_type: Target type (SKPath, Path, or str)
@@ -157,40 +163,52 @@ def _convert_value(
         return None
     
     original_type = type(value).__name__
+    original_value = str(value) if isinstance(value, (str, Path)) else None
     
-    # Convert to target type
+    # All paths flow through SKPath for normalization: input → SKPath → target type
     if target_type is SKPath:
         if isinstance(value, SKPath):
             result = value
         elif isinstance(value, (str, Path)):
-            result = SKPath(value)
+            try:
+                result = SKPath(value)
+            except Exception:
+                return value  # Can't convert, return as-is
         else:
-            return value  # Can't convert, return as-is
+            return value
             
     elif target_type is Path:
-        if isinstance(value, Path):
-            result = value
-        elif isinstance(value, SKPath):
+        if isinstance(value, SKPath):
             result = Path(value.ap)
-        elif isinstance(value, str):
-            result = Path(value)
+        elif isinstance(value, (str, Path)):
+            try:
+                # Normalize through SKPath, then convert to Path
+                result = Path(SKPath(value).ap)
+            except Exception:
+                result = Path(value) if isinstance(value, str) else value
         else:
             return value
             
     elif target_type is str:
-        if isinstance(value, str):
-            result = value  # Don't normalize strings passed to str params
-        elif isinstance(value, SKPath):
+        if isinstance(value, SKPath):
             result = value.ap
-        elif isinstance(value, Path):
-            result = str(value)
+        elif isinstance(value, (str, Path)):
+            try:
+                # Normalize through SKPath, then extract string
+                result = SKPath(value).ap
+            except Exception:
+                result = str(value)  # Fall back to simple str conversion
         else:
             return value
     else:
         return value
     
-    if debug and type(value) != type(result):
-        print(f"@autopath: Converted {param_name}: {original_type} → {target_type.__name__}")
+    if debug:
+        result_str = str(result) if isinstance(result, (str, Path, SKPath)) else None
+        if type(value) != type(result):
+            print(f"@autopath: Converted {param_name}: {original_type} → {target_type.__name__}")
+        elif original_value is not None and result_str is not None and original_value != result_str:
+            print(f"@autopath: Normalized {param_name}: {original_value!r} → {result_str!r}")
     
     return result
 
@@ -221,14 +239,21 @@ def _convert_iterable(
 def autopath(
     use_caller: bool = False,
     debug: bool = False,
+    only: str | list[str] | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator that automatically converts path parameters based on type annotations.
     
+    All path-like inputs are normalized through SKPath before conversion to the
+    target type. This ensures:
+    - Resolved absolute paths
+    - Normalized separators (always /)
+    - Cross-platform consistency
+    
     Converts inputs to match the declared type:
     - Parameters annotated as AnyPath or SKPath → converted to SKPath
-    - Parameters annotated as Path → converted to Path
-    - Parameters annotated as str → converted to str (no separator normalization)
+    - Parameters annotated as Path → normalized through SKPath, then to Path
+    - Parameters annotated as str → normalized through SKPath, returns absolute path string
     
     Also handles iterables: list[AnyPath], tuple[Path, ...], set[SKPath], etc.
     
@@ -236,6 +261,11 @@ def autopath(
         use_caller: If True, parameters that accept SKPath or Path will use
                    the caller's file path if no value was provided
         debug: If True, print messages when conversions occur
+        only: Restrict normalization to specific parameters. If None (default),
+              all path-like parameters are normalized. If a string or list of
+              strings, only parameters with matching names are normalized.
+              Use this for performance when you have str/list[str] params
+              that aren't actually file paths.
         
     Returns:
         Decorated function
@@ -250,7 +280,26 @@ def autopath(
         def log_from(path: AnyPath):
             # path defaults to caller's file if not provided
             print(f"Logging from: {path.np}")
+        
+        @autopath()
+        def save_file(path: str):
+            # path is normalized: "./data\\file.txt" → "/abs/path/data/file.txt"
+            with open(path, 'w') as f:
+                f.write('data')
+        
+        @autopath(only="file_path")
+        def process_with_data(file_path: str, names: list[str], ids: list[str]):
+            # Only file_path is normalized, names and ids are left unchanged
+            # This is much faster when names/ids contain thousands of items
+            return file_path
     """
+    # Normalize 'only' to a set for O(1) lookup
+    if only is None:
+        allowed_params: set[str] | None = None  # None means all params
+    elif isinstance(only, str):
+        allowed_params = {only}
+    else:
+        allowed_params = set(only)
     
     def decorator(func: F) -> F:
         sig = inspect.signature(func)
@@ -267,6 +316,10 @@ def autopath(
         
         for param_name, param in sig.parameters.items():
             if param_name in ("self", "cls"):
+                continue
+            
+            # Skip if path_params specified and this param isn't in the list
+            if allowed_params is not None and param_name not in allowed_params:
                 continue
             
             annotation = type_hints.get(param_name, param.annotation)

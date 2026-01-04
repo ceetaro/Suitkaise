@@ -210,26 +210,24 @@ t = sktime.Timer()
    - `_paused_durations`: empty list to track pause time for each measurement
    - `_lock`: creates a `threading.RLock()` for thread safety
    - `_sessions`: empty dictionary to track timing sessions per thread (keyed by thread ID)
-   - `_stats_view`: a `TimerStatsView` instance for accessing statistics
-
 Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
 
-### `Timer.stats` property
+### Statistics properties and methods
 
-The `stats` property returns a `TimerStatsView` that provides organized access to all timer statistics.
+All statistics are accessed directly on the timer as properties and methods.
 
 ```python
 timer = sktime.Timer()
 # ... record some timings ...
 
-# Access statistics through the stats namespace
-print(timer.stats.mean)
-print(timer.stats.stdev)
-print(timer.stats.percentile(95))
-print(timer.stats.num_times)
+# Access statistics directly on the timer
+print(timer.mean)
+print(timer.stdev)
+print(timer.percentile(95))
+print(timer.num_times)
 ```
 
-The `TimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
+All statistics are live - they always reflect the current state of the timer. All property accesses are thread-safe.
 
 ### `Timer.start()`
 
@@ -478,9 +476,9 @@ Returns:
 4. Releases the lock
 5. Returns None
 
-### `TimerStatsView` properties (via `timer.stats`)
+### `Timer` statistics properties
 
-All properties are accessed via `timer.stats` and work by acquiring the lock and calculating from the `times` list:
+All statistics are accessed directly on the timer and work by acquiring the lock and calculating from the `times` list:
 
 **`num_times`**: Returns `len(self.times)`
 
@@ -514,9 +512,9 @@ All properties are accessed via `timer.stats` and work by acquiring the lock and
 
 All property accesses acquire the lock to ensure thread-safe reads.
 
-### `TimerStatsView` methods (via `timer.stats`)
+### `Timer` statistics methods
 
-#### `timer.stats.get_time()`
+#### `timer.get_time()`
 
 Gets and returns a specific timing measurement by index.
 
@@ -532,7 +530,7 @@ Returns:
 4. If invalid, returns `None`
 5. Releases the lock
 
-#### `timer.stats.percentile()`
+#### `timer.percentile()`
 
 Calculates a percentile of all measurements.
 
@@ -612,7 +610,7 @@ This completely resets the timer as if it was just created.
 
 A frozen snapshot of timer statistics returned by `Timer.get_statistics()`.
 
-Unlike `timer.stats` (the live `TimerStatsView`), `TimerStats` is immutable and won't change even if the timer continues recording.
+Unlike the live statistics on `Timer`, `TimerStats` is immutable and won't change even if the timer continues recording.
 
 All statistics are pre-computed at creation time:
 
@@ -658,8 +656,8 @@ with sktime.TimeThis() as timer:
     pass
 
 # Access stats directly on the returned timer
-print(timer.stats.most_recent)
-print(timer.stats.mean)
+print(timer.most_recent)
+print(timer.mean)
 ```
 
 ### methods
@@ -748,7 +746,7 @@ When `timer_instance` is `None` (the default), the decorator creates and manages
 
 5. Attaches the timer to the wrapper function:
     - Sets `wrapper.timer = the_timer`
-    - This lets you access statistics via `your_function.timer.stats.mean`, etc.
+    - This lets you access statistics via `your_function.timer.mean`, etc.
 
 6. At call time (every time the decorated function runs):
     - Same as Mode 1: `start()`, run function, `stop()`
