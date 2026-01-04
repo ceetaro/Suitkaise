@@ -4,11 +4,14 @@ why the skpath module was created
 
 what problems it solves
 
+each numbered section is a dropdown.
+
 */
 
 text = "
 File paths are a pain to work with.
 
+(start of dropdown section for 1)
 1. `\` vs `/`
 
 Windows uses `\`, everything else uses `/`. You write code on a Mac, push it, and then everything breaks on Windows.
@@ -102,8 +105,9 @@ Then, it passes the normalized path into the function, choosing the correct type
 
 No need to edit any function code to make paths work.
 
----
+(end of dropdown section for 1)
 
+(start of dropdown section for 2)
 2. Relative paths
 
 Writing out the full path to a file sucks.
@@ -142,26 +146,76 @@ Then, when you work with `SKPath` objects across machines or even operating syst
 
 So now you can just `SKPath` everything and not have to worry about platform issues, or having to manually relate paths to the root.
 
----
+(end of dropdown section for 2)
 
+(start of dropdown section for 3)
 3. Project root related issues
 
----
+Finding the project root recursively is not standardized at all.
 
+Also a drag to do.
+
+Each dev does it slightly differently, and there are inconsistencies.
+
+You end up having to copy paste something like this every time:
+
+```python
+def find_project_root():
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / "pyproject.toml").exists():
+            return current
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    raise RuntimeError("Could not find project root")
+
+PROJECT_ROOT = find_project_root()
+```
+
+Which is cloudy and relies on exact indicators.
+
+With `skpath` - *1 line* 2 different ways
+
+```python
+PROJECT_ROOT = get_project_root()
+```
+
+```python
+PROJECT_ROOT = SKPath().root
+```
+
+With `skpath` you can also use different roots quickly and easily.
+
+- you can add a `setup.sk` file to your project root to guarantee detection (it will look for things like `setup.py` even if you don't do this)
+
+- you can use `set_custom_root` to set a custom root that all `SKPath` objects will use
+
+- you can use the `CustomRoot` context manager to temporarily set a custom root for a code block for things like testing
+
+Note that `SKPaths` are created with the project root they were given, so either use a custom root or don't.
+
+(end of dropdown section for 3)
+
+(start of dropdown section for 4)
 4. String manipulation
 
----
+(end of dropdown section for 4)
 
+
+(start of dropdown section for 5)
 5. Figuring out if you need to use a `Path` or a `str`
 
----
+(end of dropdown section for 5)
 
+(start of dropdown section for 6)
 6. Comparing paths
 
----
+(end of dropdown section for 6)
 
+(start of dropdown section for 7)
 7. Caller file pathfinding
 
-
+(end of dropdown section for 7)
 
 

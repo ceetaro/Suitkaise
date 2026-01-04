@@ -161,10 +161,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function styleAPIHighlights() {
         // API identifiers to highlight
         const apiModules = new Set(['suitkaise', 'sktime', 'skpath', 'circuit', 'cerial', 'processing', 'docs']);
-        const apiClasses = new Set(['SKPath', 'Timer', 'TimeThis', 'Yawn', 'Circuit', 'Process', 'CustomRoot', 'AnyPath', 'Permission']);
+        const apiClasses = new Set([
+            // skpath
+            'SKPath', 'AnyPath', 'CustomRoot', 'PathDetectionError',
+            // sktime
+            'Timer', 'TimeThis', 'Yawn',
+            // circuit
+            'Circuit',
+            // cerial
+            'Cerializer', 'Decerializer', 'SerializationError', 'DeserializationError',
+            // processing
+            'Process', 'ProcessConfig', 'TimeoutConfig', 'ProcessTimers',
+            'PreloopError', 'MainLoopError', 'PostLoopError', 'OnFinishError', 'ResultError',
+        ]);
         // Note: 'time' and 'sleep' are NOT included here because they conflict with time.time() and time.sleep()
         // They still get highlighted as part of sktime.time() chains since 'sktime' is in apiModules
-        const apiMethods = new Set(['timethis', 'autopath', 'elapsed', 'get_stats', 'get_statistics']);
+        const apiMethods = new Set([
+            // sktime
+            'timethis', 'elapsed', 'clear_global_timers',
+            // skpath
+            'autopath', 'get_project_root', 'set_custom_root', 'get_custom_root', 'clear_custom_root',
+            'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
+            'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
+            // cerial
+            'serialize', 'deserialize',
+            // processing
+            'timesection',
+        ]);
         
         // Overrides: properties that should highlight word.property.chain patterns
         // These only activate if their associated decorator is found in the code block
@@ -190,10 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
+            // Build dynamic patterns from our API sets
+            const classesPattern = [...apiClasses].join('|');
+            const methodsPattern = [...apiMethods].join('|');
+            
             // Find variable assignments like: varname = sktime.Timer()
             const assignmentPatterns = [
                 /(\w+)\s*=\s*(?:sktime|skpath|circuit|cerial|processing)\.\w+/g,
-                /(\w+)\s*=\s*(?:Timer|TimeThis|Yawn|SKPath|Circuit|Process|CustomRoot|AnyPath|Permission)\s*\(/g,
+                new RegExp(`(\\w+)\\s*=\\s*(?:${classesPattern})\\s*\\(`, 'g'),
+                new RegExp(`(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
                 /with\s+(?:sktime|skpath|circuit|cerial|processing)\.\w+[^:]*\s+as\s+(\w+)/g,
             ];
             
@@ -1217,14 +1245,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const modulePage = document.querySelector('.module-page, .about-page, .why-page');
         if (!modulePage) return;
         
+        // Collect dropdown elements separately - they have their own opacity logic
+        const dropdownElements = Array.from(modulePage.querySelectorAll('details'));
+        
         // Group elements into logical sections:
         // - h2 starts a major section (includes everything until next h2)
         // - h3/h4/h5 starts a subsection within the current major section
         // - Code blocks (pre) are part of their parent section
         // - Text/lists belong to the most recent header
+        // - Dropdowns are handled separately (not part of sections)
         
-        const allElements = Array.from(modulePage.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, pre, details, hr'));
-        if (allElements.length === 0) return;
+        // Select elements for sections, excluding content inside details
+        // Use :scope > * for pages with dropdowns to avoid nested content issues
+        const hasDropdowns = dropdownElements.length > 0;
+        let allElements;
+        if (hasDropdowns) {
+            // Get direct children only, excluding details (handled separately)
+            allElements = Array.from(modulePage.querySelectorAll(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6, :scope > p, :scope > ul, :scope > ol, :scope > pre, :scope > hr'));
+        } else {
+            allElements = Array.from(modulePage.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, pre, hr'));
+        }
+        if (allElements.length === 0 && dropdownElements.length === 0) return;
         
         const sections = [];
         let currentSection = null;
@@ -1238,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allElements.forEach(el => {
             const tagName = el.tagName.toLowerCase();
             
-            // Skip li elements inside details (they're part of the details group)
+            // Skip li elements inside details (they're part of the details, handled separately)
             if (tagName === 'li' && el.closest('details')) return;
             
             // Headers (h2-h6)
@@ -1264,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 currentSection = null;
             }
-            // Everything else (p, li, pre, details, h1) belongs to current section
+            // Everything else (p, li, pre, h1, ul, ol) belongs to current section
             else {
                 if (!currentSection) {
                     currentSection = { elements: [] };
@@ -1401,6 +1442,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             });
+            
+            // Handle dropdowns separately - simple visibility check
+            // A dropdown is highlighted if its summary is visible in the viewport
+            dropdownElements.forEach(details => {
+                const summary = details.querySelector('summary');
+                if (!summary) {
+                    details.style.opacity = 1;
+                    return;
+                }
+                
+                const rect = summary.getBoundingClientRect();
+                const isVisible = rect.bottom > contentTop && rect.top < contentBottom;
+                
+                // Check if this dropdown is near any active section
+                // (within 100px of an active section element)
+                let isNearActiveSection = false;
+                const detailsRect = details.getBoundingClientRect();
+                
+                sections.forEach((section, index) => {
+                    if (activeIndices.has(index)) {
+                        section.elements.forEach(el => {
+                            const elRect = el.getBoundingClientRect();
+                            // Check if dropdown is adjacent to this element (within 50px)
+                            const gap = Math.min(
+                                Math.abs(detailsRect.top - elRect.bottom),
+                                Math.abs(detailsRect.bottom - elRect.top)
+                            );
+                            if (gap < 50) {
+                                isNearActiveSection = true;
+                            }
+                        });
+                    }
+                });
+                
+                if (isVisible || isNearActiveSection) {
+                    details.style.opacity = 1;
+                } else {
+                    details.style.opacity = 0.3;
+                }
+            });
         }
         
         // Update on scroll
@@ -1421,9 +1502,24 @@ document.addEventListener('DOMContentLoaded', () => {
         // Listen for scroll
         window.addEventListener('scroll', onScroll, { passive: true });
         
+        // Listen for details toggle events (dropdowns expanding/collapsing)
+        const detailsElements = modulePage.querySelectorAll('details');
+        function onDetailsToggle() {
+            // Small delay to let the DOM update after toggle
+            requestAnimationFrame(() => {
+                updateSections();
+            });
+        }
+        detailsElements.forEach(details => {
+            details.addEventListener('toggle', onDetailsToggle);
+        });
+        
         // Store cleanup function for when navigating away
         modulePage._scrollOpacityCleanup = () => {
             window.removeEventListener('scroll', onScroll);
+            detailsElements.forEach(details => {
+                details.removeEventListener('toggle', onDetailsToggle);
+            });
         };
     }
     

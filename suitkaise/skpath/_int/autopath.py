@@ -171,7 +171,7 @@ def _convert_value(
             result = value
         elif isinstance(value, (str, Path)):
             try:
-                result = SKPath(value)
+            result = SKPath(value)
             except Exception:
                 return value  # Can't convert, return as-is
         else:
@@ -206,7 +206,7 @@ def _convert_value(
     if debug:
         result_str = str(result) if isinstance(result, (str, Path, SKPath)) else None
         if type(value) != type(result):
-            print(f"@autopath: Converted {param_name}: {original_type} → {target_type.__name__}")
+        print(f"@autopath: Converted {param_name}: {original_type} → {target_type.__name__}")
         elif original_value is not None and result_str is not None and original_value != result_str:
             print(f"@autopath: Normalized {param_name}: {original_value!r} → {result_str!r}")
     

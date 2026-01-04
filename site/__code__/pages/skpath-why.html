@@ -1,15 +1,231 @@
 <div class="module-bar" data-module="skpath">
     <button class="module-bar-title">suitkaise.skpath</button>
     <nav class="module-bar-nav">
+        <a href="#skpath-why" class="module-bar-link active" data-page="skpath-why">why</a>
         <a href="#skpath" class="module-bar-link" data-page="skpath">how to use</a>
         <a href="#skpath-how-it-works" class="module-bar-link" data-page="skpath-how-it-works">how it works</a>
         <a href="#skpath-videos" class="module-bar-link" data-page="skpath-videos">videos</a>
         <a href="#skpath-tests" class="module-bar-link" data-page="skpath-tests">tests</a>
         <a href="#skpath-examples" class="module-bar-link" data-page="skpath-examples">examples</a>
-        <a href="#skpath-why" class="module-bar-link active" data-page="skpath-why">why</a>
     </nav>
 </div>
-<section class="module-page">
-    <h1>why</h1>
-    <p>Skpath module - why content coming soon...</p>
+<section class="module-page why-page">
+    <h1>Why <code>skpath</code>?</h1>
+
+    <p>Because file paths are a pain to work with.</p>
+
+    <details>
+        <summary>1. <code>\</code> vs <code>/</code></summary>
+        <div class="dropdown-content">
+
+    <p>Windows uses <code>\</code>, everything else uses <code>/</code>. You write code on a Mac, push it, and then everything breaks on Windows.</p>
+
+    <p>Or even worse, you have cross platform compatibility issues on a live build.</p>
+
+    <p>Let's make a function that opens and reads a file, scanning it for a specific string.</p>
+
+<pre><code class="language-python">def scan_file_for_matches(file_path: str, search_string: str):
+
+    # open and read file
+    with open(file_path, "r") as f:
+        content = f.read()
+
+    # scan for matches
+    matches = [line for line in content.split("\n") if search_string in line]
+
+    return matches</code></pre>
+
+    <h3>Without <code>skpath</code> - <em>14 lines</em></h3>
+
+<pre><code class="language-python">from pathlib import Path # 1
+# import os works similarly
+
+def find_project_root(): # 2
+    current = Path(__file__).resolve().parent # 3
+    while current != current.parent: # 4
+        if (current / "pyproject.toml").exists(): # 5
+            return current # 6
+        if (current / ".git").exists(): # 7
+            return current # 8
+        current = current.parent # 9
+    raise RuntimeError("Could not find project root") # 10
+
+PROJECT_ROOT = find_project_root() # 11
+
+def scan_file_for_matches(file_path: str | Path, search_string: str):
+
+    # normalize string
+    p = Path(file_path) # 12
+    p = p.resolve() # 13
+    p = p.relative_to(PROJECT_ROOT) # 14
+
+    # open and read file
+    with open(p, "r") as f:
+        content = f.read()
+
+    # scan for matches
+    matches = [line for line in content.split("\n") if search_string in line]
+
+    return matches</code></pre>
+
+    <p>The most annoying part of this is that you have to manually find or calculate the project root each time, and every dev likely does it slightly differently.</p>
+
+    <p>You can't just use a hardcoded file path for the root either because each person running the code will likely have a different path to the project.</p>
+
+    <p>And, the moment you log, print, or store the path in a different file, it goes back to the original platform's slashes.</p>
+
+    <p>Also, everyone has to do this each time.</p>
+
+    <p>And, third-party libraries are a total crapshoot when it comes to even possibly accepting <code>pathlib.Path</code> objects.</p>
+
+    <p>Most of the time, you either have to convert it and fix it before passing it in as a string, or pass in the original string path and work with the path in the function.</p>
+
+    <p>Pure hell.</p>
+
+    <h3>With <code>skpath</code> - <em>2 lines</em></h3>
+
+<pre><code class="language-python">from suitkaise.skpath import autopath # 1
+
+@autopath() # 2
+def scan_file_for_matches(file_path: str, search_string: str):
+
+    # open and read file
+    with open(file_path, "r") as f:
+        content = f.read()
+
+    # scan for matches
+    matches = [line for line in content.split("\n") if search_string in line]
+
+    return matches</code></pre>
+
+    <ul>
+        <li><code>@autopath</code> does all of what was happening above.</li>
+        <li>Then, it passes the normalized path into the function, choosing the correct type based on the param type annotation.</li>
+        <li>No need to edit any function code to make paths work.</li>
+    </ul>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>2. Relative paths</summary>
+        <div class="dropdown-content">
+
+    <p>Writing out the full path to a file sucks.</p>
+
+    <p>But relative paths are inconsistent and unclear.</p>
+
+    <p>Is the <code>data/file.txt</code> path relative to the root? The cwd? What if there are multiple files of the same name under different <code>/data</code> directories?</p>
+
+    <p>So, you have to do something like this every time.</p>
+
+<pre><code class="language-python">path = Path("data/file.txt")
+path = path.resolve()
+path = str(path)</code></pre>
+
+    <p>You could do it in one long line if you want, I guess.</p>
+
+<pre><code class="language-python">path = str(Path("data/file.txt").resolve())</code></pre>
+
+    <h3>With <code>skpath</code></h3>
+
+<pre><code class="language-python">path = SKPath("data/file.txt")</code></pre>
+
+    <p><code>SKPaths</code> are awesome because they actually store 2 paths.</p>
+
+    <ul>
+        <li>stores absolute path</li>
+        <li>also auto detects the project root and stores the path relative to it</li>
+    </ul>
+
+    <p>(<code>SKPaths</code> are also automatically cross-platform compatible)</p>
+
+    <p>Then, when you work with <code>SKPath</code> objects across machines or even operating systems, as long as the project root is the same, the paths will work the same.</p>
+
+    <p>So now you can just <code>SKPath</code> everything and not have to worry about platform issues, or having to manually relate paths to the root.</p>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>3. Project root related issues</summary>
+        <div class="dropdown-content">
+
+    <p>Finding the project root recursively is not standardized at all.</p>
+
+    <p>Also a drag to do.</p>
+
+    <p>Each dev does it slightly differently, and there are inconsistencies.</p>
+
+    <p>You end up having to copy paste something like this every time:</p>
+
+<pre><code class="language-python">def find_project_root():
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / "pyproject.toml").exists():
+            return current
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    raise RuntimeError("Could not find project root")
+
+PROJECT_ROOT = find_project_root()</code></pre>
+
+    <p>Which is cloudy and relies on exact indicators.</p>
+
+    <h3>With <code>skpath</code> - <em>1 line</em> (2 different ways)</h3>
+
+<pre><code class="language-python">PROJECT_ROOT = get_project_root()</code></pre>
+
+<pre><code class="language-python">PROJECT_ROOT = SKPath().root</code></pre>
+
+    <p>With <code>skpath</code> you can also use different roots quickly and easily.</p>
+
+    <ul>
+        <li>you can add a <code>setup.sk</code> file to your project root to guarantee detection (it will look for things like <code>setup.py</code> even if you don't do this)</li>
+        <li>you can use <code>set_custom_root</code> to set a custom root that all <code>SKPath</code> objects will use</li>
+        <li>you can use the <code>CustomRoot</code> context manager to temporarily set a custom root for a code block for things like testing</li>
+    </ul>
+
+    <p>Note that <code>SKPaths</code> are created with the project root they were given, so either use a custom root or don't.</p>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>4. String manipulation</summary>
+        <div class="dropdown-content">
+
+    <p><em>Coming soon...</em></p>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>5. Figuring out if you need to use a <code>Path</code> or a <code>str</code></summary>
+        <div class="dropdown-content">
+
+    <p><em>Coming soon...</em></p>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>6. Comparing paths</summary>
+        <div class="dropdown-content">
+
+    <p><em>Coming soon...</em></p>
+
+        </div>
+    </details>
+
+    <details>
+        <summary>7. Caller file pathfinding</summary>
+        <div class="dropdown-content">
+
+    <p><em>Coming soon...</em></p>
+
+        </div>
+    </details>
+
 </section>
