@@ -1,5 +1,3 @@
-# there will be 3 levels of nested classes.
-
 # each level will have all cerial-supported objects (primitives and complex objects that handlers can handle) as attributes
 # outside of collections
 
@@ -25,7 +23,8 @@ import subprocess
 import socket
 import sys
 import uuid
-from datetime import datetime, date, time, timedelta
+import datetime as dt
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from fractions import Fraction
 from collections import defaultdict, OrderedDict, Counter, deque, ChainMap
@@ -73,24 +72,40 @@ COMPLEX_TYPES_THAT_CERIAL_CAN_HANDLE = [
     'iterator',
     'string_io',
     'bytes_io',
+    'subprocess_popen',
+    'subprocess_completed_process',
+    'socket',
 ]
 
 # sktime
 # skpath
 from suitkaise.skpath import *
 from suitkaise.sktime import *
+from suitkaise.circuit import *
+from suitkaise.processing import *
 
-# dont worry about these for now.
+# Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [
-    # skpath
-    SKPath, AnyPath, CustomRoot,
-    # do i need to import functions to test if they are serializable? 
-    # or are they handled by cerial function handler
-
-    # sktime
-    Yawn, Timer, TimeThis
-    # same thing: do i need to test the functions and/or decorators?
-]  # add them here as modules are completed
+    # skpath - project-aware path handling
+    'SKPath',           # Main path class with project root awareness
+    'CustomRoot',       # Custom root management
+    'autopath',         # Decorator (handled by function handler)
+    
+    # sktime - timing utilities  
+    'Timer',            # Elapsed time tracker with laps
+    'Yawn',             # Sleep utility
+    'TimeThis',         # Context manager for timing
+    'timethis',         # Decorator (handled by function handler)
+    
+    # circuit - circuit breaker pattern
+    'Circuit',          # Circuit breaker for fault tolerance
+    
+    # processing - process management
+    'Process',          # Main process class
+    'ProcessConfig',    # Configuration for processes
+    'TimeoutConfig',    # Timeout configuration
+    'ProcessTimers',    # Timing data for processes
+]
 
 class WorstPossibleObject:
 
@@ -161,7 +176,8 @@ class WorstPossibleObject:
     def _track_init(self, category, name, obj=None):
         """Track that an object was initialized."""
         self._initialized_types[category].append(name)
-        self._log(f"  ✓ {name}: {type(obj).__name__ if obj else 'initialized'}")
+        # Use 'is not None' to avoid DeprecationWarning when obj is NotImplemented
+        self._log(f"  ✓ {name}: {type(obj).__name__ if obj is not None else 'initialized'}")
 
 
     def init_all_base_pickle_supported_objects(self):
@@ -234,8 +250,8 @@ class WorstPossibleObject:
         self.date_today = date.today()
         self._track_init('primitives', 'date_value/today', self.date_value)
         
-        self.time_value = time(10, 30, 45)
-        self.time_with_micro = time(10, 30, 45, 123456)
+        self.time_value = dt.time(10, 30, 45)
+        self.time_with_micro = dt.time(10, 30, 45, 123456)
         self._track_init('primitives', 'time_value/micro', self.time_value)
         
         self.timedelta_value = timedelta(days=5, hours=3, minutes=30)
@@ -344,6 +360,9 @@ class WorstPossibleObject:
             self._init_memory_mapped_files,
             self._init_context_vars,
             self._init_iterators,
+            self._init_subprocesses,
+            self._init_sockets,
+            self._init_suitkaise_objects,
         ]
         
         # Shuffle for random order initialization
@@ -659,6 +678,177 @@ class WorstPossibleObject:
         self.iterator_dict = iter({"key1": "val1", "key2": "val2"}.items())
         next(self.iterator_dict)
         self._track_init('complex', 'iterator_dict (advanced 1)', self.iterator_dict)
+    
+    def _init_subprocesses(self):
+        """Initialize subprocess objects."""
+        if 'subprocesses' in self.skip_types:
+            self._log("  [SKIPPED] Subprocesses")
+            return
+        
+        self._log("  [INIT] Subprocesses")
+        
+        # CompletedProcess - result from subprocess.run()
+        # Use a simple, fast command that works on all platforms
+        self.subprocess_completed = subprocess.run(
+            ['echo', 'test output'],
+            capture_output=True,
+            text=True
+        )
+        self._track_init('complex', 'subprocess_completed', self.subprocess_completed)
+        
+        # Popen - actively running or recently completed process
+        # Use a quick command that completes immediately
+        self.subprocess_popen = subprocess.Popen(
+            ['echo', 'popen test'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        # Wait for it to complete so we have a stable state
+        self.subprocess_popen.wait()
+        self._track_init('complex', 'subprocess_popen (completed)', self.subprocess_popen)
+        
+        # Another CompletedProcess with different args (use sys.executable for portability)
+        self.subprocess_completed_with_args = subprocess.run(
+            [sys.executable, '-c', 'print("hello from subprocess")'],
+            capture_output=True,
+            text=True
+        )
+        self._track_init('complex', 'subprocess_completed_with_args', self.subprocess_completed_with_args)
+    
+    def _init_sockets(self):
+        """Initialize socket objects."""
+        if 'sockets' in self.skip_types:
+            self._log("  [SKIPPED] Sockets")
+            return
+        
+        self._log("  [INIT] Sockets")
+        
+        # Basic TCP socket (unconnected)
+        self.socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket_tcp.settimeout(5.0)
+        self._track_init('complex', 'socket_tcp (unconnected)', self.socket_tcp)
+        
+        # UDP socket (unconnected)
+        self.socket_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket_udp.settimeout(10.0)
+        self._track_init('complex', 'socket_udp (unconnected)', self.socket_udp)
+        
+        # Socket with different options
+        self.socket_with_options = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket_with_options.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket_with_options.setblocking(False)
+        self._track_init('complex', 'socket_with_options (non-blocking)', self.socket_with_options)
+    
+    def _init_suitkaise_objects(self):
+        """Initialize suitkaise-specific objects (skpath, sktime, circuit, processing)."""
+        if 'suitkaise' in self.skip_types:
+            self._log("  [SKIPPED] Suitkaise objects")
+            return
+        
+        self._log("  [INIT] Suitkaise objects")
+        
+        # === SKPath objects ===
+        # SKPath - project-aware path object
+        self.skpath_current_file = SKPath(__file__)
+        self._track_init('complex', 'skpath_current_file', self.skpath_current_file)
+        
+        self.skpath_project_root = SKPath('.')
+        self._track_init('complex', 'skpath_project_root', self.skpath_project_root)
+        
+        # CustomRoot - for custom project root management
+        self.custom_root = CustomRoot('/tmp/test_project')
+        self._track_init('complex', 'custom_root', self.custom_root)
+        
+        # === SKTime objects ===
+        # Timer - elapsed time tracker
+        self.timer = Timer()
+        self.timer.start()
+        self.timer.lap()  # Record first lap
+        self.timer.lap()  # Record second lap
+        self._track_init('complex', 'timer (with laps)', self.timer)
+        
+        self.timer_empty = Timer()
+        self._track_init('complex', 'timer_empty', self.timer_empty)
+        
+        # Yawn - sleep utility (sleep_duration, yawn_threshold)
+        self.yawn = Yawn(sleep_duration=0.001, yawn_threshold=5)
+        self._track_init('complex', 'yawn', self.yawn)
+        
+        # TimeThis - context manager for timing
+        self.timethis_ctx = TimeThis("test_operation")
+        self._track_init('complex', 'timethis_ctx', self.timethis_ctx)
+        
+        # SKPath module-level functions
+        self.skpath_autopath_decorator = autopath
+        self._track_init('complex', 'autopath (decorator)', self.skpath_autopath_decorator)
+        
+        self.skpath_get_project_root_func = get_project_root
+        self._track_init('complex', 'get_project_root (function)', self.skpath_get_project_root_func)
+        
+        self.skpath_set_custom_root_func = set_custom_root
+        self._track_init('complex', 'set_custom_root (function)', self.skpath_set_custom_root_func)
+        
+        self.skpath_get_custom_root_func = get_custom_root
+        self._track_init('complex', 'get_custom_root (function)', self.skpath_get_custom_root_func)
+        
+        self.skpath_clear_custom_root_func = clear_custom_root
+        self._track_init('complex', 'clear_custom_root (function)', self.skpath_clear_custom_root_func)
+        
+        # === SKTime module-level functions ===
+        # Note: 'time' shadows datetime.time, so we reference it via sktime module
+        from suitkaise import sktime as sktime_module
+        self.sktime_time_func = sktime_module.time
+        self._track_init('complex', 'sktime.time (function)', self.sktime_time_func)
+        
+        self.sktime_sleep_func = sleep
+        self._track_init('complex', 'sleep (function)', self.sktime_sleep_func)
+        
+        self.sktime_elapsed_func = elapsed
+        self._track_init('complex', 'elapsed (function)', self.sktime_elapsed_func)
+        
+        self.sktime_timethis_decorator = timethis
+        self._track_init('complex', 'timethis (decorator)', self.sktime_timethis_decorator)
+        
+        self.sktime_clear_global_timers_func = clear_global_timers
+        self._track_init('complex', 'clear_global_timers (function)', self.sktime_clear_global_timers_func)
+        
+        # === Circuit objects ===
+        # Circuit - circuit breaker pattern (num_shorts_to_trip required)
+        self.circuit = Circuit(num_shorts_to_trip=5)
+        self._track_init('complex', 'circuit (fresh)', self.circuit)
+        
+        self.circuit_with_shorts = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01)
+        # Simulate some activity - short it a couple times
+        self.circuit_with_shorts.short()
+        self.circuit_with_shorts.short()
+        self._track_init('complex', 'circuit_with_shorts', self.circuit_with_shorts)
+        
+        # === Processing objects ===
+        # ProcessConfig - configuration for processes (dataclass)
+        self.process_config = ProcessConfig(
+            num_loops=100,
+            join_in=60.0,
+            lives=3
+        )
+        self._track_init('complex', 'process_config', self.process_config)
+        
+        # TimeoutConfig - timeout configuration (dataclass)
+        self.timeout_config = TimeoutConfig(
+            preloop=30.0,
+            loop=300.0,
+            postloop=60.0,
+            onfinish=60.0
+        )
+        self._track_init('complex', 'timeout_config', self.timeout_config)
+        
+        # ProcessTimers - timing data container
+        self.process_timers = ProcessTimers()
+        self._track_init('complex', 'process_timers', self.process_timers)
+        
+        # Processing module-level functions/decorators
+        self.processing_timesection_decorator = timesection
+        self._track_init('complex', 'timesection (decorator)', self.processing_timesection_decorator)
 
     def generate_random_nested_collection(self, collection_type):
         """Generate a random nested collection of primitives, collections, and complex objects."""
@@ -1081,6 +1271,48 @@ class WorstPossibleObject:
             'lambda_callable': callable(self.lambda_function),
             'partial_callable': callable(self.partial_function),
             'bound_method_callable': callable(self.bound_method),
+            
+            # Subprocess objects
+            'subprocess_completed_returncode': self.subprocess_completed.returncode,
+            'subprocess_completed_args': self.subprocess_completed.args,
+            'subprocess_popen_returncode': self.subprocess_popen.returncode,
+            'subprocess_popen_args': self.subprocess_popen.args,
+            'subprocess_completed_with_args_returncode': self.subprocess_completed_with_args.returncode,
+            
+            # Socket objects
+            'socket_tcp_family': self.socket_tcp.family,
+            'socket_tcp_type': self.socket_tcp.type,
+            'socket_tcp_timeout': self.socket_tcp.gettimeout(),
+            'socket_udp_family': self.socket_udp.family,
+            'socket_udp_type': self.socket_udp.type,
+            'socket_udp_timeout': self.socket_udp.gettimeout(),
+            'socket_with_options_blocking': self.socket_with_options.getblocking(),
+            
+            # Suitkaise objects - check types and key attributes
+            'skpath_current_file_type': type(self.skpath_current_file).__name__,
+            'skpath_project_root_type': type(self.skpath_project_root).__name__,
+            'custom_root_type': type(self.custom_root).__name__,
+            'timer_type': type(self.timer).__name__,
+            'yawn_sleep_duration': self.yawn.sleep_duration,
+            'yawn_threshold': self.yawn.yawn_threshold,
+            'circuit_num_shorts_to_trip': self.circuit.num_shorts_to_trip,
+            'process_config_num_loops': self.process_config.num_loops,
+            'process_config_lives': self.process_config.lives,
+            'timeout_config_preloop': self.timeout_config.preloop,
+            'timeout_config_loop': self.timeout_config.loop,
+            
+            # Suitkaise module-level functions (verify they're callable)
+            'autopath_callable': callable(self.skpath_autopath_decorator),
+            'get_project_root_callable': callable(self.skpath_get_project_root_func),
+            'set_custom_root_callable': callable(self.skpath_set_custom_root_func),
+            'get_custom_root_callable': callable(self.skpath_get_custom_root_func),
+            'clear_custom_root_callable': callable(self.skpath_clear_custom_root_func),
+            'sktime_time_callable': callable(self.sktime_time_func),
+            'sleep_callable': callable(self.sktime_sleep_func),
+            'elapsed_callable': callable(self.sktime_elapsed_func),
+            'timethis_callable': callable(self.sktime_timethis_decorator),
+            'clear_global_timers_callable': callable(self.sktime_clear_global_timers_func),
+            'timesection_callable': callable(self.processing_timesection_decorator),
         }
         
         return self._verification_checksums
@@ -1194,6 +1426,9 @@ class WorstPossibleObject:
             ('mmap', lambda: (self.mmap.close(), self.mmap_file.close(), Path(self.mmap_file.name).unlink(missing_ok=True))),
             ('sqlite_conn', lambda: (self.sqlite_conn.close(), Path(self.sqlite_file.name).unlink(missing_ok=True))),
             ('sqlite_conn_complex', lambda: (self.sqlite_conn_complex.close(), Path(self.sqlite_file_complex.name).unlink(missing_ok=True))),
+            ('socket_tcp', lambda: self.socket_tcp.close()),
+            ('socket_udp', lambda: self.socket_udp.close()),
+            ('socket_with_options', lambda: self.socket_with_options.close()),
         ]
         
         for attr_name, cleanup_func in resources_to_cleanup:

@@ -194,9 +194,17 @@ class SKPath:
             path_to_encode = self.np if self.np else self.ap
             self._id = encode_path_id(path_to_encode)
         return self._id
+
+
+    @property
+    def root(self) -> "SKPath":
+        """
+        Project root as SKPath object.
+        """
+        return SKPath(self.root_path)
     
     @property
-    def root(self) -> str:
+    def root_str(self) -> str:
         """
         Project root path as string with normalized separators.
         """
@@ -312,6 +320,22 @@ class SKPath:
             "name": self.name,
             "exists": self.exists,
         }
+
+    
+    @property
+    def platform(self) -> str:
+        """
+        Absolute path with platform-native separators.
+        
+        On Windows, uses backslashes (\\).
+        On Mac/Linux, uses forward slashes (/).
+        
+        Use this when you need to pass a path to OS-specific tools,
+        display paths to users in their native format, or integrate
+        with platform-specific APIs.
+        """
+        return to_os_separators(self.ap)
+    
     
     # ========================================================================
     # pathlib.Path Compatible Methods

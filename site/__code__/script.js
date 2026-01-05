@@ -1444,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             // Handle dropdowns separately - simple visibility check
-            // A dropdown is highlighted if its summary is visible in the viewport
+            // A dropdown is highlighted if any part of it is visible in the viewport
             dropdownElements.forEach(details => {
                 const summary = details.querySelector('summary');
                 if (!summary) {
@@ -1452,8 +1452,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                const rect = summary.getBoundingClientRect();
-                const isVisible = rect.bottom > contentTop && rect.top < contentBottom;
+                // If dropdown is open, check if any part of the entire details is visible
+                // If closed, just check the summary
+                let isVisible;
+                if (details.open) {
+                    const detailsRect = details.getBoundingClientRect();
+                    isVisible = detailsRect.bottom > contentTop && detailsRect.top < contentBottom;
+                } else {
+                    const rect = summary.getBoundingClientRect();
+                    isVisible = rect.bottom > contentTop && rect.top < contentBottom;
+                }
                 
                 // Check if this dropdown is near any active section
                 // (within 100px of an active section element)

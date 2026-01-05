@@ -191,12 +191,19 @@ class SocketHandler(Handler):
             proto=state["proto"]
         )
         
-        # Set timeout
-        if state["timeout"] is not None:
-            sock.settimeout(state["timeout"])
-        
-        # Set blocking mode
-        sock.setblocking(state["blocking"])
+        # Set timeout AFTER creating socket
+        # Note: setblocking(True) clears timeout to None, so we use settimeout()
+        # which properly sets both timeout and blocking mode together:
+        # - settimeout(None) = blocking with no timeout
+        # - settimeout(0) = non-blocking
+        # - settimeout(positive) = blocking with timeout
+        timeout = state["timeout"]
+        if timeout is not None:
+            sock.settimeout(timeout)
+        elif not state["blocking"]:
+            # Non-blocking with no timeout means timeout=0
+            sock.settimeout(0)
+        # else: blocking with no timeout is the default
         
         return sock
 

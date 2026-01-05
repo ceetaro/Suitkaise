@@ -1,13 +1,13 @@
 /* ============================================
    Suitkaise Website Styles
    Colors from __home__.md:
-   - Background: rgb(3, 5, 5)
+   - Background: rgb(0, 3, 0)
    - Text: rgb(109, 233, 149)
    - Border: rgb(33, 40, 35)
    ============================================ */
 
 :root {
-    --bg-color: rgb(3, 5, 5);
+    --bg-color: rgb(0, 3, 0);
     --text-color: rgb(109, 233, 149);
     --border-color: rgb(33, 40, 35);
     --hover-color: rgba(109, 233, 149, 0.2);

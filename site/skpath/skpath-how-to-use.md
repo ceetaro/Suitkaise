@@ -21,11 +21,16 @@ Special path object. Automatically detects your project root and uses it to norm
 
 - `SKPath.ap` - absolute path. All slashes are streamlined to `/` for cross-platform compatibility.
 
-"Users/john/Documents/projects/myproject/feature1/file.txt"
+"/Users/john/Documents/projects/myproject/feature1/file.txt"
 
 - `SKPath.np` - normalized path, relative to project root
 
 "myproject/feature1/file.txt"
+
+- `SKPath.platform` - absolute path with platform-native separators (`\` on Windows, `/` elsewhere)
+
+"/Users/john/Documents/projects/myproject/feature1/file.txt" (Mac/Linux)
+"C:\Users\john\Documents\projects\myproject\feature1\file.txt" (Windows)
 
 ```python
 from suitkaise.skpath import SKPath
@@ -47,13 +52,16 @@ path = SKPath("file.txt") # DON'T DO THIS!
 (this is a dropdown section)
 ### `SKPath` Properties and Methods
 
-- `ap` - absolute path
+- `ap` - absolute path (always forward slashes)
 - `np` - path normalized to project root
+- `platform` - absolute path with platform-native separators
 
 Unique to `SKPath`
 
 - `id` - reversible base64url encoded ID (can be used to reconstruct the path)
-- `root` - project root
+- `root` - project root as `SKPath` object
+- `root_str` - project root as string (normalized separators)
+- `root_path` - project root as `Path` object
 
 `pathlib` Compatible
 

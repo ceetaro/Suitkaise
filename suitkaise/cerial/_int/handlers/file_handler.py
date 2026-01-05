@@ -59,12 +59,31 @@ class FileHandleHandler(Handler):
         - errors: Error handling mode (for text mode files)
         - newline: Newline handling (for text mode files)
         - closed: Whether file is closed
+        - is_pipe: Whether this is a subprocess pipe (not a real file)
         
         Note: We try to get skpath-relative path if available,
         otherwise fall back to absolute path.
         """
-        # Get file path
+        # Check if file is closed first
+        is_closed = obj.closed
+        
+        # Get file path/name - may be an int for subprocess pipes
         file_path = obj.name
+        is_pipe = isinstance(file_path, int)  # Subprocess pipes have int file descriptors as names
+        
+        # For closed files or pipes, we store minimal state
+        if is_closed or is_pipe:
+            return {
+                "path": str(file_path) if not is_pipe else None,
+                "relative_path": None,
+                "mode": getattr(obj, 'mode', 'r'),  # Default to 'r' if no mode
+                "position": 0,
+                "encoding": getattr(obj, 'encoding', None),
+                "errors": getattr(obj, 'errors', None),
+                "newline": getattr(obj, 'newline', None),
+                "closed": is_closed,
+                "is_pipe": is_pipe,
+            }
         
         # Try to make path relative using skpath (if available)
         relative_path: Optional[str] = None
@@ -93,11 +112,12 @@ class FileHandleHandler(Handler):
         # Get current position in file
         try:
             position = obj.tell()
-        except (OSError, IOError):
+        except (OSError, IOError, ValueError):
+            # ValueError can occur on closed files
             position = 0
         
-        # Get mode
-        mode = obj.mode
+        # Get mode - may not exist on all file-like objects
+        mode = getattr(obj, 'mode', 'r')
         
         # Get encoding info (for text mode files)
         encoding = getattr(obj, 'encoding', None)
@@ -112,7 +132,8 @@ class FileHandleHandler(Handler):
             "encoding": encoding,
             "errors": errors,
             "newline": newline,
-            "closed": obj.closed,
+            "closed": is_closed,
+            "is_pipe": is_pipe,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -120,17 +141,50 @@ class FileHandleHandler(Handler):
         Reconstruct file handle.
         
         Process:
-        1. Try relative path first (using skpath), fall back to absolute
-        2. Open file with same mode and encoding
-        3. Seek to same position
+        1. Check if this was a pipe or closed file - return placeholder
+        2. Try relative path first (using skpath), fall back to absolute
+        3. Open file with same mode and encoding
+        4. Seek to same position
         
         If file doesn't exist or can't be opened, raise clear error.
         """
-        # If file was closed, we can't really reconstruct it meaningfully
-        # But we'll try anyway for completeness
+        # Handle pipes (subprocess stdout/stderr) - these can't be meaningfully reconstructed
+        if state.get("is_pipe", False):
+            # Return a closed BytesIO as a placeholder for the pipe
+            placeholder = io.BytesIO()
+            placeholder.close()
+            return placeholder
+        
+        # Handle closed files - return a placeholder that represents the closed state
+        if state.get("closed", False):
+            # Return a placeholder object that represents the closed file
+            class ClosedFilePlaceholder:
+                """Placeholder for a file that was closed when serialized."""
+                def __init__(self, original_path, original_mode):
+                    self.name = original_path
+                    self.mode = original_mode
+                    self.closed = True
+                    self._was_closed_at_serialization = True
+                
+                def __repr__(self):
+                    return f"<ClosedFilePlaceholder path={self.name!r} mode={self.mode!r}>"
+                
+                def read(self, *args, **kwargs):
+                    raise ValueError("I/O operation on closed file.")
+                
+                def write(self, *args, **kwargs):
+                    raise ValueError("I/O operation on closed file.")
+                
+                def tell(self):
+                    raise ValueError("I/O operation on closed file.")
+                
+                def seek(self, *args, **kwargs):
+                    raise ValueError("I/O operation on closed file.")
+            
+            return ClosedFilePlaceholder(state.get("path"), state.get("mode"))
         
         # Determine which path to use
-        if state["relative_path"]:
+        if state.get("relative_path"):
             try:
                 from suitkaise.skpath.api import SKPath
                 # Try relative path (better for cross-machine)
@@ -156,11 +210,11 @@ class FileHandleHandler(Handler):
         }
         
         # Add encoding kwargs for text mode
-        if state["encoding"]:
+        if state.get("encoding"):
             open_kwargs["encoding"] = state["encoding"]
-        if state["errors"]:
+        if state.get("errors"):
             open_kwargs["errors"] = state["errors"]
-        if state["newline"] is not None:
+        if state.get("newline") is not None:
             open_kwargs["newline"] = state["newline"]
         
         # Open file
@@ -369,7 +423,16 @@ class BytesIOHandler(Handler):
         What we capture:
         - content: The full bytes buffer
         - position: Current position (from tell())
+        - closed: Whether the BytesIO is closed
         """
+        # Check if closed first
+        if obj.closed:
+            return {
+                "content": b"",
+                "position": 0,
+                "closed": True,
+            }
+        
         # Save current position
         original_pos = obj.tell()
         
@@ -383,6 +446,7 @@ class BytesIOHandler(Handler):
         return {
             "content": content,
             "position": original_pos,
+            "closed": False,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> io.BytesIO:
@@ -390,9 +454,16 @@ class BytesIOHandler(Handler):
         Reconstruct BytesIO.
         
         Process:
-        1. Create new BytesIO with content
-        2. Seek to same position
+        1. Handle closed state if applicable
+        2. Create new BytesIO with content
+        3. Seek to same position
         """
+        # Handle closed BytesIO (e.g., subprocess pipe placeholders)
+        if state.get("closed", False):
+            closed_io = io.BytesIO(b"")
+            closed_io.close()
+            return closed_io
+        
         # Create new BytesIO with content
         bytes_io = io.BytesIO(state["content"])
         

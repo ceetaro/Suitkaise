@@ -20,10 +20,14 @@
 
     <ul>
         <li><code>SKPath.ap</code> - absolute path. All slashes are streamlined to <code>/</code> for cross-platform compatibility.
-            <br><code>"Users/john/Documents/projects/myproject/feature1/file.txt"</code>
+            <br><code>"/Users/john/Documents/projects/myproject/feature1/file.txt"</code>
         </li>
         <li><code>SKPath.np</code> - normalized path, relative to project root
             <br><code>"myproject/feature1/file.txt"</code>
+        </li>
+        <li><code>SKPath.platform</code> - absolute path with platform-native separators
+            <br><code>"/Users/john/Documents/projects/myproject/feature1/file.txt"</code> (Mac/Linux)
+            <br><code>"C:\Users\john\Documents\projects\myproject\feature1\file.txt"</code> (Windows)
         </li>
     </ul>
 
@@ -48,15 +52,18 @@ path = SKPath("feature1/file.txt")</code></pre>
         <summary><code>SKPath</code> Properties and Methods</summary>
 
         <ul>
-            <li><code>ap</code> - absolute path</li>
+            <li><code>ap</code> - absolute path (always forward slashes)</li>
             <li><code>np</code> - path normalized to project root</li>
+            <li><code>platform</code> - absolute path with platform-native separators</li>
         </ul>
 
         <p><strong>Unique to <code>SKPath</code></strong></p>
 
         <ul>
             <li><code>id</code> - reversible base64url encoded ID (can be used to reconstruct the path)</li>
-            <li><code>root</code> - project root</li>
+            <li><code>root</code> - project root as <code>SKPath</code> object</li>
+            <li><code>root_str</code> - project root as string (normalized separators)</li>
+            <li><code>root_path</code> - project root as <code>Path</code> object</li>
         </ul>
 
         <p><strong><code>pathlib</code> Compatible</strong></p>

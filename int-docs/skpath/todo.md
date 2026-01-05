@@ -1,1 +1,0 @@
-1. path_ops has moved to suitkaise/skpath/_int/path_ops.py. ensure that all reference imports to path_ops are updated to the new location across the project.

@@ -97,6 +97,21 @@ Returns the path relative to the project root.
 
 Returns `""` (empty string) if the path is outside the project root.
 
+#### `SKPath.platform` (platform-native path)
+
+Returns the absolute path with platform-native separators.
+
+1. Gets `ap` (absolute path with forward slashes)
+2. On Windows (`os.sep == "\\"`):
+   - Converts `/` to `\`
+3. On Mac/Linux:
+   - Returns as-is (already uses `/`)
+
+Use this when you need to:
+- Pass paths to OS-specific tools or APIs
+- Display paths to users in their native format
+- Integrate with platform-specific libraries
+
 #### `SKPath.id` (encoded ID)
 
 Returns a reversible base64url-encoded ID for the path.
@@ -111,16 +126,24 @@ Returns a reversible base64url-encoded ID for the path.
 
 The ID can be used to reconstruct the path later: `SKPath(encoded_id)`
 
-#### `SKPath.root` and `SKPath.root_path`
+#### `SKPath.root`, `SKPath.root_str`, and `SKPath.root_path`
 
-`root` returns the project root as a string with normalized separators.
-`root_path` returns the project root as a `Path` object.
+Three ways to access the project root:
+
+- `root` returns the project root as an `SKPath` object
+- `root_str` returns the project root as a string with normalized separators (`/`)
+- `root_path` returns the project root as a `Path` object
+
+All three use the same cached `_root` value internally:
 
 1. Checks if `_root` is cached
 2. If not cached:
    - Calls `detect_project_root(from_path=self._path)`
-   - Caches the result
-3. Returns the cached value
+   - Caches the result as a `Path`
+3. Returns the cached value, converted to the appropriate type:
+   - `root` wraps the `Path` in an `SKPath`
+   - `root_str` normalizes separators and returns as string
+   - `root_path` returns the `Path` directly
 
 ### `__hash__` and `__eq__`
 

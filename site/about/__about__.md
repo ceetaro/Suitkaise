@@ -418,9 +418,11 @@ def potential_lagger_2():
 def potential_lagger_3():
     # Your real code here
     pass
+```
 
-# your program runs...
+Your program runs...
 
+```python
 # get stats
 mean_1 = potential_lagger_1.timer.mean
 mean_2 = potential_lagger_2.timer.mean
@@ -468,7 +470,9 @@ However, there are 2 ways to let AI use `suitkaise`:
 1. Have it search this page! Copy this into your prompt:
 
 ```text
-I would like you to understand and use the suitkaise modules in my project. It is installable using pip install suitkaise.
+I would like you to understand and use the suitkaise modules in my project.
+
+It is installable using `pip install suitkaise`.
 
 Can you go to the website (suitkaise.info) and look at the "how to use" section for each module?
 ```

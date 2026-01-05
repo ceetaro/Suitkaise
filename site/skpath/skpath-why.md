@@ -11,99 +11,89 @@ each numbered section is a dropdown.
 text = "
 File paths are a pain to work with.
 
+Sometimes pure hell, even.
+
+I got gutted the moment I started trying to write cross-platform code. Slashes going the wrong way, paths breaking when my teammate ran the same script, logs full of absolute paths that meant nothing on another machine. Oops.
+
+Find the project root, resolve the path, make it relative, normalize the slashes, cast to string, pass it in. Over and over.
+
+So I made `skpath`.
+
+## `SKPath` paths
+
+Every `SKPath` stores three paths:
+
+- `ap` — absolute path, always forward slashes (`/Users/me/project/data/file.txt`)
+
+- `np` — normalized path relative to project root (`data/file.txt`)
+
+- `platform` — absolute path with the correct separators for the current platform
+
+`np` is the same on every machine, every OS, as long as the project structure is the same.
+
+This changes everything, and is a huge jump in path standardization.
+
+## What about `pathlib`?
+
+`pathlib` is great. It handles slash differences internally and gives you a nice object to work with.
+
+But it doesn't know about your project. It doesn't auto-detect the root. It doesn't give you a consistent path that works everywhere. And it doesn't convert types for you.
+
+`skpath` wraps `pathlib` and adds project awareness, so you don't have to make it aware yourself.
+
+It also adds a bunch of cool things like `@autopath` and `AnyPath` to help you in your quest to make paths easy.
+
+`pathlib.Path` handles this internally, but the moment you convert to string (for logging, storing, or passing to a library), you're back to platform-specific slashes.
+
+```python
+path = Path("config/settings.yaml")
+str(path)
+
+# "config/settings.yaml" on Mac, "config\\settings.yaml" on Windows
+```
+
+Here is a set of problems that `skpath` solves.
+
 (start of dropdown section for 1)
 1. `\` vs `/`
 
-Windows uses `\`, everything else uses `/`. You write code on a Mac, push it, and then everything breaks on Windows.
+Windows uses `\`, everything else uses `/`. 
 
-Or even worse, you have cross platform compatibility issues on a live build.
-
-Let's make a function that opens and reads a file, scanning it for a specific string.
+You write code on a Mac, push it, and your teammate on Windows gets broken paths.
 
 ```python
-def scan_file_for_matches(file_path: str, search_string: str):
+# You write this on Mac
+config_path = "config/settings.yaml"
 
-    # open and read file
-    with open(file_path, "r") as f:
-        content = f.read()
+# Works fine on Mac
+open(config_path)  # ✓
 
-    # scan for matches
-    matches = [line for line in content.split("\n") if search_string in line]
+# Your teammate on Windows logs the resolved path
+print(Path(config_path).resolve())
 
-    return matches
+# C:\Users\teammate\project\config\settings.yaml
+
+# Later, that path gets stored or compared somewhere
+# Now you have mixed slashes in your system
 ```
 
-Without `skpath` - *14 lines*
+With `skpath`
+
 ```python
-from pathlib import Path # 1
-# import os works similarily
+path = SKPath("config/settings.yaml")
 
-def find_project_root(): # 2
-    current = Path(__file__).resolve().parent # 3
-    while current != current.parent: # 4
-        if (current / "pyproject.toml").exists(): # 5
-            return current # 6
-        if (current / ".git").exists(): # 7
-            return current # 8
-        current = current.parent # 9
-    raise RuntimeError("Could not find project root") # 10
+path.ap  # Always forward slashes: "/Users/me/project/config/settings.yaml"
 
-PROJECT_ROOT = find_project_root() # 11
+path.np  # Always forward slashes: "config/settings.yaml"
 
-def scan_file_for_matches(file_path: str | Path, search_string: str):
+path.platform  # platform specific
 
-    # normalize string
-    p = Path(file_path) # 12
-    p = p.resolve() # 13
-    p = p.relative_to(PROJECT_ROOT) # 14
-
-    # # open and read file
-    # with open(p, "r") as f:
-    #     content = f.read()
-
-    # # scan for matches
-    # matches = [line for line in content.split("\n") if search_string in line]
-
-    # return matches
-
-```
-The most annoying part of this is that you have to manually find or calculate the project root each time, and every dev likely does it slightly differently.
-
-You can't just use a hardcoded file path for the root either because each person running the code will likely have a different path to the project.
-
-And, the moment you log, print, or store the path in a different file, it goes back to the original platform's slashes.
-
-Also, everyone has to do this each time.
-
-And, third-party libraries are a total crapshoot when it comes to even possibly accepting `pathlib.Path` objects.
-
-Most of the time, you either have to convert it and fix it before passing it in as a string, or pass in the original string path and work with the path in the function.
-
-Pure hell.
-
-
-With `skpath` - *2 lines*
-```python
-from suitkaise.skpath import autopath # 1
-
-@autopath() # 2
-def scan_file_for_matches(file_path: str, search_string: str):
-
-    # # open and read file
-    # with open(file_path, "r") as f:
-    #     content = f.read()
-
-    # # scan for matches
-    # matches = [line for line in content.split("\n") if search_string in line]
-
-    # return matches
+str(path)  # Always forward slashes (same as ap)
 ```
 
-`@autopath` does all of what was happening above. 
+Need to pass a path to a Windows-specific tool or open a file? Use `path.platform`. Want to log or store paths consistently? Use `path.ap` or `path.np`.
 
-Then, it passes the normalized path into the function, choosing the correct type based on the param type annotation.
-
-No need to edit any function code to make paths work.
+`SKPath` normalizes to forward slashes everywhere, except for `platform`.
 
 (end of dropdown section for 1)
 
@@ -135,14 +125,18 @@ With `skpath`
 path = SKPath("data/file.txt")
 ```
 
-`SKPaths` are awesome because they actually store 2 paths.
+So much cleaner.
+
+`SKPaths` are awesome because they actually store 3 paths.
 
 - stores absolute path
 - also auto detects the project root and stores the path relative to it
 
-(`SKPaths` are also automatically cross-platform compatible)
+- (also stores platform specific separator absolute path)
 
-Then, when you work with `SKPath` objects across machines or even operating systems, as long as the project root is the same, the paths will work the same.
+`SKPaths` are automatically cross-platform compatible.
+
+When you work with `SKPath` objects across machines or even operating systems, as long as the project root is the same, the paths will work the same.
 
 So now you can just `SKPath` everything and not have to worry about platform issues, or having to manually relate paths to the root.
 
@@ -198,24 +192,266 @@ Note that `SKPaths` are created with the project root they were given, so either
 (end of dropdown section for 3)
 
 (start of dropdown section for 4)
-4. String manipulation
+4. Figuring out if you need to use a `Path` or a `str`
+
+Even if you are in an IDE/code editor, figuring out what type of path you need to use for what function across a whole project base is tedious and annoying.
+
+You have to make everyone use either `Path` or `str`, or let everyone code how they want and then hover over every function using paths to see the expected types.
+
+### `@autopath` does this for you.
+
+```python
+from suitkaise.skpath import autopath
+
+@autopath()
+def function_that_uses_strs(path: str, ...):
+
+    # changes all Paths to strings for you before passing them in
+
+
+@autopath()
+def function_that_uses_paths(path: Path, ...):
+
+    # changes all strings to Paths for you before passing them in
+```
+
+All you have to do is slap `@autopath()` on the function and it will automatically convert the paths to the types that you expect, and automatically normalize them as well.
+
+There is also another way to do this: the `AnyPath` type.
+
+`AnyPath` is a union of `str`, `Path`, and `SKPath`.
+
+This allows you to quickly update your code to use the superior `SKPath` type, while not breaking previous code.
+
+```python
+from suitkaise.skpath import AnyPath
+
+def function_that_uses_any_paths(path: AnyPath, ...):
+
+    # allows you to accept all 3 path types 
+    # without having to create unions every time
+```
+
+And when you combine them...
+
+```python
+from suitkaise.skpath import autopath, AnyPath
+
+@autopath()
+def function_that_uses_any_paths(path: AnyPath, ...):
+
+    # automatically converts strs and Paths to SKPaths for you
+    # gives you access to the more awesome SKPath quickly
+```
+
+I do a lot of solo coding, and even I was having trouble standardizing path code! When working in a team, don't even get me started.
+
+I think this is a game changer.
 
 (end of dropdown section for 4)
 
-
 (start of dropdown section for 5)
-5. Figuring out if you need to use a `Path` or a `str`
+5. Comparing paths
+
+Say you're writing a script that processes files and saves which ones are done to a log file, so you can skip them on future runs.
+
+```python
+from pathlib import Path
+import json
+
+LOG_FILE = "processed_files.json"
+
+def load_processed():
+    if Path(LOG_FILE).exists():
+        return set(json.load(open(LOG_FILE)))
+    return set()
+
+def save_processed(processed):
+    json.dump(list(processed), open(LOG_FILE, "w"))
+
+def process_file(path, processed):
+    path_str = str(Path(path).resolve())
+    if path_str in processed:
+        print(f"Skipping {path}, already processed")
+        return
+    
+    # ... do the actual processing ...
+    
+    processed.add(path_str)
+    save_processed(processed)
+```
+
+Murphy runs the script on his Mac:
+
+```python
+processed = load_processed()
+process_file("data/report.csv", processed)
+```
+
+The log file now contains:
+
+```json
+["/Users/murphy/projects/myapp/data/report.csv"]
+```
+
+Gurphy pulls the latest changes and runs the same script on his Windows machine:
+
+```python
+processed = load_processed()
+process_file("data/report.csv", processed)
+```
+
+His resolved path is `C:\Users\gurphy\projects\myapp\data\report.csv`, which doesn't match Murphy's path in the log.
+
+The same file gets processed twice because absolute paths don't match across machines or operating systems.
+
+You could try to fix this by storing paths relative to the project root:
+
+```python
+def process_file(path, processed):
+    path_resolved = Path(path).resolve()
+    path_relative = str(path_resolved.relative_to(PROJECT_ROOT))
+    if path_relative in processed:
+        # ...
+```
+
+But now you need to find `PROJECT_ROOT` consistently and correctly, and fix the separators to be consistent.
+
+The funniest thing here is that the log file might not even load in the first place because the paths are different.
+
+With `skpath`
+
+```python
+from suitkaise.skpath import SKPath, autopath
+import json
+
+LOG_FILE = "processed_files.json"
+
+@autopath()
+def process_file(path: SKPath, processed: set[SKPath]):
+
+    if path.np in processed:
+        print(f"Skipping {path.np}, already processed")
+        return
+    
+    # ... do the actual processing ...
+    
+    processed.add(path.np)
+    save_processed(processed)
+```
+
+The log file now contains:
+
+```json
+["data/report.csv"]
+```
+
+Same on Murphy's Mac. Same on Gurphy's Windows PC. Same on someone else's Linux desktop.
 
 (end of dropdown section for 5)
 
 (start of dropdown section for 6)
-6. Comparing paths
+6. Caller file pathfinding
+
+Sometimes you need to know which file called your function — for logging, for relative path resolution, for debugging.
+
+Without `skpath` - *13 lines*
+```python
+import inspect # 1
+from pathlib import Path # 2
+
+def get_caller_file(): # 3
+    stack = inspect.stack() # 4
+    
+    for frame in stack[1:]: # 5
+        filename = frame.filename # 6
+        
+        # Skip built-in/frozen modules # 7
+        if filename.startswith("<"): # 8
+            continue # 9
+        
+        more_filtering_logic() # 10
+        
+        return Path(filename).resolve() # 11
+    
+    raise RuntimeError("Could not detect caller") # 12
+
+caller = get_caller_file() # 13
+```
+
+And this doesn't even handle edge cases like notebook environments, compiled code, or filtering out your own library's frames.
+
+With `skpath` - *1 line* 3 ways
+```python
+caller = SKPath()
+```
+
+```python
+caller = get_caller_path()
+```
+
+```python
+@autopath(use_caller=True) # 1
+def function_that_uses_caller_path(path: SKPath):
+
+    # path will be the caller's file path if not explicitly provided
+```
 
 (end of dropdown section for 6)
 
 (start of dropdown section for 7)
-7. Caller file pathfinding
+7. Using paths as dict keys or in sets
+
+You want to track which files you've seen. Simple, right?
+
+Without `skpath` - *8 lines*
+```python
+from pathlib import Path # 1
+
+seen = set() # 2
+
+def mark_seen(path: str):
+
+    # Normalize to avoid duplicates
+    normalized = Path(path) # 3
+    normalized = normalized.resolve() # 4
+    normalized = str(normalized) # 5
+    seen.add(normalized)
+
+def is_seen(path: str):
+    normalized = Path(path) # 6
+    normalized = normalized.resolve() # 7
+    normalized = str(normalized) # 8
+    return normalized in seen
+
+# this might mess up and have duplicate paths
+len(seen)
+```
+
+You have to manually normalize every time you add or check. And if you forget once, you get duplicates or missed lookups.
+
+With `skpath`
+```python
+from suitkaise import skpath # 1
+
+seen = set() # 2
+
+@skpath.autopath() # 3
+def mark_seen(path: skpath.AnyPath):
+    seen.add(path)
+
+@skpath.autopath() # 4
+def is_seen(path: skpath.AnyPath):
+    return path in seen
+
+len(seen) # no duplicates
+```
+
+`SKPath` objects hash and compare using their normalized path (`np`), so different representations of the same file are recognized as equal.
+
+Works in sets, works as dict keys, no extra effort.
 
 (end of dropdown section for 7)
+
 
 

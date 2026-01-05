@@ -166,14 +166,14 @@ class TestSKPathSerialization:
         from suitkaise.skpath import SKPath
         
         path = SKPath(__file__)
-        original_root = path.root
+        original_root = path.root  # root is a str property
         
         serialized = cerial.serialize(path)
         restored = cerial.deserialize(serialized)
         
         if original_root is not None:
             assert restored.root is not None
-            assert restored.root.ap == original_root.ap
+            assert restored.root == original_root  # Compare strings directly
     
     def test_skpath_still_functional_after_deserialize(self):
         """Deserialized SKPath can still perform path operations."""
@@ -204,7 +204,7 @@ class TestCircuitSerialization:
         from suitkaise import cerial
         from suitkaise.circuit import Circuit
         
-        circuit = Circuit(shorts=5, break_sleep=0.5)
+        circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.5)
         
         # Short a few times
         circuit.short()
@@ -213,10 +213,9 @@ class TestCircuitSerialization:
         serialized = cerial.serialize(circuit)
         restored = cerial.deserialize(serialized)
         
-        assert restored.shorts == 5
-        assert restored.break_sleep == 0.5
-        assert restored.flowing is True
-        assert restored.broken is False
+        assert restored.num_shorts_to_trip == 5
+        assert restored.sleep_time_after_trip == 0.5
+        assert restored.broken is False  # not broken = flowing
         assert restored.times_shorted == 2
     
     def test_circuit_broken_state_roundtrip(self):
@@ -224,14 +223,13 @@ class TestCircuitSerialization:
         from suitkaise import cerial
         from suitkaise.circuit import Circuit
         
-        circuit = Circuit(shorts=2, break_sleep=0)
+        circuit = Circuit(num_shorts_to_trip=2, sleep_time_after_trip=0)
         circuit.short()
         circuit.short()  # This should break the circuit
         
         serialized = cerial.serialize(circuit)
         restored = cerial.deserialize(serialized)
         
-        assert restored.flowing is False
         assert restored.broken is True
         # times_shorted is reset to 0 when circuit breaks
         assert restored.times_shorted == 0
@@ -241,14 +239,14 @@ class TestCircuitSerialization:
         from suitkaise import cerial
         from suitkaise.circuit import Circuit
         
-        circuit = Circuit(shorts=3, break_sleep=0)
+        circuit = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0)
         circuit.short()
         
         serialized = cerial.serialize(circuit)
         restored = cerial.deserialize(serialized)
         
         # Continue using the circuit
-        assert restored.flowing is True
+        assert restored.broken is False  # not broken = flowing
         restored.short()
         restored.short()  # This should break
         
@@ -256,7 +254,7 @@ class TestCircuitSerialization:
         
         # Reset and use again
         restored.reset()
-        assert restored.flowing is True
+        assert restored.broken is False  # not broken = flowing
         assert restored.times_shorted == 0
 
 
@@ -567,7 +565,7 @@ class TestNestedObjects:
         # Object containing multiple suitkaise objects
         data = {
             "timer": Timer(),
-            "circuit": Circuit(shorts=3),
+            "circuit": Circuit(num_shorts_to_trip=3),
             "values": [1, 2, 3],
         }
         data["timer"].add_time(5.0)

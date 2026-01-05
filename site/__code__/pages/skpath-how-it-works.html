@@ -122,6 +122,31 @@ path = SKPath(encoded_id_string)</code></pre>
 
     <p>Returns <code>""</code> (empty string) if the path is outside the project root.</p>
 
+    <h4><code>SKPath.platform</code> (platform-native path)</h4>
+
+    <p>Returns the absolute path with platform-native separators.</p>
+
+    <ol>
+        <li>Gets <code>ap</code> (absolute path with forward slashes)</li>
+        <li>On Windows (<code>os.sep == "\\"</code>):
+            <ul>
+                <li>Converts <code>/</code> to <code>\</code></li>
+            </ul>
+        </li>
+        <li>On Mac/Linux:
+            <ul>
+                <li>Returns as-is (already uses <code>/</code>)</li>
+            </ul>
+        </li>
+    </ol>
+
+    <p>Use this when you need to:</p>
+    <ul>
+        <li>Pass paths to OS-specific tools or APIs</li>
+        <li>Display paths to users in their native format</li>
+        <li>Integrate with platform-specific libraries</li>
+    </ul>
+
     <h4><code>SKPath.id</code> (encoded ID)</h4>
 
     <p>Returns a reversible base64url-encoded ID for the path.</p>
@@ -141,20 +166,32 @@ path = SKPath(encoded_id_string)</code></pre>
 
     <p>The ID can be used to reconstruct the path later: <code>SKPath(encoded_id)</code></p>
 
-    <h4><code>SKPath.root</code> and <code>SKPath.root_path</code></h4>
+    <h4><code>SKPath.root</code>, <code>SKPath.root_str</code>, and <code>SKPath.root_path</code></h4>
 
-    <p><code>root</code> returns the project root as a string with normalized separators.</p>
-    <p><code>root_path</code> returns the project root as a <code>Path</code> object.</p>
+    <p>Three ways to access the project root:</p>
+    <ul>
+        <li><code>root</code> returns the project root as an <code>SKPath</code> object</li>
+        <li><code>root_str</code> returns the project root as a string with normalized separators (<code>/</code>)</li>
+        <li><code>root_path</code> returns the project root as a <code>Path</code> object</li>
+    </ul>
+
+    <p>All three use the same cached <code>_root</code> value internally:</p>
 
     <ol>
         <li>Checks if <code>_root</code> is cached</li>
         <li>If not cached:
             <ul>
                 <li>Calls <code>detect_project_root(from_path=self._path)</code></li>
-                <li>Caches the result</li>
+                <li>Caches the result as a <code>Path</code></li>
             </ul>
         </li>
-        <li>Returns the cached value</li>
+        <li>Returns the cached value, converted to the appropriate type:
+            <ul>
+                <li><code>root</code> wraps the <code>Path</code> in an <code>SKPath</code></li>
+                <li><code>root_str</code> normalizes separators and returns as string</li>
+                <li><code>root_path</code> returns the <code>Path</code> directly</li>
+            </ul>
+        </li>
     </ol>
 
     <h3><code>__hash__</code> and <code>__eq__</code></h3>

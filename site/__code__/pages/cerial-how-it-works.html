@@ -10,6 +10,171 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>how it works</h1>
-    <p>Cerial module - how it works content coming soon...</p>
+    <h1>How <code>cerial</code> actually works</h1>
+
+    <p><code>cerial</code> is a serialization engine that handles complex Python objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot.</p>
+
+    <p>It builds directly on top of <code>pickle</code>, requiring no external dependencies.</p><br>
+
+    <h2>Architecture Overview</h2>
+
+    <p>Cerial uses a two-phase approach:</p>
+
+    <ol>
+        <li><strong>Transform</strong> — Convert complex objects into an Intermediate Representation (IR) using specialized handlers</li>
+        <li><strong>Serialize</strong> — Use standard <code>pickle.dumps()</code> on the IR</li>
+    </ol>
+
+    <p>Deserialization is the reverse:</p>
+
+    <ol>
+        <li><strong>Deserialize</strong> — Use <code>pickle.loads()</code> to get the IR</li>
+        <li><strong>Reconstruct</strong> — Convert the IR back into the original objects using handlers</li>
+    </ol>
+
+<pre><code>Object → Handler → IR (nested dicts) → pickle.dumps() → bytes
+bytes → pickle.loads() → IR → Handler → Object</code></pre>
+
+    <h2>The Intermediate Representation (IR)</h2>
+
+    <p>The IR is a nested dictionary structure where everything is pickle-native:</p>
+
+    <ul>
+        <li>dicts, lists, tuples, sets</li>
+        <li>ints, strings, bools, None</li>
+        <li>other pickle-native types (datetime, Decimal, etc.)</li>
+    </ul>
+
+    <p>Complex objects get converted to dicts with special markers:</p>
+
+<pre><code class="language-python">{
+    '__cerial_type__': 'lock',
+    '__handler__': 'LockHandler',
+    '__object_id__': 140234567890,
+    'state': {
+        'locked': False
+    }
+}</code></pre>
+
+    <p>This structure:</p>
+    <ul>
+        <li>Mirrors the original object structure</li>
+        <li>Can nest infinitely deep</li>
+        <li>Lets primitive types pass through untouched</li>
+        <li>Gives complex types their own dict at each level</li>
+    </ul>
+
+    <h2>Handler System</h2>
+
+    <p>Handlers are responsible for serializing and deserializing specific object types.</p>
+
+    <p>Each handler:</p>
+    <ul>
+        <li>Defines a <code>type_name</code> (e.g., "lock", "logger", "class_instance")</li>
+        <li>Implements <code>can_handle(obj)</code> to check if it handles this type</li>
+        <li>Implements <code>extract_state(obj)</code> to extract serializable state</li>
+        <li>Implements <code>reconstruct(state)</code> to rebuild the object</li>
+    </ul>
+
+    <details>
+        <summary>Handler Priority</summary>
+        <p>Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are checked before general ones:</p>
+        <ol>
+            <li>Function handlers (functions, lambdas, partials, bound methods)</li>
+            <li>Logging handlers (loggers, handlers, formatters)</li>
+            <li>Threading handlers (locks, events, semaphores, conditions, barriers)</li>
+            <li>Queue handlers (Queue, LifoQueue, PriorityQueue)</li>
+            <li>File handlers (file handles, StringIO, BytesIO, mmap)</li>
+            <li>Database handlers (sqlite connections, cursors)</li>
+            <li>Network handlers (sockets, HTTP sessions)</li>
+            <li>Generator and iterator handlers</li>
+            <li>Subprocess handlers (Popen, CompletedProcess)</li>
+            <li>Async handlers (coroutines, tasks, futures)</li>
+            <li>Context manager handlers</li>
+            <li>Module handlers</li>
+            <li>Class object handlers (for classes themselves)</li>
+            <li><strong>Class instance handler</strong> (catch-all for user-defined instances)</li>
+        </ol>
+        <p>The class instance handler is last — it's the "catch-all" for any class that doesn't have a specialized handler.</p>
+    </details>
+
+    <h2>Central Serializer</h2>
+
+    <p>The central serializer coordinates the entire process:</p>
+
+    <h3>Serialization Flow</h3>
+    <ol>
+        <li><strong>Reset state</strong> — Clear circular reference tracker, depth counter, etc.</li>
+        <li><strong>Recursive serialization</strong> — Build the IR by walking the object tree</li>
+        <li><strong>Pickle</strong> — Call <code>pickle.dumps()</code> on the IR</li>
+        <li><strong>Return bytes</strong></li>
+    </ol>
+
+    <details>
+        <summary>Recursive Serialization Steps</summary>
+        <ol>
+            <li><strong>Check recursion depth</strong> — Prevent stack overflow</li>
+            <li><strong>Check for circular references</strong> — Return reference marker if seen before</li>
+            <li><strong>Check if pickle-native</strong> — Pass primitives through, recurse into collections</li>
+            <li><strong>Find handler</strong> — Match the object to a handler</li>
+            <li><strong>Extract state</strong> — Handler converts object to dict/list</li>
+            <li><strong>Recursively serialize state</strong> — Process any complex objects in the state</li>
+            <li><strong>Wrap in metadata</strong> — Add type markers</li>
+            <li><strong>Return</strong> — The fully serialized structure</li>
+        </ol>
+    </details>
+
+    <h2>Circular Reference Handling</h2>
+
+    <p>Objects can reference each other or themselves. Cerial handles this with object ID tracking.</p>
+
+    <h3>During Serialization</h3>
+    <ol>
+        <li>Each object gets a unique ID</li>
+        <li>Before serializing, check if we've seen this ID</li>
+        <li>If yes, return a reference marker</li>
+        <li>If no, add to seen set and continue</li>
+    </ol>
+
+    <h3>During Deserialization (Two-Pass)</h3>
+    <p><strong>Pass 1:</strong> Create empty placeholder objects, store by ID</p>
+    <p><strong>Pass 2:</strong> Fill in state, resolving references from the lookup</p>
+
+    <h2>Class Instance Handler</h2>
+
+    <p>The catch-all handler for user-defined class instances.</p>
+
+    <h3>Extraction Strategy Hierarchy</h3>
+    <ol>
+        <li><strong>Custom methods</strong> — <code>__serialize__</code> / <code>__deserialize__</code></li>
+        <li><strong>Common patterns</strong> — <code>to_dict()</code> / <code>from_dict()</code></li>
+        <li><strong>Fallback</strong> — <code>__dict__</code> access</li>
+    </ol>
+
+    <details>
+        <summary>Special Cases</summary>
+        <ul>
+            <li><strong>Nested classes</strong> — Stores module and qualname for lookup</li>
+            <li><strong>Classes in <code>__main__</code></strong> — Handled specially (pickle can't normally do this)</li>
+            <li><strong>Classes with <code>__slots__</code></strong> — Iterates over slot names</li>
+            <li><strong>Classes with both <code>__dict__</code> and <code>__slots__</code></strong> — Handles both</li>
+        </ul>
+    </details>
+
+    <h2>What Can Cerial Handle?</h2>
+
+    <ul>
+        <li><strong>Functions</strong> — regular, nested, lambdas, partials, bound methods, decorators</li>
+        <li><strong>Classes</strong> — dataclasses, enums, <code>__slots__</code>, nested, dynamic</li>
+        <li><strong>Threading</strong> — Lock, RLock, Semaphore, Barrier, Condition, Event</li>
+        <li><strong>Queues</strong> — Queue, LifoQueue, PriorityQueue</li>
+        <li><strong>File/IO</strong> — file handles, StringIO, BytesIO, mmap</li>
+        <li><strong>Logging</strong> — Logger, Handler, Formatter</li>
+        <li><strong>Database</strong> — SQLite connections and cursors</li>
+        <li><strong>Network</strong> — sockets, HTTP sessions</li>
+        <li><strong>Subprocess</strong> — Popen, CompletedProcess</li>
+        <li><strong>Async</strong> — coroutines, tasks, futures</li>
+        <li><strong>Advanced</strong> — generators, iterators, regex, weak references, code objects</li>
+    </ul>
+
 </section>

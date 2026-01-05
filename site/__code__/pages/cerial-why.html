@@ -10,6 +10,214 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>why</h1>
-    <p>Cerial module - why content coming soon...</p>
+    <h1>Why <code>cerial</code>?</h1>
+
+    <p><code>cerial</code> is a serialization engine.</p>
+
+    <p>It allows you to serialize and deserialize objects across Python processes.</p>
+
+    <p>Not built for external or cross-language serialization.</p>
+
+    <p>Is built as "Can't pickle this"'s mortal enemy.</p>
+
+    <p>It is also the engine that the <code>processing</code> module uses instead of <code>pickle</code>.</p><br>
+
+    <ul>
+        <li>Allows for serialization of complex objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot handle</li>
+        <li>2x faster than <code>cloudpickle</code> when it comes to dataclasses</li>
+        <li>Builds directly on top of <code>pickle</code>, meaning no dependencies</li>
+    </ul><br>
+
+    <p>If you need fast speed for simple types, use base <code>pickle</code>.</p>
+    <p>If you want to serialize functions or simple <code>dicts</code> quickly, use <code>cloudpickle</code>.</p>
+    <p>If you want to serialize simple <code>classes</code> quickly, use <code>dill</code>.</p><br>
+
+    <p>But if you want to serialize...</p>
+
+    <details>
+        <summary><strong>Everything Else</strong></summary>
+
+        <details>
+            <summary>Functions</summary>
+            <ul>
+                <li>regular functions</li>
+                <li>nested functions</li>
+                <li>functions in <code>__main__</code></li>
+                <li>lambdas</li>
+                <li><code>functools.partial</code> functions</li>
+                <li>bound methods</li>
+                <li><code>@staticmethod</code>s</li>
+                <li><code>@classmethod</code>s</li>
+                <li><code>@property</code> methods</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Classes and Instances</summary>
+            <ul>
+                <li>dataclasses</li>
+                <li>enums</li>
+                <li>instances with <code>__dict__</code></li>
+                <li>instances with <code>__slots__</code></li>
+                <li>instances with both <code>__dict__</code> and <code>__slots__</code></li>
+                <li>nested classes</li>
+                <li>dynamic classes created with <code>type()</code></li>
+                <li><code>namedtuples</code> (both <code>collections.namedtuple</code> and <code>typing.NamedTuple</code>)</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary><code>threading</code></summary>
+            <ul>
+                <li><code>Lock</code> and <code>RLock</code></li>
+                <li><code>Semaphore</code> and <code>BoundedSemaphore</code></li>
+                <li><code>Barrier</code></li>
+                <li><code>Condition</code></li>
+                <li><code>Event</code></li>
+                <li><code>threading.local</code></li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Queues</summary>
+            <ul>
+                <li><code>queue</code>
+                    <ul>
+                        <li><code>Queue</code></li>
+                        <li><code>LifoQueue</code></li>
+                        <li><code>PriorityQueue</code></li>
+                    </ul>
+                </li>
+                <li><code>multiprocessing</code>
+                    <ul>
+                        <li><code>Queue</code></li>
+                        <li><code>Event</code></li>
+                    </ul>
+                </li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>File and I/O</summary>
+            <ul>
+                <li>file handles (open files)</li>
+                <li>temporary files (<code>tempfile.NamedTemporaryFile</code>)</li>
+                <li><code>StringIO</code></li>
+                <li><code>BytesIO</code></li>
+                <li>memory-mapped files (<code>mmap</code>)</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary><code>logging</code></summary>
+            <ul>
+                <li><code>Logger</code></li>
+                <li><code>StreamHandler</code></li>
+                <li><code>FileHandler</code></li>
+                <li><code>Formatter</code></li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Database</summary>
+            <ul>
+                <li><code>sqlite3</code> connections and cursors</li>
+                <li>generic database connections (with limitations)</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Network</summary>
+            <ul>
+                <li>HTTP sessions (<code>requests.Session</code>)</li>
+                <li>sockets (<code>socket.socket</code>)</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary><code>subprocess</code></summary>
+            <ul>
+                <li><code>subprocess.Popen</code></li>
+                <li><code>subprocess.CompletedProcess</code></li>
+            </ul>
+        </details>
+
+        <details>
+            <summary><code>async</code> and <code>await</code></summary>
+            <ul>
+                <li>coroutines (<code>async def</code> functions)</li>
+                <li>async generators</li>
+                <li><code>asyncio.Task</code></li>
+                <li><code>asyncio.Future</code></li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Context Managers</summary>
+            <ul>
+                <li>custom context managers (<code>__enter__</code> and <code>__exit__</code>)</li>
+                <li><code>contextlib.contextmanager</code> decorators</li>
+            </ul>
+        </details>
+
+        <details>
+            <summary>Advanced Python</summary>
+            <ul>
+                <li>generators (with state)</li>
+                <li>iterators (enumerate, zip, filter, map, etc.)</li>
+                <li>regex patterns (<code>re.Pattern</code>)</li>
+                <li>weak references (<code>weakref.ref</code>, <code>WeakValueDictionary</code>, etc.)</li>
+                <li>code objects (<code>types.CodeType</code>)</li>
+                <li>properties and descriptors</li>
+                <li>context variables (<code>contextvars.ContextVar</code>)</li>
+                <li>pipes (<code>multiprocessing.Pipe</code>)</li>
+                <li>shared memory (<code>multiprocessing.shared_memory.SharedMemory</code>)</li>
+                <li>executors (<code>ThreadPoolExecutor</code>, <code>ProcessPoolExecutor</code>)</li>
+            </ul>
+        </details>
+
+        <ul>
+            <li>circular references with automatic detection and handling</li>
+            <li>two-pass reconstruction for complex circular structures</li>
+            <li>dynamic modules (<code>types.ModuleType</code>)</li>
+        </ul>
+
+    </details><br>
+
+    <p>...then you should be using <code>cerial</code>.</p><br>
+
+    <p>Cerial deconstructs objects down to a level where <code>pickle</code> can handle them, using nested dicts and base <code>pickle</code> types within.</p>
+
+    <p>Here's a broad example:</p>
+
+<pre><code class="language-python">{
+    "__cerial_type__": "&lt;type_name&gt;",
+    "__handler__": "&lt;handler_name&gt;",
+    "__object_id__": &lt;id&gt;,
+    "state": {
+        # handler-extracted state (all pickle-native or recursively serialized)
+    }
+}</code></pre>
+
+    <p>(Object IDs are for tracking circular references)</p>
+
+    <details>
+        <summary>Nested <code>dicts</code></summary>
+        <p>Nested <code>dicts</code> are <code>pickle</code> native.</p>
+        <p>You can also easily print and debug the structure.</p>
+        <ul>
+            <li>dict structure mirrors object structure</li>
+            <li>can contain other <code>dicts</code> infinitely deep</li>
+            <li>lets primitive types remain untouched while complex types get a dict nested at that level</li>
+        </ul>
+    </details><br>
+
+    <p>Cerial then serializes the nested dicts to bytes using <code>pickle</code>.</p>
+
+    <p>Deserialization is the reverse process, using a central deserializer that calls the appropriate handler to reconstruct an exact copy of the original object.</p>
+
+    <p>It isn't the same object, but a functionally equivalent copy.</p>
+
+    <p>With this, <code>cerial</code> can serialize almost anything, even your most complex classes and objects that others cannot.</p>
+
 </section>

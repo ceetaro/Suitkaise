@@ -58,10 +58,11 @@ Important Behavioral Notes:
 
 ## 3. `SKPath` Class and Structure
 
-`SKPath` is a class with properties that expose two path views:
+`SKPath` is a class with properties that expose multiple path views:
 
 - `ap`: Absolute filesystem path (string), with separators normalized (all `/`)
 - `np`: Normalized path relative to your project root (string), or `None` if outside project root
+- `platform`: Absolute path with platform-native separators (`\` on Windows, `/` elsewhere)
 
 To access them, simply do:
 
@@ -81,6 +82,8 @@ normpath = SKPath().np
 # example ap: /Users/johndoe/Documents/my_project_root/my/relative/path
 # example np: my/relative/path (auto detects my_project_root as root)
 # example np: None (if path is outside the project root)
+# example platform: /Users/johndoe/Documents/my_project_root/my/relative/path (Mac/Linux)
+# example platform: C:\Users\johndoe\Documents\my_project_root\my\relative\path (Windows)
 ```
 
 `SKPath` objects have a bunch of properties that make them easy to work with:

@@ -459,7 +459,7 @@ class TestWorstPossibleObject:
         print("\n" + "="*70)
         print("Serializing Worst Possible Object...")
         print("="*70)
-        serializer = CerialSerializer(verbose=True)
+        serializer = Cerializer(verbose=True)
         result = serializer.serialize(obj)
         
         # Verify it produced bytes
@@ -485,14 +485,14 @@ class TestErrorHandling:
                 pass
         
         # Without debug mode - basic error
-        serializer = CerialSerializer(debug=False)
+        serializer = Cerializer(debug=False)
         obj = UnserializableClass()
         # Should succeed (has __dict__)
         assert isinstance(serializer.serialize(obj), bytes)
     
     def test_verbose_mode(self):
         """Test that verbose mode prints progress."""
-        serializer = CerialSerializer(verbose=True)
+        serializer = Cerializer(verbose=True)
         print("\n--- Verbose mode output: ---")
         result = serializer.serialize({"key": "value", "nested": [1, 2, 3]})
         print("--- End verbose output ---\n")

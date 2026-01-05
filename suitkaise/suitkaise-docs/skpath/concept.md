@@ -41,7 +41,9 @@ path = SKPath("file.txt") # DON'T DO THIS!
 Unique to `SKPath`
 
 - `id` - reversible base64url encoded ID (can be used to reconstruct the path)
-- `root` - project root
+- `root` - project root as `SKPath` object
+- `root_str` - project root as string (normalized separators)
+- `root_path` - project root as `Path` object
 
 Pathlib Compatible
 

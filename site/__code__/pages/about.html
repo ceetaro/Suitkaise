@@ -228,6 +228,9 @@ while circ.flowing:
 
     <details>
         <summary>I hate having to write code to time things.</summary>
+
+<p>You can use the <code>timethis</code> decorator to time a function.</p>
+
 <pre><code class="language-python">from suitkaise import sktime
 
 # automatically times the function every time it is called
@@ -244,6 +247,9 @@ for i in range(100):
 # get stats
 mean = my_function.timer.mean
 stdev = my_function.timer.stdev</code></pre>
+
+<p>You can also use the <code>TimeThis</code> context manager to time a block of code.</p>
+
 <pre><code class="language-python">from suitkaise import sktime
 
 with sktime.TimeThis() as timer:
@@ -273,11 +279,11 @@ def potential_lagger_2():
 @sktime.timethis()
 def potential_lagger_3():
     # Your real code here
-    pass
+    pass</code></pre>
 
-# your program runs...
+<p>Your program runs...</p>
 
-# get stats
+<pre><code class="language-python"></code># get stats
 mean_1 = potential_lagger_1.timer.mean
 mean_2 = potential_lagger_2.timer.mean
 mean_3 = potential_lagger_3.timer.mean
@@ -315,12 +321,12 @@ def my_function_2(path: Path)
     <p>Why? Because I tried to have AI do all of these kinds of things for me and it failed miserably (I still say Please and Thank You, don't worry).</p>
     <p>However, there are 2 ways to let AI use <code>suitkaise</code>:</p>
     <p><strong>1. Have it search this page!</strong> Copy this into your prompt:</p>
-<pre><code>I would like you to understand and use the 
-suitkaise modules in my project. 
-It is installable using pip install suitkaise.
 
-Can you go to the website (suitkaise.info) and 
-look at the "how to use" section for each module?</code></pre>
+<pre><code class="language-text">I would like you to understand and use the suitkaise modules in my project.
+
+It is installable using `pip install suitkaise`.
+
+Can you go to the website (suitkaise.info) and look at the "how to use" section for each module?</code></pre>
 
     <p><strong>2. Download the official docs and place them in your project.</strong></p>
     <p>Run this as python code in your terminal:</p>
