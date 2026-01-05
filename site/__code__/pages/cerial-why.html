@@ -18,13 +18,15 @@
 
     <p>Not built for external or cross-language serialization.</p>
 
-    <p>Is built as "Can't pickle this"'s mortal enemy.</p>
+    <p>Is built as <code>PicklingError</code>'s mortal enemy.</p>
 
     <p>It is also the engine that the <code>processing</code> module uses instead of <code>pickle</code>.</p><br>
 
     <ul>
         <li>Allows for serialization of complex objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot handle</li>
+        <br>
         <li>2x faster than <code>cloudpickle</code> when it comes to dataclasses</li>
+        <br>
         <li>Builds directly on top of <code>pickle</code>, meaning no dependencies</li>
     </ul><br>
 
@@ -32,7 +34,7 @@
     <p>If you want to serialize functions or simple <code>dicts</code> quickly, use <code>cloudpickle</code>.</p>
     <p>If you want to serialize simple <code>classes</code> quickly, use <code>dill</code>.</p><br>
 
-    <p>But if you want to serialize...</p>
+    <h3>But, if you want to serialize...</h3>
 
     <details>
         <summary><strong>Everything Else</strong></summary>

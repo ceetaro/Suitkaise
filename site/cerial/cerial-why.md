@@ -13,7 +13,7 @@ It allows you to serialize and deserialize objects across `Python` processes.
 
 Not built for external or cross-language serialization.
 
-Is built as `Can't pickle this`'s mortal enemy.
+Is built as `PicklingError: Can't serialize object`'s mortal enemy.
 
 It is also the engine that the `processing` module uses instead of `pickle`.
 

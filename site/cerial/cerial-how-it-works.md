@@ -19,13 +19,13 @@ text = "
 
 `cerial` has no dependencies outside of the standard library.
 
-`cerial` is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot
+It is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot
 
 ---
 
 ## Overview
 
-Cerial uses a two-phase approach.
+`cerial` uses a two-phase approach.
 
 1. **Transform** — Convert unpickleable objects into an intermediate representation (IR) using handlers for complex objects
 
@@ -102,11 +102,11 @@ Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are c
 13. class object handlers
 14. class instance handler
 
-For more info on exactly what is covered under each handler, navigate down to "What Can Cerial Handle?"
+For more info on exactly what is covered under each handler, navigate down to "What Can `cerial` Handle?"
 
 ---
 
-## Central Serializer (`Cerializer`)
+## Central Serializer (``cerial`izer`)
 
 Coordinates the entire process.
 
@@ -143,7 +143,7 @@ This is the main function that builds the intermediate representation.
 
 Step 6 is especially important in the quest to serialize any complex object. Some objects may have other complex objects inside them.
 
-Cerial recursively processes everything until the entire representation is pickle native.
+`cerial` recursively processes everything until the entire representation is pickle native.
 
 ---
 
@@ -157,7 +157,7 @@ obj_a.ref = obj_b   # mutual reference
 obj_b.ref = obj_a
 ```
 
-Cerial handles this with object ID tracking:
+`cerial` handles this with object ID tracking:
 
 ### During Serialization
 
@@ -258,7 +258,7 @@ new_obj.__dict__.update(state)
 ---
 
 (start of drop down)
-## What Can Cerial Handle?
+## What Can `cerial` Handle?
 
 ### Functions
 - Regular functions
@@ -382,7 +382,7 @@ The path tells you exactly where in your nested object the failure occurred.
 - **Complex objects** — Handler lookup + state extraction + recursion
 - **Circular references** — Handled with O(1) lookup in seen set
 
-Cerial is optimized for correctness over raw speed. If you need the fastest serialization for simple types, use base `pickle`. If you need to serialize complex objects that others can't handle, use cerial.
+`cerial` is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base `pickle`. If you need to serialize complex objects that others can't handle, use `cerial`.
 
 ---
 
