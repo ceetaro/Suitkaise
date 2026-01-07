@@ -2,19 +2,28 @@
 Suitkaise Processing - Subprocess-based task execution.
 
 Usage:
-    from suitkaise.processing import Process, timesection
+    from suitkaise.processing import Process
     
     class MyWorker(Process):
         def __init__(self):
             self.data = []
-            self.config.num_loops = 100
+            self.config.runs = 100
         
-        @timesection()
-        def __loop__(self):
+        def __run__(self):
             self.data.append(process_item())
         
         def __result__(self):
             return self.data
+    
+    worker = MyWorker()
+    worker.start()
+    worker.wait()
+    
+    # Access results
+    result = worker.result
+    
+    # Access timing (automatic for any lifecycle method)
+    print(worker.__run__.timer.mean)
 """
 
 from .api import (
@@ -28,16 +37,15 @@ from .api import (
     # Timers
     ProcessTimers,
     
-    # Errors
-    PreloopError,
-    MainLoopError,
-    PostLoopError,
+    # Errors (all inherit from ProcessError)
+    ProcessError,
+    PreRunError,
+    RunError,
+    PostRunError,
     OnFinishError,
     ResultError,
-    TimeoutError,
-    
-    # Decorator
-    timesection,
+    ErrorError,
+    ProcessTimeoutError,
 )
 
 __all__ = [
@@ -45,12 +53,12 @@ __all__ = [
     'ProcessConfig',
     'TimeoutConfig',
     'ProcessTimers',
-    'PreloopError',
-    'MainLoopError',
-    'PostLoopError',
+    'ProcessError',
+    'PreRunError',
+    'RunError',
+    'PostRunError',
     'OnFinishError',
     'ResultError',
-    'TimeoutError',
-    'timesection',
+    'ErrorError',
+    'ProcessTimeoutError',
 ]
-

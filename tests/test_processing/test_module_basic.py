@@ -15,13 +15,13 @@ from suitkaise.processing import (
     ProcessConfig,
     TimeoutConfig,
     ProcessTimers,
-    PreloopError,
-    MainLoopError,
-    PostLoopError,
+    ProcessError,
+    PreRunError,
+    RunError,
+    PostRunError,
     OnFinishError,
     ResultError,
-    TimeoutError,
-    timesection,
+    ProcessTimeoutError,
 )
 
 
@@ -52,43 +52,43 @@ class TestProcessCreation:
         
         p = SimpleProcess()
         
-        reporter.add(f"  config.num_loops: {p.config.num_loops}")
+        reporter.add(f"  config.runs: {p.config.runs}")
         reporter.add(f"  config.join_in: {p.config.join_in}")
         reporter.add(f"  config.lives: {p.config.lives}")
-        reporter.add(f"  config.timeouts.preloop: {p.config.timeouts.preloop}")
-        reporter.add(f"  config.timeouts.loop: {p.config.timeouts.loop}")
-        reporter.add(f"  config.timeouts.postloop: {p.config.timeouts.postloop}")
+        reporter.add(f"  config.timeouts.prerun: {p.config.timeouts.prerun}")
+        reporter.add(f"  config.timeouts.run: {p.config.timeouts.run}")
+        reporter.add(f"  config.timeouts.postrun: {p.config.timeouts.postrun}")
         reporter.add(f"  config.timeouts.onfinish: {p.config.timeouts.onfinish}")
         
-        assert p.config.num_loops is None
+        assert p.config.runs is None
         assert p.config.join_in is None
         assert p.config.lives == 1
-        assert p.config.timeouts.preloop == 30.0
-        assert p.config.timeouts.loop == 300.0
-        assert p.config.timeouts.postloop == 60.0
-        assert p.config.timeouts.onfinish == 60.0
+        assert p.config.timeouts.prerun is None
+        assert p.config.timeouts.run is None
+        assert p.config.timeouts.postrun is None
+        assert p.config.timeouts.onfinish is None
     
     def test_process_creation_with_custom_config(self, reporter):
         """Process config can be customized in __init__."""
         
         class CustomProcess(Process):
             def __init__(self):
-                self.config.num_loops = 5
+                self.config.runs = 5
                 self.config.join_in = 10.0
                 self.config.lives = 3
-                self.config.timeouts.loop = 60.0
+                self.config.timeouts.run = 60.0
         
         p = CustomProcess()
         
-        reporter.add(f"  config.num_loops: {p.config.num_loops}")
+        reporter.add(f"  config.runs: {p.config.runs}")
         reporter.add(f"  config.join_in: {p.config.join_in}")
         reporter.add(f"  config.lives: {p.config.lives}")
-        reporter.add(f"  config.timeouts.loop: {p.config.timeouts.loop}")
+        reporter.add(f"  config.timeouts.run: {p.config.timeouts.run}")
         
-        assert p.config.num_loops == 5
+        assert p.config.runs == 5
         assert p.config.join_in == 10.0
         assert p.config.lives == 3
-        assert p.config.timeouts.loop == 60.0
+        assert p.config.timeouts.run == 60.0
     
     def test_process_auto_init_no_super_needed(self, reporter):
         """Process subclass __init__ works without calling super().__init__()."""
@@ -96,17 +96,17 @@ class TestProcessCreation:
         class NoSuperProcess(Process):
             def __init__(self, value):
                 self.value = value
-                self.config.num_loops = 10
+                self.config.runs = 10
         
         p = NoSuperProcess(42)
         
         reporter.add(f"  self.value: {p.value}")
         reporter.add(f"  self.config exists: {hasattr(p, 'config')}")
-        reporter.add(f"  config.num_loops: {p.config.num_loops}")
+        reporter.add(f"  config.runs: {p.config.runs}")
         
         assert p.value == 42
         assert hasattr(p, 'config')
-        assert p.config.num_loops == 10
+        assert p.config.runs == 10
     
     def test_process_initial_state(self, reporter):
         """Process has correct initial state after creation."""
@@ -116,12 +116,12 @@ class TestProcessCreation:
         
         p = StateProcess()
         
-        reporter.add(f"  current_lap: {p.current_lap}")
+        reporter.add(f"  current_run: {p.current_run}")
         reporter.add(f"  is_alive: {p.is_alive}")
         reporter.add(f"  timers: {p.timers}")
         reporter.add(f"  error: {p.error}")
         
-        assert p.current_lap == 0
+        assert p.current_run == 0
         assert p.is_alive == False
         assert p.timers is None
         assert p.error is None
@@ -134,15 +134,15 @@ class TestProcessCreation:
 class TestLifecycleMethods:
     """Tests for lifecycle method execution order and behavior."""
     
-    def test_basic_loop_execution(self, reporter):
-        """Process executes __loop__ the correct number of times."""
+    def test_basic_run_execution(self, reporter):
+        """Process executes __run__ the correct number of times."""
         
         class CounterProcess(Process):
             def __init__(self):
                 self.count = 0
-                self.config.num_loops = 3
+                self.config.runs = 3
             
-            def __loop__(self):
+            def __run__(self):
                 self.count += 1
             
             def __result__(self):
@@ -153,27 +153,27 @@ class TestLifecycleMethods:
         p.wait()
         result = p.result
         
-        reporter.add(f"  num_loops configured: 3")
+        reporter.add(f"  runs configured: 3")
         reporter.add(f"  result (count): {result}")
         
         assert result == 3
     
     def test_lifecycle_order(self, reporter):
-        """Lifecycle methods execute in correct order: preloop → loop → postloop."""
+        """Lifecycle methods execute in correct order: prerun → run → postrun."""
         
         class OrderProcess(Process):
             def __init__(self):
                 self.order = []
-                self.config.num_loops = 2
+                self.config.runs = 2
             
-            def __preloop__(self):
-                self.order.append('preloop')
+            def __prerun__(self):
+                self.order.append('prerun')
             
-            def __loop__(self):
-                self.order.append('loop')
+            def __run__(self):
+                self.order.append('run')
             
-            def __postloop__(self):
-                self.order.append('postloop')
+            def __postrun__(self):
+                self.order.append('postrun')
             
             def __onfinish__(self):
                 self.order.append('onfinish')
@@ -188,7 +188,7 @@ class TestLifecycleMethods:
         
         reporter.add(f"  execution order: {result}")
         
-        expected = ['preloop', 'loop', 'postloop', 'preloop', 'loop', 'postloop', 'onfinish']
+        expected = ['prerun', 'run', 'postrun', 'prerun', 'run', 'postrun', 'onfinish']
         assert result == expected
     
     def test_stop_from_inside_process(self, reporter):
@@ -198,7 +198,7 @@ class TestLifecycleMethods:
             def __init__(self):
                 self.count = 0
             
-            def __loop__(self):
+            def __run__(self):
                 self.count += 1
                 if self.count >= 5:
                     self.stop()
@@ -220,9 +220,9 @@ class TestLifecycleMethods:
         
         class NoResultProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
         
         p = NoResultProcess()
@@ -242,21 +242,21 @@ class TestLifecycleMethods:
 class TestErrorHandling:
     """Tests for error handling and lives system."""
     
-    def test_error_in_loop_raises_main_loop_error(self, reporter):
-        """Error in __loop__ is wrapped in MainLoopError."""
+    def test_error_in_run_raises_run_error(self, reporter):
+        """Error in __run__ is wrapped in RunError."""
         
         class ErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 5
+                self.config.runs = 5
             
-            def __loop__(self):
+            def __run__(self):
                 raise ValueError("test error")
         
         p = ErrorProcess()
         p.start()
         p.wait()
         
-        with pytest.raises(MainLoopError) as exc_info:
+        with pytest.raises(RunError) as exc_info:
             _ = p.result
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
@@ -264,24 +264,24 @@ class TestErrorHandling:
         
         assert isinstance(exc_info.value.original_error, ValueError)
     
-    def test_error_in_preloop_raises_preloop_error(self, reporter):
-        """Error in __preloop__ is wrapped in PreloopError."""
+    def test_error_in_prerun_raises_prerun_error(self, reporter):
+        """Error in __prerun__ is wrapped in PreRunError."""
         
-        class PreloopErrorProcess(Process):
+        class PreRunErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __preloop__(self):
-                raise RuntimeError("preloop failed")
+            def __prerun__(self):
+                raise RuntimeError("prerun failed")
             
-            def __loop__(self):
+            def __run__(self):
                 pass
         
-        p = PreloopErrorProcess()
+        p = PreRunErrorProcess()
         p.start()
         p.wait()
         
-        with pytest.raises(PreloopError) as exc_info:
+        with pytest.raises(PreRunError) as exc_info:
             _ = p.result
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
@@ -289,25 +289,45 @@ class TestErrorHandling:
         
         assert isinstance(exc_info.value.original_error, RuntimeError)
     
+    def test_catch_all_process_errors(self, reporter):
+        """All process errors can be caught with ProcessError base class."""
+        
+        class FailingProcess(Process):
+            def __init__(self):
+                self.config.runs = 1
+            
+            def __run__(self):
+                raise ValueError("fail")
+        
+        p = FailingProcess()
+        p.start()
+        p.wait()
+        
+        # Can catch with ProcessError
+        with pytest.raises(ProcessError) as exc_info:
+            _ = p.result
+        
+        reporter.add(f"  caught with ProcessError: {type(exc_info.value).__name__}")
+        assert isinstance(exc_info.value, ProcessError)
+    
     def test_lives_retry_on_error(self, reporter):
-        """Process retries with fresh state when lives > 1."""
+        """Process retries with preserved state when lives > 1."""
         
         class RetryProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.attempt = 0  # User state is preserved across retries
+                self.config.runs = 1
                 self.config.lives = 3
             
-            def __loop__(self):
-                # Each retry starts with fresh state, so instance vars reset.
-                # But config.lives is updated by the engine to remaining lives.
-                # On the last life (lives=1), succeed.
-                if self.config.lives == 1:
-                    pass  # Success on last life!
-                else:
-                    raise ValueError(f"failing with {self.config.lives} lives remaining")
+            def __run__(self):
+                self.attempt += 1
+                # Fail on first 2 attempts, succeed on 3rd
+                if self.attempt < 3:
+                    raise ValueError(f"failing on attempt {self.attempt}")
+                # Success on attempt 3!
             
             def __result__(self):
-                return f"succeeded on life {self.config.lives}"
+                return f"succeeded on attempt {self.attempt}"
         
         p = RetryProcess()
         p.start()
@@ -317,18 +337,18 @@ class TestErrorHandling:
         reporter.add(f"  configured lives: 3")
         reporter.add(f"  result: {result}")
         
-        # With 3 lives: fails on lives=3, fails on lives=2, succeeds on lives=1
-        assert result == "succeeded on life 1"
+        # With 3 lives: attempt 1 fails, attempt 2 fails, attempt 3 succeeds
+        assert result == "succeeded on attempt 3"
     
     def test_error_handler_receives_error(self, reporter):
         """__error__() receives the wrapped error via self.error."""
         
         class ErrorHandlerProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
                 self.error_received = None
             
-            def __loop__(self):
+            def __run__(self):
                 raise ValueError("test")
             
             def __error__(self):
@@ -358,9 +378,9 @@ class TestControlMethods:
         
         class QuickProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
         
         p = QuickProcess()
@@ -375,7 +395,7 @@ class TestControlMethods:
         """wait(timeout) returns False if process doesn't finish in time."""
         
         class SlowProcess(Process):
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(5)  # Long sleep
         
         p = SlowProcess()
@@ -394,7 +414,7 @@ class TestControlMethods:
         """kill() terminates process immediately."""
         
         class InfiniteProcess(Process):
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.1)
         
         p = InfiniteProcess()
@@ -416,7 +436,7 @@ class TestControlMethods:
             def __init__(self):
                 self.finished_gracefully = False
             
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.05)
             
             def __onfinish__(self):
@@ -438,28 +458,27 @@ class TestControlMethods:
 
 
 # =============================================================================
-# Timing with @timesection
+# Auto-Timing Feature
 # =============================================================================
 
-class TestTimesectionDecorator:
-    """Tests for @timesection() decorator."""
+class TestAutoTiming:
+    """Tests for automatic timing of lifecycle methods."""
     
-    def test_timesection_creates_timers(self, reporter):
-        """@timesection() creates self.timers with appropriate timer slots."""
+    def test_auto_timing_creates_timers(self, reporter):
+        """Defining lifecycle methods automatically creates timers."""
         
         class TimedProcess(Process):
             def __init__(self):
-                self.config.num_loops = 3
+                self.config.runs = 3
             
-            @timesection()
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.01)
             
             def __result__(self):
                 return {
                     'timers_exists': self.timers is not None,
-                    'loop_timer_exists': self.timers.loop is not None if self.timers else False,
-                    'num_times': self.timers.loop.num_times if self.timers and self.timers.loop else 0,
+                    'run_timer_exists': self.timers.run is not None if self.timers else False,
+                    'num_times': self.timers.run.num_times if self.timers and self.timers.run else 0,
                 }
         
         p = TimedProcess()
@@ -468,38 +487,35 @@ class TestTimesectionDecorator:
         result = p.result
         
         reporter.add(f"  timers exists: {result['timers_exists']}")
-        reporter.add(f"  loop timer exists: {result['loop_timer_exists']}")
+        reporter.add(f"  run timer exists: {result['run_timer_exists']}")
         reporter.add(f"  num_times recorded: {result['num_times']}")
         
         assert result['timers_exists'] == True
-        assert result['loop_timer_exists'] == True
+        assert result['run_timer_exists'] == True
         assert result['num_times'] == 3
     
-    def test_timesection_on_multiple_methods(self, reporter):
-        """@timesection() can be used on multiple lifecycle methods."""
+    def test_auto_timing_on_multiple_methods(self, reporter):
+        """Timing is automatically created for all user-defined lifecycle methods."""
         
         class MultiTimedProcess(Process):
             def __init__(self):
-                self.config.num_loops = 2
+                self.config.runs = 2
             
-            @timesection()
-            def __preloop__(self):
+            def __prerun__(self):
                 time.sleep(0.005)
             
-            @timesection()
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.01)
             
-            @timesection()
-            def __postloop__(self):
+            def __postrun__(self):
                 time.sleep(0.005)
             
             def __result__(self):
                 return {
-                    'preloop_times': self.timers.preloop.num_times if self.timers and self.timers.preloop else 0,
-                    'loop_times': self.timers.loop.num_times if self.timers and self.timers.loop else 0,
-                    'postloop_times': self.timers.postloop.num_times if self.timers and self.timers.postloop else 0,
-                    'full_loop_times': self.timers.full_loop.num_times if self.timers else 0,
+                    'prerun_times': self.timers.prerun.num_times if self.timers and self.timers.prerun else 0,
+                    'run_times': self.timers.run.num_times if self.timers and self.timers.run else 0,
+                    'postrun_times': self.timers.postrun.num_times if self.timers and self.timers.postrun else 0,
+                    'full_run_times': self.timers.full_run.num_times if self.timers else 0,
                 }
         
         p = MultiTimedProcess()
@@ -507,15 +523,75 @@ class TestTimesectionDecorator:
         p.wait()
         result = p.result
         
-        reporter.add(f"  preloop times: {result['preloop_times']}")
-        reporter.add(f"  loop times: {result['loop_times']}")
-        reporter.add(f"  postloop times: {result['postloop_times']}")
-        reporter.add(f"  full_loop times: {result['full_loop_times']}")
+        reporter.add(f"  prerun times: {result['prerun_times']}")
+        reporter.add(f"  run times: {result['run_times']}")
+        reporter.add(f"  postrun times: {result['postrun_times']}")
+        reporter.add(f"  full_run times: {result['full_run_times']}")
         
-        assert result['preloop_times'] == 2
-        assert result['loop_times'] == 2
-        assert result['postloop_times'] == 2
-        assert result['full_loop_times'] == 2
+        assert result['prerun_times'] == 2
+        assert result['run_times'] == 2
+        assert result['postrun_times'] == 2
+        assert result['full_run_times'] == 2
+    
+    def test_timer_access_via_method_attribute(self, reporter):
+        """Timers can be accessed via process.__run__.timer pattern."""
+        
+        class TimerAccessProcess(Process):
+            def __init__(self):
+                self.config.runs = 3
+            
+            def __run__(self):
+                time.sleep(0.01)
+            
+            def __result__(self):
+                return "done"
+        
+        p = TimerAccessProcess()
+        p.start()
+        p.wait()
+        _ = p.result
+        
+        # Access timer via method attribute
+        run_timer = p.__run__.timer
+        
+        reporter.add(f"  p.__run__.timer exists: {run_timer is not None}")
+        reporter.add(f"  num_times: {run_timer.num_times if run_timer else 0}")
+        
+        assert run_timer is not None
+        assert run_timer.num_times == 3
+    
+    def test_full_run_timer_aggregates(self, reporter):
+        """p.timer returns the aggregate full_run timer."""
+        
+        class AggregateProcess(Process):
+            def __init__(self):
+                self.config.runs = 2
+            
+            def __prerun__(self):
+                time.sleep(0.005)
+            
+            def __run__(self):
+                time.sleep(0.01)
+            
+            def __postrun__(self):
+                time.sleep(0.005)
+            
+            def __result__(self):
+                return "done"
+        
+        p = AggregateProcess()
+        p.start()
+        p.wait()
+        _ = p.result
+        
+        full_timer = p.timer
+        
+        reporter.add(f"  p.timer exists: {full_timer is not None}")
+        reporter.add(f"  num_times: {full_timer.num_times if full_timer else 0}")
+        reporter.add(f"  mean: {full_timer.mean:.4f}s" if full_timer and full_timer.mean else "  mean: N/A")
+        
+        assert full_timer is not None
+        assert full_timer.num_times == 2
 
 
 # =============================================================================
@@ -523,17 +599,17 @@ class TestTimesectionDecorator:
 # =============================================================================
 
 class TestConfigLimits:
-    """Tests for num_loops and join_in limits."""
+    """Tests for runs and join_in limits."""
     
-    def test_num_loops_limit(self, reporter):
-        """Process stops after num_loops iterations."""
+    def test_runs_limit(self, reporter):
+        """Process stops after runs iterations."""
         
         class LimitedProcess(Process):
             def __init__(self):
                 self.count = 0
-                self.config.num_loops = 5
+                self.config.runs = 5
             
-            def __loop__(self):
+            def __run__(self):
                 self.count += 1
             
             def __result__(self):
@@ -544,7 +620,7 @@ class TestConfigLimits:
         p.wait()
         result = p.result
         
-        reporter.add(f"  num_loops: 5")
+        reporter.add(f"  runs: 5")
         reporter.add(f"  actual count: {result}")
         
         assert result == 5
@@ -557,7 +633,7 @@ class TestConfigLimits:
                 self.count = 0
                 self.config.join_in = 0.3
             
-            def __loop__(self):
+            def __run__(self):
                 self.count += 1
                 time.sleep(0.05)
             
@@ -573,7 +649,7 @@ class TestConfigLimits:
         
         reporter.add(f"  join_in: 0.3s")
         reporter.add(f"  actual elapsed: {elapsed:.2f}s")
-        reporter.add(f"  loop count: {result}")
+        reporter.add(f"  run count: {result}")
         
         # Should have stopped around 0.3s
         _assert_between(elapsed, 0.2, 0.6)
@@ -587,35 +663,35 @@ class TestConfigLimits:
 class TestProperties:
     """Tests for process properties."""
     
-    def test_current_lap_property(self, reporter):
-        """current_lap tracks the current iteration number."""
+    def test_current_run_property(self, reporter):
+        """current_run tracks the current iteration number."""
         
-        class LapProcess(Process):
+        class RunProcess(Process):
             def __init__(self):
-                self.laps_seen = []
-                self.config.num_loops = 3
+                self.runs_seen = []
+                self.config.runs = 3
             
-            def __loop__(self):
-                self.laps_seen.append(self._current_lap)
+            def __run__(self):
+                self.runs_seen.append(self._current_run)
             
             def __result__(self):
-                return self.laps_seen
+                return self.runs_seen
         
-        p = LapProcess()
+        p = RunProcess()
         p.start()
         p.wait()
         result = p.result
         
-        reporter.add(f"  laps seen: {result}")
+        reporter.add(f"  runs seen: {result}")
         
-        # Laps should be 0, 1, 2 (0-indexed, incremented after each iteration)
+        # Runs should be 0, 1, 2 (0-indexed, incremented after each iteration)
         assert result == [0, 1, 2]
     
     def test_is_alive_property(self, reporter):
         """is_alive correctly reports process state."""
         
         class AliveProcess(Process):
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.2)
         
         p = AliveProcess()

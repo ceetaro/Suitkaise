@@ -3,7 +3,7 @@
 
 import pytest  # type: ignore
 
-from suitkaise.processing import Process, timesection
+from suitkaise.processing import Process
 from suitkaise import sktime
 
 
@@ -16,9 +16,9 @@ class TestWithSktime:
         class TimedWorkProcess(Process):
             def __init__(self):
                 self.custom_timer = sktime.Timer()
-                self.config.num_loops = 5
+                self.config.runs = 5
             
-            def __loop__(self):
+            def __run__(self):
                 with sktime.TimeThis(self.custom_timer):
                     sktime.sleep(0.02)
             
@@ -41,36 +41,33 @@ class TestWithSktime:
         assert result['num_times'] == 5
         assert result['mean'] >= 0.015  # At least 15ms per iteration
     
-    def test_timesection_decorator_with_sktime_analysis(self, reporter):
-        """@timesection() creates timers compatible with sktime analysis."""
+    def test_auto_timing_with_sktime_analysis(self, reporter):
+        """Auto timing creates timers compatible with sktime analysis."""
         
         class AnalyzedProcess(Process):
             def __init__(self):
-                self.config.num_loops = 10
+                self.config.runs = 10
             
-            @timesection()
-            def __preloop__(self):
+            def __prerun__(self):
                 sktime.sleep(0.005)
             
-            @timesection()
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.01)
             
-            @timesection()
-            def __postloop__(self):
+            def __postrun__(self):
                 sktime.sleep(0.005)
             
             def __result__(self):
                 # Analyze timing statistics
-                loop = self.timers.loop if self.timers else None
-                full_loop = self.timers.full_loop if self.timers else None
+                run = self.timers.run if self.timers else None
+                full_run = self.timers.full_run if self.timers else None
                 return {
-                    'loop_mean': loop.mean if loop else None,
-                    'loop_min': loop.min if loop else None,
-                    'loop_max': loop.max if loop else None,
-                    'loop_stdev': loop.stdev if loop else None,
-                    'full_loop_mean': full_loop.mean if full_loop else None,
-                    'full_loop_total': full_loop.total_time if full_loop else None,
+                    'run_mean': run.mean if run else None,
+                    'run_min': run.min if run else None,
+                    'run_max': run.max if run else None,
+                    'run_stdev': run.stdev if run else None,
+                    'full_run_mean': full_run.mean if full_run else None,
+                    'full_run_total': full_run.total_time if full_run else None,
                 }
         
         p = AnalyzedProcess()
@@ -78,25 +75,25 @@ class TestWithSktime:
         p.wait()
         result = p.result
         
-        reporter.add(f"  loop mean: {result['loop_mean']:.4f}s")
-        reporter.add(f"  loop min: {result['loop_min']:.4f}s")
-        reporter.add(f"  loop max: {result['loop_max']:.4f}s")
-        reporter.add(f"  full_loop mean: {result['full_loop_mean']:.4f}s")
-        reporter.add(f"  full_loop total: {result['full_loop_total']:.4f}s")
+        reporter.add(f"  run mean: {result['run_mean']:.4f}s")
+        reporter.add(f"  run min: {result['run_min']:.4f}s")
+        reporter.add(f"  run max: {result['run_max']:.4f}s")
+        reporter.add(f"  full_run mean: {result['full_run_mean']:.4f}s")
+        reporter.add(f"  full_run total: {result['full_run_total']:.4f}s")
         
-        assert result['loop_mean'] >= 0.008
-        assert result['full_loop_mean'] >= 0.015  # preloop + loop + postloop
+        assert result['run_mean'] >= 0.008
+        assert result['full_run_mean'] >= 0.015  # prerun + run + postrun
     
     def test_yawn_rate_limiting_in_process(self, reporter):
-        """Process can use sktime.Yawn for rate limiting within loop."""
+        """Process can use sktime.Yawn for rate limiting within run."""
         
         class RateLimitedProcess(Process):
             def __init__(self):
                 self.rate_limiter = sktime.Yawn(sleep_duration=0.1, yawn_threshold=3)
                 self.yawn_count = 0
-                self.config.num_loops = 10
+                self.config.runs = 10
             
-            def __loop__(self):
+            def __run__(self):
                 if self.rate_limiter.yawn():
                     self.yawn_count += 1
             
@@ -114,7 +111,7 @@ class TestWithSktime:
         result = p.result
         
         reporter.add(f"  yawn threshold: 3")
-        reporter.add(f"  num_loops: 10")
+        reporter.add(f"  runs: 10")
         reporter.add(f"  times slept: {result['yawn_count']}")
         reporter.add(f"  total elapsed: {elapsed:.2f}s")
         
@@ -127,24 +124,24 @@ class TestWithSktime:
         class DurationTrackingProcess(Process):
             def __init__(self):
                 self.start_time = None
-                self.lap_durations = []
-                self.config.num_loops = 5
+                self.run_durations = []
+                self.config.runs = 5
             
-            def __preloop__(self):
+            def __prerun__(self):
                 self.start_time = sktime.now()
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.02)
             
-            def __postloop__(self):
+            def __postrun__(self):
                 if self.start_time is not None:
                     duration = sktime.elapsed(self.start_time)
-                    self.lap_durations.append(duration)
+                    self.run_durations.append(duration)
             
             def __result__(self):
                 return {
-                    'durations': self.lap_durations,
-                    'mean_duration': sum(self.lap_durations) / len(self.lap_durations),
+                    'durations': self.run_durations,
+                    'mean_duration': sum(self.run_durations) / len(self.run_durations),
                 }
         
         p = DurationTrackingProcess()
@@ -152,7 +149,7 @@ class TestWithSktime:
         p.wait()
         result = p.result
         
-        reporter.add(f"  lap durations: {[f'{d:.4f}s' for d in result['durations']]}")
+        reporter.add(f"  run durations: {[f'{d:.4f}s' for d in result['durations']]}")
         reporter.add(f"  mean duration: {result['mean_duration']:.4f}s")
         
         assert len(result['durations']) == 5
@@ -177,8 +174,7 @@ class TestRealWorldScenarios:
                 self.batch_count = 0
                 self.config.join_in = 0.5  # Stop after 0.5 seconds
             
-            @timesection()
-            def __loop__(self):
+            def __run__(self):
                 # Simulate processing a batch
                 for _ in range(self.batch_size):
                     sktime.sleep(0.002)  # 2ms per item
@@ -190,7 +186,7 @@ class TestRealWorldScenarios:
                     'items_processed': self.items_processed,
                     'batch_count': self.batch_count,
                     'items_per_batch': self.batch_size,
-                    'avg_batch_time': self.timers.loop.mean if self.timers and self.timers.loop else None,
+                    'avg_batch_time': self.timers.run.mean if self.timers and self.timers.run else None,
                 }
         
         p = BatchProcessor(batch_size=10)
@@ -214,24 +210,24 @@ class TestRealWorldScenarios:
         Simulate a process that retries failed operations with backoff.
         Uses lives system for retries.
         
-        Note: Each retry starts with fresh state, so we use config.lives
-        to track which attempt we're on (engine updates it to remaining lives).
+        User state is preserved across retries, so we can track attempts.
         """
         
         class BackoffProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.attempt = 0
+                self.config.runs = 1
                 self.config.lives = 5
             
-            def __loop__(self):
-                # Fresh state on each retry, but config.lives is updated.
-                # Fail until we're on the last 2 lives
-                if self.config.lives > 2:
-                    raise ConnectionError(f"Failing with {self.config.lives} lives remaining")
-                # Success on lives 1 or 2
+            def __run__(self):
+                self.attempt += 1
+                # Fail on first 3 attempts, succeed on 4th
+                if self.attempt < 4:
+                    raise ConnectionError(f"Failing on attempt {self.attempt}")
+                # Success on attempt 4
             
             def __result__(self):
-                return f"Succeeded with {self.config.lives} lives remaining"
+                return f"Succeeded on attempt {self.attempt}"
         
         p = BackoffProcess()
         p.start()
@@ -241,9 +237,9 @@ class TestRealWorldScenarios:
         reporter.add(f"  configured lives: 5")
         reporter.add(f"  result: {result}")
         
-        # Should succeed after using 3 lives (fails at 5, 4, 3 - succeeds at 2)
+        # Should succeed on 4th attempt (fails at 1, 2, 3 - succeeds at 4)
         assert "Succeeded" in result
-        assert "2 lives" in result
+        assert "attempt 4" in result
     
     def test_progress_tracking_process(self, reporter):
         """
@@ -255,9 +251,9 @@ class TestRealWorldScenarios:
                 self.total_items = total_items
                 self.processed = 0
                 self.progress_snapshots = []
-                self.config.num_loops = total_items
+                self.config.runs = total_items
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.005)
                 self.processed += 1
                 progress = (self.processed / self.total_items) * 100
@@ -292,9 +288,9 @@ class TestRealWorldScenarios:
                 self.task_id = task_id
                 self.task_data = task_data
                 self.result_value = None
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 # Simulate computation based on task data
                 sktime.sleep(0.02)
                 self.result_value = sum(self.task_data) * self.task_id

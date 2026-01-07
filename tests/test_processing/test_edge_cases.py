@@ -2,10 +2,10 @@
 
 import pytest  # type: ignore
 
-from suitkaise.processing import Process, timesection
+from suitkaise.processing import Process, ProcessError
 from suitkaise.processing._int.errors import (
-    PreloopError, MainLoopError, PostLoopError, 
-    OnFinishError, ResultError, TimeoutError
+    PreRunError, RunError, PostRunError, 
+    OnFinishError, ResultError, ProcessTimeoutError
 )
 from suitkaise import sktime
 
@@ -42,7 +42,7 @@ class TestMinimalProcesses:
         
         class ResultOnlyProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
             def __result__(self):
                 return "only result defined"
@@ -55,50 +55,50 @@ class TestMinimalProcesses:
         reporter.add(f"  result: {result}")
         assert result == "only result defined"
     
-    def test_process_zero_loops(self, reporter):
-        """Process configured for 0 loops."""
+    def test_process_zero_runs(self, reporter):
+        """Process configured for 0 runs."""
         
-        class ZeroLoopProcess(Process):
+        class ZeroRunProcess(Process):
             def __init__(self):
-                self.config.num_loops = 0
-                self.loop_called = False
+                self.config.runs = 0
+                self.run_called = False
             
-            def __loop__(self):
-                self.loop_called = True
+            def __run__(self):
+                self.run_called = True
             
             def __result__(self):
-                return {"loop_called": self.loop_called}
+                return {"run_called": self.run_called}
         
-        p = ZeroLoopProcess()
+        p = ZeroRunProcess()
         p.start()
         p.wait()
         result = p.result
         
-        reporter.add(f"  loop_called: {result['loop_called']}")
+        reporter.add(f"  run_called: {result['run_called']}")
         
-        # 0 loops means __loop__ should never be called
-        assert result['loop_called'] is False
+        # 0 runs means __run__ should never be called
+        assert result['run_called'] is False
     
-    def test_process_one_loop(self, reporter):
-        """Process configured for exactly 1 loop."""
+    def test_process_one_run(self, reporter):
+        """Process configured for exactly 1 run."""
         
-        class OneLoopProcess(Process):
+        class OneRunProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
-                self.loop_count = 0
+                self.config.runs = 1
+                self.run_count = 0
             
-            def __loop__(self):
-                self.loop_count += 1
+            def __run__(self):
+                self.run_count += 1
             
             def __result__(self):
-                return self.loop_count
+                return self.run_count
         
-        p = OneLoopProcess()
+        p = OneRunProcess()
         p.start()
         p.wait()
         result = p.result
         
-        reporter.add(f"  loop executed: {result} times")
+        reporter.add(f"  run executed: {result} times")
         assert result == 1
 
 
@@ -118,9 +118,9 @@ class TestStateEdgeCases:
                 self.large_list = list(range(10000))
                 self.large_dict = {f"key_{i}": i * 2 for i in range(1000)}
                 self.nested = {"a": {"b": {"c": {"d": list(range(100))}}}}
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 # Modify data
                 self.large_list.append(99999)
                 self.large_dict["final"] = "done"
@@ -149,15 +149,15 @@ class TestStateEdgeCases:
         class NoneProcess(Process):
             def __init__(self):
                 self.value = None
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __preloop__(self):
+            def __prerun__(self):
                 return None  # Return None
             
-            def __loop__(self):
+            def __run__(self):
                 self.value = None  # Set to None
             
-            def __postloop__(self):
+            def __postrun__(self):
                 pass  # Implicit None return
             
             def __result__(self):
@@ -176,7 +176,7 @@ class TestStateEdgeCases:
         
         class ComplexReturnProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
             def __result__(self):
                 return {
@@ -204,10 +204,10 @@ class TestStateEdgeCases:
         class MutableDefaultProcess(Process):
             def __init__(self, items=None):
                 self.items = items if items is not None else []
-                self.config.num_loops = 3
+                self.config.runs = 3
             
-            def __loop__(self):
-                self.items.append(self._current_lap)
+            def __run__(self):
+                self.items.append(self._current_run)
             
             def __result__(self):
                 return self.items
@@ -246,23 +246,23 @@ class TestTimingEdgeCases:
         class ShortJoinProcess(Process):
             def __init__(self):
                 self.config.join_in = 0.05  # 50ms
-                self.loops_completed = 0
+                self.runs_completed = 0
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.02)
-                self.loops_completed += 1
+                self.runs_completed += 1
             
             def __result__(self):
-                return self.loops_completed
+                return self.runs_completed
         
         p = ShortJoinProcess()
         p.start()
         p.wait()
         result = p.result
         
-        reporter.add(f"  loops in 50ms: {result}")
+        reporter.add(f"  runs in 50ms: {result}")
         
-        # Should complete 1-3 loops in 50ms
+        # Should complete 1-3 runs in 50ms
         assert result >= 1
         assert result <= 5
     
@@ -272,54 +272,50 @@ class TestTimingEdgeCases:
         class ZeroJoinProcess(Process):
             def __init__(self):
                 self.config.join_in = 0.0
-                self.loops = 0
+                self.runs = 0
             
-            def __loop__(self):
-                self.loops += 1
+            def __run__(self):
+                self.runs += 1
             
             def __result__(self):
-                return self.loops
+                return self.runs
         
         p = ZeroJoinProcess()
         p.start()
         p.wait()
         result = p.result
         
-        reporter.add(f"  loops with join_in=0: {result}")
+        reporter.add(f"  runs with join_in=0: {result}")
         
-        # Should stop immediately or after 1 loop
+        # Should stop immediately or after 1 run
         assert result <= 1
     
-    def test_timesection_on_all_methods(self, reporter):
-        """@timesection on every lifecycle method."""
+    def test_auto_timing_on_all_methods(self, reporter):
+        """Auto timing on every lifecycle method."""
         
         class FullyTimedProcess(Process):
             def __init__(self):
-                self.config.num_loops = 3
+                self.config.runs = 3
             
-            @timesection()
-            def __preloop__(self):
+            def __prerun__(self):
                 sktime.sleep(0.005)
             
-            @timesection()
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.01)
             
-            @timesection()
-            def __postloop__(self):
+            def __postrun__(self):
                 sktime.sleep(0.005)
             
-            @timesection()
             def __onfinish__(self):
                 sktime.sleep(0.005)
             
             def __result__(self):
                 return {
-                    "preloop_times": self.timers.preloop.num_times if self.timers.preloop else 0,
-                    "loop_times": self.timers.loop.num_times if self.timers.loop else 0,
-                    "postloop_times": self.timers.postloop.num_times if self.timers.postloop else 0,
+                    "prerun_times": self.timers.prerun.num_times if self.timers.prerun else 0,
+                    "run_times": self.timers.run.num_times if self.timers.run else 0,
+                    "postrun_times": self.timers.postrun.num_times if self.timers.postrun else 0,
                     "onfinish_times": self.timers.onfinish.num_times if self.timers.onfinish else 0,
-                    "full_loop_times": self.timers.full_loop.num_times if self.timers.full_loop else 0,
+                    "full_run_times": self.timers.full_run.num_times if self.timers.full_run else 0,
                 }
         
         p = FullyTimedProcess()
@@ -327,15 +323,15 @@ class TestTimingEdgeCases:
         p.wait()
         result = p.result
         
-        reporter.add(f"  preloop calls: {result['preloop_times']}")
-        reporter.add(f"  loop calls: {result['loop_times']}")
-        reporter.add(f"  postloop calls: {result['postloop_times']}")
+        reporter.add(f"  prerun calls: {result['prerun_times']}")
+        reporter.add(f"  run calls: {result['run_times']}")
+        reporter.add(f"  postrun calls: {result['postrun_times']}")
         reporter.add(f"  onfinish calls: {result['onfinish_times']}")
-        reporter.add(f"  full_loop aggregates: {result['full_loop_times']}")
+        reporter.add(f"  full_run aggregates: {result['full_run_times']}")
         
-        assert result['preloop_times'] == 3
-        assert result['loop_times'] == 3
-        assert result['postloop_times'] == 3
+        assert result['prerun_times'] == 3
+        assert result['run_times'] == 3
+        assert result['postrun_times'] == 3
         assert result['onfinish_times'] == 1
 
 
@@ -346,45 +342,45 @@ class TestTimingEdgeCases:
 class TestErrorEdgeCases:
     """Test unusual error scenarios."""
     
-    def test_error_in_first_loop(self, reporter):
-        """Error on the very first loop iteration."""
+    def test_error_in_first_run(self, reporter):
+        """Error on the very first run iteration."""
         
-        class FirstLoopErrorProcess(Process):
+        class FirstRunErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 10
+                self.config.runs = 10
             
-            def __loop__(self):
-                raise ValueError("First loop fails")
+            def __run__(self):
+                raise ValueError("First run fails")
         
-        p = FirstLoopErrorProcess()
+        p = FirstRunErrorProcess()
         p.start()
         p.wait()
         
-        with pytest.raises(MainLoopError) as exc_info:
+        with pytest.raises(RunError) as exc_info:
             _ = p.result
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         reporter.add(f"  original: {type(exc_info.value.original_error).__name__}")
         
-        assert exc_info.value.current_lap == 0
+        assert exc_info.value.current_run == 0
         assert isinstance(exc_info.value.original_error, ValueError)
     
     def test_error_in_onfinish(self, reporter):
-        """Error in __onfinish__ after successful loops."""
+        """Error in __onfinish__ after successful runs."""
         
         class OnfinishErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 3
-                self.loops_done = 0
+                self.config.runs = 3
+                self.runs_done = 0
             
-            def __loop__(self):
-                self.loops_done += 1
+            def __run__(self):
+                self.runs_done += 1
             
             def __onfinish__(self):
                 raise RuntimeError("Cleanup failed")
             
             def __result__(self):
-                return self.loops_done
+                return self.runs_done
         
         p = OnfinishErrorProcess()
         p.start()
@@ -401,9 +397,9 @@ class TestErrorEdgeCases:
         
         class ResultErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
             
             def __result__(self):
@@ -424,31 +420,33 @@ class TestErrorEdgeCases:
         
         class AlwaysFailProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.attempt = 0
+                self.config.runs = 1
                 self.config.lives = 3
             
-            def __loop__(self):
-                raise Exception(f"Failing with {self.config.lives} lives")
+            def __run__(self):
+                self.attempt += 1
+                raise Exception(f"Failing on attempt {self.attempt}")
         
         p = AlwaysFailProcess()
         p.start()
         p.wait()
         
-        with pytest.raises(MainLoopError) as exc_info:
+        with pytest.raises(RunError) as exc_info:
             _ = p.result
         
-        # Should have exhausted all lives
-        reporter.add(f"  error on final life: {exc_info.value.original_error}")
-        assert "1 lives" in str(exc_info.value.original_error)
+        # Should have exhausted all lives (3 attempts)
+        reporter.add(f"  error on final attempt: {exc_info.value.original_error}")
+        assert "attempt 3" in str(exc_info.value.original_error)
     
     def test_custom_error_handler(self, reporter):
         """Test __error__ method is called and can transform errors."""
         
         class CustomErrorProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 raise ValueError("Original error")
             
             def __error__(self):
@@ -465,7 +463,7 @@ class TestErrorEdgeCases:
             _ = p.result
         
         reporter.add(f"  transformed error: {exc_info.value}")
-        assert "Transformed: MainLoopError" in str(exc_info.value)
+        assert "Transformed: RunError" in str(exc_info.value)
 
 
 # =============================================================================
@@ -480,9 +478,9 @@ class TestControlFlowEdgeCases:
         
         class StopBeforeStartProcess(Process):
             def __init__(self):
-                self.config.num_loops = 100
+                self.config.runs = 100
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.1)
             
             def __result__(self):
@@ -505,14 +503,14 @@ class TestControlFlowEdgeCases:
         
         class MultiStopProcess(Process):
             def __init__(self):
-                self.loops = 0
+                self.runs = 0
             
-            def __loop__(self):
-                self.loops += 1
+            def __run__(self):
+                self.runs += 1
                 sktime.sleep(0.05)
             
             def __result__(self):
-                return self.loops
+                return self.runs
         
         p = MultiStopProcess()
         p.start()
@@ -526,14 +524,14 @@ class TestControlFlowEdgeCases:
         p.wait()
         result = p.result
         
-        reporter.add(f"  loops before multi-stop: {result}")
+        reporter.add(f"  runs before multi-stop: {result}")
         assert isinstance(result, int)
     
     def test_kill_immediately(self, reporter):
         """Kill process immediately after start."""
         
         class KillImmediateProcess(Process):
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(10)  # Long sleep
             
             def __result__(self):
@@ -557,7 +555,7 @@ class TestControlFlowEdgeCases:
         
         class NoStartProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
             def __result__(self):
                 return "never"
@@ -574,7 +572,7 @@ class TestControlFlowEdgeCases:
         
         class DoubleResultProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
             def __result__(self):
                 return {"value": 42}
@@ -603,19 +601,19 @@ class TestControlFlowEdgeCases:
 class TestLifecycleInteractions:
     """Test interactions between lifecycle methods."""
     
-    def test_preloop_modifies_state_for_loop(self, reporter):
-        """__preloop__ sets up state that __loop__ uses."""
+    def test_prerun_modifies_state_for_run(self, reporter):
+        """__prerun__ sets up state that __run__ uses."""
         
         class SetupProcess(Process):
             def __init__(self):
-                self.config.num_loops = 3
+                self.config.runs = 3
                 self.multiplier = 1
                 self.results = []
             
-            def __preloop__(self):
-                self.multiplier = self._current_lap + 1
+            def __prerun__(self):
+                self.multiplier = self._current_run + 1
             
-            def __loop__(self):
+            def __run__(self):
                 self.results.append(10 * self.multiplier)
             
             def __result__(self):
@@ -629,20 +627,20 @@ class TestLifecycleInteractions:
         reporter.add(f"  results: {result}")
         assert result == [10, 20, 30]
     
-    def test_postloop_validates_loop_result(self, reporter):
-        """__postloop__ validates what __loop__ did."""
+    def test_postrun_validates_run_result(self, reporter):
+        """__postrun__ validates what __run__ did."""
         
         class ValidatingProcess(Process):
             def __init__(self):
-                self.config.num_loops = 5
+                self.config.runs = 5
                 self.last_value = 0
                 self.validation_count = 0
             
-            def __loop__(self):
-                self.last_value = self._current_lap * 2
+            def __run__(self):
+                self.last_value = self._current_run * 2
             
-            def __postloop__(self):
-                if self.last_value != self._current_lap * 2:
+            def __postrun__(self):
+                if self.last_value != self._current_run * 2:
                     raise ValueError("Validation failed")
                 self.validation_count += 1
             
@@ -657,17 +655,17 @@ class TestLifecycleInteractions:
         reporter.add(f"  validations passed: {result['validations']}")
         assert result['validations'] == 5
     
-    def test_onfinish_aggregates_loop_data(self, reporter):
-        """__onfinish__ aggregates data from all loops."""
+    def test_onfinish_aggregates_run_data(self, reporter):
+        """__onfinish__ aggregates data from all runs."""
         
         class AggregatingProcess(Process):
             def __init__(self):
-                self.config.num_loops = 5
+                self.config.runs = 5
                 self.values = []
                 self.summary = None
             
-            def __loop__(self):
-                self.values.append(self._current_lap ** 2)
+            def __run__(self):
+                self.values.append(self._current_run ** 2)
             
             def __onfinish__(self):
                 self.summary = {
@@ -703,7 +701,7 @@ class TestConcurrencyEdgeCases:
         class CounterProcess(Process):
             def __init__(self, process_id):
                 self.process_id = process_id
-                self.config.num_loops = 1
+                self.config.runs = 1
             
             def __result__(self):
                 return self.process_id
@@ -731,9 +729,9 @@ class TestConcurrencyEdgeCases:
         class VariableDurationProcess(Process):
             def __init__(self, duration):
                 self.duration = duration
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(self.duration)
             
             def __result__(self):
@@ -774,20 +772,20 @@ class TestConcurrencyEdgeCases:
 class TestCircuitComposition:
     """Test using Circuit inside a Process (composable pattern)."""
     
-    def test_circuit_within_loop(self, reporter):
-        """Use Circuit for failure tracking within __loop__."""
+    def test_circuit_within_run(self, reporter):
+        """Use Circuit for failure tracking within __run__."""
         from suitkaise.circuit import Circuit
         
         class CircuitProtectedProcess(Process):
             def __init__(self):
-                self.config.num_loops = 20
+                self.config.runs = 20
                 self.circuit = Circuit(shorts=3)
                 self.successful_ops = 0
                 self.failed_ops = 0
             
-            def __loop__(self):
+            def __run__(self):
                 # Simulate occasional failures
-                if self._current_lap % 4 == 0:
+                if self._current_run % 4 == 0:
                     self.circuit.short()
                     self.failed_ops += 1
                 else:
@@ -813,7 +811,7 @@ class TestCircuitComposition:
         reporter.add(f"  failed ops: {result['failed']}")
         reporter.add(f"  circuit broken: {result['circuit_broken']}")
         
-        # Circuit should break after 3 shorts (at laps 0, 4, 8)
+        # Circuit should break after 3 shorts (at runs 0, 4, 8)
         assert result['circuit_broken'] is True
         assert result['failed'] == 3
 

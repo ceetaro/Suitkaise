@@ -1,19 +1,22 @@
 """
 Errors for processing lifecycle hooks.
 
+All errors inherit from ProcessError, allowing users to catch any
+Process-related error with a single `except ProcessError`.
+
 These errors wrap the original exception using Python's exception chaining.
 The original error and traceback are preserved in __cause__ AND in the
 `original_error` attribute (for serialization across processes).
 
 Usage in engine:
     try:
-        self.__preloop__()
+        self.__prerun__()
     except Exception as e:
-        raise PreloopError(current_lap, e) from e
+        raise PreRunError(current_run, e) from e
 
 Output when raised:
     Traceback (most recent call last):
-      File "user_code.py", line 12, in __preloop__
+      File "user_code.py", line 12, in __prerun__
         raise ValueError("bad data")
     ValueError: bad data
 
@@ -21,8 +24,8 @@ Output when raised:
 
     Traceback (most recent call last):
       File "engine.py", line 48, in run_section
-        raise PreloopError(current_lap, e) from e
-    PreloopError: Error in __preloop__ on lap 3
+        raise PreRunError(current_run, e) from e
+    PreRunError: Error in __prerun__ on run 3
 
 Accessing the original error:
     error.__cause__              # the original exception (local only)
@@ -30,56 +33,99 @@ Accessing the original error:
 """
 
 
-class PreloopError(Exception):
-    """Error raised when __preloop__() fails."""
+class ProcessError(Exception):
+    """
+    Base class for all Process-related errors.
     
-    def __init__(self, current_lap: int, original_error: BaseException | None = None):
-        self.current_lap = current_lap
-        self.original_error = original_error
-        super().__init__(f"Error in __preloop__ on lap {current_lap}")
-
-
-class MainLoopError(Exception):
-    """Error raised when __loop__() fails."""
+    Catch this to handle any error from a Process lifecycle method.
     
-    def __init__(self, current_lap: int, original_error: BaseException | None = None):
-        self.current_lap = current_lap
-        self.original_error = original_error
-        super().__init__(f"Error in __loop__ on lap {current_lap}")
-
-
-class PostLoopError(Exception):
-    """Error raised when __postloop__() fails."""
+    Usage:
+        try:
+            result = process.result
+        except ProcessError as e:
+            print(f"Process failed: {e}")
+    """
     
-    def __init__(self, current_lap: int, original_error: BaseException | None = None):
-        self.current_lap = current_lap
+    def __init__(self, message: str, current_run: int = 0, original_error: BaseException | None = None):
+        self.current_run = current_run
         self.original_error = original_error
-        super().__init__(f"Error in __postloop__ on lap {current_lap}")
+        super().__init__(message)
 
 
-class OnFinishError(Exception):
+class PreRunError(ProcessError):
+    """Error raised when __prerun__() fails."""
+    
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __prerun__ on run {current_run}",
+            current_run,
+            original_error
+        )
+
+
+class RunError(ProcessError):
+    """Error raised when __run__() fails."""
+    
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __run__ on run {current_run}",
+            current_run,
+            original_error
+        )
+
+
+class PostRunError(ProcessError):
+    """Error raised when __postrun__() fails."""
+    
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __postrun__ on run {current_run}",
+            current_run,
+            original_error
+        )
+
+
+class OnFinishError(ProcessError):
     """Error raised when __onfinish__() fails."""
     
-    def __init__(self, current_lap: int, original_error: BaseException | None = None):
-        self.current_lap = current_lap
-        self.original_error = original_error
-        super().__init__(f"Error in __onfinish__ on lap {current_lap}")
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __onfinish__ on run {current_run}",
+            current_run,
+            original_error
+        )
 
 
-class ResultError(Exception):
+class ResultError(ProcessError):
     """Error raised when __result__() fails."""
     
-    def __init__(self, current_lap: int, original_error: BaseException | None = None):
-        self.current_lap = current_lap
-        self.original_error = original_error
-        super().__init__(f"Error in __result__ on lap {current_lap}")
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __result__ on run {current_run}",
+            current_run,
+            original_error
+        )
 
 
-class TimeoutError(Exception):
+class ErrorError(ProcessError):
+    """Error raised when __error__() fails."""
+    
+    def __init__(self, current_run: int, original_error: BaseException | None = None):
+        super().__init__(
+            f"Error in __error__ on run {current_run}",
+            current_run,
+            original_error
+        )
+
+
+class ProcessTimeoutError(ProcessError):
     """Error raised when a lifecycle section times out."""
     
-    def __init__(self, section: str, timeout: float, current_lap: int):
+    def __init__(self, section: str, timeout: float, current_run: int):
         self.section = section
         self.timeout = timeout
-        self.current_lap = current_lap
-        super().__init__(f"Timeout in {section} after {timeout}s on lap {current_lap}")
+        super().__init__(
+            f"Timeout in {section} after {timeout}s on run {current_run}",
+            current_run,
+            None
+        )

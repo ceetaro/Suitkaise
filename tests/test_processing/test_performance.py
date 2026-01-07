@@ -4,7 +4,7 @@
 import multiprocessing
 import pytest  # type: ignore
 
-from suitkaise.processing import Process, timesection
+from suitkaise.processing import Process
 from suitkaise import sktime
 
 
@@ -65,9 +65,9 @@ class TestPerformanceBasics:
         
         class QuickProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
             
             def __result__(self):
@@ -96,20 +96,20 @@ class TestPerformanceBasics:
         
         assert timer.mean is not None and timer.mean < 1.0, "Process startup too slow"
     
-    def test_loop_overhead(self, reporter):
-        """Measure overhead per loop iteration."""
+    def test_run_overhead(self, reporter):
+        """Measure overhead per run iteration."""
         
         print_benchmark_header(
-            "Loop Overhead",
-            "Time spent in processing infrastructure per loop iteration"
+            "Run Overhead",
+            "Time spent in processing infrastructure per run iteration"
         )
         
         class OverheadProcess(Process):
             def __init__(self):
-                self.config.num_loops = 100
+                self.config.runs = 100
                 self.iteration_count = 0
             
-            def __loop__(self):
+            def __run__(self):
                 self.iteration_count += 1  # Minimal work
             
             def __result__(self):
@@ -122,45 +122,42 @@ class TestPerformanceBasics:
         result = p.result
         elapsed = sktime.elapsed(start)
         
-        overhead_per_loop = elapsed / result
+        overhead_per_run = elapsed / result
         
         print_benchmark_row("Total iterations", str(result))
         print_benchmark_row("Total time", format_time(elapsed))
-        print_benchmark_row("Overhead per loop", format_time(overhead_per_loop))
-        print_benchmark_row("Loops per second", f"{result / elapsed:,.0f}")
+        print_benchmark_row("Overhead per run", format_time(overhead_per_run))
+        print_benchmark_row("Runs per second", f"{result / elapsed:,.0f}")
         
         reporter.add(f"  100 iterations in {format_time(elapsed)}")
-        reporter.add(f"  overhead per loop: {format_time(overhead_per_loop)}")
+        reporter.add(f"  overhead per run: {format_time(overhead_per_run)}")
         
         assert result == 100
     
-    def test_timesection_decorator_overhead(self, reporter):
-        """Measure overhead added by @timesection decorator."""
+    def test_auto_timing_overhead(self, reporter):
+        """Measure overhead added by auto-timing."""
         
         print_benchmark_header(
-            "@timesection Decorator Overhead",
+            "Auto-Timing Overhead",
             "Additional time cost when using timing instrumentation"
         )
         
-        NUM_LOOPS = 50
+        NUM_RUNS = 50
         
         class UntitmedProcess(Process):
             def __init__(self):
-                self.config.num_loops = NUM_LOOPS
+                self.config.runs = NUM_RUNS
             
-            def __loop__(self):
-                pass
-            
+            # No lifecycle methods defined = no auto-timing
             def __result__(self):
                 return "done"
         
         class TimedProcess(Process):
             def __init__(self):
-                self.config.num_loops = NUM_LOOPS
+                self.config.runs = NUM_RUNS
             
-            @timesection()
-            def __loop__(self):
-                pass
+            def __run__(self):
+                pass  # Defining __run__ enables auto-timing
             
             def __result__(self):
                 return "done"
@@ -182,18 +179,18 @@ class TestPerformanceBasics:
         timed_elapsed = sktime.elapsed(start)
         
         overhead = timed_elapsed - untimed_elapsed
-        overhead_per_loop = overhead / NUM_LOOPS
+        overhead_per_run = overhead / NUM_RUNS
         overhead_pct = (overhead / untimed_elapsed) * 100 if untimed_elapsed > 0 else 0
         
-        print_benchmark_row("Iterations", str(NUM_LOOPS))
-        print_benchmark_row("Without @timesection", format_time(untimed_elapsed))
-        print_benchmark_row("With @timesection", format_time(timed_elapsed))
+        print_benchmark_row("Iterations", str(NUM_RUNS))
+        print_benchmark_row("Without auto-timing", format_time(untimed_elapsed))
+        print_benchmark_row("With auto-timing", format_time(timed_elapsed))
         print_benchmark_row("Total overhead", format_time(overhead))
-        print_benchmark_row("Overhead per loop", format_time(overhead_per_loop))
+        print_benchmark_row("Overhead per run", format_time(overhead_per_run))
         print_benchmark_row("Overhead %", f"{overhead_pct:.1f}%")
         
-        reporter.add(f"  without decorator: {format_time(untimed_elapsed)}")
-        reporter.add(f"  with decorator: {format_time(timed_elapsed)}")
+        reporter.add(f"  without timing: {format_time(untimed_elapsed)}")
+        reporter.add(f"  with timing: {format_time(timed_elapsed)}")
         reporter.add(f"  overhead: {format_time(overhead)} ({overhead_pct:.1f}%)")
 
 
@@ -238,10 +235,10 @@ class TestComparisonWithMultiprocessing:
         # Processing approach (can use local class - our advantage!)
         class SumProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
                 self.total = 0
             
-            def __loop__(self):
+            def __run__(self):
                 self.total = sum(range(1000))
             
             def __result__(self):
@@ -313,9 +310,9 @@ class TestComparisonWithMultiprocessing:
             def __init__(self, worker_id):
                 self.worker_id = worker_id
                 self.work_duration = WORK_DURATION  # captured from closure!
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(self.work_duration)
             
             def __result__(self):
@@ -359,29 +356,29 @@ class TestComparisonWithMultiprocessing:
 class TestScalability:
     """Test scalability characteristics."""
     
-    def test_increasing_loop_counts(self, reporter):
-        """Measure how time scales with loop count."""
+    def test_increasing_run_counts(self, reporter):
+        """Measure how time scales with run count."""
         
         print_benchmark_header(
-            "Scalability: Loop Count",
-            "How execution time scales with number of loop iterations"
+            "Scalability: Run Count",
+            "How execution time scales with number of run iterations"
         )
         
         class ScalableProcess(Process):
-            def __init__(self, num_loops):
-                self.config.num_loops = num_loops
+            def __init__(self, num_runs):
+                self.config.runs = num_runs
                 self.count = 0
             
-            def __loop__(self):
+            def __run__(self):
                 self.count += 1
             
             def __result__(self):
                 return self.count
         
-        loop_counts = [10, 50, 100, 200]
+        run_counts = [10, 50, 100, 200]
         times = []
         
-        for count in loop_counts:
+        for count in run_counts:
             start = sktime.now()
             p = ScalableProcess(count)
             p.start()
@@ -390,14 +387,14 @@ class TestScalability:
             elapsed = sktime.elapsed(start)
             times.append(elapsed)
         
-        print(f"\n  {'Loops':<10} {'Total Time':>12} {'Per Loop':>12} {'Loops/sec':>12}")
+        print(f"\n  {'Runs':<10} {'Total Time':>12} {'Per Run':>12} {'Runs/sec':>12}")
         print(f"  {'-'*48}")
-        for count, elapsed in zip(loop_counts, times):
-            per_loop = elapsed / count
-            loops_per_sec = count / elapsed
-            print(f"  {count:<10} {format_time(elapsed):>12} {format_time(per_loop):>12} {loops_per_sec:>12,.0f}")
+        for count, elapsed in zip(run_counts, times):
+            per_run = elapsed / count
+            runs_per_sec = count / elapsed
+            print(f"  {count:<10} {format_time(elapsed):>12} {format_time(per_run):>12} {runs_per_sec:>12,.0f}")
         
-        reporter.add(f"  scaling test completed with loop counts: {loop_counts}")
+        reporter.add(f"  scaling test completed with run counts: {run_counts}")
         
         # Verify results are reasonable (should scale roughly linearly)
         assert times[-1] < times[0] * 100  # Not exponential growth
@@ -414,9 +411,9 @@ class TestScalability:
         
         class QuickWorker(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(WORK_TIME)
             
             def __result__(self):
@@ -482,9 +479,9 @@ class TestScalability:
         # Processing module
         class Worker(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(WORK_TIME)
             
             def __result__(self):
@@ -580,9 +577,9 @@ class TestMemoryAndResources:
         
         class CleanupProcess(Process):
             def __init__(self):
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
             
             def __result__(self):
@@ -621,7 +618,7 @@ class TestMemoryAndResources:
         )
         
         class InfiniteProcess(Process):
-            def __loop__(self):
+            def __run__(self):
                 sktime.sleep(0.1)
         
         NUM_PROCESSES = 5
@@ -676,12 +673,12 @@ def print_final_summary():
      - Subprocess spawn overhead
      - Fixed cost regardless of work done
   
-  2. Loop Overhead (~1ms/loop):
+  2. Run Overhead (~1ms/run):
      - Per-iteration cost of processing infrastructure
      - Includes lifecycle method dispatching
-     - Amortized over many loops
+     - Amortized over many runs
   
-  3. @timesection Overhead (negligible):
+  3. Auto-Timing Overhead (negligible):
      - Within measurement noise
      - Safe to use everywhere
   

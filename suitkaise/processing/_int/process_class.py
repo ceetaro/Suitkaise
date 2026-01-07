@@ -2,7 +2,7 @@
 Process base class for subprocess-based task execution.
 
 Users inherit from Process, define lifecycle methods, and the engine
-handles looping, timing, error recovery, and subprocess management.
+handles running, timing, error recovery, and subprocess management.
 """
 
 import multiprocessing
@@ -14,6 +14,37 @@ from .timers import ProcessTimers
 if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
     from multiprocessing import Queue
+    from suitkaise.sktime import Timer
+
+
+class TimedMethod:
+    """
+    Wrapper for lifecycle methods that provides a .timer attribute.
+    
+    Usage:
+        p = MyProcess()
+        p.start()
+        p.wait()
+        
+        # Access timing data
+        print(p.__run__.timer.mean)
+        print(p.__prerun__.timer.total)
+    """
+    
+    def __init__(self, method, process: "Process", timer_name: str):
+        self._method = method
+        self._process = process
+        self._timer_name = timer_name
+    
+    def __call__(self, *args, **kwargs):
+        return self._method(*args, **kwargs)
+    
+    @property
+    def timer(self) -> "Timer | None":
+        """Get the timer for this method, or None if not yet timed."""
+        if self._process.timers is None:
+            return None
+        return getattr(self._process.timers, self._timer_name, None)
 
 
 class Process:
@@ -21,9 +52,9 @@ class Process:
     Base class for subprocess-based process execution.
     
     Inherit from this class and implement lifecycle methods:
-    - __preloop__(): Called before each loop iteration
-    - __loop__(): Main work (required) - called each iteration
-    - __postloop__(): Called after each loop iteration  
+    - __prerun__(): Called before each run iteration
+    - __run__(): Main work (required) - called each iteration
+    - __postrun__(): Called after each run iteration  
     - __onfinish__(): Called when process ends (stop/limit reached)
     - __result__(): Return data when process completes
     - __error__(): Handle errors when all lives exhausted
@@ -32,9 +63,9 @@ class Process:
         class MyProcess(Process):
             def __init__(self):
                 self.counter = 0
-                self.config.num_loops = 10
+                self.config.runs = 10
             
-            def __loop__(self):
+            def __run__(self):
                 self.counter += 1
             
             def __result__(self):
@@ -44,13 +75,17 @@ class Process:
         process.start()
         process.wait()
         result = process.result
+        
+        # Access timing (automatic for any lifecycle method you define)
+        print(process.__run__.timer.mean)
     """
     
     # Class-level attribute declarations for type checking
     config: ProcessConfig
     timers: ProcessTimers | None
+    timer: "Timer | None"  # Alias for full_run timer
     error: BaseException | None
-    _current_lap: int
+    _current_run: int
     _start_time: float | None
     _stop_event: "Event | None"
     _result_queue: "Queue[Any] | None"
@@ -60,6 +95,13 @@ class Process:
     
     # Class-level flag to track if __init_subclass__ should wrap __init__
     _is_base_class = True
+    
+    # Internal attribute names (used for serialization filtering)
+    _INTERNAL_ATTRS = frozenset({
+        'config', 'timers', 'error', '_current_run', '_start_time',
+        '_stop_event', '_result_queue', '_subprocess', '_result',
+        '_has_result', '_timed_methods',
+    })
     
     def __init_subclass__(cls, **kwargs):
         """
@@ -150,7 +192,7 @@ class Process:
     
     # Lifecycle method names that need to be captured during serialization
     _LIFECYCLE_METHODS = (
-        '__preloop__', '__loop__', '__postloop__', 
+        '__prerun__', '__run__', '__postrun__', 
         '__onfinish__', '__result__', '__error__'
     )
     
@@ -188,8 +230,16 @@ class Process:
             # Include class variables, but not inherited stuff
             class_attrs[name] = value
         
+        # Prepare instance dict, excluding TimedMethod wrappers
+        # (they'll be recreated on deserialization)
+        instance_dict = {}
+        for key, value in instance.__dict__.items():
+            if isinstance(value, TimedMethod):
+                continue
+            instance_dict[key] = value
+        
         state = {
-            'instance_dict': instance.__dict__.copy(),
+            'instance_dict': instance_dict,
             'class_name': cls.__name__,
             'lifecycle_methods': lifecycle_methods,
             'class_attrs': class_attrs,
@@ -234,6 +284,9 @@ class Process:
         
         # Restore instance state directly (includes config, timers, etc.)
         obj.__dict__.update(state['instance_dict'])
+        
+        # Set up timed method wrappers
+        Process._setup_timed_methods(obj)
         
         # If user defined their own __deserialize__, apply it now
         if state.get('has_user_serialize') and user_deserialize is not None:
@@ -293,11 +346,11 @@ class Process:
         # Configuration with defaults
         instance.config = ProcessConfig()
         
-        # Timers container (created lazily by @timethis decorator)
+        # Timers container (created when needed)
         instance.timers = None
         
         # Runtime state
-        instance._current_lap = 0
+        instance._current_run = 0
         instance._start_time = None
         
         # Error state (set when error occurs, used by __error__)
@@ -313,21 +366,52 @@ class Process:
         # Result storage (populated after process completes)
         instance._result = None
         instance._has_result = False
+        
+        # Set up timed method wrappers
+        Process._setup_timed_methods(instance)
+    
+    @staticmethod
+    def _setup_timed_methods(instance: "Process") -> None:
+        """
+        Create TimedMethod wrappers for user-defined lifecycle methods.
+        
+        This enables access like process.__run__.timer
+        """
+        cls = instance.__class__
+        
+        method_to_timer = {
+            '__prerun__': 'prerun',
+            '__run__': 'run',
+            '__postrun__': 'postrun',
+            '__onfinish__': 'onfinish',
+            '__result__': 'result',
+            '__error__': 'error',
+        }
+        
+        for method_name, timer_name in method_to_timer.items():
+            # Check if user defined this method (not just inherited from Process)
+            if method_name in cls.__dict__:
+                # Get the actual method
+                method = getattr(instance, method_name)
+                # Create wrapper
+                wrapper = TimedMethod(method, instance, timer_name)
+                # Store as instance attribute (shadows class method)
+                setattr(instance, method_name, wrapper)
     
     # =========================================================================
     # Lifecycle methods (override these in subclass)
     # =========================================================================
     
-    def __preloop__(self) -> None:
-        """Called before each __loop__() iteration. Override in subclass."""
+    def __prerun__(self) -> None:
+        """Called before each __run__() iteration. Override in subclass."""
         pass
     
-    def __loop__(self) -> None:
+    def __run__(self) -> None:
         """Main work method. Called each iteration. Override in subclass."""
         pass
     
-    def __postloop__(self) -> None:
-        """Called after each __loop__() iteration. Override in subclass."""
+    def __postrun__(self) -> None:
+        """Called after each __run__() iteration. Override in subclass."""
         pass
     
     def __onfinish__(self) -> None:
@@ -356,11 +440,15 @@ class Process:
         Start the process in a new subprocess.
         
         Serializes this Process object, spawns a subprocess, and runs
-        the engine loop there.
+        the engine there.
         """
         # Import here to avoid circular imports
         from .engine import _engine_main
         from suitkaise import cerial
+        
+        # Ensure timers exist
+        if self.timers is None:
+            self.timers = ProcessTimers()
         
         # Serialize current state
         serialized = cerial.serialize(self)
@@ -374,7 +462,7 @@ class Process:
         
         # Record start time
         from suitkaise import sktime
-        self._start_time = sktime.now()
+        self._start_time = sktime.time()
         
         # Spawn subprocess
         self._subprocess = multiprocessing.Process(
@@ -387,11 +475,11 @@ class Process:
         """
         Signal the process to stop gracefully.
         
+        Does NOT block - returns immediately after setting the stop signal.
         The process will finish its current section, run __onfinish__(),
         and send its result back.
         
-        If called from inside the process (in a lifecycle method),
-        this sets the stop signal that the engine checks between sections.
+        Use wait() after stop() if you need to block until finished.
         """
         if self._stop_event is not None:
             self._stop_event.set()
@@ -400,6 +488,7 @@ class Process:
         """
         Forcefully terminate the process immediately.
         
+        Bypasses the lives system - process is killed immediately.
         No cleanup, no __onfinish__, no result. The process is just killed.
         """
         if self._subprocess is not None and self._subprocess.is_alive():
@@ -414,14 +503,16 @@ class Process:
         """
         Wait for the process to finish.
         
+        Blocks until the process completes successfully. If the process
+        crashes and has lives remaining, wait() continues blocking during
+        the restart - it only returns when the process finishes (success
+        or out of lives).
+        
         Args:
             timeout: Maximum seconds to wait. None = wait forever.
         
         Returns:
             True if process finished, False if timeout reached.
-        
-        Raises:
-            RuntimeError: If called from inside the process.
         """
         if self._subprocess is None:
             return True
@@ -435,12 +526,14 @@ class Process:
         Get the result from the process.
         
         Blocks until the process finishes if not already done.
+        If the process crashes and has lives remaining, this continues
+        blocking during restarts.
         
         Returns:
             Whatever __result__() returned.
         
         Raises:
-            The error if the process failed (after exhausting lives).
+            ProcessError: If the process failed (after exhausting lives).
         """
         if self._has_result:
             # Already retrieved
@@ -465,6 +558,12 @@ class Process:
             # Give a small timeout to account for message transit time
             message = self._result_queue.get(timeout=1.0)
             
+            # Update timers from subprocess
+            if 'timers' in message and message['timers'] is not None:
+                self.timers = cerial.deserialize(message['timers'])
+                # Re-setup timed methods to point to new timers
+                Process._setup_timed_methods(self)
+            
             if message["type"] == "error":
                 self._result = cerial.deserialize(message["data"])
                 self._has_result = True
@@ -478,9 +577,21 @@ class Process:
             return None
     
     @property
-    def current_lap(self) -> int:
-        """Current loop iteration number (0-indexed)."""
-        return self._current_lap
+    def timer(self) -> "Timer | None":
+        """
+        Get the aggregate timer for full run iterations.
+        
+        This timer accumulates the total time for each complete iteration
+        (prerun + run + postrun combined).
+        """
+        if self.timers is None:
+            return None
+        return self.timers.full_run
+    
+    @property
+    def current_run(self) -> int:
+        """Current run iteration number (0-indexed)."""
+        return self._current_run
     
     @property
     def is_alive(self) -> bool:

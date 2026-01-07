@@ -15,9 +15,9 @@ class TestMultipleProcesses:
         class Worker(Process):
             def __init__(self, worker_id):
                 self.worker_id = worker_id
-                self.config.num_loops = 5
+                self.config.runs = 5
             
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(0.01)  # Simulate work
             
             def __result__(self):
@@ -61,9 +61,9 @@ class TestMultipleProcesses:
         class SleepWorker(Process):
             def __init__(self, sleep_time):
                 self.sleep_time = sleep_time
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(self.sleep_time)
             
             def __result__(self):
@@ -104,9 +104,9 @@ class TestMultipleProcesses:
             def __init__(self, worker_id, duration):
                 self.worker_id = worker_id
                 self.duration = duration
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(self.duration)
             
             def __result__(self):
@@ -145,10 +145,10 @@ class TestMultipleProcesses:
             def __init__(self, worker_id, duration):
                 self.worker_id = worker_id
                 self.duration = duration
-                self.config.num_loops = 1
+                self.config.runs = 1
                 self.finish_time = None
             
-            def __loop__(self):
+            def __run__(self):
                 time.sleep(self.duration)
             
             def __result__(self):
@@ -183,9 +183,9 @@ class TestMultipleProcesses:
             def __init__(self, operation, value):
                 self.operation = operation
                 self.value = value
-                self.config.num_loops = 1
+                self.config.runs = 1
             
-            def __loop__(self):
+            def __run__(self):
                 pass
             
             def __result__(self):

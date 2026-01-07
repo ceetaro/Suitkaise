@@ -9,7 +9,7 @@ import platform
 import threading
 from typing import Callable, TypeVar, Any
 
-from .errors import TimeoutError as ProcessTimeoutError
+from .errors import ProcessTimeoutError
 
 T = TypeVar('T')
 
@@ -18,7 +18,7 @@ def _signal_based_timeout(
     func: Callable[[], T],
     timeout: float | None,
     section: str,
-    current_lap: int
+    current_run: int
 ) -> T:
     """
     Run function with signal-based timeout (Unix only).
@@ -32,7 +32,7 @@ def _signal_based_timeout(
     import signal
     
     def handler(signum, frame):
-        raise ProcessTimeoutError(section, timeout, current_lap)
+        raise ProcessTimeoutError(section, timeout, current_run)
     
     # Save old handler and set new one
     old_handler = signal.signal(signal.SIGALRM, handler)
@@ -52,7 +52,7 @@ def _thread_based_timeout(
     func: Callable[[], T],
     timeout: float | None,
     section: str,
-    current_lap: int
+    current_run: int
 ) -> T:
     """
     Run function with thread-based timeout (cross-platform fallback).
@@ -88,7 +88,7 @@ def _thread_based_timeout(
     
     if not finished:
         # Thread is still running - we can't kill it, but we know timeout occurred
-        raise ProcessTimeoutError(section, timeout, current_lap)
+        raise ProcessTimeoutError(section, timeout, current_run)
     
     # Thread finished - check for exception
     if exception[0] is not None:
