@@ -2,33 +2,41 @@
 Suitkaise Processing - Subprocess-based task execution.
 
 Usage:
-    from suitkaise.processing import Process
+    from suitkaise.processing import Process, Pool
     
     class MyWorker(Process):
-        def __init__(self):
-            self.data = []
-            self.config.runs = 100
+        def __init__(self, value):
+            self.value = value
         
         def __run__(self):
-            self.data.append(process_item())
+            self.result_value = self.value * 2
         
         def __result__(self):
-            return self.data
+            return self.result_value
     
-    worker = MyWorker()
+    # Single process
+    worker = MyWorker(5)
     worker.start()
     worker.wait()
+    result = worker.result()  # 10
     
-    # Access results
-    result = worker.result
+    # Batch processing with Pool
+    pool = Pool(workers=8)
+    results = pool.map(MyWorker, [1, 2, 3, 4, 5])
+    # results = [2, 4, 6, 8, 10]
     
     # Access timing (automatic for any lifecycle method)
     print(worker.__run__.timer.mean)
 """
 
 from .api import (
-    # Main class
+    # Main classes
     Process,
+    Pool,
+    
+    # Pool helpers
+    AsyncResult,
+    StarModifier,
     
     # Configuration
     ProcessConfig,
@@ -50,6 +58,9 @@ from .api import (
 
 __all__ = [
     'Process',
+    'Pool',
+    'AsyncResult',
+    'StarModifier',
     'ProcessConfig',
     'TimeoutConfig',
     'ProcessTimers',

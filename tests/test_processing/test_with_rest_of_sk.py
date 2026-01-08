@@ -32,7 +32,7 @@ class TestWithSktime:
         p = TimedWorkProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  custom timer measurements: {result['num_times']}")
         reporter.add(f"  mean time: {result['mean']:.4f}s")
@@ -73,7 +73,7 @@ class TestWithSktime:
         p = AnalyzedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  run mean: {result['run_mean']:.4f}s")
         reporter.add(f"  run min: {result['run_min']:.4f}s")
@@ -108,7 +108,7 @@ class TestWithSktime:
         p.start()
         p.wait()
         elapsed = sktime.elapsed(start)
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  yawn threshold: 3")
         reporter.add(f"  runs: 10")
@@ -147,7 +147,7 @@ class TestWithSktime:
         p = DurationTrackingProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  run durations: {[f'{d:.4f}s' for d in result['durations']]}")
         reporter.add(f"  mean duration: {result['mean_duration']:.4f}s")
@@ -194,7 +194,7 @@ class TestRealWorldScenarios:
         p.start()
         p.wait()
         elapsed = sktime.elapsed(start)
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  batch size: {result['items_per_batch']}")
         reporter.add(f"  batches processed: {result['batch_count']}")
@@ -232,7 +232,7 @@ class TestRealWorldScenarios:
         p = BackoffProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  configured lives: 5")
         reporter.add(f"  result: {result}")
@@ -269,7 +269,7 @@ class TestRealWorldScenarios:
         p = ProgressProcess(total_items=10)
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  total items: {result['total']}")
         reporter.add(f"  processed: {result['processed']}")
@@ -323,7 +323,7 @@ class TestRealWorldScenarios:
             w.wait()
         elapsed = sktime.elapsed(start)
         
-        results = [w.result for w in workers]
+        results = [w.result() for w in workers]
         
         reporter.add(f"  tasks: {len(tasks)}")
         reporter.add(f"  total time: {elapsed:.2f}s")

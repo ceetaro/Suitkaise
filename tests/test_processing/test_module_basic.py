@@ -151,7 +151,7 @@ class TestLifecycleMethods:
         p = CounterProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs configured: 3")
         reporter.add(f"  result (count): {result}")
@@ -184,7 +184,7 @@ class TestLifecycleMethods:
         p = OrderProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  execution order: {result}")
         
@@ -209,7 +209,7 @@ class TestLifecycleMethods:
         p = SelfStopProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  stopped at count: {result}")
         
@@ -228,7 +228,7 @@ class TestLifecycleMethods:
         p = NoResultProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  result: {result}")
         
@@ -257,7 +257,7 @@ class TestErrorHandling:
         p.wait()
         
         with pytest.raises(RunError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         reporter.add(f"  original error: {type(exc_info.value.original_error).__name__}")
@@ -282,7 +282,7 @@ class TestErrorHandling:
         p.wait()
         
         with pytest.raises(PreRunError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         reporter.add(f"  original error: {type(exc_info.value.original_error).__name__}")
@@ -305,7 +305,7 @@ class TestErrorHandling:
         
         # Can catch with ProcessError
         with pytest.raises(ProcessError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  caught with ProcessError: {type(exc_info.value).__name__}")
         assert isinstance(exc_info.value, ProcessError)
@@ -332,7 +332,7 @@ class TestErrorHandling:
         p = RetryProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  configured lives: 3")
         reporter.add(f"  result: {result}")
@@ -361,7 +361,7 @@ class TestErrorHandling:
         
         # Result should raise since __error__ returns something that gets treated as error
         with pytest.raises(Exception):
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  __error__() was called with self.error set")
 
@@ -450,7 +450,7 @@ class TestControlMethods:
         time.sleep(0.1)
         p.stop()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  result: {result}")
         
@@ -484,7 +484,7 @@ class TestAutoTiming:
         p = TimedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  timers exists: {result['timers_exists']}")
         reporter.add(f"  run timer exists: {result['run_timer_exists']}")
@@ -521,7 +521,7 @@ class TestAutoTiming:
         p = MultiTimedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  prerun times: {result['prerun_times']}")
         reporter.add(f"  run times: {result['run_times']}")
@@ -549,7 +549,7 @@ class TestAutoTiming:
         p = TimerAccessProcess()
         p.start()
         p.wait()
-        _ = p.result
+        _ = p.result()
         
         # Access timer via method attribute
         run_timer = p.__run__.timer
@@ -582,7 +582,7 @@ class TestAutoTiming:
         p = AggregateProcess()
         p.start()
         p.wait()
-        _ = p.result
+        _ = p.result()
         
         full_timer = p.timer
         
@@ -618,7 +618,7 @@ class TestConfigLimits:
         p = LimitedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs: 5")
         reporter.add(f"  actual count: {result}")
@@ -645,7 +645,7 @@ class TestConfigLimits:
         p.start()
         p.wait()
         elapsed = time.time() - start
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  join_in: 0.3s")
         reporter.add(f"  actual elapsed: {elapsed:.2f}s")
@@ -680,7 +680,7 @@ class TestProperties:
         p = RunProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs seen: {result}")
         

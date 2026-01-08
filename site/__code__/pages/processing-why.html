@@ -10,6 +10,356 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>why</h1>
-    <p>Processing module - why content coming soon...</p>
+    <h1>Why <code>processing</code>?</h1>
+
+    <p>You have 2 choices:</p>
+
+    <ol>
+        <li>Accept that Python is single-threaded</li>
+        <li>Deal with <code>multiprocessing</code> bullshit</li>
+    </ol>
+
+    <p>As CPUs get more and more cores, this answer essentially becomes number 2.</p>
+
+    <p>Your program that gets away with 1 core usage when the high end CPUs had 4 cores...</p>
+
+    <p>...now has to deal with 24 core laptops.</p>
+
+    <p>So, you have to turn to <code>multiprocessing</code> or a similar library for computational power.</p>
+
+    <p>And now you have to deal with so much more BS.</p><br>
+
+    <details>
+        <summary><strong><code>PicklingError: Can't pickle your object, hahahahaha! loser.</code></strong></summary>
+
+        <p>Everything passed from one process to another must be serializable, usually via <code>pickle</code>.</p>
+
+        <p>But this means that so many essential objects in Python just can't be passed to a different process.</p>
+
+        <p>Even if you use serializers like <code>cloudpickle</code> or <code>dill</code>, you still have to deal with locks, loggers, and other objects that are not serializable.</p>
+
+        <p>So you either have to tiptoe around them and not use them, or manually serialize and deserialize them. Neither are fun.</p>
+
+        <p>With <code>processing</code>, you don't have to deal with any of that. <code>cerial</code> handles all of that for you, opening up the road to making complex multi-process code.</p>
+
+        <h3>What is <code>cerial</code>?</h3>
+
+        <p><code>cerial</code> is a serialization engine, and another module in the <code>suitkaise</code> library.</p>
+
+        <p>It is built off of base <code>pickle</code>, with specialized handlers for essentially all of the complex objects that other serializers cannot handle.</p>
+
+        <p>To learn more, navigate to the <code>cerial</code> module page using the sidebar.</p>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Spaghetti code</strong></summary>
+
+        <p>Standard <code>multiprocessing</code> code is a mess, forcing you to put setup, work, cleanup, looping logic, error handling, and more all into one giant function. Everything just gets hard to manage and starts blending together in our minds. Lots of floating variables, conditional loops, and other things that just cloud everything up.</p>
+
+        <p>If only there was an object, that all Python devs use on a daily basis, that organizes complex code with several different pieces into one cohesive unit...</p>
+
+        <p>Oh, wait...</p>
+
+        <p>Classes exist.</p>
+
+        <p><code>processing</code> includes the <code>Process</code> class.</p>
+
+        <p>Inherit from this class like you would inherit <code>ABC</code> from <code>abc</code>.</p>
+
+<pre><code class="language-python">from abc import ABC
+
+class MyAbstractClass(ABC):
+    ...</code></pre>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+    ...</code></pre>
+
+        <p>And get access to an entire lifecycle of methods to easily separate your code into sensible pieces.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+
+        # super().__init__() is called automatically for you
+        # setup your process here
+        # initialize attributes
+        # configure Process attributes
+
+    def __prerun__(self):
+
+        # here, you can setup before the main part
+        # connect to databases, make API calls, read files...
+
+    def __run__(self):
+
+        # this is the main part
+        # you can just write your code here
+        # it repeats for you, no need to write looping code
+
+    def __postrun__(self):
+
+        # this is where you clean up your work for this iteration
+
+    def __onfinish__(self):
+
+        # this is when you clean up the process before it exits
+
+    def __result__(self):
+
+        # this returns the result of the process
+        # don't have to worry about confusing mid-function returns
+        # store your results as instance attributes
+        # and return them here
+
+    def __error__(self):
+
+        # this is __result__() when an error occurs
+        # you can return a result here, or just raise an error</code></pre>
+
+        <p>Best part? Once you code the class with at least the <code>__run__</code> method, you can just use super simple syntax to run it.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class DoubleThisNumber(Process):
+
+    def __init__(self, starting_num, number_of_doubles):
+
+        self.starting_num = 1
+        self.config.runs = number_of_doubles
+
+
+    def __run__(self):
+        
+        self.starting_num *= 2
+
+    def __result__(self):
+
+        return self.starting_num
+
+
+doubler = DoubleThisNumber(1, 5)
+doubler.start()
+
+doubler.wait()
+result = doubler.result  # == 32</code></pre>
+
+        <p>There are also other methods! To learn more, head to the <code>how to use</code> page.</p>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Queue management, yay yippie I love queues (said no one ever)</strong></summary>
+
+        <p>Creating queues.</p>
+
+        <p>Making sure that they connect how you want them to.</p>
+
+        <p>Putting data in them. Getting data out of them.</p>
+
+        <p>Setting up timeouts so that they don't freeze things up.</p>
+
+        <p>Having to manually clear out all of them so you don't get deadlocked.</p>
+
+        <p>None of this is enjoyable, per se.</p>
+
+        <h3><code>tell()</code> and <code>listen()</code></h3>
+
+        <p><code>tell()</code> and <code>listen()</code> are methods you inherit from <code>Process</code> that allow you to send and receive data between the parent and subprocess.</p>
+
+        <p>It's as simple as this.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+        
+        # ...
+
+    def __run__(self):
+
+        thing_to_do = self.listen(timeout=1.0)
+
+        did_thing_succeed = do_thing(thing_to_do)
+
+        self.tell(did_thing_succeed)
+
+
+
+p = MyProcess()
+p.start()
+
+if user_wants_to_change_theme:
+    p.tell(f"change the UI theme to {new_theme}")
+
+    theme_changed = p.listen(timeout=1.0)
+
+    if not theme_changed:
+        p.stop()
+
+p.wait()
+
+try:
+    current_theme_data = p.result
+except ProcessError as e:
+    print(f"Process failed: {e}")
+    current_theme_data = None</code></pre>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Retries</strong></summary>
+
+        <p>Usually, you have to write a lot of code to handle retries. You have to let the process fail, get information that it crashed, and then restart it manually.</p>
+
+        <p>With <code>processing</code>, you can just set the <code>lives</code> config to a number greater than 1, and the process will retry itself if it fails, keeping all progress except progress from the failed iteration.</p>
+
+        <p>So, if something ran for 1000 runs and then crashed, it won't have to rerun the first 999 times. The engine will just reattempt the last run from <code>__prerun__</code> onwards.</p>
+
+        <p>If the process fails too many times and runs out of <code>lives</code>, it will automatically call <code>__error__()</code> and return an error, plus whatever else you want to return as a result in the failing state.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+        self.config.lives = 3</code></pre>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Timing is busy work</strong></summary>
+
+        <p>Want to know how long something took to run in a process?</p>
+
+<pre><code class="language-python">import time
+
+# for everything you need to time...
+start_time = time.time()
+do_first_thing()
+end_time = time.time()
+
+time_taken = end_time - start_time
+
+first_thing_times.append(time_taken)
+
+# ...
+second_thing_times.append(time_taken)
+third_thing_times.append(time_taken)
+
+return result, (first_thing_times, second_thing_times, third_thing_times)</code></pre>
+
+        <p>I don't like having to do this. I'm assuming you don't either.</p>
+
+        <hr>
+
+        <p>Say you implement the lifecycle methods in your process.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __prerun__(self):
+        # ...
+
+    def __run__(self):
+        # ...
+
+    def __postrun__(self):
+        # ...
+
+    def __onfinish__(self):
+        # ...
+
+    def __result__(self):
+        # ...
+
+    def __error__(self):
+        # ...
+
+p = MyProcess()
+p.start()
+
+if something:
+    p.stop()
+
+p.wait()
+
+# access times
+prerun_timer = p.__prerun__.timer
+run_timer = p.__run__.timer
+postrun_timer = p.__postrun__.timer
+onfinish_timer = p.__onfinish__.timer
+result_timer = p.__result__.timer
+error_timer = p.__error__.timer
+
+# combined prerun, run, and postrun times for each iteration
+all_3_combined = p.timer</code></pre>
+
+        <p>Timers act just like <code>Timer</code> objects from <code>sktime</code>, another <code>suitkaise</code> module.</p>
+
+        <p>For more information on timers, head to the <code>sktime</code> module page.</p>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Adding in timeouts</strong></summary>
+
+        <p>Adding in timeouts to a real program is very nuanced/difficult.</p>
+
+        <p>First off, you need to actually be able to interrupt blocking code — something that changes depending on the platform the program is running on.</p>
+
+        <p>If you're on Mac or Linux, you can use <code>SIGALRM</code> to interrupt blocking code.</p>
+
+        <p>If you're on Windows, you need to use a thread-based timeout.</p>
+
+        <p>Then, you have to set up timers manually track if the timeout was reached.</p>
+
+        <p>It sounds simple, but in reality it is anything but.</p>
+
+        <p>To save you time, <code>Process</code> allows you to easily set timeouts for each lifecycle method in one line by updating the <code>config</code> attribute.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+
+        self.config.timeouts.prerun = 5.0
+        self.config.timeouts.run = 10.0
+        self.config.timeouts.postrun = 5.0
+        self.config.timeouts.onfinish = 10.0
+        self.config.timeouts.result = 2.0
+        self.config.timeouts.error = 1.0</code></pre>
+
+        <p>This will automatically raise a <code>ProcessTimeoutError</code> if the timeout is reached as well.</p>
+
+    </details><br>
+
+    <details>
+        <summary><strong>Error handling</strong></summary>
+
+        <p>We both know that error handling is a necessary evil.</p>
+
+        <p>So <code>Process</code> raises custom errors depending on the section that the error occurred in, wrapping the original error so you can see what actually happened when.</p>
+
+        <p>They all inherit from a <code>ProcessError</code> class, making it easy to catch all process errors with a single <code>except ProcessError</code> block.</p>
+
+<pre><code class="language-python">try:
+    result = p.result
+
+except ProcessError as e:
+
+    # e is a ProcessError
+    print(f"Process failed: {e}")
+    print(f"Original error: {e.original_error}")
+    print(f"Run number: {e.current_run}")</code></pre>
+
+    </details>
+
 </section>

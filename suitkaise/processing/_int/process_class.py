@@ -6,6 +6,7 @@ handles running, timing, error recovery, and subprocess management.
 """
 
 import multiprocessing
+import queue as queue_module
 from typing import Any, TYPE_CHECKING
 
 from .config import ProcessConfig
@@ -89,6 +90,8 @@ class Process:
     _start_time: float | None
     _stop_event: "Event | None"
     _result_queue: "Queue[Any] | None"
+    _tell_queue: "Queue[Any] | None"  # Parent → Child communication
+    _listen_queue: "Queue[Any] | None"  # Child → Parent communication
     _subprocess: multiprocessing.Process | None
     _result: Any
     _has_result: bool
@@ -99,8 +102,8 @@ class Process:
     # Internal attribute names (used for serialization filtering)
     _INTERNAL_ATTRS = frozenset({
         'config', 'timers', 'error', '_current_run', '_start_time',
-        '_stop_event', '_result_queue', '_subprocess', '_result',
-        '_has_result', '_timed_methods',
+        '_stop_event', '_result_queue', '_tell_queue', '_listen_queue',
+        '_subprocess', '_result', '_has_result', '_timed_methods',
     })
     
     def __init_subclass__(cls, **kwargs):
@@ -359,6 +362,8 @@ class Process:
         # Communication primitives (created on start())
         instance._stop_event = None
         instance._result_queue = None
+        instance._tell_queue = None  # Parent → Child
+        instance._listen_queue = None  # Child → Parent
         
         # Subprocess handle
         instance._subprocess = None
@@ -459,6 +464,8 @@ class Process:
         # Create communication primitives
         self._stop_event = multiprocessing.Event()
         self._result_queue = multiprocessing.Queue()
+        self._tell_queue = multiprocessing.Queue()  # Parent → Child
+        self._listen_queue = multiprocessing.Queue()  # Child → Parent
         
         # Record start time
         from suitkaise import sktime
@@ -467,7 +474,8 @@ class Process:
         # Spawn subprocess
         self._subprocess = multiprocessing.Process(
             target=_engine_main,
-            args=(serialized, self._stop_event, self._result_queue, original_state)
+            args=(serialized, self._stop_event, self._result_queue, 
+                  original_state, self._tell_queue, self._listen_queue)
         )
         self._subprocess.start()
     
@@ -517,10 +525,53 @@ class Process:
         if self._subprocess is None:
             return True
         
+        # Must drain result queue BEFORE waiting for subprocess
+        # Otherwise deadlock: subprocess can't exit until queue is drained,
+        # but we can't drain until subprocess exits
+        self._drain_result_queue(timeout)
+        
         self._subprocess.join(timeout=timeout)
         return not self._subprocess.is_alive()
     
-    @property
+    def _drain_result_queue(self, timeout: float | None = None) -> None:
+        """
+        Read result from queue and store internally.
+        
+        This allows the subprocess's QueueFeederThread to complete,
+        which allows the subprocess to exit cleanly.
+        """
+        if self._has_result or self._result_queue is None:
+            return
+        
+        from suitkaise import cerial
+        import queue as queue_module
+        
+        try:
+            # Use short timeout for polling - subprocess may still be producing
+            message = self._result_queue.get(timeout=timeout if timeout else 1.0)
+            
+            # Update timers from subprocess
+            if 'timers' in message and message['timers'] is not None:
+                self.timers = cerial.deserialize(message['timers'])
+                Process._setup_timed_methods(self)
+            
+            if message["type"] == "error":
+                error_data = cerial.deserialize(message["data"])
+                # If __error__() returned a non-exception, wrap it
+                if isinstance(error_data, BaseException):
+                    self._result = error_data
+                else:
+                    # Create a generic ProcessError wrapping the error info
+                    from .errors import ProcessError
+                    self._result = ProcessError(f"Process failed: {error_data}")
+            else:
+                self._result = cerial.deserialize(message["data"])
+            
+            self._has_result = True
+        except queue_module.Empty:
+            # No result yet - subprocess may still be running
+            pass
+    
     def result(self) -> Any:
         """
         Get the result from the process.
@@ -535,45 +586,55 @@ class Process:
         Raises:
             ProcessError: If the process failed (after exhausting lives).
         """
+        # Wait drains the queue and stores result
+        self.wait()
+        
         if self._has_result:
-            # Already retrieved
             if isinstance(self._result, BaseException):
                 raise self._result
             return self._result
         
-        # Wait for result from queue
-        if self._result_queue is None:
-            return None
+        # No result retrieved - subprocess may have crashed silently
+        return None
+    
+    def tell(self, data: Any) -> None:
+        """
+        Send data to the subprocess.
         
-        # Wait for process to finish first
-        self.wait()
+        If the subprocess calls listen(), it will receive this data.
+        This method is non-blocking - returns immediately after queuing the data.
         
-        # Get result from queue
-        # Note: Don't use queue.empty() - it's unreliable in multiprocessing.
-        # The message might be in transit even after wait() returns.
+        Args:
+            data: Any serializable data to send to the subprocess.
+        """
+        if self._tell_queue is None:
+            raise RuntimeError("Cannot tell() - process not started")
+        
         from suitkaise import cerial
-        import queue as queue_module
+        serialized = cerial.serialize(data)
+        self._tell_queue.put(serialized)
+    
+    def listen(self, timeout: float | None = None) -> Any:
+        """
+        Receive data from the subprocess.
+        
+        Blocks until data is received from the subprocess via tell().
+        
+        Args:
+            timeout: Maximum seconds to wait. None = wait forever.
+        
+        Returns:
+            The data sent by the subprocess, or None if timeout reached.
+        """
+        if self._listen_queue is None:
+            raise RuntimeError("Cannot listen() - process not started")
+        
+        from suitkaise import cerial
         
         try:
-            # Give a small timeout to account for message transit time
-            message = self._result_queue.get(timeout=1.0)
-            
-            # Update timers from subprocess
-            if 'timers' in message and message['timers'] is not None:
-                self.timers = cerial.deserialize(message['timers'])
-                # Re-setup timed methods to point to new timers
-                Process._setup_timed_methods(self)
-            
-            if message["type"] == "error":
-                self._result = cerial.deserialize(message["data"])
-                self._has_result = True
-                raise self._result
-            else:
-                self._result = cerial.deserialize(message["data"])
-                self._has_result = True
-                return self._result
+            serialized = self._listen_queue.get(timeout=timeout)
+            return cerial.deserialize(serialized)
         except queue_module.Empty:
-            # No message received - subprocess may have crashed silently
             return None
     
     @property

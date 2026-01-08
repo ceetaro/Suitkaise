@@ -14,12 +14,12 @@ title = "How `processing` actually works"
 # 1.2
 
 text = "
-`processing` has no dependencies outside of the standard library (except for `cerial`, another suitkaise module).
+`processing` has no dependencies outside of the standard library.
 
 - uses Python's `multiprocessing` module for subprocess spawning
 - uses `suitkaise.cerial` for serialization of complex objects between processes
 - all lifecycle methods are timed using `suitkaise.sktime.Timer`
-- communication between parent and subprocess happens via `multiprocessing.Queue`
+- communication between parent and subprocess happens via `multiprocessing.Queue` and `multiprocessing.Event`
 
 ---
 
@@ -66,6 +66,9 @@ __result__() or __error__()
     │
     ▼
 send result via Queue
+    │
+    ▼
+cleanup queues and exit
 ```
 
 ### Stop Conditions
@@ -91,13 +94,13 @@ This allows complex objects (database connections, loggers, custom classes) to b
 
 ### Flow
 
-1. **Before start()** — `Process._serialize_with_user()` captures:
+1. **Before start()** — `cerial.serialize()` captures the entire Process instance.
    - `instance.__dict__` (all attributes)
    - Class name and lifecycle methods
    - User's custom `__serialize__` if defined
 
-2. **Subprocess** — `Process._deserialize_with_user()` reconstructs:
-   - Creates new instance via `__new__` (bypasses `__init__`)
+2. **Subprocess** — `cerial.deserialize()` reconstructs.
+   - Creates new instance via class reconstruction
    - Restores all attributes from serialized state
    - Re-attaches lifecycle methods
    - Sets up timed method wrappers
@@ -249,7 +252,7 @@ User state, run counter, and previous times are preserved.
 
 ### Platform Specifics
 
-`processing` uses different timeout strategies per platform:
+`processing` uses different timeout strategies per platform.
 
 Unix (Linux/mac) — Signal-based (`SIGALRM`):
 - Actually interrupts blocking code
@@ -265,7 +268,7 @@ Windows — Thread-based (fallback):
 
 ### Timeout Enforcement
 
-Each lifecycle method can have its own timeout:
+Each lifecycle method can have its own timeout.
 
 ```python
 self.config.timeouts.prerun = 5.0   # 5 second timeout
@@ -282,11 +285,24 @@ When timeout is reached, `ProcessTimeoutError` is raised with:
 
 ## Error Handling
 
-All other errors inherit from `ProcessError`:
+All errors inherit from `ProcessError`.
+
+- `ProcessError` — Base class, wraps errors outside lifecycle methods
+- `PreRunError` — Error in `__prerun__`
+- `RunError` — Error in `__run__`
+- `PostRunError` — Error in `__postrun__`
+- `OnFinishError` — Error in `__onfinish__`
+- `ResultError` — Error in `__result__`
+- `ErrorError` — Error in `__error__` itself
+- `ProcessTimeoutError` — Timeout reached in any section
+
+Each error wraps the original exception and includes:
+- `original_error` — The actual exception that was raised
+- `current_run` — Which run number the error occurred on
 
 ### Error Wrapping
 
-Errors in lifecycle methods are caught and wrapped:
+Errors in lifecycle methods are caught and wrapped.
 
 ```python
 # In engine._run_section_timed():
@@ -302,7 +318,7 @@ except Exception as e:
     raise error_class(current_run, e) from e
 ```
 
-The original error is accessible via `e.original_error` when caught:
+The original error is accessible via `e.original_error` when caught.
 
 ```python
 except ProcessError as e:
@@ -316,57 +332,118 @@ except ProcessError as e:
 2. Engine catches and wraps in appropriate error class
 3. If lives remain → retry
 4. If no lives → call `__error__()`, send error via Queue
-5. Parent process raises error when `result` property accessed
+5. Parent process raises error when `result()` is called
 
+---
 
 ## Subprocess Communication
 
 ### Queue-Based Messaging
 
-Communication uses `multiprocessing.Queue`.
+Communication uses `multiprocessing.Queue`. There are three queues:
+
+1. **result_queue** — Subprocess → Parent (results and errors)
+2. **tell_queue** — Parent → Subprocess (via `tell()`)
+3. **listen_queue** — Subprocess → Parent (via `listen()`)
 
 ```python
-# Subprocess sends:
+# Subprocess sends result:
 result_queue.put({
-    'type': 'result',      # or 'error'
-    'result': result,       # serialized result
-    'timers': timer_bytes,  # serialized ProcessTimers
+    'type': 'result',       # or 'error'
+    'data': serialized,     # cerial-serialized result
+    'timers': timer_bytes,  # cerial-serialized ProcessTimers
 })
-
-# Parent receives:
-message = self._result_queue.get(timeout=...)
 ```
+
+### tell() and listen()
+
+Parent and subprocess can exchange data during execution:
+
+```python
+# Parent sends data to subprocess:
+p.tell(some_data)
+
+# Subprocess receives in __run__:
+def __run__(self):
+    data = self.listen(timeout=1.0)  # blocks until data arrives
+```
+
+Internally, queues are swapped in the subprocess for symmetric API:
+- Parent's `tell()` puts in `tell_queue` → subprocess's `listen()` gets from it
+- Subprocess's `tell()` puts in `listen_queue` → parent's `listen()` gets from it
 
 ### Message Types
 
 - `result` — Successful completion with `__result__()` output
-- `error` — Failure with exception object
+- `error` — Failure with exception object or `__error__()` return value
 
 ### Result Retrieval
 
-The `result` property blocks until message received.
+The `wait()` method drains the result queue before waiting for subprocess exit.
+This prevents deadlock where the subprocess can't exit because its QueueFeederThread is blocked.
 
 ```python
-@property
-def result(self):
-    if not self._has_result:
-        # Block waiting for message
-        message = self._result_queue.get()
+def wait(self, timeout=None):
+    # Must drain result queue BEFORE waiting for subprocess
+    # Otherwise deadlock: subprocess can't exit until queue is drained
+    self._drain_result_queue(timeout)
+    
+    self._subprocess.join(timeout=timeout)
+    return not self._subprocess.is_alive()
+
+def _drain_result_queue(self, timeout=None):
+    """Read result from queue and store internally."""
+    if self._has_result or self._result_queue is None:
+        return
+    
+    try:
+        message = self._result_queue.get(timeout=timeout or 1.0)
         
-        if message['type'] == 'error':
-            self._result = message['error']
-        else:
-            self._result = message['result']
-            # Restore timers
+        # Update timers from subprocess
+        if message.get('timers'):
             self.timers = cerial.deserialize(message['timers'])
         
+        if message["type"] == "error":
+            error_data = cerial.deserialize(message["data"])
+            if isinstance(error_data, BaseException):
+                self._result = error_data
+            else:
+                self._result = ProcessError(f"Process failed: {error_data}")
+        else:
+            self._result = cerial.deserialize(message["data"])
+        
         self._has_result = True
+    except queue.Empty:
+        pass  # No result yet
+
+def result(self):
+    """Get result - calls wait() first, then returns stored result."""
+    self.wait()
     
-    if isinstance(self._result, ProcessError):
-        raise self._result
+    if self._has_result:
+        if isinstance(self._result, BaseException):
+            raise self._result
+        return self._result
     
-    return self._result
+    return None
 ```
+
+### Queue Cleanup
+
+Before the subprocess exits, it cancels feeder threads on `tell_queue` and `listen_queue` to allow clean exit:
+
+```python
+# In engine._engine_main():
+for q in [tell_queue, listen_queue]:
+    if q is not None:
+        try:
+            q.cancel_join_thread()
+        except Exception:
+            pass
+```
+
+This prevents the subprocess from hanging if the parent isn't consuming from these queues.
+The `result_queue` is NOT canceled — the parent must call `result()` to get the data.
 
 ---
 
@@ -375,32 +452,41 @@ def result(self):
 ### start()
 
 1. Validates process not already started
-2. Creates `multiprocessing.Event` for stop signaling
-3. Creates `multiprocessing.Queue` for results
-4. Serializes process instance with `cerial`
-5. Spawns subprocess with `_engine_main` as target
-6. Records start time
+2. Serializes process instance with `cerial`
+3. Creates `multiprocessing.Event` for stop signaling
+4. Creates `multiprocessing.Queue` for results
+5. Creates `multiprocessing.Queue` for tell (parent → subprocess)
+6. Creates `multiprocessing.Queue` for listen (subprocess → parent)
+7. Spawns subprocess with `_engine_main` as target
+8. Records start time
 
 ### stop()
 
 1. Sets the stop event
 2. Does NOT block (returns immediately)
 3. Subprocess checks event in `_should_continue()`
-4. Subprocess finishes current run, then exits gracefully
+4. Subprocess finishes current section, runs `__onfinish__()`, then exits gracefully
 
 ### kill()
 
 1. Calls `subprocess.terminate()`
 2. Bypasses lives system
 3. No cleanup methods called
-4. `result` will be `None`
+4. `result()` will return `None`
 
 ### wait()
 
-1. Calls `subprocess.join(timeout)`
-2. Blocks until subprocess completes
-3. Returns `True` if finished, `False` if still running
-4. Will not return during retries (subprocess keeps running)
+1. Drains result queue first (prevents deadlock)
+2. Calls `subprocess.join(timeout)`
+3. Blocks until subprocess completes
+4. Returns `True` if finished, `False` if still running
+5. Will not return during retries (subprocess keeps running)
+
+### result()
+
+1. Calls `wait()` (which drains queue)
+2. If result stored, returns it (or raises if it's an exception)
+3. Returns `None` if no result available
 
 ---
 
@@ -408,9 +494,11 @@ def result(self):
 
 ### Parent Process
 
-- `result` property is thread-safe (uses Queue)
+- `result()` is thread-safe (uses Queue)
 - Multiple threads can call `stop()` (Event is thread-safe)
 - `wait()` can be called from any thread
+- `tell()` is thread-safe (Queue is thread-safe)
+- `listen()` is thread-safe (Queue is thread-safe)
 
 ### Subprocess
 
@@ -441,3 +529,64 @@ For large results, consider:
 - Using shared memory (`multiprocessing.shared_memory`)
 - Chunking results across multiple runs
 
+---
+
+## Pool
+
+### Overview
+
+The `Pool` class provides batch parallel processing using multiple worker subprocesses.
+
+Like `Process`, it uses `cerial` for serialization, allowing complex objects and `Process` classes.
+
+### Methods
+
+`fc = function or class of type ["processing.Process"]`
+
+- `map(fc, items)` — Blocking, returns `[results]`
+- `imap(fc, items)` — Blocking iterator, yields results in order
+- `async_map(fc, items)` — Non-blocking, returns `AsyncResult`
+- `unordered_imap(fc, items)` — Blocking iterator, yields results as completed
+- `star(fc)` — Modifier to unpack tuple arguments
+
+### How It Works
+
+```python
+pool = Pool(workers=4)
+
+# Each item is processed in a separate subprocess
+results = pool.map(fc, [1, 2, 3, 4])
+```
+
+Internally, Pool:
+1. Creates worker subprocesses
+2. Serializes function and arguments with `cerial`
+3. Distributes work across workers
+4. Collects and deserializes results
+5. Returns results in the same order as input
+
+### Process Classes in Pool
+
+You can use `Process` subclasses in Pool:
+
+```python
+class MyProcess(Process):
+    def __init__(self, value):
+        self.value = value
+        self.config.runs = 3
+    
+    def __run__(self):
+        self.value *= 2
+    
+    def __result__(self):
+        return self.value
+
+pool = Pool(workers=2)
+results = pool.map(MyProcess, [1, 2, 3, 4])
+# → [8, 16, 24, 32] (each ran 3 times, doubling each time)
+```
+
+When using `Process` classes:
+- Full lifecycle is respected (`config.runs`, `config.lives`, `stop()`)
+- Each instance runs as it normally would
+- Results collected via `__result__()`

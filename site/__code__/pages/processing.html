@@ -10,6 +10,354 @@
     </nav>
 </div>
 <section class="module-page">
-    <h1>how to use</h1>
-    <p>Processing module - how to use content coming soon...</p>
+    <h1>How to use <code>processing</code></h1>
+
+    <p><code>processing</code> provides a much simpler way to run Python code in subprocesses.</p>
+
+    <p>Designed to make using multiple processes really easy.</p>
+
+    <p>By inheriting from the <code>Process</code> class, you can create a well organized process in a class structure.</p>
+
+    <p>Since <code>processing</code> uses <code>cerial</code> (another <code>suitkaise</code> module) as its serializer, you can create these process classes with essentially any object you want.</p>
+
+    <p>No more <code>PicklingError: Can't serialize object</code> errors when you start up your process!</p>
+
+    <ul>
+        <li>no more manual serialization</li>
+        <li>no more queue management</li>
+        <li>lifecycle methods for setup and teardown including error handling</li>
+        <li>built in timing</li>
+        <li>automatic retries with <code>lives</code> system</li>
+    </ul><br>
+
+    <h2><code>Process</code> class special methods</h2>
+
+    <p>Classes that inherit from <code>Process</code> have access to 6 special methods.</p>
+
+    <p>These methods are what run the actual process when it is created.</p>
+
+    <p>Additionally, <code>__init__</code> is modified to automatically call <code>super().__init__()</code> for you.</p>
+
+    <p>In order for <code>Process</code> inheriting classes to run correctly, you must implement the <code>__run__</code> method.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+
+        # super().__init__() is called automatically for you
+        # setup your process here
+        # initalize attributes
+        # configure Process attributes
+
+
+    def __prerun__(self):
+
+        # here, you can setup before the main part
+        # connect to databases
+        # make API calls
+        # read files
+
+
+    def __run__(self): # REQUIRED
+
+        # this is the main part
+        # you can just write your code here
+        # it repeats for you, no need to write looping code
+
+
+    def __postrun__(self):
+
+        # this is where you clean up your work
+        # close connections
+        # add results to attributes
+
+    
+    def __onfinish__(self): 
+
+        # this is when you clean up the process
+        # calculate summaries
+        # save results to files
+        # send emails or do other actions
+
+
+    def __result__(self):
+
+        # this returns the result of the process
+        # don't have to worry about confusing returns
+        # store your results as instance attributes
+        # and return them here
+
+
+    def __error__(self):
+
+        # this is __result__() when an error occurs</code></pre>
+
+    <hr>
+
+    <h2>Methods</h2>
+
+    <h3><code>start()</code></h3>
+
+    <p>Starts the process.</p>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()</code></pre>
+
+    <h3><code>wait()</code></h3>
+
+    <p>Blocks until the process finishes.</p>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()
+
+p.wait()
+
+# doesn't get called until p finishes
+something_else()</code></pre>
+
+    <h3><code>stop()</code></h3>
+
+    <p>Signals to the process to finish its current run and clean up.</p>
+
+    <p>Does not block (so you can stop other processes without having to wait)</p>
+
+    <ul>
+        <li>finishes current run</li>
+        <li>calls <code>__onfinish__()</code></li>
+        <li>calls <code>__result__()</code> or <code>__error__()</code> depending on status</li>
+        <li>closes</li>
+    </ul>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()
+
+# manually signal to stop
+p.stop()
+
+p.wait()</code></pre>
+
+    <h3><code>kill()</code></h3>
+
+    <p>Forcefully terminates the process immediately without cleanup.</p>
+
+    <p>Do not use this unless something goes wrong (like a process hanging).</p>
+
+    <ul>
+        <li>immediately closes</li>
+        <li>does not finish current run</li>
+        <li>does not call <code>__onfinish__()</code></li>
+        <li>does not call <code>__result__()</code> or <code>__error__()</code></li>
+    </ul>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()
+ 
+p.kill() # Immediate termination
+
+# p.result will be None</code></pre>
+
+    <h3><code>result</code> property</h3>
+
+    <p>Retrieves the result from the process.</p>
+
+    <ul>
+        <li>blocks if not finished</li>
+        <li>raises if error occurred</li>
+    </ul>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()
+
+try:
+    # blocks until process finishes and returns __result__() output
+    data = p.result
+
+except ProcessError as e:
+    print(f"{e}")</code></pre>
+
+    <hr>
+
+    <h2>Configuration</h2>
+
+    <p><code>Process</code> also has a <code>config</code> attribute that allows you to configure the process in the inheriting class.</p>
+
+    <p>The config can only be updated in the <code>__init__()</code> method.</p>
+
+    <p>All values assigned in the code block below are the defaults.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    # CAN ONLY BE UPDATED IN __INIT__
+    def __init__(self):
+
+        # None = infinite number of runs
+        self.config.runs = None
+
+        # None = no time limit before auto-joining
+        self.config.join_in = None
+
+        # 1 = no retries
+        self.config.lives = 1
+
+        # None = no timeout
+        self.config.timeouts.prerun = None
+        self.config.timeouts.run = None
+        self.config.timeouts.postrun = None
+        self.config.timeouts.onfinish = None
+        self.config.timeouts.result = None
+        self.config.timeouts.error = None</code></pre>
+
+    <p>Setting any of these numbers to zero or lower will reset them to the default value.</p>
+
+    <hr>
+
+    <h2>Timing</h2>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+
+    def __init__(self):
+
+        # ...
+
+    def __prerun__(self):
+
+        # ...
+    
+    def __run__(self):
+
+        # ...
+
+    def __postrun__(self):
+
+        # ...
+
+    def __onfinish__(self):
+
+        # ...
+
+    def __result__(self):
+
+        # ...
+
+    def __error__(self):
+
+        # ...
+
+
+p = MyProcess()
+p.start()
+
+p.wait()
+
+prerun_timer = p.__prerun__.timer
+run_timer = p.__run__.timer
+postrun_timer = p.__postrun__.timer
+onfinish_timer = p.__onfinish__.timer
+result_timer = p.__result__.timer
+error_timer = p.__error__.timer
+
+# adds prerun, run, and postrun times together
+full_run_timer = p.timer</code></pre>
+
+    <p>The <code>p.timer</code> adds up the times from the <code>__prerun__</code>, <code>__run__</code>, and <code>__postrun__</code> method timers into one value, and records that value. It does this every iteration/run.</p>
+
+    <p>All timers are <code>suitkaise.sktime.Timer</code> objects, and function exactly the same.</p>
+
+    <p>Timers will not be accessible unless you define their respective methods yourself.</p>
+
+    <hr>
+
+    <h2><code>lives</code> system</h2>
+
+    <p>Setting <code>self.config.lives</code> to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.</p>
+
+<pre><code class="language-python">from suitkaise.processing import Process
+
+class MyProcess(Process):
+    def __init__(self):
+
+        # 3 attempts total
+        self.config.lives = 3</code></pre>
+
+    <p>When a process needs to retry, it retries the current run starting from <code>__prerun__</code>. (Does not fully reset to run 0)</p>
+
+    <p>Using <code>kill()</code> will ignore <code>lives</code> and immediately terminate the process.</p>
+
+    <p><code>wait()</code> will block until the process finishes successfully. It will not return if the process fails and restarts with remaining lives.</p>
+
+    <hr>
+
+    <h2>Error Handling</h2>
+
+    <p>All errors are caught and handled by the process.</p>
+
+    <p>If an error occurs, the process will call <code>__error__()</code> instead of <code>__result__()</code>.</p>
+
+    <p>All errors inherit from a <code>ProcessError</code> class, and wrap the actual error that happened.</p>
+
+    <h3><code>ProcessError</code></h3>
+
+    <p>Base class for all process errors.</p>
+
+    <p>If an error occurs outside of one of the inherited <code>Process</code> methods, it will be wrapped in a <code>ProcessError</code>.</p>
+
+    <h3>Error Classes</h3>
+
+    <ul>
+        <li><code>PreRunError</code> — error raised when an error occurs in the <code>__prerun__</code> method.</li>
+        <li><code>RunError</code> — error raised when an error occurs in the <code>__run__</code> method.</li>
+        <li><code>PostRunError</code> — error raised when an error occurs in the <code>__postrun__</code> method.</li>
+        <li><code>OnFinishError</code> — error raised when an error occurs in the <code>__onfinish__</code> method.</li>
+        <li><code>ResultError</code> — error raised when an error occurs in the <code>__result__</code> method.</li>
+    </ul>
+
+    <h3>Timeout Errors</h3>
+
+    <p>If a timeout occurs, a <code>ProcessTimeoutError</code> will be raised. It contains the section name, timeout value, and current run number.</p>
+
+    <details>
+        <summary><strong>Error Examples</strong></summary>
+
+<pre><code>Traceback (most recent call last):
+  File "my_script.py", line 25, in &lt;module&gt;
+    result = p.result
+             ^^^^^^^^
+  ...
+suitkaise.processing.RunError: Error in __run__ on run 5
+
+The above exception was caused by:
+
+Traceback (most recent call last):
+  File "my_script.py", line 14, in __run__
+    data = fetch_from_api()
+  File "my_script.py", line 8, in fetch_from_api
+    raise ConnectionError("Failed to connect to server")
+ConnectionError: Failed to connect to server</code></pre>
+
+<pre><code>suitkaise.processing.ProcessTimeoutError: Timeout in run after 5.0s on run 3</code></pre>
+
+    </details><br>
+
+    <h3>Accessing the Original Error</h3>
+
+    <p>All <code>ProcessError</code> subclasses store the original exception:</p>
+
+<pre><code class="language-python">try:
+    result = p.result
+except ProcessError as e:
+    print(f"Process error: {e}")
+    print(f"Original error: {e.original_error}")
+    print(f"Run number: {e.current_run}")
+
+# Output:
+# Process error: Error in __run__ on run 5
+# Original error: ConnectionError('Failed to connect to server')
+# Run number: 5</code></pre>
+
 </section>

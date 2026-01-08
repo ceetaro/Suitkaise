@@ -81,7 +81,7 @@ class TestPerformanceBasics:
             p = QuickProcess()
             p.start()
             p.wait()
-            _ = p.result
+            _ = p.result()
             timer.lap()
         
         print_benchmark_row("Iterations", str(NUM_RUNS))
@@ -119,7 +119,7 @@ class TestPerformanceBasics:
         p = OverheadProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         elapsed = sktime.elapsed(start)
         
         overhead_per_run = elapsed / result
@@ -167,7 +167,7 @@ class TestPerformanceBasics:
         p1 = UntitmedProcess()
         p1.start()
         p1.wait()
-        _ = p1.result
+        _ = p1.result()
         untimed_elapsed = sktime.elapsed(start)
         
         # Time timed
@@ -175,7 +175,7 @@ class TestPerformanceBasics:
         p2 = TimedProcess()
         p2.start()
         p2.wait()
-        _ = p2.result
+        _ = p2.result()
         timed_elapsed = sktime.elapsed(start)
         
         overhead = timed_elapsed - untimed_elapsed
@@ -258,7 +258,7 @@ class TestComparisonWithMultiprocessing:
         p = SumProcess()
         p.start()
         p.wait()
-        proc_result = p.result
+        proc_result = p.result()
         proc_elapsed = sktime.elapsed(start)
         
         overhead = proc_elapsed - raw_elapsed
@@ -324,7 +324,7 @@ class TestComparisonWithMultiprocessing:
             w.start()
         for w in workers:
             w.wait()
-        proc_results = [w.result for w in workers]
+        proc_results = [w.result() for w in workers]
         proc_elapsed = sktime.elapsed(start)
         
         overhead = proc_elapsed - raw_elapsed
@@ -383,7 +383,7 @@ class TestScalability:
             p = ScalableProcess(count)
             p.start()
             p.wait()
-            _ = p.result
+            _ = p.result()
             elapsed = sktime.elapsed(start)
             times.append(elapsed)
         
@@ -430,7 +430,7 @@ class TestScalability:
             for w in workers:
                 w.wait()
             for w in workers:
-                _ = w.result
+                _ = w.result()
             elapsed = sktime.elapsed(start)
             times.append(elapsed)
         
@@ -496,7 +496,7 @@ class TestScalability:
             for w in workers:
                 w.wait()
             for w in workers:
-                _ = w.result
+                _ = w.result()
             elapsed = sktime.elapsed(start)
             proc_times.append(elapsed)
         
@@ -593,7 +593,7 @@ class TestMemoryAndResources:
             p = CleanupProcess()
             p.start()
             p.wait()
-            _ = p.result
+            _ = p.result()
             processes.append(p)
         
         # Check they're all dead

@@ -163,7 +163,7 @@ p.start()
  
 p.kill() # Immediate termination
 
-# p.result will be None
+# p.result() will be None
 ```
 
 ### `tell()`
@@ -433,6 +433,11 @@ except ProcessError as e:
 
 `Pool` allows you to run multiple processes in parallel.
 
+It does 2 things differently.
+
+- uses `cerial` for serialization of complex objects between processes
+- allows for the use of the `Process` inheriting classes mentioned above
+
 ```python
 from suitkaise.processing import Pool
 
@@ -452,6 +457,27 @@ Blocks until all processes finish, and then returns a list of results in the sam
 ```python
 results = pool.map(p, data_set)
 ```
+
+### `imap()`
+
+Returns an iterator of results.
+
+Each result is returned in order. If the next result is not ready, it will block until it is.
+
+```python
+def upscale_image_section(image_data):
+
+    # ... upscale image data ...
+    return upscaled_image_data
+
+full_image_data = []
+
+# call function to upscale chunk of image data
+for result in pool.imap(upscale_image_section, data_set):
+
+    full_image_data.append(result)
+```
+
 
 ### `async_map()`
 
@@ -476,30 +502,69 @@ actual_results = results.get()
 actual_results = results.get(timeout=1.0)
 ```
 
-### `imap()`
-
-Returns an iterator of results.
-
-Each result is returned in order. If the next result is not ready, it will block until it is.
-
-```python
-full_image_data = []
-
-for result in pool.imap(upscale_image_section(), data_set):
-
-    full_image_data.append(result)
-```
-
-### `unordered_imap()`
+#### `unordered_imap()`
 
 Returns an iterator of results.
 
 Each result is returned as it is ready, regardless of order.
 
+Fastest way to get results, but not in order.
+
 ```python
-for processed image in pool.unordered_imap(UpscaleImage(), data_set):
+# use Process inheriting class UpscaleImage to process each image in data_set
+for processed_image in pool.unordered_imap(UpscaleImage, data_set):
 
     upscaled_images.append(processed_image)
 ```
-    
 
+### `star()`
+
+Modifier of `map()`, `imap()`, `async_map()`, and `unordered_imap()`.
+
+When used, it makes iterators of tuples spread across multiple arguments instead of the entire tuple being passed as a single argument.
+
+```python
+# map - always passes item as single argument
+pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
+
+# star map - unpacks tuples as arguments (but only tuples!)
+pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)
+```
+
+```python
+# imap - always passes item as single argument
+for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
+
+# star imap - unpacks tuples as arguments (but only tuples!)
+for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)
+```
+
+### Using `Pool` with `Process` inheriting classes
+
+When using `Pool` with `Process` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
+
+The second argument will be an argument (or arguments) to `__init__()`.
+
+Classes run as they would normally, including ones that don't have a run or time limit (you can still use `stop()` to stop them in `Pools`).
+
+```python
+class UpscaleImage(Process):
+
+    def __init__(self, image):
+        self.image_data = image
+
+for result in pool.unordered_imap(UpscaleImage, data_set):
+
+    upscaled_images.append(result)
+```
+
+```python
+class ColorImage(Process):
+
+    def __init__(self, image, color, percent_change):
+        self.image_data = image
+        self.color = color
+        self.percent_change = percent_change
+
+colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))
+```

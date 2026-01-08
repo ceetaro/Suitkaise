@@ -43,7 +43,7 @@ class TestMultipleProcesses:
         reporter.add(f"  all processes finished in {elapsed:.2f}s")
         
         # Collect results
-        results = [p.result for p in processes]
+        results = [p.result() for p in processes]
         
         reporter.add(f"  results: {results}")
         
@@ -122,7 +122,7 @@ class TestMultipleProcesses:
             w.wait()
         elapsed = time.time() - start
         
-        results = [w.result for w in workers]
+        results = [w.result() for w in workers]
         
         reporter.add(f"  durations: {durations}")
         reporter.add(f"  slowest: {max(durations)}s")
@@ -209,7 +209,7 @@ class TestMultipleProcesses:
         for w in workers:
             w.wait()
         
-        results = [w.result for w in workers]
+        results = [w.result() for w in workers]
         
         reporter.add(f"  operations: square(5), double(10), string(42), square(3)")
         reporter.add(f"  results: {results}")

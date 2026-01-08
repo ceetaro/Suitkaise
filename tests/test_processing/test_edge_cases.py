@@ -31,7 +31,7 @@ class TestMinimalProcesses:
         p.stop()
         p.wait()
         
-        result = p.result
+        result = p.result()
         reporter.add(f"  empty process result: {result}")
         
         # Default __result__ returns None
@@ -50,7 +50,7 @@ class TestMinimalProcesses:
         p = ResultOnlyProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  result: {result}")
         assert result == "only result defined"
@@ -72,7 +72,7 @@ class TestMinimalProcesses:
         p = ZeroRunProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  run_called: {result['run_called']}")
         
@@ -96,7 +96,7 @@ class TestMinimalProcesses:
         p = OneRunProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  run executed: {result} times")
         assert result == 1
@@ -135,7 +135,7 @@ class TestStateEdgeCases:
         p = LargeStateProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  list size: {result['list_len']}")
         reporter.add(f"  dict size: {result['dict_len']}")
@@ -166,7 +166,7 @@ class TestStateEdgeCases:
         p = NoneProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  result is None: {result is None}")
         assert result is None
@@ -190,7 +190,7 @@ class TestStateEdgeCases:
         p = ComplexReturnProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  tuple preserved: {result['tuple'] == (1, 2, 3)}")
         reporter.add(f"  bytes preserved: {result['bytes'] == b'hello'}")
@@ -221,8 +221,8 @@ class TestStateEdgeCases:
         p1.wait()
         p2.wait()
         
-        r1 = p1.result
-        r2 = p2.result
+        r1 = p1.result()
+        r2 = p2.result()
         
         reporter.add(f"  p1 items: {r1}")
         reporter.add(f"  p2 items: {r2}")
@@ -258,7 +258,7 @@ class TestTimingEdgeCases:
         p = ShortJoinProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs in 50ms: {result}")
         
@@ -283,7 +283,7 @@ class TestTimingEdgeCases:
         p = ZeroJoinProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs with join_in=0: {result}")
         
@@ -321,7 +321,7 @@ class TestTimingEdgeCases:
         p = FullyTimedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  prerun calls: {result['prerun_times']}")
         reporter.add(f"  run calls: {result['run_times']}")
@@ -357,7 +357,7 @@ class TestErrorEdgeCases:
         p.wait()
         
         with pytest.raises(RunError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         reporter.add(f"  original: {type(exc_info.value.original_error).__name__}")
@@ -387,7 +387,7 @@ class TestErrorEdgeCases:
         p.wait()
         
         with pytest.raises(OnFinishError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         assert isinstance(exc_info.value.original_error, RuntimeError)
@@ -410,7 +410,7 @@ class TestErrorEdgeCases:
         p.wait()
         
         with pytest.raises(ResultError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  error type: {type(exc_info.value).__name__}")
         assert isinstance(exc_info.value.original_error, TypeError)
@@ -433,7 +433,7 @@ class TestErrorEdgeCases:
         p.wait()
         
         with pytest.raises(RunError) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         # Should have exhausted all lives (3 attempts)
         reporter.add(f"  error on final attempt: {exc_info.value.original_error}")
@@ -460,7 +460,7 @@ class TestErrorEdgeCases:
         
         # __error__ returns a transformed exception
         with pytest.raises(Exception) as exc_info:
-            _ = p.result
+            _ = p.result()
         
         reporter.add(f"  transformed error: {exc_info.value}")
         assert "Transformed: RunError" in str(exc_info.value)
@@ -491,7 +491,7 @@ class TestControlFlowEdgeCases:
         p.start()
         p.wait()
         
-        result = p.result
+        result = p.result()
         reporter.add(f"  result after stop-before-start: {result}")
         
         # Stop event was set before start, so should exit quickly
@@ -522,7 +522,7 @@ class TestControlFlowEdgeCases:
         p.stop()
         
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  runs before multi-stop: {result}")
         assert isinstance(result, int)
@@ -546,7 +546,7 @@ class TestControlFlowEdgeCases:
         p.kill()  # Kill after subprocess exists
         
         # Result should be None (abandoned)
-        result = p.result
+        result = p.result()
         reporter.add(f"  result after immediate kill: {result}")
         assert result is None
     
@@ -563,7 +563,7 @@ class TestControlFlowEdgeCases:
         p = NoStartProcess()
         p.wait()  # Should not block - no process to wait for
         
-        result = p.result
+        result = p.result()
         reporter.add(f"  result without start: {result}")
         assert result is None
     
@@ -581,9 +581,9 @@ class TestControlFlowEdgeCases:
         p.start()
         p.wait()
         
-        r1 = p.result
-        r2 = p.result
-        r3 = p.result
+        r1 = p.result()
+        r2 = p.result()
+        r3 = p.result()
         
         reporter.add(f"  r1: {r1}")
         reporter.add(f"  r2: {r2}")
@@ -622,7 +622,7 @@ class TestLifecycleInteractions:
         p = SetupProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  results: {result}")
         assert result == [10, 20, 30]
@@ -650,7 +650,7 @@ class TestLifecycleInteractions:
         p = ValidatingProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  validations passed: {result['validations']}")
         assert result['validations'] == 5
@@ -680,7 +680,7 @@ class TestLifecycleInteractions:
         p = AggregatingProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  summary: {result}")
         assert result['count'] == 5
@@ -716,7 +716,7 @@ class TestConcurrencyEdgeCases:
         for p in processes:
             p.wait()
         
-        results = [p.result for p in processes]
+        results = [p.result() for p in processes]
         
         reporter.add(f"  {NUM_PROCESSES} processes completed")
         reporter.add(f"  unique results: {len(set(results))}")
@@ -740,14 +740,14 @@ class TestConcurrencyEdgeCases:
         durations = [0.05, 0.02, 0.08, 0.01, 0.04]
         processes = [VariableDurationProcess(d) for d in durations]
         
-        start = sktime.now()
+        start = sktime.time()
         for p in processes:
             p.start()
         for p in processes:
             p.wait()
         elapsed = sktime.elapsed(start)
         
-        results = [p.result for p in processes]
+        results = [p.result() for p in processes]
         
         # Sequential time = if we ran all processes one after another
         # Each process has ~100ms overhead + work time
@@ -779,7 +779,7 @@ class TestCircuitComposition:
         class CircuitProtectedProcess(Process):
             def __init__(self):
                 self.config.runs = 20
-                self.circuit = Circuit(shorts=3)
+                self.circuit = Circuit(num_shorts_to_trip=3)
                 self.successful_ops = 0
                 self.failed_ops = 0
             
@@ -805,7 +805,7 @@ class TestCircuitComposition:
         p = CircuitProtectedProcess()
         p.start()
         p.wait()
-        result = p.result
+        result = p.result()
         
         reporter.add(f"  successful ops: {result['successful']}")
         reporter.add(f"  failed ops: {result['failed']}")

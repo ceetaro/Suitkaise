@@ -16,7 +16,9 @@ def _engine_main(
     serialized_process: bytes,
     stop_event: "Event",
     result_queue: "Queue[Any]",
-    original_state: bytes
+    original_state: bytes,
+    tell_queue: "Queue[Any]" = None,
+    listen_queue: "Queue[Any]" = None
 ) -> None:
     """
     Main entry point for the subprocess engine.
@@ -34,12 +36,15 @@ def _engine_main(
         stop_event: Event to check for stop signal from parent
         result_queue: Queue to send results/errors back to parent
         original_state: Original serialized state for retries (lives system)
+        tell_queue: Queue for receiving data from parent (parent calls tell())
+        listen_queue: Queue for sending data to parent (parent calls listen())
     """
     import traceback
     import sys
     
     try:
-        _engine_main_inner(serialized_process, stop_event, result_queue, original_state)
+        _engine_main_inner(serialized_process, stop_event, result_queue, original_state,
+                          tell_queue, listen_queue)
     except Exception as e:
         # DEBUG: Catch ANY uncaught exception and report it
         print(f"\n[ENGINE ERROR] Uncaught exception in subprocess:", file=sys.stderr)
@@ -57,13 +62,24 @@ def _engine_main(
             })
         except Exception as send_err:
             print(f"[ENGINE ERROR] Failed to send error to parent: {send_err}", file=sys.stderr)
+    
+    # Cancel feeder threads on tell/listen queues which may not be consumed
+    # Result queue is NOT canceled - parent must call result() to get data
+    for q in [tell_queue, listen_queue]:
+        if q is not None:
+            try:
+                q.cancel_join_thread()
+            except Exception:
+                pass
 
 
 def _engine_main_inner(
     serialized_process: bytes,
     stop_event: "Event",
     result_queue: "Queue[Any]",
-    original_state: bytes
+    original_state: bytes,
+    tell_queue: "Queue[Any]" = None,
+    listen_queue: "Queue[Any]" = None
 ) -> None:
     """Inner engine implementation."""
     from suitkaise import cerial, sktime
@@ -86,6 +102,13 @@ def _engine_main_inner(
     
     # Store reference to stop_event on process so lifecycle methods can use stop()
     process._stop_event = stop_event
+    
+    # Set up communication queues for tell/listen
+    # IMPORTANT: Queues are SWAPPED in subprocess for symmetric tell/listen API
+    # - Parent's tell() puts in tell_queue → subprocess's listen() gets from it
+    # - Subprocess's tell() puts in listen_queue → parent's listen() gets from it
+    process._tell_queue = listen_queue  # subprocess tell() → parent listen()
+    process._listen_queue = tell_queue  # parent tell() → subprocess listen()
     
     # Record start time for join_in limit
     process._start_time = sktime.time()
