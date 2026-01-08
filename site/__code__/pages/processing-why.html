@@ -30,7 +30,11 @@
     <p>And now you have to deal with so much more BS.</p><br>
 
     <details>
-        <summary><strong><code>PicklingError: Can't pickle your object, hahahahaha! loser.</code></strong></summary>
+        <summary><strong>Pickle</strong></summary>
+
+        <br>
+
+        <p><code>PicklingError: Can't pickle your object, hahahahaha! loser.</code></p>
 
         <p>Everything passed from one process to another must be serializable, usually via <code>pickle</code>.</p>
 
@@ -50,7 +54,7 @@
 
         <p>To learn more, navigate to the <code>cerial</code> module page using the sidebar.</p>
 
-    </details><br>
+    </details>
 
     <details>
         <summary><strong>Spaghetti code</strong></summary>
@@ -146,16 +150,16 @@ doubler = DoubleThisNumber(1, 5)
 doubler.start()
 
 doubler.wait()
-result = doubler.result  # == 32</code></pre>
+result = doubler.result()  # == 32</code></pre>
 
         <p>There are also other methods! To learn more, head to the <code>how to use</code> page.</p>
 
-    </details><br>
+    </details>
 
     <details>
-        <summary><strong>Queue management, yay yippie I love queues (said no one ever)</strong></summary>
+        <summary><strong>Queue management</strong></summary>
 
-        <p>Creating queues.</p>
+        <p>Creating queues. "Yay, yippie! I love queues!" said no one ever.</p>
 
         <p>Making sure that they connect how you want them to.</p>
 
@@ -205,12 +209,12 @@ if user_wants_to_change_theme:
 p.wait()
 
 try:
-    current_theme_data = p.result
+    current_theme_data = p.result()
 except ProcessError as e:
     print(f"Process failed: {e}")
     current_theme_data = None</code></pre>
 
-    </details><br>
+    </details>
 
     <details>
         <summary><strong>Retries</strong></summary>
@@ -230,7 +234,7 @@ class MyProcess(Process):
     def __init__(self):
         self.config.lives = 3</code></pre>
 
-    </details><br>
+    </details>
 
     <details>
         <summary><strong>Timing is busy work</strong></summary>
@@ -305,7 +309,7 @@ all_3_combined = p.timer</code></pre>
 
         <p>For more information on timers, head to the <code>sktime</code> module page.</p>
 
-    </details><br>
+    </details>
 
     <details>
         <summary><strong>Adding in timeouts</strong></summary>
@@ -339,7 +343,7 @@ class MyProcess(Process):
 
         <p>This will automatically raise a <code>ProcessTimeoutError</code> if the timeout is reached as well.</p>
 
-    </details><br>
+    </details>
 
     <details>
         <summary><strong>Error handling</strong></summary>
@@ -351,7 +355,7 @@ class MyProcess(Process):
         <p>They all inherit from a <code>ProcessError</code> class, making it easy to catch all process errors with a single <code>except ProcessError</code> block.</p>
 
 <pre><code class="language-python">try:
-    result = p.result
+    result = p.result()
 
 except ProcessError as e:
 

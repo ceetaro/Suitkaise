@@ -24,6 +24,8 @@ So, you have to turn to `multiprocessing` or a similar library for computational
 And now you have to deal with so much more BS.
 
 (start of dropdown)
+Pickle
+
 `PicklingError: Can't pickle your object, hahahahaha! loser.`
 
 Eveything passed from one process to another must be serializable, usually via `pickle`.
@@ -153,9 +155,9 @@ There are also other methods! To learn more, head to the `how to use` page.
 (end of dropdown)
 
 (start of dropdown)
-Queue management, yay yippie I love queues (said no one ever)
+Queue management
 
-Creating queues.
+Creating queues. "Yay, yippie! I love queues!" said no one ever.
 
 Making sure that they connect how you want them to.
 

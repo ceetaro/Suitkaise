@@ -20,6 +20,10 @@
 
     <p>Since <code>processing</code> uses <code>cerial</code> (another <code>suitkaise</code> module) as its serializer, you can create these process classes with essentially any object you want.</p>
 
+    <p>You can also use the <code>Pool</code> class for batch processing.</p>
+
+    <p><code>Pool</code> also uses <code>cerial</code> for serialization, so you can use it with any object you want, and it also allows you to use <code>Process</code> inheriting classes instead of just functions.</p>
+
     <p>No more <code>PicklingError: Can't serialize object</code> errors when you start up your process!</p>
 
     <ul>
@@ -30,9 +34,9 @@
         <li>automatic retries with <code>lives</code> system</li>
     </ul><br>
 
-    <h2><code>Process</code> class special methods</h2>
+    <h2>Lifecycle Methods</h2>
 
-    <p>Classes that inherit from <code>Process</code> have access to 6 special methods.</p>
+    <p>Classes that inherit from <code>Process</code> have access to 6 lifecycle methods.</p>
 
     <p>These methods are what run the actual process when it is created.</p>
 
@@ -119,7 +123,7 @@ something_else()</code></pre>
 
     <h3><code>stop()</code></h3>
 
-    <p>Signals to the process to finish its current run and clean up.</p>
+    <p>Signals to the subprocess to finish its current run and clean up.</p>
 
     <p>Does not block (so you can stop other processes without having to wait)</p>
 
@@ -137,6 +141,17 @@ p.start()
 p.stop()
 
 p.wait()</code></pre>
+
+<pre><code class="language-python">class MyProcess(Process):
+
+    def __run__(self):
+
+        if found_what_we_need:
+            # exit early
+            self.stop()
+
+        else:
+            # ...</code></pre>
 
     <h3><code>kill()</code></h3>
 
@@ -156,9 +171,58 @@ p.start()
  
 p.kill() # Immediate termination
 
-# p.result will be None</code></pre>
+# p.result() will be None</code></pre>
 
-    <h3><code>result</code> property</h3>
+    <h3><code>tell()</code></h3>
+
+    <p>Sends data to the other process.</p>
+
+    <p>If the other process calls <code>listen()</code>, it will receive the data from <code>tell()</code>.</p>
+
+    <p><code>tell()</code> is not a blocking method.</p>
+
+<pre><code class="language-python">p = MyProcess()
+p.start()
+
+# sends "data" to the subprocess
+p.tell("some data")
+
+p.wait()</code></pre>
+
+<pre><code class="language-python">class MyProcess(Process):
+
+    def __run__(self):
+
+        self.tell(("i have found a corrupt file", "corrupt_file.txt"))</code></pre>
+
+    <h3><code>listen()</code></h3>
+
+    <p>Blocks until data is received from the other process.</p>
+
+    <p>Optional timeout.</p>
+
+<pre><code class="language-python">corrupt_files = []
+
+p = MyProcess()
+p.start()
+
+data = p.listen(timeout=1.0)
+
+if data[0] == "i have found a corrupt file":
+    corrupt_files.append(data[1])</code></pre>
+
+<pre><code class="language-python">class MyProcess(Process):
+
+    def __run__(self):
+
+        command = self.listen(timeout=5.0)
+
+        if not command:
+            raise ProcessTimeoutError("No command received")
+        else:
+            run_command(command)</code></pre>
+
+    <h3><code>result()</code></h3>
 
     <p>Retrieves the result from the process.</p>
 
@@ -172,7 +236,7 @@ p.start()
 
 try:
     # blocks until process finishes and returns __result__() output
-    data = p.result
+    data = p.result()
 
 except ProcessError as e:
     print(f"{e}")</code></pre>
@@ -269,7 +333,7 @@ full_run_timer = p.timer</code></pre>
 
     <p>All timers are <code>suitkaise.sktime.Timer</code> objects, and function exactly the same.</p>
 
-    <p>Timers will not be accessible unless you define their respective methods yourself.</p>
+    <p>Timers will not be accessible unless you define their respective lifecycle methods yourself.</p>
 
     <hr>
 
@@ -326,7 +390,7 @@ class MyProcess(Process):
 
 <pre><code>Traceback (most recent call last):
   File "my_script.py", line 25, in &lt;module&gt;
-    result = p.result
+    result = p.result()
              ^^^^^^^^
   ...
 suitkaise.processing.RunError: Error in __run__ on run 5
@@ -349,7 +413,7 @@ ConnectionError: Failed to connect to server</code></pre>
     <p>All <code>ProcessError</code> subclasses store the original exception:</p>
 
 <pre><code class="language-python">try:
-    result = p.result
+    result = p.result()
 except ProcessError as e:
     print(f"Process error: {e}")
     print(f"Original error: {e.original_error}")
@@ -359,5 +423,130 @@ except ProcessError as e:
 # Process error: Error in __run__ on run 5
 # Original error: ConnectionError('Failed to connect to server')
 # Run number: 5</code></pre>
+
+    <hr>
+
+    <h2><code>Pool</code></h2>
+
+    <p><code>Pool</code> allows you to run multiple processes in parallel.</p>
+
+    <p>It does 2 things differently.</p>
+
+    <ul>
+        <li>uses <code>cerial</code> for serialization of complex objects between processes</li>
+        <li>allows for the use of the <code>Process</code> inheriting classes mentioned above</li>
+    </ul>
+
+<pre><code class="language-python">from suitkaise.processing import Pool
+
+# a class of type ["processing.Process"]
+p = MyProcess()
+data_set = get_data()
+
+pool = Pool(workers=8)</code></pre>
+
+    <h3><code>map()</code></h3>
+
+    <p>Takes a function and a list of arguments.</p>
+
+    <p>Blocks until all processes finish, and then returns a list of results in the same order as the arguments.</p>
+
+<pre><code class="language-python">results = pool.map(p, data_set)</code></pre>
+
+    <h3><code>imap()</code></h3>
+
+    <p>Returns an iterator of results.</p>
+
+    <p>Each result is returned in order. If the next result is not ready, it will block until it is.</p>
+
+<pre><code class="language-python">def upscale_image_section(image_data):
+
+    # ... upscale image data ...
+    return upscaled_image_data
+
+full_image_data = []
+
+# call function to upscale chunk of image data
+for result in pool.imap(upscale_image_section, data_set):
+
+    full_image_data.append(result)</code></pre>
+
+    <h3><code>async_map()</code></h3>
+
+    <p>Non-blocking version of <code>map()</code>.</p>
+
+    <p>It returns immediately, with several methods to check and get the results.</p>
+
+<pre><code class="language-python">results = pool.async_map(p, data_set)
+
+# check if results are ready
+if results.ready():
+    # ...
+
+# block and wait for results to be ready but don't get them
+results.wait()
+
+# block until results are ready and get them
+actual_results = results.get()
+
+# block until results are ready and get them or until timeout
+actual_results = results.get(timeout=1.0)</code></pre>
+
+    <h4><code>unordered_imap()</code></h4>
+
+    <p>Returns an iterator of results.</p>
+
+    <p>Each result is returned as it is ready, regardless of order.</p>
+
+    <p>Fastest way to get results, but not in order.</p>
+
+<pre><code class="language-python"># use Process inheriting class UpscaleImage to process each image in data_set
+for processed_image in pool.unordered_imap(UpscaleImage, data_set):
+
+    upscaled_images.append(processed_image)</code></pre>
+
+    <h3><code>star()</code></h3>
+
+    <p>Modifier of <code>map()</code>, <code>imap()</code>, <code>async_map()</code>, and <code>unordered_imap()</code>.</p>
+
+    <p>When used, it makes iterators of tuples spread across multiple arguments instead of the entire tuple being passed as a single argument.</p>
+
+<pre><code class="language-python"># map - always passes item as single argument
+pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
+
+# star map - unpacks tuples as arguments (but only tuples!)
+pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)</code></pre>
+
+<pre><code class="language-python"># imap - always passes item as single argument
+for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
+
+# star imap - unpacks tuples as arguments (but only tuples!)
+for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)</code></pre>
+
+    <h3>Using <code>Pool</code> with <code>Process</code> inheriting classes</h3>
+
+    <p>When using <code>Pool</code> with <code>Process</code> inheriting classes, pass the class itself (not an instance) as the first argument to <code>map()</code> or <code>imap()</code>.</p>
+
+    <p>The second argument will be an argument (or arguments) to <code>__init__()</code>.</p>
+
+    <p>Classes run as they would normally, including ones that don't have a run or time limit (you can still use <code>stop()</code> to stop them in <code>Pools</code>).</p>
+
+<pre><code class="language-python">class UpscaleImage(Process):
+
+    def __init__(self, image):
+        self.image_data = image
+
+for result in pool.unordered_imap(UpscaleImage, data_set):
+
+    upscaled_images.append(result)</code></pre>
+
+<pre><code class="language-python">class ColorImage(Process):
+
+    def __init__(self, image, color, percent_change):
+        self.image_data = image
+        self.color = color
+        self.percent_change = percent_change
+
+colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))</code></pre>
 
 </section>

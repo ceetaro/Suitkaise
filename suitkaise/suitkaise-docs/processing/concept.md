@@ -223,7 +223,7 @@ class MyProcess(Process):
             run_command(command)
 ```
 
-### result()
+### `result()`
 
 Retrieves the result from the process.
 

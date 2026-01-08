@@ -22,6 +22,10 @@ By inheriting from the `Process` class, you can create a well organized process 
 
 Since `processing` uses `cerial` (another `suitkaise` module) as its serializer, you can create these process classes with essentially any object you want.
 
+You can also use the `Pool` class for batch processing.
+
+`Pool` also uses `cerial` for serialization, so you can use it with any object you want, and it also allows you to use `Process` inheriting classes instead of just functions.
+
 No more `PicklingError: Can't serialize object` errors when you start up your process!
 
 - no more manual serialization
@@ -30,9 +34,9 @@ No more `PicklingError: Can't serialize object` errors when you start up your pr
 - built in timing
 - automatic retries with `lives` system
 
-## `Process` class special methods
+## Lifecycle Methods
 
-Classes that inherit from `Process` have access to 6 special methods.
+Classes that inherit from `Process` have access to 6 lifecycle methods.
 
 These methods are what run the actual process when it is created.
 
@@ -124,7 +128,7 @@ something_else()
 
 ### `stop()`
 
-Signals to the process to finish its current run and clean up. 
+Signals to the subprocess to finish its current run and clean up. 
 
 Does not block (so you can stop other processes without having to wait)
 
@@ -141,6 +145,19 @@ p.start()
 p.stop()
 
 p.wait()
+```
+
+```python
+class MyProcess(Process):
+
+    def __run__(self):
+
+        if found_what_we_need:
+            # exit early
+            self.stop()
+
+        else:
+            # ...  
 ```
 
 ### `kill()`
@@ -160,10 +177,67 @@ p.start()
  
 p.kill() # Immediate termination
 
-# p.result will be None
+# p.result() will be None
 ```
 
-### `result` property
+### `tell()`
+
+Sends data to the other process.
+
+If the other process calls `listen()`, it will receive the data from `tell()`.
+
+`tell()` is not a blocking method.
+
+```python
+p = MyProcess()
+p.start()
+
+# sends "data" to the subprocess
+p.tell("some data")
+
+p.wait()
+```
+
+```python
+class MyProcess(Process):
+
+    def __run__(self):
+
+        self.tell(("i have found a corrupt file", "corrupt_file.txt"))
+```
+
+### `listen()`
+
+Blocks until data is received from the other process.
+
+Optional timeout.
+
+```python
+corrupt_files = []
+
+p = MyProcess()
+p.start()
+
+data = p.listen(timeout=1.0)
+
+if data[0] == "i have found a corrupt file":
+    corrupt_files.append(data[1])
+```
+
+```python
+class MyProcess(Process):
+
+    def __run__(self):
+
+        command = self.listen(timeout=5.0)
+
+        if not command:
+            raise ProcessTimeoutError("No command received")
+        else:
+            run_command(command)
+```
+
+### `result()`
 
 Retrieves the result from the process.
 
@@ -176,7 +250,7 @@ p.start()
 
 try:
     # blocks until process finishes and returns __result__() output
-    data = p.result
+    data = p.result()
 
 except ProcessError as e:
     print(f"{e}")
@@ -274,7 +348,7 @@ The `p.timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun
 
 All timers are `suitkaise.sktime.Timer` objects, and function exactly the same.
 
-Timers will not be accessible unless you define their respective methods yourself.
+Timers will not be accessible unless you define their respective lifecycle methods yourself.
 
 ## `lives` system
 
@@ -327,13 +401,12 @@ If an error occurs outside of one of the inherited `Process` methods, it will be
 
 If a timeout occurs, a `ProcessTimeoutError` will be raised. It contains the section name, timeout value, and current run number.
 
-(start of dropdown)
 ### Error Examples
 
 ```text
 Traceback (most recent call last):
-  File \"my_script.py\", line 25, in <module>
-    result = p.result
+  File "my_script.py", line 25, in <module>
+    result = p.result()
              ^^^^^^^^
   ...
 suitkaise.processing.RunError: Error in __run__ on run 5
@@ -341,10 +414,10 @@ suitkaise.processing.RunError: Error in __run__ on run 5
 The above exception was caused by:
 
 Traceback (most recent call last):
-  File \"my_script.py\", line 14, in __run__
+  File "my_script.py", line 14, in __run__
     data = fetch_from_api()
-  File \"my_script.py\", line 8, in fetch_from_api
-    raise ConnectionError(\"Failed to connect to server\")
+  File "my_script.py", line 8, in fetch_from_api
+    raise ConnectionError("Failed to connect to server")
 ConnectionError: Failed to connect to server
 ```
 
@@ -352,19 +425,17 @@ ConnectionError: Failed to connect to server
 suitkaise.processing.ProcessTimeoutError: Timeout in run after 5.0s on run 3
 ```
 
-(end of dropdown)
-
 ### Accessing the Original Error
 
 All `ProcessError` subclasses store the original exception:
 
 ```python
 try:
-    result = p.result
+    result = p.result()
 except ProcessError as e:
-    print(f\"Process error: {e}\")
-    print(f\"Original error: {e.original_error}\")
-    print(f\"Run number: {e.current_run}\")
+    print(f"Process error: {e}")
+    print(f"Original error: {e.original_error}")
+    print(f"Run number: {e.current_run}")
 
 # Output:
 # Process error: Error in __run__ on run 5
@@ -372,7 +443,142 @@ except ProcessError as e:
 # Run number: 5
 ```
 
+## `Pool`
+
+`Pool` allows you to run multiple processes in parallel.
+
+It does 2 things differently.
+
+- uses `cerial` for serialization of complex objects between processes
+- allows for the use of the `Process` inheriting classes mentioned above
+
+```python
+from suitkaise.processing import Pool
+
+# a class of type ["processing.Process"]
+p = MyProcess()
+data_set = get_data()
+
+pool = Pool(workers=8)
+```
+
+### `map()`
+
+Takes a function and a list of arguments.
+
+Blocks until all processes finish, and then returns a list of results in the same order as the arguments.
+
+```python
+results = pool.map(p, data_set)
+```
+
+### `imap()`
+
+Returns an iterator of results.
+
+Each result is returned in order. If the next result is not ready, it will block until it is.
+
+```python
+def upscale_image_section(image_data):
+
+    # ... upscale image data ...
+    return upscaled_image_data
+
+full_image_data = []
+
+# call function to upscale chunk of image data
+for result in pool.imap(upscale_image_section, data_set):
+
+    full_image_data.append(result)
+```
 
 
+### `async_map()`
 
+Non-blocking version of `map()`.
 
+It returns immediately, with several methods to check and get the results.
+
+```python
+results = pool.async_map(p, data_set)
+
+# check if results are ready
+if results.ready():
+    # ...
+
+# block and wait for results to be ready but don't get them
+results.wait()
+
+# block until results are ready and get them
+actual_results = results.get()
+
+# block until results are ready and get them or until timeout
+actual_results = results.get(timeout=1.0)
+```
+
+#### `unordered_imap()`
+
+Returns an iterator of results.
+
+Each result is returned as it is ready, regardless of order.
+
+Fastest way to get results, but not in order.
+
+```python
+# use Process inheriting class UpscaleImage to process each image in data_set
+for processed_image in pool.unordered_imap(UpscaleImage, data_set):
+
+    upscaled_images.append(processed_image)
+```
+
+### `star()`
+
+Modifier of `map()`, `imap()`, `async_map()`, and `unordered_imap()`.
+
+When used, it makes iterators of tuples spread across multiple arguments instead of the entire tuple being passed as a single argument.
+
+```python
+# map - always passes item as single argument
+pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
+
+# star map - unpacks tuples as arguments (but only tuples!)
+pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)
+```
+
+```python
+# imap - always passes item as single argument
+for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
+
+# star imap - unpacks tuples as arguments (but only tuples!)
+for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)
+```
+
+### Using `Pool` with `Process` inheriting classes
+
+When using `Pool` with `Process` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
+
+The second argument will be an argument (or arguments) to `__init__()`.
+
+Classes run as they would normally, including ones that don't have a run or time limit (you can still use `stop()` to stop them in `Pools`).
+
+```python
+class UpscaleImage(Process):
+
+    def __init__(self, image):
+        self.image_data = image
+
+for result in pool.unordered_imap(UpscaleImage, data_set):
+
+    upscaled_images.append(result)
+```
+
+```python
+class ColorImage(Process):
+
+    def __init__(self, image, color, percent_change):
+        self.image_data = image
+        self.color = color
+        self.percent_change = percent_change
+
+colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))
+```
