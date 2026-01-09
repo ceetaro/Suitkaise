@@ -59,7 +59,7 @@ from suitkaise import sktime
 # time multiple functions with this one timer
 t = sktime.Timer()
 
-def MyClass:
+class MyClass:
     @sktime.timethis(timer=t)
     def my_function(self):
         # Your code here
