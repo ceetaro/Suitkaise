@@ -15,7 +15,7 @@ from .timers import ProcessTimers
 if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
     from multiprocessing import Queue
-    from suitkaise.sktime import Timer
+    from suitkaise.timing import Timer
 
 
 class TimedMethod:

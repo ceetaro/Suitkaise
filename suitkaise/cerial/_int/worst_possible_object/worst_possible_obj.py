@@ -79,21 +79,20 @@ COMPLEX_TYPES_THAT_CERIAL_CAN_HANDLE = [
 
 # sktime
 # skpath
-from suitkaise.skpath import *
-from suitkaise.sktime import *
-from suitkaise.circuit import *
+from suitkaise.paths import *
+from suitkaise.timing import *
+from suitkaise.circuits import *
 from suitkaise.processing import *
 
 # Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [
     # skpath - project-aware path handling
-    'SKPath',           # Main path class with project root awareness
+    'Skpath',           # Main path class with project root awareness
     'CustomRoot',       # Custom root management
     'autopath',         # Decorator (handled by function handler)
     
-    # sktime - timing utilities  
+    # timing - timing utilities  
     'Timer',            # Elapsed time tracker with laps
-    'Yawn',             # Sleep utility
     'TimeThis',         # Context manager for timing
     'timethis',         # Decorator (handled by function handler)
     
@@ -748,12 +747,12 @@ class WorstPossibleObject:
         
         self._log("  [INIT] Suitkaise objects")
         
-        # === SKPath objects ===
-        # SKPath - project-aware path object
-        self.skpath_current_file = SKPath(__file__)
+        # === Skpath objects ===
+        # Skpath - project-aware path object
+        self.skpath_current_file = Skpath(__file__)
         self._track_init('complex', 'skpath_current_file', self.skpath_current_file)
         
-        self.skpath_project_root = SKPath('.')
+        self.skpath_project_root = Skpath('.')
         self._track_init('complex', 'skpath_project_root', self.skpath_project_root)
         
         # CustomRoot - for custom project root management
@@ -771,15 +770,15 @@ class WorstPossibleObject:
         self.timer_empty = Timer()
         self._track_init('complex', 'timer_empty', self.timer_empty)
         
-        # Yawn - sleep utility (sleep_duration, yawn_threshold)
-        self.yawn = Yawn(sleep_duration=0.001, yawn_threshold=5)
-        self._track_init('complex', 'yawn', self.yawn)
+        # Circuit - auto-resetting circuit (from circuits module)
+        self.circuit_auto = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.001)
+        self._track_init('complex', 'circuit_auto', self.circuit_auto)
         
         # TimeThis - context manager for timing
         self.timethis_ctx = TimeThis("test_operation")
         self._track_init('complex', 'timethis_ctx', self.timethis_ctx)
         
-        # SKPath module-level functions
+        # Skpath module-level functions
         self.skpath_autopath_decorator = autopath
         self._track_init('complex', 'autopath (decorator)', self.skpath_autopath_decorator)
         
@@ -827,7 +826,7 @@ class WorstPossibleObject:
         # === Processing objects ===
         # ProcessConfig - configuration for processes (dataclass)
         self.process_config = ProcessConfig(
-            num_loops=100,
+            runs=100,
             join_in=60.0,
             lives=3
         )
@@ -835,9 +834,9 @@ class WorstPossibleObject:
         
         # TimeoutConfig - timeout configuration (dataclass)
         self.timeout_config = TimeoutConfig(
-            preloop=30.0,
-            loop=300.0,
-            postloop=60.0,
+            prerun=30.0,
+            run=300.0,
+            postrun=60.0,
             onfinish=60.0
         )
         self._track_init('complex', 'timeout_config', self.timeout_config)
@@ -846,9 +845,7 @@ class WorstPossibleObject:
         self.process_timers = ProcessTimers()
         self._track_init('complex', 'process_timers', self.process_timers)
         
-        # Processing module-level functions/decorators
-        self.processing_timesection_decorator = timesection
-        self._track_init('complex', 'timesection (decorator)', self.processing_timesection_decorator)
+        # Note: timesection decorator removed - not in current processing API
 
     def generate_random_nested_collection(self, collection_type):
         """Generate a random nested collection of primitives, collections, and complex objects."""
@@ -1293,13 +1290,13 @@ class WorstPossibleObject:
             'skpath_project_root_type': type(self.skpath_project_root).__name__,
             'custom_root_type': type(self.custom_root).__name__,
             'timer_type': type(self.timer).__name__,
-            'yawn_sleep_duration': self.yawn.sleep_duration,
-            'yawn_threshold': self.yawn.yawn_threshold,
+            'circuit_auto_sleep_time': self.circuit_auto.sleep_time_after_trip,
+            'circuit_auto_threshold': self.circuit_auto.num_shorts_to_trip,
             'circuit_num_shorts_to_trip': self.circuit.num_shorts_to_trip,
-            'process_config_num_loops': self.process_config.num_loops,
+            'process_config_runs': self.process_config.runs,
             'process_config_lives': self.process_config.lives,
-            'timeout_config_preloop': self.timeout_config.preloop,
-            'timeout_config_loop': self.timeout_config.loop,
+            'timeout_config_prerun': self.timeout_config.prerun,
+            'timeout_config_run': self.timeout_config.run,
             
             # Suitkaise module-level functions (verify they're callable)
             'autopath_callable': callable(self.skpath_autopath_decorator),
@@ -1312,7 +1309,6 @@ class WorstPossibleObject:
             'elapsed_callable': callable(self.sktime_elapsed_func),
             'timethis_callable': callable(self.sktime_timethis_decorator),
             'clear_global_timers_callable': callable(self.sktime_clear_global_timers_func),
-            'timesection_callable': callable(self.processing_timesection_decorator),
         }
         
         return self._verification_checksums

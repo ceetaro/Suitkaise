@@ -1,0 +1,229 @@
+"""
+Handler for enum objects.
+
+Enums (from the enum module) are commonly used in Python for defining
+named constants. We need to handle both Enum instances and Enum classes.
+"""
+
+import enum
+import importlib
+from typing import Any, Dict
+from .base_class import Handler
+
+
+class EnumSerializationError(Exception):
+    """Raised when enum serialization fails."""
+    pass
+
+
+class EnumHandler(Handler):
+    """
+    Serializes enum.Enum instances.
+    
+    Strategy:
+    - Store the enum class (module + qualname) and the enum value
+    - On reconstruction, import the enum class and get the member by value
+    
+    Example:
+        from enum import Enum
+        class Color(Enum):
+            RED = 1
+            GREEN = 2
+            BLUE = 3
+        
+        color = Color.RED
+        # Serializes as: {"module": "__main__", "enum_name": "Color", "value": 1}
+    
+    This works for:
+    - Standard Enum
+    - IntEnum
+    - Flag
+    - IntFlag
+    - Custom enum subclasses
+    """
+    
+    type_name = "enum"
+    
+    def can_handle(self, obj: Any) -> bool:
+        """
+        Check if object is an Enum instance.
+        
+        We check if the object is an instance of enum.Enum.
+        """
+        return isinstance(obj, enum.Enum)
+    
+    def extract_state(self, obj: enum.Enum) -> Dict[str, Any]:
+        """
+        Extract enum instance state.
+        
+        What we capture:
+        - module: Module name where enum is defined
+        - enum_name: Name of the enum class
+        - member_name: Name of the specific enum member
+        - value: Value of the enum member
+        
+        We store both name and value for robustness. If the enum changes
+        between serialization and deserialization, we can still try to
+        match by value.
+        """
+        enum_class = type(obj)
+        
+        return {
+            "module": enum_class.__module__,
+            "enum_name": enum_class.__name__,
+            "qualname": enum_class.__qualname__,
+            "member_name": obj.name,
+            "value": obj.value,  # The actual value (int, str, etc.)
+        }
+    
+    def reconstruct(self, state: Dict[str, Any]) -> enum.Enum:
+        """
+        Reconstruct enum instance.
+        
+        Process:
+        1. Import the enum class by module + name
+        2. Try to get member by name (fastest, most reliable)
+        3. If that fails, try to get member by value (fallback)
+        4. If both fail, raise error
+        """
+        # Import module
+        try:
+            module = importlib.import_module(state["module"])
+        except ImportError as e:
+            raise EnumSerializationError(
+                f"Cannot import module '{state['module']}' for enum {state['enum_name']}. "
+                f"Ensure the module exists in the target process."
+            ) from e
+        
+        # Get enum class
+        # Handle nested enums (qualname might be "Outer.Inner.MyEnum")
+        parts = state["qualname"].split('.')
+        enum_class = module
+        for part in parts:
+            try:
+                enum_class = getattr(enum_class, part)
+            except AttributeError as e:
+                raise EnumSerializationError(
+                    f"Cannot find enum '{state['qualname']}' in module '{state['module']}'. "
+                    f"Ensure the enum definition exists in the target process."
+                ) from e
+        
+        # Verify it's actually an enum class
+        if not isinstance(enum_class, type) or not issubclass(enum_class, enum.Enum):
+            raise EnumSerializationError(
+                f"'{state['qualname']}' is not an Enum class"
+            )
+        
+        # Try to get enum member by name first (most reliable)
+        try:
+            return enum_class[state["member_name"]]
+        except KeyError:
+            # Member name doesn't exist, try by value
+            pass
+        
+        # Fallback: try to get member by value
+        try:
+            return enum_class(state["value"])
+        except ValueError as e:
+            raise EnumSerializationError(
+                f"Cannot reconstruct enum {state['enum_name']}.{state['member_name']}. "
+                f"Neither member name '{state['member_name']}' nor value {state['value']} "
+                f"exist in the enum. The enum definition may have changed."
+            ) from e
+
+
+class EnumClassHandler(Handler):
+    """
+    Serializes enum.Enum classes (not instances, the class itself).
+    
+    Example:
+        from enum import Enum
+        class Color(Enum):
+            RED = 1
+            GREEN = 2
+        
+        cls = Color  # The class itself, not an instance
+    
+    For module-level enums, we just store the module + name.
+    For dynamically created enums, we store the full definition.
+    """
+    
+    type_name = "enum_class"
+    
+    def can_handle(self, obj: Any) -> bool:
+        """
+        Check if object is an Enum class (not instance).
+        
+        We check if it's a type that is a subclass of enum.Enum.
+        """
+        return (
+            isinstance(obj, type) and
+            issubclass(obj, enum.Enum) and
+            obj is not enum.Enum  # Exclude the Enum base class itself
+        )
+    
+    def extract_state(self, obj: type) -> Dict[str, Any]:
+        """
+        Extract enum class.
+        
+        For module-level enums, just store module + name.
+        For dynamic enums, serialize the full definition.
+        """
+        # Check if enum is at module level
+        try:
+            module = importlib.import_module(obj.__module__)
+            module_enum = getattr(module, obj.__name__, None)
+            is_module_level = module_enum is obj
+        except (ImportError, AttributeError):
+            # Module doesn't exist or enum not in module - it's dynamic
+            is_module_level = False
+        except Exception as e:
+            # Unexpected error - log and treat as dynamic
+            import warnings
+            warnings.warn(f"Error checking if enum is module-level: {e}")
+            is_module_level = False
+        
+        if is_module_level:
+            # Simple reference
+            return {
+                "type": "reference",
+                "module": obj.__module__,
+                "name": obj.__name__,
+            }
+        else:
+            # Dynamic enum - serialize definition
+            # Get all members and their values
+            members = {}
+            for member in obj:
+                members[member.name] = member.value
+            
+            # Get base enum type (Enum, IntEnum, Flag, etc.)
+            base_type = None
+            for base in obj.__mro__[1:]:
+                if base in (enum.Enum, enum.IntEnum, enum.Flag, enum.IntFlag):
+                    base_type = base.__name__
+                    break
+            
+            if base_type is None:
+                base_type = "Enum"  # Default
+            
+            return {
+                "type": "definition",
+                "name": obj.__name__,
+                "members": members,
+                "base_type": base_type,
+            }
+    
+    def reconstruct(self, state: Dict[str, Any]) -> type:
+        """Reconstruct enum class."""
+        if state["type"] == "reference":
+            # Import and return enum class
+            module = importlib.import_module(state["module"])
+            return getattr(module, state["name"])
+        else:
+            # Reconstruct dynamic enum
+            base_type = getattr(enum, state["base_type"], enum.Enum)
+            
+            # Create enum using functional API
+            return base_type(state["name"], state["members"])
+

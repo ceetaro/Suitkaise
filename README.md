@@ -12,7 +12,7 @@ pip install suitkaise
 
 Supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.2.4`.
+Currently, `suitkaise` is version `0.3.0`.
 
 All files and code in this repository is licensed under the MIT License.
 

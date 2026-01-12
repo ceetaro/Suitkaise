@@ -8,7 +8,7 @@ Access via process.__run__.timer, process.__prerun__.timer, etc.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from suitkaise.sktime import Timer
+    from suitkaise.timing import Timer
 
 
 class ProcessTimers:
@@ -24,7 +24,7 @@ class ProcessTimers:
     
     def __init__(self):
         # Import here to avoid circular imports
-        from suitkaise.sktime import Timer
+        from suitkaise.timing import Timer
         
         # Individual section timers
         self.prerun: Timer | None = None
@@ -65,7 +65,7 @@ class ProcessTimers:
         Returns:
             The Timer for that section
         """
-        from suitkaise.sktime import Timer
+        from suitkaise.timing import Timer
         
         current = getattr(self, section, None)
         if current is None:
@@ -80,7 +80,7 @@ class ProcessTimers:
         
         Called when a process crashes and restarts with a life.
         """
-        from suitkaise.sktime import Timer
+        from suitkaise.timing import Timer
         
         self.prerun = None
         self.run = None

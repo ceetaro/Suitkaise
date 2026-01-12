@@ -5,6 +5,14 @@ This is the ultimate test - if WorstPossibleObject round-trips successfully,
 then cerial can handle pretty much anything.
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path for direct script execution
+_project_root = Path(__file__).resolve().parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 import pytest
 from suitkaise.cerial._int.serializer import Cerializer
 from suitkaise.cerial._int.deserializer import Decerializer
