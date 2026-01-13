@@ -98,7 +98,7 @@ def _engine_main_inner(
         process.timers = ProcessTimers()
     
     # Track lives for retry system
-    lives_remaining = process.config.lives
+    lives_remaining = process.process_config.lives
     
     # Store reference to stop_event on process so lifecycle methods can use stop()
     process._stop_event = stop_event
@@ -169,7 +169,7 @@ def _engine_main_inner(
             if lives_remaining > 0:
                 # Retry: keep user state and run counter, retry current iteration
                 # Failed timings already discarded via timer.discard()
-                process.config.lives = lives_remaining
+                process.process_config.lives = lives_remaining
                 process._stop_event = stop_event
                 continue
             else:
@@ -207,7 +207,7 @@ def _run_section_timed(
         method = method_attr
     
     # Get timeout for this section
-    timeout = getattr(process.config.timeouts, timer_name, None)
+    timeout = getattr(process.process_config.timeouts, timer_name, None)
     
     # Get or create timer
     timer = process.timers._ensure_timer(timer_name)
@@ -246,14 +246,14 @@ def _should_continue(process: Any, stop_event: "Event") -> bool:
         return False
     
     # Check run count limit
-    if process.config.runs is not None:
-        if process._current_run >= process.config.runs:
+    if process.process_config.runs is not None:
+        if process._current_run >= process.process_config.runs:
             return False
     
     # Check time limit
-    if process.config.join_in is not None:
+    if process.process_config.join_in is not None:
         elapsed = sktime.elapsed(process._start_time)
-        if elapsed >= process.config.join_in:
+        if elapsed >= process.process_config.join_in:
             return False
     
     return True
@@ -278,7 +278,7 @@ def _run_finish_sequence(
     else:
         method = method_attr
     
-    timeout = process.config.timeouts.onfinish
+    timeout = process.process_config.timeouts.onfinish
     
     # Time onfinish if user defined it
     if process.timers is not None:
@@ -312,7 +312,7 @@ def _run_finish_sequence(
     else:
         result_method = result_method_attr
     
-    result_timeout = process.config.timeouts.result
+    result_timeout = process.process_config.timeouts.result
     
     # Time result if user defined it
     if process.timers is not None:
@@ -361,7 +361,7 @@ def _send_error(
     Call __error__ and send error result back to parent.
     """
     from suitkaise import cerial
-    from .errors import ErrorError
+    from .errors import ErrorHandlerError
     from .timeout import run_with_timeout
     
     # Set error on process for __error__ to access
@@ -374,7 +374,7 @@ def _send_error(
     else:
         error_method = error_method_attr
     
-    error_timeout = process.config.timeouts.error
+    error_timeout = process.process_config.timeouts.error
     
     # Time __error__ if user defined it
     if process.timers is not None:

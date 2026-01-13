@@ -40,6 +40,9 @@ from .timing import (
     clear_global_timers,
 )
 
+# Alias for timing module (used internally as sktime)
+from . import timing as sktime
+
 # ============================================================================
 # Paths Module Exports
 # ============================================================================
@@ -96,10 +99,6 @@ from .cerial import (
     serialize,
     deserialize,
     
-    # Classes for advanced usage
-    Cerializer,
-    Decerializer,
-    
     # Exceptions
     SerializationError,
     DeserializationError,
@@ -112,17 +111,7 @@ from .processing import (
     # Main classes
     Process,
     Pool,
-    
-    # Pool helpers
-    AsyncResult,
-    StarModifier,
-    
-    # Configuration
-    ProcessConfig,
-    TimeoutConfig,
-    
-    # Timers
-    ProcessTimers,
+    Share,
     
     # Errors
     ProcessError,
@@ -131,8 +120,17 @@ from .processing import (
     PostRunError,
     OnFinishError,
     ResultError,
-    ErrorError,
+    ErrorHandlerError,
     ProcessTimeoutError,
+)
+
+# ============================================================================
+# Sk Module Exports
+# ============================================================================
+from .sk import (
+    sk,
+    NotAsyncedError,
+    FunctionTimeoutError,
 )
 
 # ============================================================================
@@ -150,6 +148,7 @@ __all__ = [
     "TimeThis",
     "timethis",
     "clear_global_timers",
+    "sktime",  # no alias needed, lib is unreleased
     
     # Paths
     "Skpath",
@@ -179,26 +178,24 @@ __all__ = [
     # Cerial
     "serialize",
     "deserialize",
-    "Cerializer",
-    "Decerializer",
     "SerializationError",
     "DeserializationError",
     
     # Processing
     "Process",
     "Pool",
-    "AsyncResult",
-    "StarModifier",
-    "ProcessConfig",
-    "TimeoutConfig",
-    "ProcessTimers",
+    "Share",
     "ProcessError",
     "PreRunError",
     "RunError",
     "PostRunError",
     "OnFinishError",
     "ResultError",
-    "ErrorError",
+    "ErrorHandlerError",
     "ProcessTimeoutError",
     
+    # Sk
+    "sk",
+    "NotAsyncedError",
+    "FunctionTimeoutError",
 ]

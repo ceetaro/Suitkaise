@@ -64,7 +64,7 @@ class Process:
         class MyProcess(Process):
             def __init__(self):
                 self.counter = 0
-                self.config.runs = 10
+                self.process_config.runs = 10
             
             def __run__(self):
                 self.counter += 1
@@ -82,9 +82,9 @@ class Process:
     """
     
     # Class-level attribute declarations for type checking
-    config: ProcessConfig
+    process_config: ProcessConfig
     timers: ProcessTimers | None
-    timer: "Timer | None"  # Alias for full_run timer
+    process_timer: "Timer | None"  # Alias for full_run timer
     error: BaseException | None
     _current_run: int
     _start_time: float | None
@@ -101,7 +101,7 @@ class Process:
     
     # Internal attribute names (used for serialization filtering)
     _INTERNAL_ATTRS = frozenset({
-        'config', 'timers', 'error', '_current_run', '_start_time',
+        'process_config', 'timers', 'error', '_current_run', '_start_time',
         '_stop_event', '_result_queue', '_tell_queue', '_listen_queue',
         '_subprocess', '_result', '_has_result', '_timed_methods',
     })
@@ -347,7 +347,7 @@ class Process:
         Called automatically before user's __init__.
         """
         # Configuration with defaults
-        instance.config = ProcessConfig()
+        instance.process_config = ProcessConfig()
         
         # Timers container (created when needed)
         instance.timers = None
@@ -638,7 +638,7 @@ class Process:
             return None
     
     @property
-    def timer(self) -> "Timer | None":
+    def process_timer(self) -> "Timer | None":
         """
         Get the aggregate timer for full run iterations.
         

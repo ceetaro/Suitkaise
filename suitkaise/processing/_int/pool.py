@@ -523,7 +523,7 @@ def _run_process_inline(process: "Process") -> Any:
     process._stop_event = stop_event  # type: ignore[assignment]
     
     # Track lives for retry system
-    lives_remaining = process.config.lives
+    lives_remaining = process.process_config.lives
     
     def _unwrap_method(m: Any) -> Callable:
         """Unwrap TimedMethod wrapper if present."""
@@ -536,14 +536,14 @@ def _run_process_inline(process: "Process") -> Any:
             return False
         
         # Check run count limit
-        if process.config.runs is not None:
-            if process._current_run >= process.config.runs:
+        if process.process_config.runs is not None:
+            if process._current_run >= process.process_config.runs:
                 return False
         
         # Check time limit (join_in)
-        if process.config.join_in is not None and process._start_time is not None:
+        if process.process_config.join_in is not None and process._start_time is not None:
             elapsed = sktime.elapsed(process._start_time)
-            if elapsed >= process.config.join_in:
+            if elapsed >= process.process_config.join_in:
                 return False
         
         return True
@@ -553,7 +553,7 @@ def _run_process_inline(process: "Process") -> Any:
         method_attr = getattr(process, method_name)
         method = _unwrap_method(method_attr)
         
-        timeout = getattr(process.config.timeouts, timer_name, None)
+        timeout = getattr(process.process_config.timeouts, timer_name, None)
         
         # Get timer (we ensured timers exist above)
         assert process.timers is not None
@@ -610,7 +610,7 @@ def _run_process_inline(process: "Process") -> Any:
             
             if lives_remaining > 0:
                 # Retry: keep user state and run counter, retry current iteration
-                process.config.lives = lives_remaining
+                process.process_config.lives = lives_remaining
                 continue
             else:
                 # No lives left - run error sequence
@@ -627,7 +627,7 @@ def _run_finish_sequence_inline(process: "Process") -> Any:
     
     # === ONFINISH ===
     method = _unwrap_method(process.__onfinish__)
-    timeout = process.config.timeouts.onfinish
+    timeout = process.process_config.timeouts.onfinish
     
     timer = None
     if process.timers is not None:
@@ -646,7 +646,7 @@ def _run_finish_sequence_inline(process: "Process") -> Any:
     
     # === RESULT ===
     result_method = _unwrap_method(process.__result__)
-    result_timeout = process.config.timeouts.result
+    result_timeout = process.process_config.timeouts.result
     
     result_timer = None
     if process.timers is not None:
@@ -677,7 +677,7 @@ def _run_error_sequence_inline(process: "Process", error: BaseException) -> Any:
     process.error = error
     
     error_method = _unwrap_method(process.__error__)
-    error_timeout = process.config.timeouts.error
+    error_timeout = process.process_config.timeouts.error
     
     error_timer = None
     if process.timers is not None:

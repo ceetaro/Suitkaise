@@ -1,0 +1,73 @@
+"""
+Run All Cerial Tests
+
+Executes all test suites in the cerial module.
+"""
+
+import sys
+
+sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+
+# Colors
+GREEN = '\033[92m'
+RED = '\033[91m'
+CYAN = '\033[96m'
+BOLD = '\033[1m'
+RESET = '\033[0m'
+
+
+def run_all_tests():
+    """Run all cerial module tests."""
+    print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")
+    print(f"{BOLD}{CYAN}{' CERIAL MODULE - ALL TESTS ':=^80}{RESET}")
+    print(f"{BOLD}{CYAN}{'='*80}{RESET}\n")
+    
+    from tests.cerial.test_primitives import run_all_tests as run_primitives_tests
+    from tests.cerial.test_complex import run_all_tests as run_complex_tests
+    from tests.cerial.test_edge_cases import run_all_tests as run_edge_cases_tests
+    from tests.cerial.test_handlers import run_all_tests as run_handlers_tests
+    from tests.cerial.test_worst_possible_object import run_all_tests as run_wpo_tests
+    
+    results = []
+    
+    print(f"\n{CYAN}Running Primitives tests...{RESET}")
+    results.append(("Primitives", run_primitives_tests()))
+    
+    print(f"\n{CYAN}Running Complex Objects tests...{RESET}")
+    results.append(("Complex Objects", run_complex_tests()))
+    
+    print(f"\n{CYAN}Running Edge Cases tests...{RESET}")
+    results.append(("Edge Cases", run_edge_cases_tests()))
+    
+    print(f"\n{CYAN}Running Handlers tests...{RESET}")
+    results.append(("Handlers", run_handlers_tests()))
+    
+    print(f"\n{CYAN}Running WorstPossibleObject stress tests...{RESET}")
+    results.append(("WorstPossibleObject", run_wpo_tests()))
+    
+    # Summary
+    print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")
+    print(f"{BOLD}{CYAN}{' SUMMARY ':=^80}{RESET}")
+    print(f"{BOLD}{CYAN}{'='*80}{RESET}\n")
+    
+    all_passed = True
+    for name, passed in results:
+        status = f"{GREEN}✓ PASS{RESET}" if passed else f"{RED}✗ FAIL{RESET}"
+        print(f"  {status}  {name}")
+        if not passed:
+            all_passed = False
+    
+    print()
+    if all_passed:
+        print(f"  {GREEN}{BOLD}All cerial tests passed!{RESET}")
+    else:
+        print(f"  {RED}{BOLD}Some cerial tests failed.{RESET}")
+    
+    print(f"\n{BOLD}{'='*80}{RESET}\n")
+    
+    return all_passed
+
+
+if __name__ == '__main__':
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

@@ -2,7 +2,7 @@
 Suitkaise Processing - Subprocess-based task execution.
 
 Usage:
-    from suitkaise.processing import Process, Pool
+    from suitkaise.processing import Process, Pool, Share
     
     class MyWorker(Process):
         def __init__(self, value):
@@ -27,20 +27,17 @@ Usage:
     
     # Access timing (automatic for any lifecycle method)
     print(worker.__run__.timer.mean)
+    
+    # Shared state between processes
+    with Share() as share:
+        share.timer = Timer()  # Auto-wrapped for cross-process sharing
+        share.timer.add_time(1.0)
 """
 
 from .api import (
     # Main classes
     Process,
     Pool,
-    
-    # Pool helpers
-    AsyncResult,
-    StarModifier,
-    
-    # Configuration
-    ProcessConfig,
-    TimeoutConfig,
     
     # Timers
     ProcessTimers,
@@ -52,17 +49,16 @@ from .api import (
     PostRunError,
     OnFinishError,
     ResultError,
-    ErrorError,
+    ErrorHandlerError,
     ProcessTimeoutError,
 )
+
+from ._int.share import Share
 
 __all__ = [
     'Process',
     'Pool',
-    'AsyncResult',
-    'StarModifier',
-    'ProcessConfig',
-    'TimeoutConfig',
+    'Share',
     'ProcessTimers',
     'ProcessError',
     'PreRunError',
@@ -70,6 +66,6 @@ __all__ = [
     'PostRunError',
     'OnFinishError',
     'ResultError',
-    'ErrorError',
+    'ErrorHandlerError',
     'ProcessTimeoutError',
 ]

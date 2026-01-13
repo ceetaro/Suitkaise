@@ -239,7 +239,7 @@ circ.short()
 # (no broken property)
 ```
 
-- `Circuit` --> `BreakingCircuit`
+- `Circuit` -> `BreakingCircuit`
   - implementation changes to include exponential backoff
 
 ```python
@@ -278,7 +278,7 @@ you could even have BreakingCircuit inherit from Circuit and add the reset() and
 
 whatever you do, make sure code for mirroring functionality is the same in both classes. -->
 
-### Update `paths` module
+<!-- ### Update `paths` module
 
 change `Skpath.np` to `Skpath.rp`
 - same implementation, just different name to avoid Numpy as np conflict
@@ -298,7 +298,7 @@ Add utils
 
 ### Update `timing` module
 
-add a threshold arg to TimeThis and timethis that only records a time above a certain threshold. default is 0.0.
+add a threshold arg to TimeThis and timethis that only records a time above a certain threshold. default is 0.0. -->
 
 ## After Creation of a New `suitkaise` Directory
 
@@ -436,3 +436,217 @@ class MyClass:
     def value(self):
         return self.total
 ```
+
+---
+
+## Testing Plan
+
+### Structure
+
+```
+tests/
+  timing/
+    test_timer.py           # Timer class tests
+    test_timethis.py        # TimeThis context manager tests
+    test_functions.py       # time(), sleep(), elapsed(), sleep.asynced()
+    test_decorators.py      # @timethis decorator tests
+    benchmarks.py           # Timing module benchmarks
+    run_all_tests.py        # Run all timing tests
+    run_all_benchmarks.py   # Run all timing benchmarks
+  
+  circuits/
+    test_circuit.py         # Circuit class tests
+    test_breaking_circuit.py # BreakingCircuit class tests
+    test_async.py           # .asynced() method tests
+    benchmarks.py           # Circuits module benchmarks
+    run_all_tests.py
+    run_all_benchmarks.py
+  
+  paths/
+    test_skpath.py          # Skpath class tests
+    test_utilities.py       # Utility function tests
+    test_root_detection.py  # Project root detection tests
+    benchmarks.py
+    run_all_tests.py
+    run_all_benchmarks.py
+  
+  cerial/
+    test_primitives.py      # Primitive serialization tests
+    test_complex.py         # Complex object serialization tests
+    test_edge_cases.py      # Edge cases and error handling
+    benchmarks.py
+    run_all_tests.py
+    run_all_benchmarks.py
+  
+  processing/
+    test_process.py         # Process class tests
+    test_pool.py            # Pool class tests
+    test_share.py           # Share class tests
+    test_share_integration.py # Share with Timer, Circuit, user classes
+    benchmarks.py
+    run_all_tests.py
+    run_all_benchmarks.py
+  
+  sk/
+    test_skclass.py         # Skclass wrapper tests
+    test_skfunction.py      # Skfunction wrapper tests
+    test_decorator.py       # @sk decorator tests
+    test_async_chaining.py  # AsyncSkfunction chaining tests
+    benchmarks.py
+    run_all_tests.py
+    run_all_benchmarks.py
+  
+  integration/
+    test_share_timer.py     # Share + Timer multiprocess
+    test_share_circuit.py   # Share + Circuit multiprocess
+    test_async_patterns.py  # Async patterns across modules
+    run_all_tests.py
+  
+  run_all_tests.py          # Run ALL tests across all modules
+  run_all_benchmarks.py     # Run ALL benchmarks across all modules
+```
+
+### Test Requirements
+
+1. **IDE Runnable**: Every test file has `if __name__ == '__main__':` block
+2. **Self-contained**: Each test file can run independently
+3. **Comprehensive**: Test happy paths, edge cases, error conditions
+4. **Async Support**: Use `asyncio.run()` for async tests (no pytest-asyncio dependency)
+5. **Clear Output**: Print pass/fail status with descriptive messages
+
+### Test Categories Per Module
+
+#### timing
+- Timer: start/stop, lap, pause/resume, reset, statistics (mean, median, stdev, etc.)
+- Timer: concurrent/multi-threaded usage, nested timing
+- TimeThis: context manager, with explicit Timer, threshold
+- sleep: basic sleep, sleep.asynced()
+- timethis decorator: auto timer, explicit timer, threshold
+
+#### circuits
+- Circuit: short counting, trip behavior, auto-reset, backoff, reset_backoff
+- Circuit: short.asynced(), trip.asynced()
+- BreakingCircuit: short, trip, broken flag, manual reset, backoff
+- BreakingCircuit: short.asynced(), trip.asynced()
+
+#### paths
+- Skpath: creation, path operations, relative paths
+- Root detection: find project root, custom root
+- Utilities: is_valid_filename, streamline_path, get_caller_path
+
+#### cerial
+- Primitives: int, float, str, bytes, bool, None
+- Collections: list, dict, tuple, set
+- Complex: class instances, nested objects, circular references
+- Functions: module-level, lambdas, closures
+- Edge cases: unpicklable objects, large objects
+
+#### processing
+- Process: lifecycle (__run__, __result__, __error__), timing
+- Pool: map, starmap, async results
+- Share: with Timer, Circuit, user classes
+- Share: auto-wrap with Skclass, proxy behavior
+
+#### sk
+- Skclass: auto _shared_meta, blocking detection, .asynced()
+- Skfunction: .asynced(), .retry(), .timeout(), .background()
+- AsyncSkfunction: chaining .timeout().retry()
+- @sk decorator: on classes, on functions
+- NotAsyncedError: raised for non-blocking
+
+### Benchmark Categories
+
+#### timing
+- Timer.start/stop overhead
+- Statistics calculation speed (1K, 10K, 100K measurements)
+- sleep precision
+
+#### circuits
+- Circuit.short() throughput
+- Backoff calculation overhead
+
+#### cerial
+- Primitive serialization speed
+- Complex object serialization speed
+- Large object handling
+
+#### processing
+- Process spawn overhead
+- Pool.map throughput
+- Share read/write latency
+
+#### sk
+- Skclass wrapping overhead
+- Skfunction call overhead vs raw function
+- AST analysis speed
+
+### Benchmark Format
+
+```python
+def benchmark_timer_start_stop():
+    """Measure Timer.start/stop overhead."""
+    timer = Timer()
+    iterations = 100_000
+    
+    start = time.perf_counter()
+    for _ in range(iterations):
+        timer.start()
+        timer.stop()
+    elapsed = time.perf_counter() - start
+    
+    ops_per_sec = iterations / elapsed
+    us_per_op = (elapsed / iterations) * 1_000_000
+    
+    print(f"Timer.start/stop: {ops_per_sec:,.0f} ops/sec ({us_per_op:.2f} µs/op)")
+```
+
+### Running Tests
+
+```bash
+# Run single test file (IDE or command line)
+python tests/timing/test_timer.py
+
+# Run all tests for a module
+python tests/timing/run_all_tests.py
+
+# Run all benchmarks for a module
+python tests/timing/run_all_benchmarks.py
+
+# Run ALL tests
+python tests/run_all_tests.py
+
+# Run ALL benchmarks
+python tests/run_all_benchmarks.py
+```
+
+
+## Changing Skfunction and Skclass
+
+by removing them!
+
+cerial has problems with serializing Skfunctions and Skclasses.
+
+so we attach _shared_meta and the modifiers to the func or class itself.
+
+```python
+from suitkaise import sk
+
+@sk()
+def my_function():
+    return 1
+
+
+def my_function2():
+    return 2
+
+
+skfunction = sk(my_function2)
+```
+
+there are 3 ways user funcs and classes get this info:
+
+1. when they are decorated with @sk
+2. when sk(func or class) is called
+3*. _shared_meta is added when a function or class is used in Share
+
+No more Skfunction and Skclass objects.

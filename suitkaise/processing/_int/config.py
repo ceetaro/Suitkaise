@@ -2,7 +2,7 @@
 Configuration dataclasses for Process.
 
 Created automatically by Process._setup() before user's __init__ runs.
-Users can override defaults by assigning to self.config.* in their __init__.
+Users can override defaults by assigning to self.process_config.* in their __init__.
 """
 
 from dataclasses import dataclass, field

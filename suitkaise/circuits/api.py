@@ -7,12 +7,17 @@ controlled failure handling and resource management in loops.
 Two circuit types:
 - Circuit: Auto-resets after sleeping (for rate limiting, backoff)
 - BreakingCircuit: Stays broken until manually reset (for failure limits)
+
+Methods `short()` and `trip()` support `.asynced()` for async usage:
+    await circuit.short.asynced()()  # Uses asyncio.sleep instead of time.sleep
 """
 
+import asyncio
 import threading
 
 # import timing
 from suitkaise.timing import api as timing
+from suitkaise.sk._int.asyncable import _AsyncableMethod
 
 
 class Circuit:
@@ -52,6 +57,10 @@ class Circuit:
         total_trips: Lifetime count of all trips
         current_sleep_time: Current sleep duration (after backoff applied)
     
+    _shared_meta:
+        Metadata for Share - declares which attributes each method/property
+        reads from or writes to. Used by the Share for synchronization.
+    
     ────────────────────────────────────────────────────────
         ```python
         # Real use case: Rate limiting with exponential backoff
@@ -72,6 +81,19 @@ class Circuit:
         ```
     ────────────────────────────────────────────────────────
     """
+    
+    _shared_meta = {
+        'methods': {
+            'short': {'writes': ['_times_shorted', '_total_trips', '_current_sleep_time']},
+            'trip': {'writes': ['_times_shorted', '_total_trips', '_current_sleep_time']},
+            'reset_backoff': {'writes': ['_current_sleep_time']},
+        },
+        'properties': {
+            'times_shorted': {'reads': ['_times_shorted']},
+            'total_trips': {'reads': ['_total_trips']},
+            'current_sleep_time': {'reads': ['_current_sleep_time']},
+        }
+    }
 
     def __init__(
         self, 
@@ -108,29 +130,52 @@ class Circuit:
         with self._lock:
             return self._current_sleep_time
 
-    def short(self, custom_sleep: float | None = None) -> bool:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            circ.short()  # Count a failure
+    # -------------------------------------------------------------------------
+    # Async internal methods
+    # -------------------------------------------------------------------------
+    
+    async def _async_trip_circuit(self, custom_sleep: float | None = None) -> bool:
+        """Async version of _trip_circuit using asyncio.sleep."""
+        with self._lock:
+            sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+            self._total_trips += 1
+            self._times_shorted = 0
             
-            # Returns True if sleep occurred
-            if circ.short():
-                print("Circuit tripped and slept")
-            ```
-        ────────────────────────────────────────────────────────\n
-
-        Increment failure count and trip circuit if limit reached.
+            if self.factor != 1.0:
+                self._current_sleep_time = min(
+                    self._current_sleep_time * self.factor,
+                    self.max_sleep_time
+                )
         
-        When tripped, sleeps for current_sleep_time, applies backoff factor,
-        and auto-resets the counter.
+        if sleep_duration > 0:
+            await asyncio.sleep(sleep_duration)
         
-        Args:
-            custom_sleep: Override sleep duration for this short only
+        return True
+    
+    async def _async_short(self, custom_sleep: float | None = None) -> bool:
+        """Async version of short()."""
+        should_trip = False
         
-        Returns:
-            True if sleep occurred, False otherwise
-        """
+        with self._lock:
+            self._times_shorted += 1
+            if self._times_shorted >= self.num_shorts_to_trip:
+                should_trip = True
+        
+        if should_trip:
+            return await self._async_trip_circuit(custom_sleep)
+        
+        return False
+    
+    async def _async_trip(self, custom_sleep: float | None = None) -> bool:
+        """Async version of trip()."""
+        return await self._async_trip_circuit(custom_sleep)
+    
+    # -------------------------------------------------------------------------
+    # Sync methods with .asynced() support
+    # -------------------------------------------------------------------------
+    
+    def _sync_short(self, custom_sleep: float | None = None) -> bool:
+        """Sync implementation of short()."""
         should_trip = False
         
         with self._lock:
@@ -144,23 +189,60 @@ class Circuit:
         
         return False
     
-    def trip(self, custom_sleep: float | None = None) -> bool:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            circ.trip()  # Immediately trip the circuit
-            ```
-        ────────────────────────────────────────────────────────\n
-
-        Immediately trip the circuit, bypassing short counting.
+    short = _AsyncableMethod(_sync_short, _async_short)
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        circ.short()  # Count a failure
         
-        Args:
-            custom_sleep: Override sleep duration for this trip
-            
-        Returns:
-            True (always sleeps)
-        """
+        # Returns True if sleep occurred
+        if circ.short():
+            print("Circuit tripped and slept")
+        
+        # Async version
+        await circ.short.asynced()()
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Increment failure count and trip circuit if limit reached.
+    
+    When tripped, sleeps for current_sleep_time, applies backoff factor,
+    and auto-resets the counter.
+    
+    Supports `.asynced()` for async usage with `asyncio.sleep`.
+    
+    Args:
+        custom_sleep: Override sleep duration for this short only
+    
+    Returns:
+        True if sleep occurred, False otherwise
+    """
+    
+    def _sync_trip(self, custom_sleep: float | None = None) -> bool:
+        """Sync implementation of trip()."""
         return self._trip_circuit(custom_sleep)
+    
+    trip = _AsyncableMethod(_sync_trip, _async_trip)
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        circ.trip()  # Immediately trip the circuit
+        
+        # Async version
+        await circ.trip.asynced()()
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Immediately trip the circuit, bypassing short counting.
+    
+    Supports `.asynced()` for async usage with `asyncio.sleep`.
+    
+    Args:
+        custom_sleep: Override sleep duration for this trip
+        
+    Returns:
+        True (always sleeps)
+    """
     
     def _trip_circuit(self, custom_sleep: float | None = None) -> bool:
         """
@@ -242,6 +324,10 @@ class BreakingCircuit:
         total_failures: Lifetime count of all failures
         current_sleep_time: Current sleep duration (after backoff applied)
     
+    _shared_meta:
+        Metadata for Share - declares which attributes each method/property
+        reads from or writes to. Used by the Share for synchronization.
+    
     ────────────────────────────────────────────────────────
         ```python
         # Real use case: Retry loop with circuit breaker
@@ -268,6 +354,21 @@ class BreakingCircuit:
         ```
     ────────────────────────────────────────────────────────
     """
+    
+    _shared_meta = {
+        'methods': {
+            'short': {'writes': ['_times_shorted', '_total_failures', '_broken']},
+            'trip': {'writes': ['_total_failures', '_broken', '_times_shorted']},
+            'reset': {'writes': ['_broken', '_times_shorted', '_current_sleep_time']},
+            'reset_backoff': {'writes': ['_current_sleep_time']},
+        },
+        'properties': {
+            'broken': {'reads': ['_broken']},
+            'times_shorted': {'reads': ['_times_shorted']},
+            'total_failures': {'reads': ['_total_failures']},
+            'current_sleep_time': {'reads': ['_current_sleep_time']},
+        }
+    }
 
     def __init__(
         self, 
@@ -311,21 +412,48 @@ class BreakingCircuit:
         with self._lock:
             return self._current_sleep_time
 
-    def short(self, custom_sleep: float | None = None) -> None:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            breaker.short()  # Count a failure
-            
-            breaker.short(custom_sleep=2.0)  # Custom sleep if trips
-            ```
-        ────────────────────────────────────────────────────────\n
+    # -------------------------------------------------------------------------
+    # Async internal methods
+    # -------------------------------------------------------------------------
+    
+    async def _async_break_circuit(self, sleep_duration: float) -> None:
+        """Async version of _break_circuit using asyncio.sleep."""
+        with self._lock:
+            self._broken = True
+            self._times_shorted = 0
 
-        Increment failure count and trip circuit if limit reached.
+        if sleep_duration > 0:
+            await asyncio.sleep(sleep_duration)
+    
+    async def _async_short(self, custom_sleep: float | None = None) -> None:
+        """Async version of short()."""
+        should_trip = False
+        sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
         
-        Args:
-            custom_sleep: Override sleep_time_after_trip for this short
-        """
+        with self._lock:
+            self._times_shorted += 1
+            self._total_failures += 1
+            
+            if self._times_shorted >= self.num_shorts_to_trip:
+                should_trip = True
+        
+        if should_trip:
+            await self._async_break_circuit(sleep_duration)
+    
+    async def _async_trip(self, custom_sleep: float | None = None) -> None:
+        """Async version of trip()."""
+        with self._lock:
+            self._total_failures += 1
+        await self._async_break_circuit(
+            custom_sleep if custom_sleep is not None else self._current_sleep_time
+        )
+    
+    # -------------------------------------------------------------------------
+    # Sync methods with .asynced() support
+    # -------------------------------------------------------------------------
+    
+    def _sync_short(self, custom_sleep: float | None = None) -> None:
+        """Sync implementation of short()."""
         should_trip = False
         sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
         
@@ -339,24 +467,53 @@ class BreakingCircuit:
         if should_trip:
             self._break_circuit(sleep_duration)
     
-    def trip(self, custom_sleep: float | None = None) -> None:
-        """
-        ────────────────────────────────────────────────────────
-            ```python
-            breaker.trip()  # Immediately trip the circuit
-            
-            breaker.trip(custom_sleep=5.0)  # Trip with custom sleep
-            ```
-        ────────────────────────────────────────────────────────\n
-
-        Immediately trip (break) the circuit, bypassing short counting.
+    short = _AsyncableMethod(_sync_short, _async_short)
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        breaker.short()  # Count a failure
         
-        Args:
-            custom_sleep: Override sleep_time_after_trip for this trip
-        """
+        breaker.short(custom_sleep=2.0)  # Custom sleep if trips
+        
+        # Async version
+        await breaker.short.asynced()()
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Increment failure count and trip circuit if limit reached.
+    
+    Supports `.asynced()` for async usage with `asyncio.sleep`.
+    
+    Args:
+        custom_sleep: Override sleep_time_after_trip for this short
+    """
+    
+    def _sync_trip(self, custom_sleep: float | None = None) -> None:
+        """Sync implementation of trip()."""
         with self._lock:
             self._total_failures += 1
         self._break_circuit(custom_sleep if custom_sleep is not None else self._current_sleep_time)
+    
+    trip = _AsyncableMethod(_sync_trip, _async_trip)
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        breaker.trip()  # Immediately trip the circuit
+        
+        breaker.trip(custom_sleep=5.0)  # Trip with custom sleep
+        
+        # Async version
+        await breaker.trip.asynced()()
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Immediately trip (break) the circuit, bypassing short counting.
+    
+    Supports `.asynced()` for async usage with `asyncio.sleep`.
+    
+    Args:
+        custom_sleep: Override sleep_time_after_trip for this trip
+    """
     
     def reset(self) -> None:
         """

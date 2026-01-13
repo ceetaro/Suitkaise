@@ -83,6 +83,9 @@ from suitkaise.paths import *
 from suitkaise.timing import *
 from suitkaise.circuits import *
 from suitkaise.processing import *
+# NOTE: processing configs are intentionally internal (not public API).
+# WorstPossibleObject still exercises them for serialization coverage.
+from suitkaise.processing._int.config import ProcessConfig, TimeoutConfig
 
 # Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [
@@ -1385,8 +1388,16 @@ class WorstPossibleObject:
             failures.append(f"lambda_function: error calling - {e}")
         
         try:
-            if other.partial_function(y=5) != 15:  # partial(test_function, 5) called with y=5
-                failures.append("partial_function: does not compute correctly")
+            # In _init_functions:
+            #   def test_function(x, y=10): return x + y
+            #   self.partial_function = partial(test_function, 5)
+            # So:
+            #   partial_function() == 15 (uses default y=10)
+            #   partial_function(y=5) == 10 (overrides default y)
+            if other.partial_function() != 15:
+                failures.append("partial_function: does not compute correctly (default y)")
+            if other.partial_function(y=5) != 10:
+                failures.append("partial_function: does not compute correctly (override y)")
         except Exception as e:
             failures.append(f"partial_function: error calling - {e}")
         

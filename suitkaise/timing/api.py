@@ -12,6 +12,7 @@ Philosophy: Make timing operations intuitive while providing powerful analysis c
 """
 
 import time
+import asyncio
 import threading
 from typing import List, Optional, Union, Callable, Any, Dict
 from functools import wraps
@@ -30,6 +31,9 @@ except ImportError:
         "Internal time operations could not be imported. "
         "Ensure that the internal time operations module is available."
     )
+
+# Import asyncable wrapper
+from suitkaise.sk._int.asyncable import _AsyncableFunction
 
 
 # ============================================================================
@@ -56,6 +60,22 @@ def time() -> float:
     return _get_current_time()
 
 
+def _sync_sleep(seconds: float) -> float:
+    """Sync implementation of sleep."""
+    _sleep(seconds)
+    return _get_current_time()
+
+
+async def _async_sleep(seconds: float) -> float:
+    """Async implementation of sleep using asyncio.sleep."""
+    await asyncio.sleep(seconds)
+    return _get_current_time()
+
+
+# Create the asyncable sleep function
+_sleep_impl = _AsyncableFunction(_sync_sleep, _async_sleep, name='sleep')
+
+
 def sleep(seconds: float) -> float:
     """
     ────────────────────────────────────────────────────────
@@ -80,6 +100,13 @@ def sleep(seconds: float) -> float:
         
         end_time = sktime.sleep(2)
         ```
+    ────────────────────────────────────────────────────────
+        ```python
+        # Async version
+        from suitkaise import sktime
+        
+        end_time = await sktime.sleep.asynced()(2)
+        ```
     ────────────────────────────────────────────────────────\n
 
     Sleep the current thread for a given number of seconds.
@@ -88,15 +115,20 @@ def sleep(seconds: float) -> float:
     
     Sleep is functionally equivalent to `time.sleep()`.
     
+    Supports `.asynced()` for async usage:
+        `await sleep.asynced()(seconds)` uses `asyncio.sleep` internally.
+    
     Args:
         `seconds`: Number of seconds to sleep (can be fractional)
 
     Returns:
         Current time after sleeping
     """
-    _sleep(seconds)
+    return _sleep_impl(seconds)
 
-    return time()
+
+# Attach asynced method to sleep function
+sleep.asynced = _sleep_impl.asynced
 
 
 def elapsed(time1: float, time2: Optional[float] = None) -> float:

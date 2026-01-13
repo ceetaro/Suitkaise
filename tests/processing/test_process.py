@@ -1,0 +1,521 @@
+"""
+Process Class Tests
+
+Tests Process functionality:
+- Basic lifecycle (__run__, __result__, __error__)
+- start/wait/result pattern
+- Error handling
+- Timing
+- Parallel execution
+"""
+
+import sys
+import time
+import signal
+
+sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+
+from suitkaise.processing import Process, ProcessError, RunError
+
+# Import test classes from separate module for multiprocessing compatibility
+from tests.processing.test_process_classes import (
+    SimpleProcess, SlowProcess, FailingProcess, ProcessWithCallbacks,
+    InfiniteCounterProcess, LimitedCounterProcess, HangingProcess,
+    SelfStoppingProcess
+)
+
+
+# =============================================================================
+# Test Infrastructure
+# =============================================================================
+
+class TestResult:
+    def __init__(self, name: str, passed: bool, message: str = "", error: str = ""):
+        self.name = name
+        self.passed = passed
+        self.message = message
+        self.error = error
+
+
+class TestRunner:
+    def __init__(self, suite_name: str):
+        self.suite_name = suite_name
+        self.results = []
+        self.GREEN = '\033[92m'
+        self.RED = '\033[91m'
+        self.YELLOW = '\033[93m'
+        self.CYAN = '\033[96m'
+        self.BOLD = '\033[1m'
+        self.RESET = '\033[0m'
+    
+    def run_test(self, name: str, test_func, timeout: float = 10.0):
+        """Run a test with a timeout."""
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"Test timed out after {timeout}s")
+        
+        # Set up timeout (Unix only)
+        old_handler = None
+        try:
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(int(timeout))
+        except (AttributeError, ValueError):
+            pass  # Windows or other issue
+        
+        try:
+            test_func()
+            self.results.append(TestResult(name, True))
+        except AssertionError as e:
+            self.results.append(TestResult(name, False, error=str(e)))
+        except TimeoutError as e:
+            self.results.append(TestResult(name, False, error=str(e)))
+        except Exception as e:
+            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
+        finally:
+            # Disable alarm
+            try:
+                signal.alarm(0)
+                if old_handler:
+                    signal.signal(signal.SIGALRM, old_handler)
+            except (AttributeError, ValueError):
+                pass
+    
+    def print_results(self):
+        print(f"\n{self.BOLD}{self.CYAN}{'='*70}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{self.suite_name:^70}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{'='*70}{self.RESET}\n")
+        
+        passed = sum(1 for r in self.results if r.passed)
+        failed = len(self.results) - passed
+        
+        for result in self.results:
+            if result.passed:
+                status = f"{self.GREEN}✓ PASS{self.RESET}"
+            else:
+                status = f"{self.RED}✗ FAIL{self.RESET}"
+            print(f"  {status}  {result.name}")
+            if result.error:
+                print(f"         {self.RED}└─ {result.error}{self.RESET}")
+        
+        print(f"\n{self.BOLD}{'-'*70}{self.RESET}")
+        if failed == 0:
+            print(f"  {self.GREEN}{self.BOLD}All {passed} tests passed!{self.RESET}")
+        else:
+            print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
+        print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+        return failed == 0
+
+
+# =============================================================================
+# Class Structure Tests
+# =============================================================================
+
+def test_process_import():
+    """Process should be importable."""
+    assert Process is not None
+
+
+def test_process_creation():
+    """Process should be creatable."""
+    proc = SimpleProcess(5)
+    
+    assert proc is not None
+    assert proc.value == 5
+
+
+def test_process_has_run_method():
+    """Process should have __run__ method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, '__run__')
+    assert callable(proc.__run__)
+
+
+def test_process_has_result_method():
+    """Process should have __result__ method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, '__result__')
+    assert callable(proc.__result__)
+
+
+def test_process_has_start_method():
+    """Process should have start() method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, 'start')
+    assert callable(proc.start)
+
+
+def test_process_has_wait_method():
+    """Process should have wait() method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, 'wait')
+    assert callable(proc.wait)
+
+
+def test_process_has_result_accessor():
+    """Process should have result() method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, 'result')
+    assert callable(proc.result)
+
+
+# =============================================================================
+# Error Class Tests
+# =============================================================================
+
+def test_process_error_exists():
+    """ProcessError should exist."""
+    assert ProcessError is not None
+
+
+def test_run_error_exists():
+    """RunError should exist."""
+    assert RunError is not None
+
+
+def test_process_error_inheritance():
+    """ProcessError should be an Exception."""
+    assert issubclass(ProcessError, Exception)
+
+
+# =============================================================================
+# Direct Run Tests (no subprocess)
+# =============================================================================
+
+def test_process_run_directly():
+    """Process __run__ can be called directly."""
+    proc = SimpleProcess(5)
+    
+    proc.__run__()
+    
+    assert proc._result_value == 10
+
+
+def test_process_result_directly():
+    """Process __result__ can be called after __run__."""
+    proc = SimpleProcess(5)
+    
+    proc.__run__()
+    result = proc.__result__()
+    
+    assert result == 10
+
+
+def test_process_callbacks_direct():
+    """Process callbacks can be called directly."""
+    proc = ProcessWithCallbacks()
+    
+    # Simulate the lifecycle (correct method names)
+    proc.__prerun__()
+    proc.__run__()
+    result = proc.__result__()
+    proc.__onfinish__()
+    
+    assert proc.pre_run_called
+    assert proc.run_called
+    assert result == "completed"
+    assert proc.finish_called
+
+
+def test_process_failing_run():
+    """Failing process should raise exception."""
+    proc = FailingProcess("test failure")
+    
+    try:
+        proc.__run__()
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "test failure" in str(e)
+
+
+# =============================================================================
+# Actual Subprocess Tests
+# =============================================================================
+
+def test_process_actual_run():
+    """Process should run in actual subprocess."""
+    proc = SimpleProcess(5)
+    proc.start()
+    proc.wait(timeout=5.0)
+    
+    result = proc.result()
+    
+    assert result == 10
+
+
+def test_process_result():
+    """Process.result() should return __result__."""
+    proc = SimpleProcess(10)
+    proc.start()
+    proc.wait(timeout=5.0)
+    
+    result = proc.result()
+    
+    assert result == 20
+
+
+def test_process_slow_run():
+    """Process should handle slow operations."""
+    proc = SlowProcess(0.1)  # 100ms
+    
+    start = time.perf_counter()
+    proc.start()
+    proc.wait(timeout=5.0)
+    elapsed = time.perf_counter() - start
+    
+    assert elapsed >= 0.09, f"Should take ~100ms, got {elapsed}"
+    assert proc.result() == "done"
+
+
+def test_process_start_returns_immediately():
+    """Process.start() should return without blocking."""
+    proc = SlowProcess(0.5)  # 500ms
+    
+    start = time.perf_counter()
+    proc.start()
+    start_time = time.perf_counter() - start
+    
+    # start() should return quickly (< 100ms)
+    assert start_time < 0.1, f"start() should be fast, took {start_time}"
+    
+    proc.wait(timeout=5.0)
+    proc.result()  # Clean up
+
+
+def test_process_error_propagates():
+    """Process errors should propagate on result()."""
+    proc = FailingProcess("test failure")
+    proc.start()
+    proc.wait(timeout=5.0)
+    
+    try:
+        proc.result()
+        assert False, "Should have raised error"
+    except ProcessError:
+        pass  # Expected
+
+
+def test_multiple_processes():
+    """Multiple processes should run independently."""
+    procs = [SimpleProcess(i) for i in range(5)]
+    
+    for p in procs:
+        p.start()
+    
+    for p in procs:
+        p.wait(timeout=5.0)
+    
+    results = [p.result() for p in procs]
+    
+    assert results == [0, 2, 4, 6, 8]
+
+
+def test_concurrent_processes():
+    """Concurrent processes should run in parallel."""
+    # 5 processes, each sleeps 100ms
+    procs = [SlowProcess(0.1) for _ in range(5)]
+    
+    start = time.perf_counter()
+    
+    for p in procs:
+        p.start()
+    
+    for p in procs:
+        p.wait(timeout=5.0)
+    
+    elapsed = time.perf_counter() - start
+    
+    # Should complete in ~100-200ms (parallel), not 500ms (sequential)
+    assert elapsed < 0.4, f"Concurrent should be ~100ms, got {elapsed}"
+
+
+# =============================================================================
+# Stop and Kill Tests
+# =============================================================================
+
+def test_stop_infinite_process():
+    """stop() should gracefully stop an infinitely running process."""
+    proc = InfiniteCounterProcess()
+    proc.start()
+    
+    # Let it run for a bit (longer to allow for subprocess startup)
+    time.sleep(0.3)
+    
+    # Stop it
+    proc.stop()
+    
+    # Wait for it to finish
+    finished = proc.wait(timeout=5.0)
+    assert finished, "Process should have stopped"
+    
+    # Should have counted some iterations
+    result = proc.result()
+    assert result >= 1, f"Should have counted at least once, got {result}"
+
+
+def test_stop_limited_process():
+    """stop() should gracefully stop a limited process early."""
+    proc = LimitedCounterProcess(1000)  # Would take 10+ seconds normally
+    proc.start()
+    
+    # Let it run for a bit (200ms to allow for subprocess startup)
+    time.sleep(0.2)
+    
+    # Stop it early
+    proc.stop()
+    
+    # Wait for it to finish
+    finished = proc.wait(timeout=5.0)
+    assert finished, "Process should have stopped"
+    
+    # Should have counted some, but not all 1000
+    result = proc.result()
+    assert result >= 1, f"Should have counted at least once, got {result}"
+    assert result < 1000, f"Should not have reached limit, got {result}"
+
+
+def test_stop_returns_immediately():
+    """stop() should return immediately without blocking."""
+    proc = InfiniteCounterProcess()
+    proc.start()
+    
+    # Let it run for a bit
+    time.sleep(0.05)
+    
+    # stop() should be non-blocking
+    start = time.perf_counter()
+    proc.stop()
+    stop_time = time.perf_counter() - start
+    
+    assert stop_time < 0.05, f"stop() should be instant, took {stop_time}"
+    
+    # Clean up
+    proc.wait(timeout=5.0)
+
+
+def test_kill_hanging_process():
+    """kill() should forcefully terminate a hanging process."""
+    proc = HangingProcess()
+    proc.start()
+    
+    # Wait a bit for it to start
+    time.sleep(0.1)
+    
+    # Process should be alive
+    assert proc.is_alive, "Process should be running"
+    
+    # Kill it
+    start = time.perf_counter()
+    proc.kill()
+    kill_time = time.perf_counter() - start
+    
+    # kill() should complete relatively quickly (within 6 seconds including join timeout)
+    assert kill_time < 7, f"kill() should complete quickly, took {kill_time}"
+    
+    # Process should be dead
+    assert not proc.is_alive, "Process should be dead after kill()"
+
+
+def test_kill_running_process():
+    """kill() should forcefully terminate a running process."""
+    proc = InfiniteCounterProcess()
+    proc.start()
+    
+    # Let it run for a bit
+    time.sleep(0.1)
+    
+    # Kill it
+    proc.kill()
+    
+    # Process should be dead
+    assert not proc.is_alive, "Process should be dead after kill()"
+
+
+def test_stop_then_result():
+    """After stop(), result() should return the final state."""
+    proc = InfiniteCounterProcess()
+    proc.start()
+    
+    # Let it run for a bit (longer to allow for subprocess startup)
+    time.sleep(0.3)
+    
+    # Stop it
+    proc.stop()
+    proc.wait(timeout=5.0)
+    
+    # Should be able to get result
+    result = proc.result()
+    assert isinstance(result, int), f"Result should be int, got {type(result)}"
+    assert result >= 1, f"Should have counted at least once, got {result}"
+
+
+def test_self_stopping_process():
+    """A process should be able to stop itself by calling self.stop()."""
+    target_count = 5
+    proc = SelfStoppingProcess(target=target_count)
+    proc.start()
+    
+    # Wait for it to finish (it should stop itself)
+    finished = proc.wait(timeout=5.0)
+    assert finished, "Process should have stopped itself"
+    
+    # Should have reached exactly the target count
+    result = proc.result()
+    assert result == target_count, f"Should have counted to {target_count}, got {result}"
+
+
+# =============================================================================
+# Main Entry Point
+# =============================================================================
+
+def run_all_tests():
+    """Run all Process tests."""
+    runner = TestRunner("Process Class Tests")
+    
+    # Class structure tests (fast, no subprocess)
+    runner.run_test("Process import", test_process_import)
+    runner.run_test("Process creation", test_process_creation)
+    runner.run_test("Process has __run__", test_process_has_run_method)
+    runner.run_test("Process has __result__", test_process_has_result_method)
+    runner.run_test("Process has start()", test_process_has_start_method)
+    runner.run_test("Process has wait()", test_process_has_wait_method)
+    runner.run_test("Process has result()", test_process_has_result_accessor)
+    
+    # Error class tests
+    runner.run_test("ProcessError exists", test_process_error_exists)
+    runner.run_test("RunError exists", test_run_error_exists)
+    runner.run_test("ProcessError is Exception", test_process_error_inheritance)
+    
+    # Direct run tests (no subprocess, fast)
+    runner.run_test("Process __run__ directly", test_process_run_directly)
+    runner.run_test("Process __result__ directly", test_process_result_directly)
+    runner.run_test("Process callbacks direct", test_process_callbacks_direct)
+    runner.run_test("Process failing run", test_process_failing_run)
+    
+    # Actual subprocess tests (slower, may timeout in sandbox)
+    runner.run_test("Process actual run", test_process_actual_run, timeout=10)
+    runner.run_test("Process result", test_process_result, timeout=10)
+    runner.run_test("Process slow run", test_process_slow_run, timeout=10)
+    runner.run_test("Process.start() non-blocking", test_process_start_returns_immediately, timeout=10)
+    runner.run_test("Process error propagates", test_process_error_propagates, timeout=10)
+    runner.run_test("Multiple processes", test_multiple_processes, timeout=15)
+    runner.run_test("Concurrent processes", test_concurrent_processes, timeout=15)
+    
+    # Stop and kill tests
+    runner.run_test("stop() infinite process", test_stop_infinite_process, timeout=10)
+    runner.run_test("stop() limited process", test_stop_limited_process, timeout=10)
+    runner.run_test("stop() returns immediately", test_stop_returns_immediately, timeout=10)
+    runner.run_test("kill() hanging process", test_kill_hanging_process, timeout=15)
+    runner.run_test("kill() running process", test_kill_running_process, timeout=10)
+    runner.run_test("stop() then result()", test_stop_then_result, timeout=10)
+    runner.run_test("self.stop() from within process", test_self_stopping_process, timeout=10)
+    
+    return runner.print_results()
+
+
+if __name__ == '__main__':
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

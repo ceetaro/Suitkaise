@@ -43,9 +43,9 @@ Usage:
 
 # Import internal components
 from ._int.process_class import Process
-from ._int.config import ProcessConfig, TimeoutConfig
+# ProcessConfig is internal - not exported
 from ._int.timers import ProcessTimers
-from ._int.pool import Pool, AsyncResult, StarModifier
+from ._int.pool import Pool
 from ._int.errors import (
     ProcessError,
     PreRunError,
@@ -53,7 +53,7 @@ from ._int.errors import (
     PostRunError,
     OnFinishError,
     ResultError,
-    ErrorError,
+    ErrorHandlerError,
     ProcessTimeoutError,
 )
 
@@ -62,14 +62,6 @@ __all__ = [
     # Main classes
     'Process',
     'Pool',
-    
-    # Pool helpers
-    'AsyncResult',
-    'StarModifier',
-    
-    # Configuration
-    'ProcessConfig',
-    'TimeoutConfig',
     
     # Timers
     'ProcessTimers',
@@ -81,6 +73,6 @@ __all__ = [
     'PostRunError',
     'OnFinishError',
     'ResultError',
-    'ErrorError',
+    'ErrorHandlerError',
     'ProcessTimeoutError',
 ]

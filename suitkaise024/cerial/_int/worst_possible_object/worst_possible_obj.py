@@ -83,6 +83,9 @@ from suitkaise.skpath import *
 from suitkaise.sktime import *
 from suitkaise.circuit import *
 from suitkaise.processing import *
+# NOTE: processing configs are intentionally internal (not public API).
+# WorstPossibleObject still exercises them for serialization coverage.
+from suitkaise.processing._int.config import ProcessConfig, TimeoutConfig
 
 # Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [

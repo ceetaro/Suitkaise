@@ -1,0 +1,1 @@
+"""Paths module tests."""

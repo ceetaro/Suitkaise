@@ -1,29 +1,7 @@
-1. everything needs have an async version
-
-how?
-
-different naming, same module
-
-ex. `Timer` vs `TimerAsync`
-
-or:
-
-`Timer` vs `Async.Timer` or `Timer` vs `Timer.Async`
-
-this will be done manually, not with to_thread()
-
-2. everything needs to be shareable in shared memory/shared state patterns
-
-pattern below
-
-3. everything needs to be serializable with cerial (already done)
-
-- functions need to serialize faster
-- simple classes need to serialize faster
 
 
 
-5. other idea for shared state patterns:
+idea for shared state patterns:
 
 instances of Share in each process
 
@@ -141,62 +119,9 @@ blocking vs non-blocking writes
 
 
 
-Skf: wrapped function objects
 
 
-1. store changing attrs on creation for shared state
-
-2. can call function normally or async
-
-3. so, supports shared state and async with a simple conversion
-
-4. easy decorator
-
-```python
-@skf()
-def my_function():
-
-    # Your code here
-    return result
-
-
-# turns into...
-
-class Skfunction:
-
-    def __init__(self, func):
-
-        # store changing attrs here...
-
-        # calculate async version here...
-
-
-# regular version
-def my_function():
-
-    return result
-
-
-# async version
-
-async def my_function():
-
-    # Your code here
-    await result
-
-
-# calling 
-result = my_function()
-
-# or
-result = await my_function()
-
-```
-
-
----
-
-skf internal pieces (ideas, not finalized):
+internal pieces (ideas, not finalized):
 
 function wrapping
 - convert functions to objects that store metadata
@@ -205,54 +130,9 @@ function wrapping
 
 async version options
 - to_thread(): runs sync function in thread pool, ~100μs overhead, no code changes needed
-
-serialization for shared state
-- don't serialize function code (slow)
-- just serialize reference: (object_name, method_name, args, kwargs)
-- coordinator looks up method by name
-- function code already exists on coordinator side
+- (manual implementation for suitkaise objects to increase speed)
 
 method binding
 - if wrapping methods, need to handle self binding
 - descriptor protocol (__get__) can bind instance when accessed
 - or handle at call time
-
-
-
----
-
-function serialization (cerial improvement):
-
-reference vs full serialization
-- goal: serialize functions faster by using references when possible
-- reference: just store module path + qualname, look up on other end
-- full: serialize bytecode, globals, closures, etc (slow but complete)
-
-when to use reference
-- function must be guaranteed to be exactly the same on both ends
-- module-level functions: yes
-- class methods: yes
-- both sides have the same codebase/module installed
-
-when to fall back to full serialization
-- lambdas: anonymous, no unique name to look up
-- closures: depend on captured variables from outer scope
-- dynamically created functions: runtime generated, don't exist in module
-- anything where lookup might give a different function
-
-the check
-- has __module__ and __qualname__
-- qualname doesn't contain '<lambda>' or '<locals>'
-- can actually look it up and get the same object back
-- if any of these fail, fall back to full serialization
-
-performance difference
-- reference: ~50-100 bytes, ~1-10μs to serialize
-- full: ~1-10KB, ~1-10ms to serialize
-- 100-1000x faster with references
-
-implementation
-- try reference first
-- if can_use_reference() fails, fall back to full
-- deserialize by importing module and walking qualname
-

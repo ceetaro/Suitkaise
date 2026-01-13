@@ -217,6 +217,43 @@ class Timer:
         `get_statistics()` / `get_stats()`: Frozen snapshot (TimerStats)
     """
     
+    # Metadata for Share - declares which attributes each method/property
+    # reads from or writes to. Used by the Share for synchronization.
+    _shared_meta = {
+        'methods': {
+            'start': {'writes': ['_sessions', 'original_start_time']},
+            'stop': {'writes': ['times', '_paused_durations']},
+            'discard': {'writes': []},
+            'lap': {'writes': ['times', '_paused_durations']},
+            'pause': {'writes': ['_sessions']},
+            'resume': {'writes': ['_sessions']},
+            'add_time': {'writes': ['times', '_paused_durations']},
+            'reset': {'writes': ['times', '_sessions', '_paused_durations', 'original_start_time']},
+            'get_statistics': {'writes': []},
+            'get_stats': {'writes': []},
+            'get_time': {'writes': []},
+            'percentile': {'writes': []},
+        },
+        'properties': {
+            'num_times': {'reads': ['times']},
+            'most_recent': {'reads': ['times']},
+            'result': {'reads': ['times']},
+            'most_recent_index': {'reads': ['times']},
+            'total_time': {'reads': ['times']},
+            'total_time_paused': {'reads': ['_paused_durations']},
+            'mean': {'reads': ['times']},
+            'median': {'reads': ['times']},
+            'slowest_index': {'reads': ['times']},
+            'fastest_index': {'reads': ['times']},
+            'slowest_time': {'reads': ['times']},
+            'fastest_time': {'reads': ['times']},
+            'min': {'reads': ['times']},
+            'max': {'reads': ['times']},
+            'stdev': {'reads': ['times']},
+            'variance': {'reads': ['times']},
+        }
+    }
+    
     def __init__(self):
         """
         ────────────────────────────────────────────────────────

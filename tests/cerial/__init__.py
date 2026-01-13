@@ -1,0 +1,1 @@
+"""Cerial module tests."""

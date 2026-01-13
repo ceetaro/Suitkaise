@@ -107,7 +107,7 @@ class ResultError(ProcessError):
         )
 
 
-class ErrorError(ProcessError):
+class ErrorHandlerError(ProcessError):
     """Error raised when __error__() fails."""
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
