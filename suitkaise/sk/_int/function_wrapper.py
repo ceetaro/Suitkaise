@@ -22,7 +22,8 @@ class FunctionTimeoutError(Exception):
 def create_retry_wrapper(
     func: Callable[P, R],
     times: int = 3,
-    backoff: float = 1.0,
+    delay: float = 1.0,
+    factor: float = 1.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
 ) -> Callable[P, R]:
     """
@@ -31,7 +32,8 @@ def create_retry_wrapper(
     Args:
         func: Function to wrap
         times: Maximum number of attempts (default 3)
-        backoff: Multiplier for sleep between retries (default 1.0 = constant)
+        delay: Initial delay between retries in seconds (default 1.0)
+        factor: Multiplier for delay after each retry (default 1.0 = constant)
         exceptions: Exception types to catch and retry on
         
     Returns:
@@ -40,7 +42,7 @@ def create_retry_wrapper(
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         last_exception: Optional[Exception] = None
-        sleep_time = 1.0  # Initial sleep time
+        sleep_time = delay
         
         for attempt in range(times):
             try:
@@ -49,7 +51,7 @@ def create_retry_wrapper(
                 last_exception = e
                 if attempt < times - 1:
                     time.sleep(sleep_time)
-                    sleep_time *= backoff
+                    sleep_time *= factor
         
         # All retries exhausted
         raise last_exception  # type: ignore
@@ -60,7 +62,8 @@ def create_retry_wrapper(
 def create_async_retry_wrapper(
     func: Callable[P, R],
     times: int = 3,
-    backoff: float = 1.0,
+    delay: float = 1.0,
+    factor: float = 1.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
 ) -> Callable[P, R]:
     """
@@ -69,7 +72,7 @@ def create_async_retry_wrapper(
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         last_exception: Optional[Exception] = None
-        sleep_time = 1.0
+        sleep_time = delay
         
         for attempt in range(times):
             try:
@@ -79,7 +82,7 @@ def create_async_retry_wrapper(
                 last_exception = e
                 if attempt < times - 1:
                     await asyncio.sleep(sleep_time)
-                    sleep_time *= backoff
+                    sleep_time *= factor
         
         raise last_exception  # type: ignore
     
@@ -213,7 +216,8 @@ def create_async_timeout_wrapper_v2(
 def create_async_retry_wrapper_v2(
     async_func: Callable[P, R],
     times: int = 3,
-    backoff: float = 1.0,
+    delay: float = 1.0,
+    factor: float = 1.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
 ) -> Callable[P, R]:
     """
@@ -222,7 +226,7 @@ def create_async_retry_wrapper_v2(
     @functools.wraps(async_func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         last_exception: Optional[Exception] = None
-        sleep_time = 1.0
+        sleep_time = delay
         
         for attempt in range(times):
             try:
@@ -231,7 +235,7 @@ def create_async_retry_wrapper_v2(
                 last_exception = e
                 if attempt < times - 1:
                     await asyncio.sleep(sleep_time)
-                    sleep_time *= backoff
+                    sleep_time *= factor
         
         raise last_exception  # type: ignore
     

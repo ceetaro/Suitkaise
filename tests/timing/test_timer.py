@@ -1,7 +1,7 @@
 """
-Timer Class Tests
+Sktimer Class Tests
 
-Tests all Timer functionality:
+Tests all Sktimer functionality:
 - Basic start/stop
 - Lap timing
 - Pause/resume
@@ -20,7 +20,7 @@ from typing import List, Tuple
 # Add project root to path
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 
 
 # =============================================================================
@@ -93,19 +93,19 @@ class TestRunner:
 
 
 # =============================================================================
-# Basic Timer Tests
+# Basic Sktimer Tests
 # =============================================================================
 
 def test_timer_creation():
-    """Timer should be created with empty state."""
-    timer = Timer()
+    """Sktimer should be created with empty state."""
+    timer = Sktimer()
     assert timer.num_times == 0, "New timer should have no times"
     assert len(timer.times) == 0, "New timer should have empty times list"
 
 
 def test_timer_start_stop():
-    """Timer should record time between start and stop."""
-    timer = Timer()
+    """Sktimer should record time between start and stop."""
+    timer = Sktimer()
     timer.start()
     time.sleep(0.01)  # 10ms
     timer.stop()
@@ -116,8 +116,8 @@ def test_timer_start_stop():
 
 
 def test_timer_multiple_measurements():
-    """Timer should accumulate multiple measurements."""
-    timer = Timer()
+    """Sktimer should accumulate multiple measurements."""
+    timer = Sktimer()
     
     for i in range(5):
         timer.start()
@@ -129,8 +129,8 @@ def test_timer_multiple_measurements():
 
 
 def test_timer_discard():
-    """Timer.discard() should return elapsed without recording."""
-    timer = Timer()
+    """Sktimer.discard() should return elapsed without recording."""
+    timer = Sktimer()
     timer.start()
     time.sleep(0.01)
     elapsed = timer.discard()
@@ -140,8 +140,8 @@ def test_timer_discard():
 
 
 def test_timer_add_time():
-    """Timer should accept manually added times."""
-    timer = Timer()
+    """Sktimer should accept manually added times."""
+    timer = Sktimer()
     timer.add_time(1.0)
     timer.add_time(2.0)
     timer.add_time(3.0)
@@ -156,8 +156,8 @@ def test_timer_add_time():
 # =============================================================================
 
 def test_timer_lap():
-    """Timer.lap() should record intermediate times."""
-    timer = Timer()
+    """Sktimer.lap() should record intermediate times."""
+    timer = Sktimer()
     timer.start()
     
     time.sleep(0.01)
@@ -174,7 +174,7 @@ def test_timer_lap():
 
 def test_timer_lap_values():
     """Lap times should reflect actual intervals."""
-    timer = Timer()
+    timer = Sktimer()
     timer.start()
     
     time.sleep(0.02)
@@ -194,8 +194,8 @@ def test_timer_lap_values():
 # =============================================================================
 
 def test_timer_pause_resume():
-    """Timer pause/resume should exclude paused time."""
-    timer = Timer()
+    """Sktimer pause/resume should exclude paused time."""
+    timer = Sktimer()
     timer.start()
     
     time.sleep(0.01)  # 10ms active
@@ -213,8 +213,8 @@ def test_timer_pause_resume():
 
 
 def test_timer_total_paused():
-    """Timer should track total paused duration."""
-    timer = Timer()
+    """Sktimer should track total paused duration."""
+    timer = Sktimer()
     timer.start()
     
     timer.pause()
@@ -232,7 +232,7 @@ def test_timer_total_paused():
 
 def test_timer_multiple_pause_resume():
     """Multiple pause/resume cycles should work correctly."""
-    timer = Timer()
+    timer = Sktimer()
     timer.start()
     
     for _ in range(3):
@@ -254,8 +254,8 @@ def test_timer_multiple_pause_resume():
 # =============================================================================
 
 def test_timer_mean():
-    """Timer should calculate mean correctly."""
-    timer = Timer()
+    """Sktimer should calculate mean correctly."""
+    timer = Sktimer()
     timer.add_time(1.0)
     timer.add_time(2.0)
     timer.add_time(3.0)
@@ -266,8 +266,8 @@ def test_timer_mean():
 
 
 def test_timer_median():
-    """Timer should calculate median correctly."""
-    timer = Timer()
+    """Sktimer should calculate median correctly."""
+    timer = Sktimer()
     
     # Odd number of times
     for t in [1.0, 5.0, 2.0, 4.0, 3.0]:
@@ -277,8 +277,8 @@ def test_timer_median():
 
 
 def test_timer_median_even():
-    """Timer should handle even number of times for median."""
-    timer = Timer()
+    """Sktimer should handle even number of times for median."""
+    timer = Sktimer()
     for t in [1.0, 2.0, 3.0, 4.0]:
         timer.add_time(t)
     
@@ -287,8 +287,8 @@ def test_timer_median_even():
 
 
 def test_timer_min_max():
-    """Timer should track min and max correctly."""
-    timer = Timer()
+    """Sktimer should track min and max correctly."""
+    timer = Sktimer()
     for t in [3.0, 1.0, 4.0, 1.5, 9.0, 2.0]:
         timer.add_time(t)
     
@@ -299,8 +299,8 @@ def test_timer_min_max():
 
 
 def test_timer_stdev():
-    """Timer should calculate standard deviation correctly."""
-    timer = Timer()
+    """Sktimer should calculate standard deviation correctly."""
+    timer = Sktimer()
     # All same values = 0 stdev
     for _ in range(5):
         timer.add_time(2.0)
@@ -309,8 +309,8 @@ def test_timer_stdev():
 
 
 def test_timer_variance():
-    """Timer should calculate variance correctly."""
-    timer = Timer()
+    """Sktimer should calculate variance correctly."""
+    timer = Sktimer()
     # Values [1, 2, 3, 4, 5], mean=3
     # Sample variance (n-1 denominator) = 2.5
     for t in [1.0, 2.0, 3.0, 4.0, 5.0]:
@@ -321,8 +321,8 @@ def test_timer_variance():
 
 
 def test_timer_percentile():
-    """Timer should calculate percentiles correctly."""
-    timer = Timer()
+    """Sktimer should calculate percentiles correctly."""
+    timer = Sktimer()
     for i in range(1, 101):  # 1 to 100
         timer.add_time(float(i))
     
@@ -336,14 +336,14 @@ def test_timer_percentile():
 
 
 def test_timer_get_statistics():
-    """Timer.get_statistics() should return TimerStats object."""
-    timer = Timer()
+    """Sktimer.get_statistics() should return SktimerStats object."""
+    timer = Sktimer()
     for t in [1.0, 2.0, 3.0, 4.0, 5.0]:
         timer.add_time(t)
     
     stats = timer.get_statistics()
     
-    # stats is a TimerStats object with attributes
+    # stats is a SktimerStats object with attributes
     assert hasattr(stats, 'mean'), "Stats should have mean"
     assert hasattr(stats, 'median'), "Stats should have median"
     assert hasattr(stats, 'min'), "Stats should have min"
@@ -357,8 +357,8 @@ def test_timer_get_statistics():
 # =============================================================================
 
 def test_timer_most_recent_index():
-    """Timer should track index of most recent time."""
-    timer = Timer()
+    """Sktimer should track index of most recent time."""
+    timer = Sktimer()
     timer.add_time(1.0)
     timer.add_time(2.0)
     timer.add_time(3.0)
@@ -367,8 +367,8 @@ def test_timer_most_recent_index():
 
 
 def test_timer_fastest_slowest_index():
-    """Timer should track indices of fastest and slowest times."""
-    timer = Timer()
+    """Sktimer should track indices of fastest and slowest times."""
+    timer = Sktimer()
     timer.add_time(5.0)  # index 0
     timer.add_time(1.0)  # index 1 - fastest
     timer.add_time(9.0)  # index 2 - slowest
@@ -383,8 +383,8 @@ def test_timer_fastest_slowest_index():
 # =============================================================================
 
 def test_timer_reset():
-    """Timer.reset() should clear all state."""
-    timer = Timer()
+    """Sktimer.reset() should clear all state."""
+    timer = Sktimer()
     timer.add_time(1.0)
     timer.add_time(2.0)
     timer.add_time(3.0)
@@ -401,8 +401,8 @@ def test_timer_reset():
 # =============================================================================
 
 def test_timer_concurrent_add():
-    """Timer should handle concurrent add_time calls."""
-    timer = Timer()
+    """Sktimer should handle concurrent add_time calls."""
+    timer = Sktimer()
     num_threads = 10
     adds_per_thread = 100
     
@@ -421,8 +421,8 @@ def test_timer_concurrent_add():
 
 
 def test_timer_concurrent_sessions():
-    """Timer should handle concurrent start/stop sessions."""
-    timer = Timer()
+    """Sktimer should handle concurrent start/stop sessions."""
+    timer = Sktimer()
     num_threads = 5
     sessions_per_thread = 20
     
@@ -447,8 +447,8 @@ def test_timer_concurrent_sessions():
 # =============================================================================
 
 def test_timer_empty_statistics():
-    """Timer should handle empty state gracefully for statistics."""
-    timer = Timer()
+    """Sktimer should handle empty state gracefully for statistics."""
+    timer = Sktimer()
     
     # Should not raise - just return sensible defaults or None
     assert timer.num_times == 0
@@ -458,7 +458,7 @@ def test_timer_empty_statistics():
 
 def test_timer_single_measurement():
     """Statistics should work with single measurement."""
-    timer = Timer()
+    timer = Sktimer()
     timer.add_time(5.0)
     
     assert timer.mean == 5.0
@@ -469,8 +469,8 @@ def test_timer_single_measurement():
 
 
 def test_timer_very_small_times():
-    """Timer should handle very small time values."""
-    timer = Timer()
+    """Sktimer should handle very small time values."""
+    timer = Sktimer()
     for _ in range(10):
         timer.start()
         # No sleep - measure overhead
@@ -482,8 +482,8 @@ def test_timer_very_small_times():
 
 
 def test_timer_very_large_times():
-    """Timer should handle large time values."""
-    timer = Timer()
+    """Sktimer should handle large time values."""
+    timer = Sktimer()
     timer.add_time(1_000_000.0)
     timer.add_time(2_000_000.0)
     
@@ -496,51 +496,51 @@ def test_timer_very_large_times():
 # =============================================================================
 
 def run_all_tests():
-    """Run all Timer tests."""
-    runner = TestRunner("Timer Class Tests")
+    """Run all Sktimer tests."""
+    runner = TestRunner("Sktimer Class Tests")
     
     # Basic tests
-    runner.run_test("Timer creation", test_timer_creation)
-    runner.run_test("Timer start/stop", test_timer_start_stop)
-    runner.run_test("Timer multiple measurements", test_timer_multiple_measurements)
-    runner.run_test("Timer discard", test_timer_discard)
-    runner.run_test("Timer add_time", test_timer_add_time)
+    runner.run_test("Sktimer creation", test_timer_creation)
+    runner.run_test("Sktimer start/stop", test_timer_start_stop)
+    runner.run_test("Sktimer multiple measurements", test_timer_multiple_measurements)
+    runner.run_test("Sktimer discard", test_timer_discard)
+    runner.run_test("Sktimer add_time", test_timer_add_time)
     
     # Lap tests
-    runner.run_test("Timer lap", test_timer_lap)
-    runner.run_test("Timer lap values", test_timer_lap_values)
+    runner.run_test("Sktimer lap", test_timer_lap)
+    runner.run_test("Sktimer lap values", test_timer_lap_values)
     
     # Pause/resume tests
-    runner.run_test("Timer pause/resume", test_timer_pause_resume)
-    runner.run_test("Timer total paused", test_timer_total_paused)
-    runner.run_test("Timer multiple pause/resume", test_timer_multiple_pause_resume)
+    runner.run_test("Sktimer pause/resume", test_timer_pause_resume)
+    runner.run_test("Sktimer total paused", test_timer_total_paused)
+    runner.run_test("Sktimer multiple pause/resume", test_timer_multiple_pause_resume)
     
     # Statistics tests
-    runner.run_test("Timer mean", test_timer_mean)
-    runner.run_test("Timer median (odd)", test_timer_median)
-    runner.run_test("Timer median (even)", test_timer_median_even)
-    runner.run_test("Timer min/max", test_timer_min_max)
-    runner.run_test("Timer stdev", test_timer_stdev)
-    runner.run_test("Timer variance", test_timer_variance)
-    runner.run_test("Timer percentile", test_timer_percentile)
-    runner.run_test("Timer get_statistics", test_timer_get_statistics)
+    runner.run_test("Sktimer mean", test_timer_mean)
+    runner.run_test("Sktimer median (odd)", test_timer_median)
+    runner.run_test("Sktimer median (even)", test_timer_median_even)
+    runner.run_test("Sktimer min/max", test_timer_min_max)
+    runner.run_test("Sktimer stdev", test_timer_stdev)
+    runner.run_test("Sktimer variance", test_timer_variance)
+    runner.run_test("Sktimer percentile", test_timer_percentile)
+    runner.run_test("Sktimer get_statistics", test_timer_get_statistics)
     
     # Index tests
-    runner.run_test("Timer most_recent_index", test_timer_most_recent_index)
-    runner.run_test("Timer fastest/slowest index", test_timer_fastest_slowest_index)
+    runner.run_test("Sktimer most_recent_index", test_timer_most_recent_index)
+    runner.run_test("Sktimer fastest/slowest index", test_timer_fastest_slowest_index)
     
     # Reset tests
-    runner.run_test("Timer reset", test_timer_reset)
+    runner.run_test("Sktimer reset", test_timer_reset)
     
     # Concurrent tests
-    runner.run_test("Timer concurrent add", test_timer_concurrent_add)
-    runner.run_test("Timer concurrent sessions", test_timer_concurrent_sessions)
+    runner.run_test("Sktimer concurrent add", test_timer_concurrent_add)
+    runner.run_test("Sktimer concurrent sessions", test_timer_concurrent_sessions)
     
     # Edge cases
-    runner.run_test("Timer empty statistics", test_timer_empty_statistics)
-    runner.run_test("Timer single measurement", test_timer_single_measurement)
-    runner.run_test("Timer very small times", test_timer_very_small_times)
-    runner.run_test("Timer very large times", test_timer_very_large_times)
+    runner.run_test("Sktimer empty statistics", test_timer_empty_statistics)
+    runner.run_test("Sktimer single measurement", test_timer_single_measurement)
+    runner.run_test("Sktimer very small times", test_timer_very_small_times)
+    runner.run_test("Sktimer very large times", test_timer_very_large_times)
     
     return runner.print_results()
 

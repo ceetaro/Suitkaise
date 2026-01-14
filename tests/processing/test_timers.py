@@ -2,7 +2,7 @@
 ProcessTimers Tests
 
 Tests the ProcessTimers class:
-- Timer access
+- Sktimer access
 - Timing tracking
 - Integration with Process
 """

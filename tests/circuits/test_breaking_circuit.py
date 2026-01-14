@@ -98,7 +98,7 @@ def test_breaking_circuit_defaults():
     circ = BreakingCircuit(3)
     
     assert circ.sleep_time_after_trip == 0.0
-    assert circ.factor == 1.0
+    assert circ.backoff_factor == 1.0
     assert circ.max_sleep_time == 10.0
 
 
@@ -241,7 +241,7 @@ def test_breaking_reset_clears_counter():
 
 def test_breaking_reset_applies_backoff():
     """reset() should apply backoff factor."""
-    circ = BreakingCircuit(2, sleep_time_after_trip=0.01, factor=2.0)
+    circ = BreakingCircuit(2, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()
     circ.short()  # Breaks
@@ -255,7 +255,7 @@ def test_breaking_reset_applies_backoff():
 
 def test_breaking_reset_backoff_accumulates():
     """Backoff should accumulate across resets."""
-    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # Breaks
     circ.reset()  # 0.01 -> 0.02
@@ -271,7 +271,7 @@ def test_breaking_reset_backoff_accumulates():
 
 def test_breaking_reset_backoff_max_cap():
     """Backoff should be capped at max_sleep_time on reset."""
-    circ = BreakingCircuit(1, sleep_time_after_trip=0.5, factor=2.0, max_sleep_time=1.0)
+    circ = BreakingCircuit(1, sleep_time_after_trip=0.5, backoff_factor=2.0, max_sleep_time=1.0)
     
     circ.short()  # Breaks
     circ.reset()  # 0.5 -> 1.0
@@ -288,7 +288,7 @@ def test_breaking_reset_backoff_max_cap():
 
 def test_breaking_reset_backoff_method():
     """reset_backoff() should reset sleep time to original."""
-    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # Breaks
     circ.reset()  # 0.01 -> 0.02
@@ -300,7 +300,7 @@ def test_breaking_reset_backoff_method():
 
 def test_breaking_reset_backoff_preserves_broken():
     """reset_backoff() should not affect broken state."""
-    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = BreakingCircuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # Breaks
     

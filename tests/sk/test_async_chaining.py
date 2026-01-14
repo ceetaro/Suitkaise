@@ -133,7 +133,7 @@ def test_asynced_retry_succeeds():
             return "success"
         
         sk_func = Skfunction(flaky_slow)
-        async_with_retry = sk_func.asynced().retry(times=5, backoff=0.0)
+        async_with_retry = sk_func.asynced().retry(times=5, delay=0.0)
         
         result = await async_with_retry()
         
@@ -150,7 +150,7 @@ def test_asynced_retry_fails():
             raise ValueError("always fails")
         
         sk_func = Skfunction(always_fail)
-        async_with_retry = sk_func.asynced().retry(times=2, backoff=0.0)
+        async_with_retry = sk_func.asynced().retry(times=2, delay=0.0)
         
         try:
             await async_with_retry()
@@ -179,7 +179,7 @@ def test_asynced_timeout_retry():
         
         sk_func = Skfunction(flaky_slow)
         # timeout(1s) then retry(3 times)
-        chained = sk_func.asynced().timeout(1.0).retry(times=3, backoff=0.0)
+        chained = sk_func.asynced().timeout(1.0).retry(times=3, delay=0.0)
         
         result = await chained()
         

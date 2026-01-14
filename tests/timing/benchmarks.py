@@ -2,7 +2,7 @@
 Timing Module Benchmarks
 
 Performance benchmarks for timing operations:
-- Timer overhead
+- Sktimer overhead
 - Statistics calculation speed
 - sleep precision
 """
@@ -13,7 +13,7 @@ import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import Timer, TimeThis, time, sleep, elapsed
+from suitkaise.timing import Sktimer, TimeThis, time, sleep, elapsed
 
 
 # =============================================================================
@@ -95,24 +95,24 @@ class BenchmarkRunner:
 
 
 # =============================================================================
-# Timer Overhead Benchmarks
+# Sktimer Overhead Benchmarks
 # =============================================================================
 
 def benchmark_timer_creation():
-    """Measure Timer creation overhead."""
-    runner = BenchmarkRunner("Timer Creation Benchmarks")
+    """Measure Sktimer creation overhead."""
+    runner = BenchmarkRunner("Sktimer Creation Benchmarks")
     
     # Create timer
-    runner.bench("Timer()", 100_000, Timer)
+    runner.bench("Sktimer()", 100_000, Sktimer)
     
     return runner
 
 
 def benchmark_timer_start_stop():
-    """Measure Timer start/stop overhead."""
-    runner = BenchmarkRunner("Timer Start/Stop Benchmarks")
+    """Measure Sktimer start/stop overhead."""
+    runner = BenchmarkRunner("Sktimer Start/Stop Benchmarks")
     
-    timer = Timer()
+    timer = Sktimer()
     
     def start_stop():
         timer.start()
@@ -121,11 +121,11 @@ def benchmark_timer_start_stop():
     runner.bench("timer.start() + timer.stop()", 50_000, start_stop)
     
     # Just start
-    timer2 = Timer()
+    timer2 = Sktimer()
     runner.bench("timer.start()", 100_000, timer2.start)
     
     # Just stop (after start)
-    timer3 = Timer()
+    timer3 = Sktimer()
     for _ in range(100_000):
         timer3.start()
     runner.bench("timer.stop()", 100_000, timer3.stop)
@@ -134,10 +134,10 @@ def benchmark_timer_start_stop():
 
 
 def benchmark_timer_add_time():
-    """Measure Timer.add_time() overhead."""
-    runner = BenchmarkRunner("Timer add_time Benchmarks")
+    """Measure Sktimer.add_time() overhead."""
+    runner = BenchmarkRunner("Sktimer add_time Benchmarks")
     
-    timer = Timer()
+    timer = Sktimer()
     runner.bench("timer.add_time(1.0)", 100_000, timer.add_time, 1.0)
     
     return runner
@@ -151,7 +151,7 @@ def benchmark_statistics_small():
     """Measure statistics with small dataset."""
     runner = BenchmarkRunner("Statistics Benchmarks (100 measurements)")
     
-    timer = Timer()
+    timer = Sktimer()
     for i in range(100):
         timer.add_time(float(i))
     
@@ -170,7 +170,7 @@ def benchmark_statistics_large():
     """Measure statistics with large dataset."""
     runner = BenchmarkRunner("Statistics Benchmarks (10,000 measurements)")
     
-    timer = Timer()
+    timer = Sktimer()
     for i in range(10_000):
         timer.add_time(float(i))
     
@@ -191,7 +191,7 @@ def benchmark_pause_resume():
     """Measure pause/resume overhead."""
     runner = BenchmarkRunner("Pause/Resume Benchmarks")
     
-    timer = Timer()
+    timer = Sktimer()
     timer.start()
     
     def pause_resume():
@@ -272,7 +272,7 @@ def benchmark_timethis():
     """Measure TimeThis context manager overhead."""
     runner = BenchmarkRunner("TimeThis Context Manager Benchmarks")
     
-    timer = Timer()
+    timer = Sktimer()
     
     def with_timethis():
         with TimeThis(timer):
@@ -294,17 +294,17 @@ def benchmark_timethis():
 # =============================================================================
 
 def benchmark_vs_manual():
-    """Compare Timer vs manual time.time() usage."""
-    runner = BenchmarkRunner("Timer vs Manual Timing Comparison")
+    """Compare Sktimer vs manual time.time() usage."""
+    runner = BenchmarkRunner("Sktimer vs Manual Timing Comparison")
     
-    # Using Timer
-    timer = Timer()
+    # Using Sktimer
+    timer = Sktimer()
     def with_timer():
         timer.start()
         # simulated work (nothing)
         timer.stop()
     
-    runner.bench("Timer.start()/stop()", 50_000, with_timer)
+    runner.bench("Sktimer.start()/stop()", 50_000, with_timer)
     
     # Using manual time.time()
     manual_times = []

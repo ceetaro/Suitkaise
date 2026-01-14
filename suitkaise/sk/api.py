@@ -172,9 +172,14 @@ class Skfunction(Generic[P, R]):
     """
     Wrapper for user functions that provides:
     - .asynced() for async version (if function has blocking calls)
-    - .retry() for automatic retry with backoff
+    - .retry() for automatic retry with delay
     - .timeout() for execution time limits
     - .background() for fire-and-forget execution
+    
+    Modifiers can be chained in any order - they are always applied consistently:
+    1. Retry (outermost) - retries the whole operation
+    2. Timeout (inside retry) - times out each attempt
+    3. Function call (innermost)
     
     Usage:
         import time
@@ -189,7 +194,7 @@ class Skfunction(Generic[P, R]):
         result = await sk_fetch.asynced()("https://example.com")
         
         # Retry on failure
-        result = sk_fetch.retry(times=3, backoff=2.0)("https://flaky-api.com")
+        result = sk_fetch.retry(times=3, delay=1.0)("https://flaky-api.com")
         
         # Timeout
         result = sk_fetch.timeout(5.0)("https://slow-api.com")
@@ -198,26 +203,109 @@ class Skfunction(Generic[P, R]):
         future = sk_fetch.background()("https://example.com")
         result = future.result()  # Block when needed
         
-        # Chain them
+        # Chain them (order doesn't matter - behavior is consistent)
         result = sk_fetch.retry(3).timeout(10.0)("https://api.com")
+        result = sk_fetch.timeout(10.0).retry(3)("https://api.com")  # same behavior
     """
     
-    def __init__(self, func: Callable[P, R]):
+    def __init__(
+        self,
+        func: Callable[P, R],
+        *,
+        _config: Dict[str, Any] | None = None,
+        _blocking_calls: List[str] | None = None,
+    ):
         """
         Wrap a function with Skfunction functionality.
         
         Args:
             func: The function to wrap
+            _config: Internal - modifier configuration
+            _blocking_calls: Internal - cached blocking calls
         """
         self._func = func
-        self._blocking_calls = self._detect_blocking_calls()
+        self._config = _config or {}
+        self._blocking_calls = _blocking_calls if _blocking_calls is not None else self._detect_blocking_calls()
+    
+    def _copy_with(self, **config_updates) -> "Skfunction[P, R]":
+        """Create a copy with updated config."""
+        new_config = {**self._config, **config_updates}
+        return Skfunction(
+            self._func,
+            _config=new_config,
+            _blocking_calls=self._blocking_calls,
+        )
     
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        """Call the wrapped function directly."""
-        return self._func(*args, **kwargs)
+        """
+        Call the wrapped function with all modifiers applied.
+        
+        Modifiers are applied in consistent order:
+        1. Retry (outermost)
+        2. Timeout (inside retry)
+        3. Function call (innermost)
+        """
+        import time as time_module
+        from concurrent.futures import ThreadPoolExecutor
+        import concurrent.futures
+        
+        # Extract config
+        retry_config = self._config.get('retry')
+        timeout_config = self._config.get('timeout')
+        
+        # Build the execution
+        func = self._func
+        
+        # If no modifiers, just call directly
+        if not retry_config and not timeout_config:
+            return func(*args, **kwargs)
+        
+        # Define the core execution (with timeout if configured)
+        def execute_once():
+            if timeout_config:
+                seconds = timeout_config['seconds']
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(func, *args, **kwargs)
+                    try:
+                        return future.result(timeout=seconds)
+                    except concurrent.futures.TimeoutError:
+                        raise FunctionTimeoutError(
+                            f"{func.__name__} timed out after {seconds} seconds"
+                        )
+            else:
+                return func(*args, **kwargs)
+        
+        # Apply retry logic if configured
+        if retry_config:
+            times = retry_config['times']
+            delay = retry_config['delay']
+            backoff_factor = retry_config['backoff_factor']
+            exceptions = retry_config['exceptions']
+            
+            last_exception = None
+            sleep_time = delay
+            
+            for attempt in range(times):
+                try:
+                    return execute_once()
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < times - 1:
+                        time_module.sleep(sleep_time)
+                        sleep_time *= backoff_factor
+            
+            raise last_exception  # type: ignore
+        else:
+            return execute_once()
     
     def __repr__(self) -> str:
-        return f"Skfunction({self._func.__name__})"
+        modifiers = []
+        if self._config.get('retry'):
+            modifiers.append('retry')
+        if self._config.get('timeout'):
+            modifiers.append('timeout')
+        mod_str = f", modifiers={modifiers}" if modifiers else ""
+        return f"Skfunction({self._func.__name__}{mod_str})"
     
     def _detect_blocking_calls(self) -> List[str]:
         """Detect blocking calls in the function."""
@@ -266,50 +354,57 @@ class Skfunction(Generic[P, R]):
                 f"{self._func.__name__} has no blocking calls"
             )
         
-        async_func = create_async_wrapper(self._func)
-        return AsyncSkfunction(async_func)
+        # Pass config to AsyncSkfunction
+        return AsyncSkfunction(
+            self._func,
+            _config=self._config.copy(),
+            _blocking_calls=self._blocking_calls,
+        )
     
     def retry(
         self,
         times: int = 3,
-        backoff: float = 1.0,
+        delay: float = 1.0,
+        backoff_factor: float = 1.0,
         exceptions: Tuple[Type[Exception], ...] = (Exception,),
     ) -> "Skfunction[P, R]":
         """
-        Get a version that retries on failure.
+        Add retry behavior.
         
         Args:
             times: Maximum number of attempts (default 3)
-            backoff: Multiplier for sleep between retries (default 1.0)
+            delay: Delay between retries in seconds (default 1.0)
+            backoff_factor: Multiplier for delay after each retry (default 1.0)
             exceptions: Exception types to retry on (default: all)
             
         Returns:
-            New Skfunction with retry behavior
+            Skfunction with retry configured
         """
-        wrapped = create_retry_wrapper(self._func, times, backoff, exceptions)
-        return Skfunction(wrapped)
+        return self._copy_with(retry={
+            'times': times,
+            'delay': delay,
+            'backoff_factor': backoff_factor,
+            'exceptions': exceptions,
+        })
     
     def timeout(self, seconds: float) -> "Skfunction[P, R]":
         """
-        Get a version with execution timeout.
+        Add timeout behavior.
         
         Args:
-            seconds: Maximum execution time
+            seconds: Maximum execution time per attempt
             
         Returns:
-            New Skfunction with timeout behavior
-            
-        Raises:
-            TimeoutError: When function exceeds timeout
+            Skfunction with timeout configured
         """
-        wrapped = create_timeout_wrapper(self._func, seconds)
-        return Skfunction(wrapped)
+        return self._copy_with(timeout={'seconds': seconds})
     
     def background(self) -> Callable[P, Future[R]]:
         """
         Get a version that runs in a background thread.
         
         Returns a Future that can be used to get the result later.
+        Note: background() applies all configured modifiers.
         
         Returns:
             Function that returns a Future
@@ -319,7 +414,15 @@ class Skfunction(Generic[P, R]):
             # ... do other work ...
             result = future.result()  # Block when needed
         """
-        return create_background_wrapper(self._func)
+        from concurrent.futures import ThreadPoolExecutor
+        
+        executor = ThreadPoolExecutor(max_workers=4)
+        
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[R]:
+            # Submit the full __call__ (with modifiers) to background
+            return executor.submit(self.__call__, *args, **kwargs)
+        
+        return wrapper
 
 
 class AsyncSkfunction(Generic[P, R]):
@@ -327,6 +430,7 @@ class AsyncSkfunction(Generic[P, R]):
     Async version of Skfunction, returned by Skfunction.asynced().
     
     Supports chaining with .timeout(), .retry() for async operations.
+    Modifiers can be chained in any order - behavior is consistent.
     
     Usage:
         sk_func = Skfunction(slow_fetch)
@@ -335,64 +439,142 @@ class AsyncSkfunction(Generic[P, R]):
         result = await sk_func.asynced().timeout(5.0)("https://api.com")
         
         # Chain async with retry
-        result = await sk_func.asynced().retry(3, backoff=2.0)("https://api.com")
+        result = await sk_func.asynced().retry(3, delay=1.0)("https://api.com")
         
-        # Chain multiple
+        # Chain multiple (order doesn't matter)
         result = await sk_func.asynced().retry(3).timeout(10.0)("https://api.com")
+        result = await sk_func.asynced().timeout(10.0).retry(3)("https://api.com")
     """
     
-    def __init__(self, async_func: Callable[P, R]):
+    def __init__(
+        self,
+        func: Callable[P, R],
+        *,
+        _config: Dict[str, Any] | None = None,
+        _blocking_calls: List[str] | None = None,
+    ):
         """
-        Wrap an async function.
+        Wrap a function for async execution.
         
         Args:
-            async_func: The async function to wrap
+            func: The original sync function
+            _config: Internal - modifier configuration
+            _blocking_calls: Internal - cached blocking calls
         """
-        self._func = async_func
+        self._func = func
+        self._config = _config or {}
+        self._blocking_calls = _blocking_calls or []
+    
+    def _copy_with(self, **config_updates) -> "AsyncSkfunction[P, R]":
+        """Create a copy with updated config."""
+        new_config = {**self._config, **config_updates}
+        return AsyncSkfunction(
+            self._func,
+            _config=new_config,
+            _blocking_calls=self._blocking_calls,
+        )
     
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
-        """Call the wrapped async function."""
-        return await self._func(*args, **kwargs)
+        """
+        Call the wrapped function asynchronously with all modifiers applied.
+        
+        Modifiers are applied in consistent order:
+        1. Retry (outermost)
+        2. Timeout (inside retry)
+        3. Function call via to_thread (innermost)
+        """
+        import asyncio
+        
+        # Extract config
+        retry_config = self._config.get('retry')
+        timeout_config = self._config.get('timeout')
+        
+        # Define the core async execution (with timeout if configured)
+        async def execute_once():
+            if timeout_config:
+                seconds = timeout_config['seconds']
+                try:
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(self._func, *args, **kwargs),
+                        timeout=seconds,
+                    )
+                except asyncio.TimeoutError:
+                    raise FunctionTimeoutError(
+                        f"{self._func.__name__} timed out after {seconds} seconds"
+                    )
+            else:
+                return await asyncio.to_thread(self._func, *args, **kwargs)
+        
+        # Apply retry logic if configured
+        if retry_config:
+            times = retry_config['times']
+            delay = retry_config['delay']
+            backoff_factor = retry_config['backoff_factor']
+            exceptions = retry_config['exceptions']
+            
+            last_exception = None
+            sleep_time = delay
+            
+            for attempt in range(times):
+                try:
+                    return await execute_once()
+                except exceptions as e:
+                    last_exception = e
+                    if attempt < times - 1:
+                        await asyncio.sleep(sleep_time)
+                        sleep_time *= backoff_factor
+            
+            raise last_exception  # type: ignore
+        else:
+            return await execute_once()
     
     def __repr__(self) -> str:
+        modifiers = []
+        if self._config.get('retry'):
+            modifiers.append('retry')
+        if self._config.get('timeout'):
+            modifiers.append('timeout')
+        mod_str = f", modifiers={modifiers}" if modifiers else ""
         func_name = getattr(self._func, '__name__', 'async_function')
-        return f"AsyncSkfunction({func_name})"
+        return f"AsyncSkfunction({func_name}{mod_str})"
     
     def timeout(self, seconds: float) -> "AsyncSkfunction[P, R]":
         """
-        Get a version with execution timeout.
+        Add timeout behavior.
         
         Args:
-            seconds: Maximum execution time
+            seconds: Maximum execution time per attempt
             
         Returns:
-            New AsyncSkfunction with timeout behavior
-            
-        Raises:
-            FunctionTimeoutError: When function exceeds timeout
+            AsyncSkfunction with timeout configured
         """
-        wrapped = create_async_timeout_wrapper_v2(self._func, seconds)
-        return AsyncSkfunction(wrapped)
+        return self._copy_with(timeout={'seconds': seconds})
     
     def retry(
         self,
         times: int = 3,
-        backoff: float = 1.0,
+        delay: float = 1.0,
+        backoff_factor: float = 1.0,
         exceptions: Tuple[Type[Exception], ...] = (Exception,),
     ) -> "AsyncSkfunction[P, R]":
         """
-        Get a version that retries on failure.
+        Add retry behavior.
         
         Args:
             times: Maximum number of attempts (default 3)
-            backoff: Multiplier for sleep between retries (default 1.0)
+            delay: Delay between retries in seconds (default 1.0)
+            backoff_factor: Multiplier for delay after each retry (default 1.0)
             exceptions: Exception types to retry on (default: all)
             
         Returns:
-            New AsyncSkfunction with retry behavior
+            AsyncSkfunction with retry configured
         """
-        wrapped = create_async_retry_wrapper_v2(self._func, times, backoff, exceptions)
-        return AsyncSkfunction(wrapped)
+        return self._copy_with(retry={
+            'times': times,
+            'delay': delay,
+            'backoff_factor': backoff_factor,
+            'exceptions': exceptions,
+        })
 
 
 def sk(cls_or_func):
@@ -496,9 +678,9 @@ def sk(cls_or_func):
                 raise NotAsyncedError(f"{func.__name__} has no blocking calls")
             return Skfunction(func).asynced()
         
-        def retry(times: int = 3, backoff: float = 1.0, exceptions: tuple = (Exception,)):
+        def retry(times: int = 3, delay: float = 1.0, backoff_factor: float = 1.0, exceptions: tuple = (Exception,)):
             """Get version that retries on failure."""
-            return Skfunction(func).retry(times, backoff, exceptions)
+            return Skfunction(func).retry(times, delay, backoff_factor, exceptions)
         
         def timeout(seconds: float):
             """Get version with execution timeout."""

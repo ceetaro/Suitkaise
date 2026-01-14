@@ -35,7 +35,7 @@ class Skpath:
     
     Skpath automatically detects your project root and provides:
     - `ap`: Absolute path with normalized separators (/)
-    - `np`: Normalized path relative to project root
+    - `rp`: Path relative to project root
     - `id`: Reversible encoded ID for the path
     - Full pathlib.Path compatibility
     

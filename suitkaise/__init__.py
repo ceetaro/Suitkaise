@@ -10,7 +10,7 @@ Suitkaise provides a collection of utilities for common development needs:
 
 Usage:
     # Direct imports from suitkaise
-    from suitkaise import TimeThis, Timer, Skpath, Circuit
+    from suitkaise import TimeThis, Sktimer, Skpath, Circuit
     
     # Module-level imports
     from suitkaise.timing import TimeThis
@@ -30,7 +30,7 @@ from .timing import (
     elapsed,
     
     # Timing classes
-    Timer,
+    Sktimer,
     
     # Context managers
     TimeThis,
@@ -144,7 +144,7 @@ __all__ = [
     "time",
     "sleep",
     "elapsed",
-    "Timer",
+    "Sktimer",
     "TimeThis",
     "timethis",
     "clear_global_timers",

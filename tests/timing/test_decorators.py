@@ -14,7 +14,7 @@ import time
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import timethis, Timer, clear_global_timers
+from suitkaise.timing import timethis, Sktimer, clear_global_timers
 
 
 # =============================================================================
@@ -76,7 +76,7 @@ class TestRunner:
 
 
 # =============================================================================
-# Auto Timer Tests
+# Auto Sktimer Tests
 # =============================================================================
 
 def test_timethis_auto_timer():
@@ -92,7 +92,7 @@ def test_timethis_auto_timer():
     
     assert result == 42, "Function should return normally"
     assert hasattr(my_func, 'timer'), "Should attach .timer attribute"
-    assert isinstance(my_func.timer, Timer), "Timer should be Timer instance"
+    assert isinstance(my_func.timer, Sktimer), "Timer should be Sktimer instance"
     assert my_func.timer.num_times == 1, "Should have 1 recorded time"
 
 
@@ -132,12 +132,12 @@ def test_timethis_auto_timer_unique():
 
 
 # =============================================================================
-# Explicit Timer Tests
+# Explicit Sktimer Tests
 # =============================================================================
 
 def test_timethis_explicit_timer():
     """@timethis(timer) should use explicit timer."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     
     @timethis(my_timer)
     def my_func():
@@ -150,7 +150,7 @@ def test_timethis_explicit_timer():
 
 def test_timethis_explicit_shared():
     """Multiple functions can share explicit timer."""
-    shared_timer = Timer()
+    shared_timer = Sktimer()
     
     @timethis(shared_timer)
     def func_a():
@@ -169,7 +169,7 @@ def test_timethis_explicit_shared():
 
 def test_timethis_explicit_statistics():
     """Explicit timer should accumulate proper statistics."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     
     @timethis(my_timer)
     def variable_work(duration):
@@ -215,7 +215,7 @@ def test_timethis_threshold_records():
 
 def test_timethis_threshold_explicit():
     """Threshold should work with explicit timer."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     
     @timethis(my_timer, threshold=0.02)
     def work(duration):

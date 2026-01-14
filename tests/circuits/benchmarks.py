@@ -78,7 +78,7 @@ def benchmark_circuit_creation():
     
     runner.bench("Circuit(5)", 100_000, Circuit, 5)
     runner.bench("Circuit(5, 0.1, 1.5, 10.0)", 100_000, 
-                 lambda: Circuit(5, sleep_time_after_trip=0.1, factor=1.5, max_sleep_time=10.0))
+                 lambda: Circuit(5, sleep_time_after_trip=0.1, backoff_factor=1.5, max_sleep_time=10.0))
     runner.bench("BreakingCircuit(5)", 100_000, BreakingCircuit, 5)
     
     return runner
@@ -128,11 +128,11 @@ def benchmark_backoff_calculation():
     runner = BenchmarkRunner("Backoff Calculation Benchmarks")
     
     # With backoff (factor > 1)
-    circ_with = Circuit(1, sleep_time_after_trip=0.0, factor=1.5)
+    circ_with = Circuit(1, sleep_time_after_trip=0.0, backoff_factor=1.5)
     runner.bench("Circuit.short() with backoff", 50_000, circ_with.short)
     
     # Without backoff (factor = 1)
-    circ_without = Circuit(1, sleep_time_after_trip=0.0, factor=1.0)
+    circ_without = Circuit(1, sleep_time_after_trip=0.0, backoff_factor=1.0)
     runner.bench("Circuit.short() no backoff", 50_000, circ_without.short)
     
     return runner
@@ -146,7 +146,7 @@ def benchmark_property_access():
     """Measure property access overhead."""
     runner = BenchmarkRunner("Property Access Benchmarks")
     
-    circ = Circuit(100, sleep_time_after_trip=0.1, factor=1.5)
+    circ = Circuit(100, sleep_time_after_trip=0.1, backoff_factor=1.5)
     for _ in range(50):
         circ.short()
     
@@ -210,13 +210,13 @@ def benchmark_reset_backoff():
     """Measure reset_backoff() overhead."""
     runner = BenchmarkRunner("reset_backoff() Benchmarks")
     
-    circ = Circuit(1, sleep_time_after_trip=0.01, factor=1.5)
+    circ = Circuit(1, sleep_time_after_trip=0.01, backoff_factor=1.5)
     for _ in range(10):
         circ.short()
     
     runner.bench("Circuit.reset_backoff()", 100_000, circ.reset_backoff)
     
-    breaking = BreakingCircuit(1, sleep_time_after_trip=0.01, factor=1.5)
+    breaking = BreakingCircuit(1, sleep_time_after_trip=0.01, backoff_factor=1.5)
     breaking.short()
     
     runner.bench("BreakingCircuit.reset_backoff()", 100_000, breaking.reset_backoff)

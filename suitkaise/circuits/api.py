@@ -29,7 +29,7 @@ class Circuit:
         circ = Circuit(
             num_shorts_to_trip=5, 
             sleep_time_after_trip=0.5,
-            factor=1.5,  # exponential backoff
+            backoff_factor=1.5,  # exponential backoff
             max_sleep_time=10.0
         )
         
@@ -49,7 +49,7 @@ class Circuit:
     Args:
         num_shorts_to_trip: Number of shorts before circuit trips and sleeps
         sleep_time_after_trip: Base sleep duration (seconds) when circuit trips
-        factor: Exponential backoff multiplier (default 1 = no backoff)
+        backoff_factor: Exponential backoff multiplier (default 1 = no backoff)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
         
     Attributes:
@@ -69,7 +69,7 @@ class Circuit:
         rate_limiter = Circuit(
             num_shorts_to_trip=10,
             sleep_time_after_trip=1.0,
-            factor=1.5,
+            backoff_factor=1.5,
             max_sleep_time=30.0
         )
         
@@ -99,12 +99,12 @@ class Circuit:
         self, 
         num_shorts_to_trip: int, 
         sleep_time_after_trip: float = 0.0,
-        factor: float = 1.0,
+        backoff_factor: float = 1.0,
         max_sleep_time: float = 10.0
     ):
         self.num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
-        self.factor = factor
+        self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
         
         self._times_shorted = 0
@@ -141,9 +141,9 @@ class Circuit:
             self._total_trips += 1
             self._times_shorted = 0
             
-            if self.factor != 1.0:
+            if self.backoff_factor != 1.0:
                 self._current_sleep_time = min(
-                    self._current_sleep_time * self.factor,
+                    self._current_sleep_time * self.backoff_factor,
                     self.max_sleep_time
                 )
         
@@ -256,9 +256,9 @@ class Circuit:
             self._times_shorted = 0  # Auto-reset counter
             
             # Apply exponential backoff for next trip
-            if self.factor != 1.0:
+            if self.backoff_factor != 1.0:
                 self._current_sleep_time = min(
-                    self._current_sleep_time * self.factor,
+                    self._current_sleep_time * self.backoff_factor,
                     self.max_sleep_time
                 )
         
@@ -290,7 +290,7 @@ class BreakingCircuit:
         circ = BreakingCircuit(
             num_shorts_to_trip=5, 
             sleep_time_after_trip=0.5,
-            factor=1.1,
+            backoff_factor=1.1,
             max_sleep_time=10.0
         )
         
@@ -315,7 +315,7 @@ class BreakingCircuit:
     Args:
         num_shorts_to_trip: Maximum number of shorts before circuit trips
         sleep_time_after_trip: Base sleep duration (seconds) when circuit trips
-        factor: Exponential backoff multiplier applied on reset (default 1)
+        backoff_factor: Exponential backoff multiplier applied on reset (default 1)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
         
     Attributes:
@@ -337,7 +337,7 @@ class BreakingCircuit:
         api_circuit = BreakingCircuit(
             num_shorts_to_trip=3, 
             sleep_time_after_trip=1.0,
-            factor=2.0,
+            backoff_factor=2.0,
             max_sleep_time=30.0
         )
         
@@ -374,12 +374,12 @@ class BreakingCircuit:
         self, 
         num_shorts_to_trip: int, 
         sleep_time_after_trip: float = 0.0,
-        factor: float = 1.0,
+        backoff_factor: float = 1.0,
         max_sleep_time: float = 10.0
     ):
         self.num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
-        self.factor = factor
+        self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
         
         self._broken = False
@@ -533,9 +533,9 @@ class BreakingCircuit:
             self._times_shorted = 0
             
             # Apply exponential backoff on reset
-            if self.factor != 1.0:
+            if self.backoff_factor != 1.0:
                 self._current_sleep_time = min(
-                    self._current_sleep_time * self.factor,
+                    self._current_sleep_time * self.backoff_factor,
                     self.max_sleep_time
                 )
     

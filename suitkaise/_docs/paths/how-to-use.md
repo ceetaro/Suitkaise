@@ -2,48 +2,49 @@
 
 `skpath` makes file paths much easier to work with.
 
-## `SKPath` class
+## `Skpath` class
 
 Special path object. Automatically detects your project root and uses it to normalize paths.
 
-- `SKPath.ap` - absolute path. All slashes are streamlined to `/` for cross-platform compatibility.
+- `Skpath.ap` - absolute path. All slashes are streamlined to `/` for cross-platform compatibility.
 
 "Users/john/Documents/projects/myproject/feature1/file.txt"
 
-- `SKPath.np` - normalized path, relative to project root
+- `Skpath.rp` - relative path, relative to project root
 
 "myproject/feature1/file.txt"
 
 ```python
-from suitkaise.skpath import SKPath
+from suitkaise.paths import Skpath
 
-# create SKPath object with caller file path
-path = SKPath()
+# create Skpath object with caller file path
+path = Skpath()
 
-# create SKPath object with Path object
-path = SKPath(Path("feature1/file.txt"))
+# create Skpath object with Path object
+path = Skpath(Path("feature1/file.txt"))
 
 # and with string object
-path = SKPath("feature1/file.txt")
+path = Skpath("feature1/file.txt")
 ```
 
 Recommend not relying on just on file name, add at least the directory too.
 ```python
-path = SKPath("file.txt") # DON'T DO THIS!
+path = Skpath("file.txt") # DON'T DO THIS!
 ```
 
 
-### `SKPath` Properties and Methods
+### `Skpath` Properties and Methods
 
 - `ap` - absolute path
-- `np` - path normalized to project root
+- `rp` - path relative to project root
 
-Unique to `SKPath`
+Unique to `Skpath`
 
 - `id` - reversible base64url encoded ID (can be used to reconstruct the path)
-- `root` - project root as `SKPath` object
+- `root` - project root as `Skpath` object
 - `root_str` - project root as string (normalized separators)
 - `root_path` - project root as `Path` object
+- `platform` - absolute path with OS-native separators (backslashes on Windows)
 
 Pathlib Compatible
 
@@ -59,13 +60,13 @@ Pathlib Compatible
 
 
 ```python
-path = SKPath("myproject/feature1")
+path = Skpath("myproject/feature1")
 
 path_as_string = str(path)
 
 path_as_repr = repr(path)
 
-# __hash__ method uses md5 instead of SKPath.id's encoding
+# __hash__ method uses md5 instead of Skpath.id's encoding
 path_hash = hash(path)
 
 # works with Paths and strings as well
@@ -123,13 +124,13 @@ path.touch(exist_ok=True)
 
 ### Root Detection
 
-`SKPath` objects attempt to automatically detect your project root and use it to normalize paths.
+`Skpath` objects attempt to automatically detect your project root and use it to normalize paths.
 
-- Gets rid of issues where 2 people have the same project in different locations
+- gets rid of issues where 2 people have the same project in different locations
 
-- Gets rid of cross-platform file path issues, as the project itself won't change just because of a different operating system.
+- gets rid of cross-platform file path issues, as the project itself won't change just because of a different operating system.
 
-If the file path given is outside of the project root, `SKPath.np` will be an empty string `""`. However, all `SKPaths` will still have their absolute path, `SKPath.ap`.
+If the file path given is outside of the project root, `Skpath.rp` will be an empty string `""`. However, all `Skpaths` will still have their absolute path, `Skpath.ap`.
 
 1. Uses custom root if set via `set_custom_root()`
 2. Uses `setup.sk` file if found walking up directories
@@ -145,9 +146,9 @@ Definitive Indicators
 Strong Indicators
 
 - `.gitignore`
-- License: `LICENSE`, `LICENSE.txt`, `license`, ...
+- license: `LICENSE`, `LICENSE.txt`, `license`, ...
 - README: `README`, `README.md`, `readme.txt`, ...
-- Requirements: `requirements.txt`, `requirements.pip`, ...
+- requirements: `requirements.txt`, `requirements.pip`, ...
 
 #### Set Project Root
 
@@ -177,38 +178,38 @@ from suitkaise import skpath
 with skpath.CustomRoot("Documents/projects/myproject"):
 
     # normalizes to given custom root
-    path = SKPath("feature1/file.txt")
+    path = Skpath("feature1/file.txt")
 ```
 
-### Creating an SKPath from an ID
+### Creating a Skpath from an ID
 
 ```python
 from suitkaise import skpath
 
 id = # the path's id from a previous operation
 
-path = SKPath(id)
+path = Skpath(id)
 ```
 
 
 ### `AnyPath` Type
 
-The `AnyPath` type is a union of `str`, `Path`, and `SKPath`. You can use this type to maintain clear code and type safety.
+The `AnyPath` type is a union of `str`, `Path`, and `Skpath`. You can use this type to maintain clear code and type safety.
 
 
 ## `@autopath` Decorator
 
 Automatically converts paths to the types that a function expects.
 
-- Paths get normalized through `SKPath` first
-- Converts before passing, avoiding `TypeErrors`
-- Works with iterables
-- `SKPath`, `Path`, and `str` can be used interchangeably
+- paths get normalized through `Skpath` first
+- converts before passing, avoiding `TypeErrors`
+- works with iterables
+- `Skpath`, `Path`, and `str` can be used interchangeably
 
 ```python
-from suitkaise.skpath import autopath, AnyPath, SKPath
+from suitkaise.paths import autopath, AnyPath, Skpath
 
-# automatically convert Paths and strings to SKPaths
+# automatically convert Paths and strings to Skpaths
 @autopath()
 def path_pvp(path1: AnyPath, path2: AnyPath):
 
@@ -225,21 +226,21 @@ def path_royale(paths: list[AnyPath]):
     # guaranteed to work now - path.id is a property
     ids = [path.id for path in paths]
 
-    winning_path = SKPath(sorted(ids)[-1])
+    winning_path = Skpath(sorted(ids)[-1])
     return winning_path
 ```
 
 ```python
-# automatically convert SKPaths and strings to Paths
+# automatically convert Skpaths and strings to Paths
 @autopath()
 def i_like_pathlib(pathlib_path: Path):
 
-    # if SKPaths or strings are passed in, they are converted to Path objects
+    # if Skpaths or strings are passed in, they are converted to Path objects
     return pathlib_path.name  # use standard Path methods
 ```
 
 ```python
-# convert SKPaths and Paths to strings
+# convert Skpaths and Paths to strings
 @autopath()
 def i_like_strings(string_path: str):
 
@@ -254,12 +255,12 @@ Tells `@autopath` to only focus on given parameters.
 
 Use this for performance when you have `str` or `list[str]` parameters that aren't actually file paths.
 
-When not using `only`, all parameters accepting `SKPath`, `Path`, or `str` will be normalized and converted.
+When not using `only`, all parameters accepting `Skpath`, `Path`, or `str` will be normalized and converted.
 
 When using `only`, ONLY the parameters specified will do this.
 
 ```python
-from suitkaise.skpath import autopath
+from suitkaise.paths import autopath
 
 @autopath(only="file_path")
 def process_with_data(file_path: str, names: list[str], ids: list[str]):
@@ -281,28 +282,28 @@ def copy_file(input_path: str, output_path: str, metadata: list[str]):
 
 ### `use_caller`
 
-If `use_caller` is `True`, parameters that accept `SKPath` or `Path` will use the caller's file path if no value was provided.
+If `use_caller` is `True`, parameters that accept `Skpath` or `Path` will use the caller's file path if no value was provided.
 
 This occurs before the parameter's default value is used.
 
 ```python
-from suitkaise.skpath import autopath, AnyPath
+from suitkaise.paths import autopath, AnyPath
 
 @autopath(use_caller=True)
 def process_file(path: AnyPath):
 
     # path will never be None because of use_caller
-    # all paths will be converted to SKPaths
+    # all paths will be converted to Skpaths
 
 # uses file that called this function
 process_file() 
 
-# uses given file and converts to SKPath
+# uses given file and converts to Skpath
 process_file("myproject/feature1/file.txt") 
 ```
 
 ```python
-from suitkaise.skpath import autopath, AnyPath
+from suitkaise.paths import autopath, AnyPath
 
 @autopath() # use_caller=False
 def process_file(path: AnyPath):
@@ -312,7 +313,7 @@ def process_file(path: AnyPath):
 # path will be None
 process_file() 
 
-# uses given file and converts to SKPath
+# uses given file and converts to Skpath
 process_file("myproject/feature1/file.txt") 
 ```
 
@@ -321,15 +322,15 @@ process_file("myproject/feature1/file.txt")
 If `debug` is `True`, `@autopath` will output a message when a conversion is made or a path string is normalized.
 
 ```python
-from suitkaise.skpath import autopath, AnyPath
+from suitkaise.paths import autopath, AnyPath
 
 @autopath(debug=True)
 def process_file(path: AnyPath):
     return path.id
 ```
 
-Output when a string got converted to a SKPath:
-`"@autopath: Converted path: str → SKPath"`
+Output when a string got converted to a Skpath:
+`"@autopath: Converted path: str → Skpath"`
 
 Output when a string was normalized:
 `"@autopath: Normalized path: './file.txt' → '/abs/path/file.txt'"`
@@ -342,7 +343,7 @@ Arguments:
 - `expected_name`: Expected project root name. If provided, the detected root must match this name.
 
 Returns:
-- `SKPath` object pointing to project root.
+- `Skpath` object pointing to project root.
 
 Raises:
 - `PathDetectionError`: If project root detection fails.
@@ -364,15 +365,15 @@ root = skpath.get_project_root()
 
 You can also get the project root like this:
 ```python
-from suitkaise.skpath import SKPath
+from suitkaise.paths import Skpath
 
-root = SKPath().root
+root = Skpath().root
 ```
 
 ### `get_caller_path()`
 
 Returns:
-- `SKPath` object pointing to the caller's file.
+- `Skpath` object pointing to the caller's file.
 
 Raises:
 - `PathDetectionError`: If caller detection fails.
@@ -387,9 +388,9 @@ caller = skpath.get_caller_path()
 
 You can also get the caller path like this:
 ```python
-from suitkaise.skpath import SKPath
+from suitkaise.paths import Skpath
 
-caller = SKPath()
+caller = Skpath()
 ```
 
 ### `get_module_path()`
@@ -398,7 +399,7 @@ Arguments:
 - `obj`: Object to inspect, module name string, or module object
 
 Returns:
-- `SKPath` object pointing to the module file, or `None` if not found
+- `Skpath` object pointing to the module file, or `None` if not found
 
 Raises:
 - `ImportError`: If `obj` is a module name string that cannot be imported
@@ -414,7 +415,7 @@ path = skpath.get_module_path(UnknownObject)
 ### `get_current_dir()`
 
 Returns:
-- `SKPath` object pointing to the current directory.
+- `Skpath` object pointing to the current directory.
 
 Get the directory of the current calling file.
 
@@ -426,15 +427,15 @@ path = skpath.get_current_dir()
 
 You can also get the current directory like this:
 ```python
-from suitkaise.skpath import SKPath
+from suitkaise.paths import Skpath
 
-path = SKPath(path="...").parent
+path = Skpath(path="...").parent
 ```
 
 ### `get_cwd()`
 
 Returns:
-- `SKPath` object pointing to the current working directory.
+- `Skpath` object pointing to the current working directory.
 
 Get the current working directory.
 
@@ -450,9 +451,9 @@ Arguments:
 - `path`: Path to generate ID for
 
 Returns:
-- Base64url encoded ID string (reversible - can be used to reconstruct the path)
+- base64url encoded ID string (reversible - can be used to reconstruct the path)
 
-Get the reversible ID of a path. The ID can be used to reconstruct the SKPath later.
+Get the reversible ID of a path. The ID can be used to reconstruct the Skpath later.
 
 ```python
 from suitkaise import skpath
@@ -460,14 +461,14 @@ from suitkaise import skpath
 path_id = skpath.get_id(path="myproject/feature1/file.txt")
 
 # Later, reconstruct the path from the ID
-path = skpath.SKPath(path_id)
+path = skpath.Skpath(path_id)
 ```
 
 You can also get the ID like this:
 ```python
-from suitkaise.skpath import SKPath
+from suitkaise.paths import Skpath
 
-path_id = SKPath(path="...").id  # id is a property, not a method
+path_id = Skpath(path="...").id  # id is a property, not a method
 ```
 
 ### `get_project_paths()`
@@ -475,11 +476,11 @@ path_id = SKPath(path="...").id  # id is a property, not a method
 Arguments:
 - `root`: Custom root directory (defaults to current project root)
 - `exclude`: Paths to exclude from results.
-- `as_strings`: Return string paths instead of `SKPath` objects (memory efficiency)
+- `as_strings`: Return string paths instead of `Skpath` objects (memory efficiency)
 - `use_ignore_files`: Respect .*ignore files (default True)
 
 Returns:
-- List of paths in the project (`SKPath`s or strings based on `as_strings`)
+- list of paths in the project (`Skpath`s or strings based on `as_strings`)
 
 Raises:
 - `PathDetectionError`: If something goes wrong getting the project root.
@@ -503,7 +504,7 @@ paths = skpath.get_project_paths(as_strings=True)
 unwanted_paths = [
     "this/one/path/i/dont/want", 
     Path("another/path/i/dont/want"),
-    SKPath("yet/another/path/i/dont/want"),
+    Skpath("yet/another/path/i/dont/want"),
     ]
 paths = skpath.get_project_paths(exclude=unwanted_paths)
 
@@ -519,7 +520,7 @@ Arguments:
 - `use_ignore_files`: Respect .*ignore files (default `True`)
 
 Returns:
-- Nested dictionary representing the project structure.
+- nested dictionary representing the project structure.
 
 Raises:
 - `PathDetectionError`: If something goes wrong getting the project root.
@@ -553,7 +554,7 @@ Arguments:
 - `include_files`: Include files in the tree (default `True`)
 
 Returns:
-- String representing the project tree.
+- string representing the project tree.
 
 Raises:
 - `PathDetectionError`: If something goes wrong getting the project root.
@@ -579,4 +580,57 @@ root_directory/
     ├── main.py
     └── utils/
 
+---
 
+## Path Validation Utilities
+
+### `is_valid_filename()`
+
+Check if a filename is valid across common operating systems.
+
+```python
+from suitkaise.paths import is_valid_filename
+
+is_valid_filename("my_file.txt")     # True
+is_valid_filename("file<name>.txt")  # False (contains <, >)
+is_valid_filename("CON")             # False (Windows reserved)
+is_valid_filename("")                # False (empty)
+```
+
+Checks for:
+- empty or whitespace-only names
+- invalid characters (`<>:"/\|?*`)
+- Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+- names ending with space or period
+
+### `streamline_path()`
+
+Sanitize a path or filename by removing/replacing invalid characters.
+
+```python
+from suitkaise.paths import streamline_path
+
+# Basic cleanup
+streamline_path("My File<1>.txt")
+# "My File_1_.txt"
+
+# Lowercase and limit length
+streamline_path("My Long Filename.txt", max_length=10, lowercase=True)
+# "my long fi"
+
+# Replace invalid chars with custom character
+streamline_path("file:name.txt", replacement_char="-")
+# "file-name.txt"
+
+# ASCII only (no unicode)
+streamline_path("файл.txt", allow_unicode=False)
+# "____.txt"
+```
+
+Arguments:
+- `path`: The path or filename to sanitize
+- `max_length`: Maximum length to truncate to (None = no limit)
+- `replacement_char`: Character to replace invalid chars with (default "_")
+- `lowercase`: Convert to lowercase (default False)
+- `strip_whitespace`: Strip leading/trailing whitespace (default True)
+- `allow_unicode`: Allow unicode characters (default True)

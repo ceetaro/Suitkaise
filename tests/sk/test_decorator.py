@@ -230,7 +230,7 @@ def test_sk_function_retry():
             raise ValueError("fail")
         return "success"
     
-    result = flaky.retry(times=5, backoff=0.0)()
+    result = flaky.retry(times=5, delay=0.0)()
     
     assert result == "success"
 

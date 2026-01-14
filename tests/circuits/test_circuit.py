@@ -98,7 +98,7 @@ def test_circuit_default_values():
     circ = Circuit(3)
     
     assert circ.sleep_time_after_trip == 0.0
-    assert circ.factor == 1.0
+    assert circ.backoff_factor == 1.0
     assert circ.max_sleep_time == 10.0
 
 
@@ -221,7 +221,7 @@ def test_circuit_custom_sleep():
 
 def test_circuit_backoff_applies():
     """Circuit should apply backoff factor after trip."""
-    circ = Circuit(2, sleep_time_after_trip=0.01, factor=2.0)
+    circ = Circuit(2, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     assert circ.current_sleep_time == 0.01
     
@@ -234,7 +234,7 @@ def test_circuit_backoff_applies():
 
 def test_circuit_backoff_accumulates():
     """Backoff should accumulate across trips."""
-    circ = Circuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = Circuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # Trip 1: 0.01 -> 0.02
     circ.short()  # Trip 2: 0.02 -> 0.04
@@ -245,7 +245,7 @@ def test_circuit_backoff_accumulates():
 
 def test_circuit_backoff_max_cap():
     """Backoff should be capped at max_sleep_time."""
-    circ = Circuit(1, sleep_time_after_trip=0.5, factor=2.0, max_sleep_time=1.0)
+    circ = Circuit(1, sleep_time_after_trip=0.5, backoff_factor=2.0, max_sleep_time=1.0)
     
     circ.short()  # 0.5 -> 1.0
     circ.short()  # Would be 2.0, capped at 1.0
@@ -255,7 +255,7 @@ def test_circuit_backoff_max_cap():
 
 def test_circuit_no_backoff_with_factor_1():
     """Factor=1 should not change sleep time."""
-    circ = Circuit(1, sleep_time_after_trip=0.01, factor=1.0)
+    circ = Circuit(1, sleep_time_after_trip=0.01, backoff_factor=1.0)
     
     circ.short()  # Trip 1
     circ.short()  # Trip 2
@@ -270,7 +270,7 @@ def test_circuit_no_backoff_with_factor_1():
 
 def test_circuit_reset_backoff():
     """reset_backoff() should reset sleep time to original."""
-    circ = Circuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = Circuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # 0.01 -> 0.02
     circ.short()  # 0.02 -> 0.04
@@ -284,7 +284,7 @@ def test_circuit_reset_backoff():
 
 def test_circuit_reset_backoff_preserves_counts():
     """reset_backoff() should not affect trip counts."""
-    circ = Circuit(1, sleep_time_after_trip=0.01, factor=2.0)
+    circ = Circuit(1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circ.short()  # Trip 1
     circ.short()  # Trip 2
@@ -322,7 +322,7 @@ def test_circuit_total_trips_property():
 
 def test_circuit_current_sleep_time_property():
     """current_sleep_time should reflect current value."""
-    circ = Circuit(1, sleep_time_after_trip=0.05, factor=1.5)
+    circ = Circuit(1, sleep_time_after_trip=0.05, backoff_factor=1.5)
     
     assert circ.current_sleep_time == 0.05
     
@@ -425,7 +425,7 @@ def run_all_tests():
     runner.run_test("Circuit backoff applies", test_circuit_backoff_applies)
     runner.run_test("Circuit backoff accumulates", test_circuit_backoff_accumulates)
     runner.run_test("Circuit backoff max cap", test_circuit_backoff_max_cap)
-    runner.run_test("Circuit no backoff with factor=1", test_circuit_no_backoff_with_factor_1)
+    runner.run_test("Circuit no backoff with backoff_factor=1", test_circuit_no_backoff_with_factor_1)
     
     # reset_backoff tests
     runner.run_test("Circuit reset_backoff()", test_circuit_reset_backoff)

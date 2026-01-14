@@ -132,25 +132,25 @@ def test_concurrent_sleeps_and_circuits():
 
 
 # =============================================================================
-# Scenario 3: Timer in a Service Class
+# Scenario 3: Sktimer in a Service Class
 # =============================================================================
 
 def test_timer_with_skclass():
     """
     Scenario: You have a service that tracks its own performance.
-    You want the Timer to work seamlessly with the Sk wrapper system.
+    You want the Sktimer to work seamlessly with the Sk wrapper system.
     """
-    from suitkaise.timing import Timer
+    from suitkaise.timing import Sktimer
     from suitkaise.sk import Skclass
     
-    # The Timer class has _shared_meta, making it compatible
+    # The Sktimer class has _shared_meta, making it compatible
     # with Suitkaise's sharing and async systems
-    timer = Timer()
+    timer = Sktimer()
     timer.start()
     stdlib_time.sleep(0.01)
     timer.stop()
     
-    assert timer.num_times == 1, "Timer should record the measurement"
+    assert timer.num_times == 1, "Sktimer should record the measurement"
     assert timer.most_recent >= 0.008, "Should have timed ~10ms"
 
 
@@ -242,7 +242,7 @@ def test_all_async_together():
     operations, rate limiting, and legacy code integration.
     """
     async def full_application():
-        from suitkaise.timing import sleep, Timer
+        from suitkaise.timing import sleep, Sktimer
         from suitkaise.circuits import Circuit
         from suitkaise.sk import Skfunction
         import time as t
@@ -300,8 +300,8 @@ def run_all_tests():
     )
     
     runner.run_scenario(
-        "Timer in Service Class",
-        "Performance tracking Timer with Sk compatibility",
+        "Sktimer in Service Class",
+        "Performance tracking Sktimer with Sk compatibility",
         test_timer_with_skclass
     )
     

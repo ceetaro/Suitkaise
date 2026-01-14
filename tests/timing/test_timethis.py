@@ -5,7 +5,7 @@ Tests the @timethis decorator functionality:
 - Auto-created global timer
 - Explicit timer parameter
 - Threshold parameter
-- Timer access via function.timer
+- Sktimer access via function.timer
 - Global timer naming convention
 - clear_global_timers() function
 """
@@ -16,7 +16,7 @@ import threading
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import Timer, timethis, clear_global_timers
+from suitkaise.timing import Sktimer, timethis, clear_global_timers
 
 
 # =============================================================================
@@ -78,7 +78,7 @@ class TestRunner:
 
 
 # =============================================================================
-# @timethis with Auto-created Timer Tests
+# @timethis with Auto-created Sktimer Tests
 # =============================================================================
 
 def test_timethis_auto_timer():
@@ -94,7 +94,7 @@ def test_timethis_auto_timer():
     
     assert result == "done", "Function should return value"
     assert hasattr(auto_timed, 'timer'), "Should have timer attribute"
-    assert auto_timed.timer.num_times == 1, f"Timer should have 1 measurement, got {auto_timed.timer.num_times}"
+    assert auto_timed.timer.num_times == 1, f"Sktimer should have 1 measurement, got {auto_timed.timer.num_times}"
 
 
 def test_timethis_auto_timer_accumulates():
@@ -130,12 +130,12 @@ def test_timethis_auto_timer_statistics():
 
 
 # =============================================================================
-# @timethis with Explicit Timer Tests
+# @timethis with Explicit Sktimer Tests
 # =============================================================================
 
 def test_timethis_explicit_timer():
     """@timethis with explicit timer should use that timer."""
-    explicit_timer = Timer()
+    explicit_timer = Sktimer()
     
     @timethis(explicit_timer)
     def explicit_func():
@@ -148,7 +148,7 @@ def test_timethis_explicit_timer():
 
 def test_timethis_explicit_timer_shared():
     """Multiple functions can share explicit timer."""
-    shared_timer = Timer()
+    shared_timer = Sktimer()
     
     @timethis(shared_timer)
     def func_a():
@@ -167,7 +167,7 @@ def test_timethis_explicit_timer_shared():
 
 def test_timethis_explicit_timer_no_attribute():
     """With explicit timer, function may not have .timer attribute."""
-    explicit_timer = Timer()
+    explicit_timer = Sktimer()
     
     @timethis(explicit_timer)
     def no_attr_func():
@@ -185,7 +185,7 @@ def test_timethis_explicit_timer_no_attribute():
 
 def test_timethis_threshold_records():
     """Threshold should record times above threshold."""
-    timer = Timer()
+    timer = Sktimer()
     
     @timethis(timer, threshold=0.005)
     def above_threshold():
@@ -198,7 +198,7 @@ def test_timethis_threshold_records():
 
 def test_timethis_threshold_discards():
     """Threshold should discard times below threshold."""
-    timer = Timer()
+    timer = Sktimer()
     
     @timethis(timer, threshold=0.1)
     def below_threshold():
@@ -211,7 +211,7 @@ def test_timethis_threshold_discards():
 
 def test_timethis_threshold_mixed():
     """Threshold should only record qualifying times."""
-    timer = Timer()
+    timer = Sktimer()
     
     @timethis(timer, threshold=0.01)
     def mixed_times(sleep_time):
@@ -397,8 +397,8 @@ def test_clear_global_timers_thread_safe():
 
 def test_timethis_stacked():
     """Multiple @timethis decorators should work."""
-    timer1 = Timer()
-    timer2 = Timer()
+    timer1 = Sktimer()
+    timer2 = Sktimer()
     
     @timethis(timer1)
     @timethis(timer2)
@@ -414,7 +414,7 @@ def test_timethis_stacked():
 
 def test_timethis_with_other_decorators():
     """@timethis should work with other decorators."""
-    timer = Timer()
+    timer = Sktimer()
     
     def my_decorator(func):
         def wrapper(*args, **kwargs):
@@ -438,7 +438,7 @@ def test_timethis_with_other_decorators():
 
 def test_timethis_exception_still_times():
     """@timethis should record time even when function raises."""
-    timer = Timer()
+    timer = Sktimer()
     
     @timethis(timer, threshold=0.0)
     def raises_error():

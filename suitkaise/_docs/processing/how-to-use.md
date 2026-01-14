@@ -51,7 +51,7 @@ class MyProcess(Process):
         # read files
 
 
-    def __run__(self): # REQUIRED
+    def __run__(self): # required
 
         # this is the main part
         # you can just write your code here
@@ -161,7 +161,7 @@ Do not use this unless something goes wrong (like a process hanging).
 p = MyProcess()
 p.start()
  
-p.kill() # Immediate termination
+p.kill() # immediate termination
 
 # p.result() will be None
 ```
@@ -255,19 +255,19 @@ from suitkaise.processing import Process
 
 class MyProcess(Process):
 
-    # CAN ONLY BE UPDATED IN __INIT__
+    # can only be updated IN __INIT__
     def __init__(self):
 
-        # None = infinite number of runs
+        # none = infinite number of runs
         self.config.runs = None
 
-        # None = no time limit before auto-joining
+        # none = no time limit before auto-joining
         self.config.join_in = None
 
         # 1 = no retries
         self.config.lives = 1
 
-        # None = no timeout
+        # none = no timeout
         self.config.timeouts.prerun = None
         self.config.timeouts.run = None
         self.config.timeouts.postrun = None
@@ -332,7 +332,7 @@ full_run_timer = p.timer
 
 The `p.timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun__` method timers into one value, and records that value. It does this every iteration/run.
 
-All timers are `suitkaise.sktime.Timer` objects, and function exactly the same.
+All timers are `suitkaise.sktime.Sktimer` objects, and function exactly the same.
 
 Timers will not be accessible unless you define their respective lifecycle methods yourself.
 
@@ -423,10 +423,10 @@ except ProcessError as e:
     print(f"Original error: {e.original_error}")
     print(f"Run number: {e.current_run}")
 
-# Output:
-# Process error: Error in __run__ on run 5
-# Original error: ConnectionError('Failed to connect to server')
-# Run number: 5
+# output:
+# process error: Error in __run__ on run 5
+# original error: ConnectionError('Failed to connect to server')
+# run number: 5
 ```
 
 ## `Pool`

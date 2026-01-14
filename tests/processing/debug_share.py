@@ -158,12 +158,12 @@ def test_share_start(share):
 
 def test_share_set_object(share):
     """Test if Share can accept objects."""
-    print("Testing Share.timer = Timer()...", end=" ", flush=True)
+    print("Testing Share.timer = Sktimer()...", end=" ", flush=True)
     start = time.time()
     
     try:
-        from suitkaise.timing import Timer
-        share.timer = Timer()
+        from suitkaise.timing import Sktimer
+        share.timer = Sktimer()
         print(f"OK ({time.time() - start:.2f}s)")
         return True
     except Exception as e:

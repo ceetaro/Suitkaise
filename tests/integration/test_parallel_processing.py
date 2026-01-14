@@ -6,13 +6,13 @@ Real-world scenario: A parallel job processor that:
 2. Uses Pool for batch processing
 3. Uses Share for cross-process state coordination
 4. Uses cerial for serializing complex objects across process boundaries
-5. Uses Timer for performance tracking in each subprocess
+5. Uses Sktimer for performance tracking in each subprocess
 6. Uses Circuit for failure handling in workers
 
 This tests the full subprocess integration of:
 - processing: Process lifecycle, Pool, Share
-- cerial: Cross-process serialization of locks, loggers, Timer, Circuit
-- timing: Timer in subprocesses
+- cerial: Cross-process serialization of locks, loggers, Sktimer, Circuit
+- timing: Sktimer in subprocesses
 - circuits: Circuit in workers
 - sk: @sk classes for Share compatibility
 """
@@ -28,7 +28,7 @@ import logging
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.processing import Process, Pool, ProcessError
-from suitkaise.timing import Timer, TimeThis
+from suitkaise.timing import Sktimer, TimeThis
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.cerial import serialize, deserialize
 from suitkaise.sk import sk
@@ -159,7 +159,7 @@ class TimedProcess(Process):
     """Process with internal timing."""
     def __init__(self, iterations: int):
         self.iterations = iterations
-        self._timer = Timer()  # Use _timer to avoid conflict with Process.timers
+        self._timer = Sktimer()  # Use _timer to avoid conflict with Process.timers
         self._total_work = 0
         self.process_config.runs = 1  # Run once and finish
     
@@ -220,7 +220,7 @@ class ComplexStateProcess(Process):
         self.data = data
         self.lock = threading.Lock()
         self.logger = logging.getLogger(f"process_{name}")
-        self._timer = Timer()  # Use _timer to avoid conflict with Process.timers
+        self._timer = Sktimer()  # Use _timer to avoid conflict with Process.timers
         self._processed = False
         self.process_config.runs = 1  # Run once and finish
     
@@ -320,13 +320,13 @@ def test_process_run_failure():
 
 
 def test_process_with_timer():
-    """Test Process with internal Timer."""
+    """Test Process with internal Sktimer."""
     proc = TimedProcess(5)
     proc.start()
     proc.wait(timeout=10.0)
     result = proc.result()
     
-    assert result["timer_count"] == 5, f"Timer should have 5 measurements, got {result['timer_count']}"
+    assert result["timer_count"] == 5, f"Sktimer should have 5 measurements, got {result['timer_count']}"
     assert result["timer_mean"] >= 0.004, f"Mean should be ~5ms, got {result['timer_mean']}"
     assert result["total_work"] == sum(range(5)), f"Total work should be {sum(range(5))}"
 
@@ -354,7 +354,7 @@ def test_process_with_complex_state():
     assert result["processed"] == True, "Should be processed"
     assert result["data"]["processed_by"] == "worker_1", "Should have processor name"
     assert "timestamp" in result["data"], "Should have timestamp"
-    assert result["timer_count"] == 1, "Timer should have 1 measurement"
+    assert result["timer_count"] == 1, "Sktimer should have 1 measurement"
 
 
 def test_pool_basic_map():
@@ -422,7 +422,7 @@ def test_cerial_complex_process_state():
     assert restored.lock.acquire(blocking=False)
     restored.lock.release()
     
-    # Timer should preserve measurements (using _timer to match class definition)
+    # Sktimer should preserve measurements (using _timer to match class definition)
     assert restored._timer.num_times == 1
 
 
@@ -462,7 +462,7 @@ def test_full_parallel_job_processor():
     3. Track overall timing
     4. Aggregate results
     """
-    overall_timer = Timer()
+    overall_timer = Sktimer()
     
     # Create job inputs - keep it small to avoid hanging
     job_configs = [
@@ -564,7 +564,7 @@ def run_all_tests():
     )
     
     run_scenario(
-        "Process with Timer",
+        "Process with Sktimer",
         "Performance tracking inside worker processes",
         test_process_with_timer, 15, results
     )

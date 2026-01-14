@@ -18,6 +18,11 @@ BLOCKING_CALLS: Set[str] = {
     'time.sleep',
     'sleep',  # if imported as `from time import sleep`
     
+    # suitkaise timing
+    'timing.sleep',
+    'sktime.sleep',
+    'suitkaise.timing.sleep',
+    
     # File I/O
     'open',
     'read',
@@ -96,6 +101,13 @@ BLOCKING_METHOD_PATTERNS: Set[str] = {
     'commit',
     'rollback',
     'acquire',  # Lock acquisition
+    
+    # suitkaise patterns
+    'map',      # Pool.map
+    'imap',     # Pool.imap
+    'starmap',  # Pool.starmap
+    'short',    # Circuit.short (may sleep)
+    'trip',     # Circuit.trip (may sleep)
 }
 
 

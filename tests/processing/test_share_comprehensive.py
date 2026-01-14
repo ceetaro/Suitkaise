@@ -2,7 +2,7 @@
 Comprehensive Share Tests
 
 Tests Share with ALL suitkaise objects and the WorstPossibleObject:
-- Timer, Circuit, BreakingCircuit, Skpath
+- Sktimer, Circuit, BreakingCircuit, Skpath
 - WorstPossibleObject with all edge cases
 - Cross-proxy synchronization (changes reflect across proxies)
 - Serialization/deserialization roundtrip
@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Tuple
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import Timer, TimeThis
+from suitkaise.timing import Sktimer, TimeThis
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.paths import Skpath, get_project_root
 from suitkaise.processing import Share, Process, Pool
@@ -89,22 +89,22 @@ from tests.processing.test_classes import Counter, DataStore, NestedObject, Slow
 
 
 # =============================================================================
-# Timer Tests
+# Sktimer Tests
 # =============================================================================
 
 def test_share_timer_basic():
-    """Timer should have _shared_meta for Share compatibility."""
+    """Sktimer should have _shared_meta for Share compatibility."""
     # Note: Actually creating Share requires multiprocessing permissions
-    # This test checks the prerequisite: Timer has _shared_meta
-    assert hasattr(Timer, '_shared_meta')
-    timer = Timer()
+    # This test checks the prerequisite: Sktimer has _shared_meta
+    assert hasattr(Sktimer, '_shared_meta')
+    timer = Sktimer()
     assert timer is not None
 
 
 def test_share_timer_has_shared_meta():
-    """Timer should have _shared_meta for Share compatibility."""
-    assert hasattr(Timer, '_shared_meta')
-    meta = Timer._shared_meta
+    """Sktimer should have _shared_meta for Share compatibility."""
+    assert hasattr(Sktimer, '_shared_meta')
+    meta = Sktimer._shared_meta
     
     assert 'methods' in meta
     assert 'properties' in meta
@@ -114,8 +114,8 @@ def test_share_timer_has_shared_meta():
 
 
 def test_share_timer_serialization():
-    """Timer should serialize/deserialize correctly."""
-    timer = Timer()
+    """Sktimer should serialize/deserialize correctly."""
+    timer = Sktimer()
     timer.add_time(1.0)
     timer.add_time(2.0)
     timer.add_time(3.0)
@@ -134,8 +134,8 @@ def test_share_timer_serialization():
 
 
 def test_share_timer_all_properties():
-    """Timer should preserve all properties through serialization."""
-    timer = Timer()
+    """Sktimer should preserve all properties through serialization."""
+    timer = Sktimer()
     for i in range(1, 6):
         timer.add_time(float(i))
     
@@ -196,7 +196,7 @@ def test_share_circuit_has_shared_meta():
 
 def test_share_circuit_serialization():
     """Circuit should serialize/deserialize correctly."""
-    circuit = Circuit(5, sleep_time_after_trip=0.01, factor=2.0, max_sleep_time=1.0)
+    circuit = Circuit(5, sleep_time_after_trip=0.01, backoff_factor=2.0, max_sleep_time=1.0)
     
     # Make some state changes
     circuit.short()
@@ -335,7 +335,7 @@ def test_share_sk_nested_object():
 def test_share_all_sk_objects_together():
     """All suitkaise objects should have _shared_meta."""
     # Check all have _shared_meta
-    assert hasattr(Timer, '_shared_meta')
+    assert hasattr(Sktimer, '_shared_meta')
     assert hasattr(Circuit, '_shared_meta')
     assert hasattr(BreakingCircuit, '_shared_meta')
     assert hasattr(Counter, '_shared_meta')
@@ -344,7 +344,7 @@ def test_share_all_sk_objects_together():
     assert hasattr(SlowWorker, '_shared_meta')
     
     # Create all objects
-    timer = Timer()
+    timer = Sktimer()
     circuit = Circuit(5, sleep_time_after_trip=0.0)
     breaker = BreakingCircuit(3)
     path = Skpath(__file__)
@@ -367,7 +367,7 @@ def test_share_all_sk_objects_together():
 def test_share_all_objects_serialization():
     """All suitkaise objects should serialize/deserialize correctly."""
     # Create and modify suitkaise objects (not __main__ defined)
-    timer = Timer()
+    timer = Sktimer()
     timer.add_time(1.0)
     
     circuit = Circuit(5, sleep_time_after_trip=0.0)
@@ -428,8 +428,8 @@ def test_share_objects_cross_reference():
 # =============================================================================
 
 def test_share_large_timer():
-    """Timer with many measurements should serialize correctly."""
-    timer = Timer()
+    """Sktimer with many measurements should serialize correctly."""
+    timer = Sktimer()
     for i in range(1000):
         timer.add_time(float(i) / 100)
     
@@ -645,7 +645,7 @@ def test_share_all_objects_plus_wpo():
     
     try:
         # Create suitkaise objects
-        timer = Timer()
+        timer = Sktimer()
         timer.add_time(1.5)
         
         circuit = Circuit(5, sleep_time_after_trip=0.0)
@@ -681,7 +681,7 @@ def test_share_wpo_suitkaise_types():
     try:
         wpo = WorstPossibleObject(verbose=False)
         
-        # WPO may contain Timer - check if it exists
+        # WPO may contain Sktimer - check if it exists
         if hasattr(wpo, 'timer') and wpo.timer is not None:
             timer = wpo.timer
             timer.add_time(1.0)
@@ -691,8 +691,8 @@ def test_share_wpo_suitkaise_types():
             
             assert restored.num_times >= 1
         else:
-            # Timer might be created internally, test with a fresh one
-            timer = Timer()
+            # Sktimer might be created internally, test with a fresh one
+            timer = Sktimer()
             timer.add_time(1.0)
             
             data = serialize(timer)
@@ -710,7 +710,7 @@ def test_share_wpo_suitkaise_types():
 
 def test_share_modification_tracking():
     """Changes to suitkaise objects should be tracked for synchronization."""
-    timer = Timer()
+    timer = Sktimer()
     
     # Modify
     timer.add_time(1.0)
@@ -728,7 +728,7 @@ def test_share_modification_tracking():
 
 def test_share_modification_complex():
     """Complex modifications to Circuit should be preserved."""
-    circuit = Circuit(10, sleep_time_after_trip=0.01, factor=2.0)
+    circuit = Circuit(10, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     # Series of modifications
     circuit.short()
@@ -756,7 +756,7 @@ def test_share_modification_complex():
 
 def test_share_empty_objects():
     """Empty suitkaise objects should serialize correctly."""
-    empty_timer = Timer()
+    empty_timer = Sktimer()
     empty_circuit = Circuit(5)
     
     # All should serialize
@@ -810,7 +810,7 @@ def test_share_special_strings():
 
 def test_share_large_numbers():
     """Large numbers should work."""
-    timer = Timer()
+    timer = Sktimer()
     timer.add_time(float(10**15))
     timer.add_time(float(10**15))
     
@@ -857,11 +857,11 @@ def run_all_tests():
     """Run all comprehensive Share tests."""
     runner = TestRunner("Comprehensive Share Tests")
     
-    # Timer tests
-    runner.run_test("Share Timer basic", test_share_timer_basic)
-    runner.run_test("Share Timer has _shared_meta", test_share_timer_has_shared_meta)
-    runner.run_test("Share Timer serialization", test_share_timer_serialization)
-    runner.run_test("Share Timer all properties", test_share_timer_all_properties)
+    # Sktimer tests
+    runner.run_test("Share Sktimer basic", test_share_timer_basic)
+    runner.run_test("Share Sktimer has _shared_meta", test_share_timer_has_shared_meta)
+    runner.run_test("Share Sktimer serialization", test_share_timer_serialization)
+    runner.run_test("Share Sktimer all properties", test_share_timer_all_properties)
     
     # Circuit tests
     runner.run_test("Share Circuit basic", test_share_circuit_basic)
@@ -890,7 +890,7 @@ def run_all_tests():
     runner.run_test("Share objects cross-reference", test_share_objects_cross_reference)
     
     # Stress tests
-    runner.run_test("Share large Timer", test_share_large_timer)
+    runner.run_test("Share large Sktimer", test_share_large_timer)
     runner.run_test("Share large DataStore", test_share_large_datastore)
     runner.run_test("Share deeply nested", test_share_deeply_nested)
     

@@ -97,7 +97,7 @@ def test_circuit_backoff_initial():
 
 def test_circuit_backoff_increases():
     """Circuit sleep time should increase with factor after trip."""
-    circuit = Circuit(num_shorts_to_trip=2, sleep_time_after_trip=0.05, factor=2.0)
+    circuit = Circuit(num_shorts_to_trip=2, sleep_time_after_trip=0.05, backoff_factor=2.0)
     
     # Trip the circuit
     circuit.short()
@@ -116,7 +116,7 @@ def test_circuit_backoff_increases():
 
 def test_circuit_backoff_exponential():
     """Circuit sleep time should grow with factor."""
-    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, factor=2.0, max_sleep_time=1.0)
+    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, backoff_factor=2.0, max_sleep_time=1.0)
     
     # Trip multiple times
     circuit.short()  # Trip 1, sleeps 0.01
@@ -135,7 +135,7 @@ def test_circuit_backoff_exponential():
 
 def test_circuit_reset_backoff():
     """Circuit.reset_backoff() should reset sleep time to initial."""
-    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, factor=2.0)
+    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, backoff_factor=2.0)
     
     # Trip to increase sleep time
     circuit.short()
@@ -151,7 +151,7 @@ def test_circuit_reset_backoff():
 
 def test_circuit_max_backoff():
     """Circuit sleep time should not exceed max_sleep_time."""
-    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, factor=2.0, max_sleep_time=0.15)
+    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, backoff_factor=2.0, max_sleep_time=0.15)
     
     # Trip many times
     for _ in range(5):
@@ -168,7 +168,7 @@ def test_circuit_max_backoff():
 
 def test_breaking_circuit_backoff_on_reset():
     """BreakingCircuit should sleep after reset with factor > 1."""
-    circuit = BreakingCircuit(num_shorts_to_trip=2, sleep_time_after_trip=0.05, factor=2.0)
+    circuit = BreakingCircuit(num_shorts_to_trip=2, sleep_time_after_trip=0.05, backoff_factor=2.0)
     
     circuit.short()
     circuit.short()  # This breaks
@@ -183,7 +183,7 @@ def test_breaking_circuit_backoff_on_reset():
 
 def test_breaking_circuit_backoff_increases():
     """BreakingCircuit sleep time should increase with each reset."""
-    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.02, factor=2.0, max_sleep_time=0.5)
+    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.02, backoff_factor=2.0, max_sleep_time=0.5)
     
     # First break and reset
     circuit.short()
@@ -199,7 +199,7 @@ def test_breaking_circuit_backoff_increases():
 
 def test_breaking_circuit_reset_backoff():
     """BreakingCircuit.reset_backoff() should reset sleep time to initial."""
-    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, factor=2.0)
+    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, backoff_factor=2.0)
     
     # Break and reset multiple times
     for _ in range(3):
@@ -329,7 +329,7 @@ def test_very_large_backoff():
 
 def test_backoff_with_multiplier():
     """Sleep time should grow by factor."""
-    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, factor=2.0, max_sleep_time=1.0)
+    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, backoff_factor=2.0, max_sleep_time=1.0)
     
     # After each trip, sleep time doubles
     # 0.01 -> 0.02 -> 0.04 -> 0.08 -> ...
@@ -347,7 +347,7 @@ def test_backoff_with_multiplier():
 
 def test_reset_backoff_after_success():
     """reset_backoff should be callable after successful operations."""
-    circuit = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01, factor=2.0)
+    circuit = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     circuit.short()
     circuit.short()
@@ -367,7 +367,7 @@ def test_reset_backoff_after_success():
 
 def test_reset_backoff_clears_accumulated():
     """reset_backoff should clear accumulated sleep time."""
-    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, factor=2.0)
+    circuit = Circuit(num_shorts_to_trip=1, sleep_time_after_trip=0.01, backoff_factor=2.0)
     
     # Accumulate backoff
     for _ in range(3):
@@ -385,7 +385,7 @@ def test_reset_backoff_clears_accumulated():
 
 def test_breaking_circuit_reset_backoff_independent():
     """BreakingCircuit reset_backoff should be independent of reset."""
-    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, factor=2.0)
+    circuit = BreakingCircuit(num_shorts_to_trip=1, sleep_time_after_trip=0.05, backoff_factor=2.0)
     
     circuit.short()
     circuit.reset()

@@ -15,7 +15,7 @@ import time as stdlib_time
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.timing import Timer, TimeThis
+from suitkaise.timing import Sktimer, TimeThis
 
 
 # =============================================================================
@@ -94,7 +94,7 @@ def test_timethis_returns_timer():
     with TimeThis() as timer:
         pass
     
-    assert isinstance(timer, Timer), "Should yield a Timer"
+    assert isinstance(timer, Sktimer), "Should yield a Sktimer"
 
 
 def test_timethis_times_block():
@@ -107,12 +107,12 @@ def test_timethis_times_block():
 
 
 # =============================================================================
-# TimeThis with Explicit Timer Tests
+# TimeThis with Explicit Sktimer Tests
 # =============================================================================
 
 def test_timethis_explicit_timer():
     """TimeThis with explicit timer should use it."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     
     with TimeThis(my_timer) as timer:
         stdlib_time.sleep(0.01)
@@ -123,7 +123,7 @@ def test_timethis_explicit_timer():
 
 def test_timethis_explicit_timer_accumulates():
     """Multiple TimeThis blocks should accumulate in explicit timer."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     
     for _ in range(5):
         with TimeThis(my_timer):
@@ -134,7 +134,7 @@ def test_timethis_explicit_timer_accumulates():
 
 def test_timethis_explicit_timer_preserves_existing():
     """TimeThis should preserve existing times in explicit timer."""
-    my_timer = Timer()
+    my_timer = Sktimer()
     my_timer.add_time(1.0)
     my_timer.add_time(2.0)
     
@@ -152,7 +152,7 @@ def test_timethis_explicit_timer_preserves_existing():
 
 def test_timethis_threshold_records():
     """TimeThis should record times above threshold."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer, threshold=0.005):
         stdlib_time.sleep(0.02)  # Above threshold
@@ -162,7 +162,7 @@ def test_timethis_threshold_records():
 
 def test_timethis_threshold_discards():
     """TimeThis should discard times below threshold."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer, threshold=0.1):
         pass  # Nearly instant, below threshold
@@ -172,7 +172,7 @@ def test_timethis_threshold_discards():
 
 def test_timethis_threshold_at_boundary():
     """TimeThis should handle times at boundary."""
-    timer = Timer()
+    timer = Sktimer()
     
     # Time that's exactly at threshold
     with TimeThis(timer, threshold=0.0):
@@ -187,7 +187,7 @@ def test_timethis_threshold_at_boundary():
 
 def test_timethis_pause_resume():
     """TimeThis should support pause/resume via timer."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer) as t:
         stdlib_time.sleep(0.01)  # 10ms active
@@ -203,7 +203,7 @@ def test_timethis_pause_resume():
 
 def test_timethis_multiple_pauses():
     """TimeThis should handle multiple pause/resume cycles."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer) as t:
         for _ in range(3):
@@ -224,7 +224,7 @@ def test_timethis_multiple_pauses():
 
 def test_timethis_lap():
     """TimeThis should support lap timing."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer) as t:
         stdlib_time.sleep(0.01)
@@ -245,7 +245,7 @@ def test_timethis_lap():
 
 def test_timethis_exception_still_times():
     """TimeThis should record time even on exception."""
-    timer = Timer()
+    timer = Sktimer()
     
     try:
         with TimeThis(timer):
@@ -269,7 +269,7 @@ def test_timethis_exception_propagates():
 
 def test_timethis_exception_below_threshold():
     """TimeThis should not record if exception before threshold."""
-    timer = Timer()
+    timer = Sktimer()
     
     try:
         with TimeThis(timer, threshold=0.1):
@@ -287,8 +287,8 @@ def test_timethis_exception_below_threshold():
 
 def test_timethis_nested_different_timers():
     """Nested TimeThis with different timers should work."""
-    outer_timer = Timer()
-    inner_timer = Timer()
+    outer_timer = Sktimer()
+    inner_timer = Sktimer()
     
     with TimeThis(outer_timer):
         stdlib_time.sleep(0.01)
@@ -303,7 +303,7 @@ def test_timethis_nested_different_timers():
 
 def test_timethis_nested_same_timer():
     """Nested TimeThis with same timer should record both."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer):
         stdlib_time.sleep(0.01)
@@ -320,7 +320,7 @@ def test_timethis_nested_same_timer():
 
 def test_timethis_empty_block():
     """TimeThis should handle empty block."""
-    timer = Timer()
+    timer = Sktimer()
     
     with TimeThis(timer):
         pass
@@ -331,7 +331,7 @@ def test_timethis_empty_block():
 
 def test_timethis_quick_succession():
     """TimeThis should handle rapid successive uses."""
-    timer = Timer()
+    timer = Sktimer()
     
     for _ in range(100):
         with TimeThis(timer):

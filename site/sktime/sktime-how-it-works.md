@@ -205,37 +205,37 @@ All reads happen under the lock to ensure you get a consistent snapshot of the s
 
 ---
 
-## `Timer` Class
+## `Sktimer` Class
 
-The `Timer` is an advanced timer that can be used to time code execution, complete with statistics and pause/resume functionality.
+The `Sktimer` is an advanced timer that can be used to time code execution, complete with statistics and pause/resume functionality.
 
 It is also the base for the context manager `TimeThis`, the timing decorator `@timethis`, and the `processing` module's `@timesection` decorator.
 
-No arguments are needed to initialize the `Timer` class.
+No arguments are needed to initialize the `Sktimer` class.
 
 ```python
 from suitkaise import sktime
 
-t = sktime.Timer()
+t = sktime.Sktimer()
 ```
 
-1. Creates a `Timer` instance
+1. Creates a `Sktimer` instance
 2. stores the following attributes:
    - `original_start_time`: set to `None` (will be set on first `start()`)
    - `times`: empty list to store all recorded measurements
    - `_paused_durations`: empty list to track pause time for each measurement
    - `_lock`: creates a `threading.RLock()` for thread safety
    - `_sessions`: empty dictionary to track timing sessions per thread (keyed by thread ID)
-   - `_stats_view`: a `TimerStatsView` instance for accessing statistics
+   - `_stats_view`: a `SktimerStatsView` instance for accessing statistics
 
 Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
 
-### `Timer.stats` property
+### `Sktimer.stats` property
 
-The `stats` property returns a `TimerStatsView` that provides organized access to all timer statistics.
+The `stats` property returns a `SktimerStatsView` that provides organized access to all timer statistics.
 
 ```python
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 # ... record some timings ...
 
 # Access statistics through the stats namespace
@@ -245,9 +245,9 @@ print(timer.percentile(95))
 print(timer.num_times)
 ```
 
-The `TimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
+The `SktimerStatsView` is a live view - it always reflects the current state of the timer. All property accesses are thread-safe.
 
-### `Timer.start()`
+### `Sktimer.start()`
 
 Starts timing a new measurement.
 
@@ -262,13 +262,13 @@ If called while timing is already in progress, issues a `UserWarning` (it create
 1. Checks if there's already an active timing frame for this thread
    - If yes, issues a `UserWarning`
 
-2. Gets or creates a `TimerSession` for the current thread by calling `_get_or_create_session()`
+2. Gets or creates a `SktimerSession` for the current thread by calling `_get_or_create_session()`
 
    - Uses `threading.get_ident()` to get current thread ID
 
    - Looks up session in `_sessions` dictionary
 
-   - If not found, creates new `TimerSession` and stores it
+   - If not found, creates new `SktimerSession` and stores it
 
 3. Calls `session.start()` which:
     - Acquires session lock
@@ -319,7 +319,7 @@ timer.stop()           # Frame 1 removed, returns total time
 
 Each `start()` pushes a new frame onto the stack. Each `stop()` pops the top frame off and calculates how long that specific measurement took. This lets you measure the total time of something while also measuring individual pieces inside it.
 
-### `Timer.stop()`
+### `Sktimer.stop()`
 
 Stops timing the current measurement and returns the elapsed time.
 
@@ -345,11 +345,11 @@ Returns:
     
     - Pops the frame from the stack
     
-    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Timer.stop()`)
+    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Sktimer.stop()`)
 
     - Releases session lock
 
-3. Acquires the `Timer` manager lock
+3. Acquires the `Sktimer` manager lock
 4. Appends elapsed time to `times` list
 5. Appends pause duration to `_paused_durations` list
 6. Releases the lock
@@ -357,7 +357,7 @@ Returns:
 
 The elapsed time excludes any paused periods, giving you only the total time the timer was running.
 
-### `Timer.discard()`
+### `Sktimer.discard()`
 
 Stops timing but does NOT record the measurement.
 
@@ -371,7 +371,7 @@ Returns:
 
 1. Gets the current thread's session
 
-2. Calls `session.stop()` which works the same as in `Timer.stop()`
+2. Calls `session.stop()` which works the same as in `Sktimer.stop()`
 
 3. Does NOT append to `times` or `_paused_durations` lists
 
@@ -386,7 +386,7 @@ except Exception:
     timer.discard()  # Stop but don't record failed timing
 ```
 
-### `Timer.lap()`
+### `Sktimer.lap()`
 
 Records a lap time without stopping the timer.
 
@@ -413,19 +413,19 @@ Returns:
         - Setting `paused` to `False`
         - Setting `pause_started_at` to `None`
     
-    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Timer.lap()`)
+    - Returns tuple of `(elapsed_time, total_paused)` to the caller (`Sktimer.lap()`)
 
     - Releases session lock
     
-3. Acquires the `Timer` manager lock
+3. Acquires the `Sktimer` manager lock
 4. Appends elapsed time to `times` list
 5. Appends pause duration to `_paused_durations` list
 6. Releases the lock
 7. Returns just the elapsed time (unwraps the tuple)
 
-The key difference from `stop()` is the frame stays on the stack and restarts, so timing continues. It's as if you called `Timer.start()` the instant after the previous `Timer.stop()` call.
+The key difference from `stop()` is the frame stays on the stack and restarts, so timing continues. It's as if you called `Sktimer.start()` the instant after the previous `Sktimer.stop()` call.
 
-### `Timer.pause()`
+### `Sktimer.pause()`
 
 Pauses the current timing measurement.
 
@@ -451,7 +451,7 @@ Returns:
 
 The pause time is tracked but not included in the final elapsed time calculation.
 
-### `Timer.resume()`
+### `Sktimer.resume()`
 
 Resumes a paused timing measurement.
 
@@ -480,7 +480,7 @@ Returns:
 
 Each pause/resume cycle accumulates in `total_paused`, which is subtracted from the final elapsed time.
 
-### `Timer.add_time()`
+### `Sktimer.add_time()`
 
 Manually adds a pre-measured time to the statistics (a float).
 
@@ -490,13 +490,13 @@ Arguments:
 Returns:
 - None
 
-1. Acquires the `Timer` manager lock
+1. Acquires the `Sktimer` manager lock
 2. Appends `elapsed_time` to `times` list
 3. Appends `0.0` to `_paused_durations` list
 4. Releases the lock
 5. Returns None
 
-### `Timer` statistics properties
+### `Sktimer` statistics properties
 
 All statistics are accessed directly on the timer and work by acquiring the lock and calculating from the `times` list:
 
@@ -534,7 +534,7 @@ All statistics are accessed directly on the timer and work by acquiring the lock
 
 All property accesses acquire the lock to ensure thread-safe reads.
 
-### `Timer` statistics methods
+### `Sktimer` statistics methods
 
 #### `timer.get_time()`
 
@@ -546,7 +546,7 @@ Arguments:
 Returns:
 - timing measurement (in seconds) as a float or `None` if index is out of range
 
-1. Acquires the `Timer` manager lock
+1. Acquires the `Sktimer` manager lock
 2. Checks if `0 <= index < len(times)`
 3. If valid, returns `times[index]`
 4. If invalid, returns `None`
@@ -562,7 +562,7 @@ Arguments:
 Returns:
 - percentile value (in seconds) as a float or `None` if no measurements
 
-1. Acquires the `Timer` manager lock
+1. Acquires the `Sktimer` manager lock
 2. Checks if `times` is empty - returns `None` if so
 3. Validates `percent` is between 0 and 100 - raises `ValueError` if not
 4. Sorts the times list
@@ -578,7 +578,7 @@ Returns:
 
 Linear interpolation provides smooth percentile values between data points.
 
-### `Timer.get_statistics()` / `Timer.get_stats()`
+### `Sktimer.get_statistics()` / `Sktimer.get_stats()`
 
 Creates a frozen snapshot of all statistics.
 
@@ -586,28 +586,28 @@ Arguments:
 - None
 
 Returns:
-- a `TimerStats` object or `None` if no measurements have been recorded
+- a `SktimerStats` object or `None` if no measurements have been recorded
 
-1. Acquires the `Timer` manager lock
+1. Acquires the `Sktimer` manager lock
 
 2. Returns `None` if no measurements have been recorded
 
-3. Creates a new `TimerStats` object with:
+3. Creates a new `SktimerStats` object with:
     - Copy of the `times` list
     - The `original_start_time`
     - Copy of the `_paused_durations` list
 
 4. Releases the lock
 
-5. Returns the `TimerStats` object
+5. Returns the `SktimerStats` object
 
-The `TimerStats` object calculates and stores all statistics at creation time.
+The `SktimerStats` object calculates and stores all statistics at creation time.
 
-Once created, the `TimerStats` object is a frozen snapshot. You can access all the same properties and methods (like `percentile()`) without acquiring locks, making it fast for repeated access.
+Once created, the `SktimerStats` object is a frozen snapshot. You can access all the same properties and methods (like `percentile()`) without acquiring locks, making it fast for repeated access.
 
 `get_stats()` is an alias for `get_statistics()`.
 
-### `Timer.reset()`
+### `Sktimer.reset()`
 
 Clears all timing data.
 
@@ -617,7 +617,7 @@ Arguments:
 Returns:
 - None
 
-1. Acquires the `Timer` manager lock
+1. Acquires the `Sktimer` manager lock
 2. Clears the `times` list
 3. Sets `original_start_time` to `None`
 4. Clears the `_sessions` dictionary (removes all thread sessions)
@@ -633,13 +633,13 @@ This completely resets the timer as if it was just created.
 A context manager that automatically starts and stops a timer when entering and exiting a code block.
 
 Initialize with:
-- `timer`: an optional `Timer` instance to use
+- `timer`: an optional `Sktimer` instance to use
 
-If `timer` is provided, the context manager will use the provided `Timer` instance.
+If `timer` is provided, the context manager will use the provided `Sktimer` instance.
 
-Otherwise, it will create a new `Timer` instance, which will only be used for this single timing operation.
+Otherwise, it will create a new `Sktimer` instance, which will only be used for this single timing operation.
 
-The context manager returns the `Timer` instance directly:
+The context manager returns the `Sktimer` instance directly:
 
 ```python
 from suitkaise import sktime
@@ -660,7 +660,7 @@ print(timer.mean)
 Entry point for the context manager. Starts timing the code block.
 
 1. Calls `self.timer.start()`
-2. Returns the `Timer` instance (`self.timer`)
+2. Returns the `Sktimer` instance (`self.timer`)
 
 #### `TimeThis.__exit__(exc_type, exc_val, exc_tb)`
 
@@ -681,27 +681,27 @@ Pausing, resuming, and lapping are all available as methods on the `TimeThis` co
 - `resume()`: Resumes the timer
 - `lap()`: Records a lap time
 
-These work exactly the same as the ones in the `Timer` class.
+These work exactly the same as the ones in the `Sktimer` class.
 
 ---
 
 ## `timethis` decorator
 
-Decorator that dedicates a `Timer` instance to the function it decorates, timing the function's execution every time it is called.
+Decorator that dedicates a `Sktimer` instance to the function it decorates, timing the function's execution every time it is called.
 
 Arguments:
-- `timer_instance`: an optional `Timer` instance to use
+- `timer_instance`: an optional `Sktimer` instance to use
 
-If `timer_instance` is provided, the decorator will use the provided `Timer` instance.
+If `timer_instance` is provided, the decorator will use the provided `Sktimer` instance.
 
-Otherwise, it will create a new `Timer` instance, dedicated to the function it decorates.
+Otherwise, it will create a new `Sktimer` instance, dedicated to the function it decorates.
 
 ### Mode 1: Explicit timer (`timer_instance` provided)
 
-When you pass a `Timer` to the decorator, it uses that timer directly.
+When you pass a `Sktimer` to the decorator, it uses that timer directly.
 
 1. At decoration time:
-    - Receives your provided `Timer` instance
+    - Receives your provided `Sktimer` instance
     - Creates a wrapper function around your original function
 
 2. At call time (every time the decorated function runs):
@@ -724,14 +724,14 @@ When `timer_instance` is `None` (the default), the decorator creates and manages
 2. Builds a unique timer name based on the function's location:
     - Checks `func.__qualname__` to see if the function is inside a class
     - If inside a class (qualname contains a dot like `MyClass.my_method`):
-        - Timer name becomes `{module}_{ClassName}_{method}_timer`
+        - Sktimer name becomes `{module}_{ClassName}_{method}_timer`
     - If at module level (no dot in qualname):
-        - Timer name becomes `{module}_{function}_timer`
+        - Sktimer name becomes `{module}_{function}_timer`
 
 3. Creates or retrieves the global timer:
     - The `timethis` function itself stores a dictionary `_global_timers` and a lock `_timers_lock`
     - Acquires the lock (thread-safe)
-    - If a timer with this name doesn't exist yet, creates a new `Timer()`
+    - If a timer with this name doesn't exist yet, creates a new `Sktimer()`
     - Retrieves the timer from the dictionary
     - Releases the lock
 
@@ -781,7 +781,7 @@ This is useful for thread safety, as it allows the same thread to acquire the lo
 
 ### Memory Management
 
-The `Timer` stores all measurements in memory:
+The `Sktimer` stores all measurements in memory:
 - Each measurement is a single float (8 bytes)
 - Each pause duration is a single float (8 bytes)
 - 1 million measurements ≈ 16 MB of memory
@@ -790,13 +790,13 @@ Use `reset()` periodically if running indefinitely
 
 ### Error Handling
 
-- `Timer.stop()` raises `RuntimeError` if called without `start()`
+- `Sktimer.stop()` raises `RuntimeError` if called without `start()`
 
-- `Timer.start()` issues a `UserWarning` if called while timing is already in progress
+- `Sktimer.start()` issues a `UserWarning` if called while timing is already in progress
 
-- `Timer.pause()` issues a `UserWarning` if called when already paused
+- `Sktimer.pause()` issues a `UserWarning` if called when already paused
 
-- `Timer.resume()` issues a `UserWarning` if called when not paused
+- `Sktimer.resume()` issues a `UserWarning` if called when not paused
 
 - Percentile calculations raise `ValueError` if percent is not in range 0-100
 

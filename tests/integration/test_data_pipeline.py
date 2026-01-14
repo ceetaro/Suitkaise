@@ -6,14 +6,14 @@ Real-world scenario: A data pipeline that:
 2. Processes them in parallel using Pool
 3. Uses Share to coordinate progress tracking across workers
 4. Uses Circuit for rate limiting
-5. Uses Timer to track performance
+5. Uses Sktimer to track performance
 6. Uses cerial to serialize state between processes
 
 This tests the full integration of:
 - skpath: Project path utilities, file discovery
 - processing: Process, Pool, Share
 - circuits: Circuit for backoff on failures
-- timing: Timer, TimeThis, @timethis
+- timing: Sktimer, TimeThis, @timethis
 - cerial: Cross-process serialization
 - sk: @sk decorated classes for Share compatibility
 """
@@ -29,7 +29,7 @@ sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 from suitkaise.paths import Skpath, get_project_root, get_project_paths
 from suitkaise.processing import Process, Pool, Share
 from suitkaise.circuits import Circuit, BreakingCircuit
-from suitkaise.timing import Timer, TimeThis, timethis
+from suitkaise.timing import Sktimer, TimeThis, timethis
 from suitkaise.cerial import serialize, deserialize
 from suitkaise.sk import sk
 
@@ -184,8 +184,8 @@ def test_skpath_with_project_discovery():
 
 
 def test_timer_with_timethis():
-    """Test Timer integration with TimeThis context manager."""
-    timer = Timer()
+    """Test Sktimer integration with TimeThis context manager."""
+    timer = Sktimer()
     
     # Use TimeThis to time code blocks
     for _ in range(5):
@@ -198,9 +198,9 @@ def test_timer_with_timethis():
 
 
 def test_circuit_with_timer():
-    """Test Circuit and Timer working together."""
-    timer = Timer()
-    circuit = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01, factor=1.0)
+    """Test Circuit and Sktimer working together."""
+    timer = Sktimer()
+    circuit = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01, backoff_factor=1.0)
     
     # Simulate processing with circuit breaker
     for i in range(10):
@@ -223,7 +223,7 @@ def test_cerial_with_complex_objects():
         def __init__(self):
             self.lock = threading.Lock()
             self.logger = logging.getLogger("test")
-            self.timer = Timer()
+            self.timer = Sktimer()
             self.circuit = Circuit(5, 0.01)
             self.progress = ProgressTracker()
     
@@ -237,7 +237,7 @@ def test_cerial_with_complex_objects():
     restored = deserialize(data)
     
     # Verify state is preserved
-    assert len(restored.timer.times) == 2, "Timer times should be preserved"
+    assert len(restored.timer.times) == 2, "Sktimer times should be preserved"
     assert restored.progress.files_processed == 1, "Progress should be preserved"
     # Lock should be recreated
     assert restored.lock.acquire(blocking=False)
@@ -265,7 +265,7 @@ def test_pool_with_file_processing():
 def test_share_with_progress_tracking():
     """Test Share for cross-process state coordination."""
     with Share() as share:
-        share.timer = Timer()
+        share.timer = Sktimer()
         share.progress = ProgressTracker()
         
         # Simulate worker updates
@@ -280,9 +280,9 @@ def test_share_with_progress_tracking():
         timer = share._coordinator.get_object('timer')
         progress = share._coordinator.get_object('progress')
         
-        assert timer is not None, "Timer should be stored in Share"
+        assert timer is not None, "Sktimer should be stored in Share"
         assert progress is not None, "Progress should be stored in Share"
-        assert len(timer.times) == 5, f"Timer should have 5 times, got {len(timer.times)}"
+        assert len(timer.times) == 5, f"Sktimer should have 5 times, got {len(timer.times)}"
         assert progress.files_processed == 5, f"Should have processed 5 files, got {progress.files_processed}"
 
 
@@ -291,10 +291,10 @@ def test_breaking_circuit_retry_pattern():
     circuit = BreakingCircuit(
         num_shorts_to_trip=3,
         sleep_time_after_trip=0.01,
-        factor=2.0,
+        backoff_factor=2.0,
         max_sleep_time=0.1
     )
-    timer = Timer()
+    timer = Sktimer()
     
     attempts = 0
     success = False
@@ -320,7 +320,7 @@ def test_full_pipeline_integration():
     2. Process in parallel with Pool
     3. Track progress with Share
     4. Use Circuit for failure handling
-    5. Time operations with Timer
+    5. Time operations with Sktimer
     """
     # Get project root and some Python files
     root = get_project_root()
@@ -334,7 +334,7 @@ def test_full_pipeline_integration():
         py_files = [f"mock_{i}.py" for i in range(10)]
     
     # Track overall performance
-    pipeline_timer = Timer()
+    pipeline_timer = Sktimer()
     
     with TimeThis(pipeline_timer):
         # Create pool and process
@@ -412,7 +412,7 @@ def run_all_tests():
     
     run_scenario(
         "Performance Measurement",
-        "Using Timer with TimeThis context manager to track execution time",
+        "Using Sktimer with TimeThis context manager to track execution time",
         test_timer_with_timethis, 10, results
     )
     

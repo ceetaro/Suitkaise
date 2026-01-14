@@ -5,6 +5,9 @@ from types import SimpleNamespace
 from typing import Dict, List, Tuple
 
 import pytest  # type: ignore
+import pytest_asyncio  # type: ignore
+
+pytest_plugins = ('pytest_asyncio',)
 
 
 _TEST_DETAILS: Dict[str, List[str]] = {}

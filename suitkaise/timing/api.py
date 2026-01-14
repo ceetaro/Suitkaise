@@ -6,7 +6,7 @@ sophisticated timing classes, and convenient decorators for performance measurem
 
 Key Features:
 - Simple timing functions (time, sleep, elapsed)
-- Timer for statistical timing analysis, pause and resume, context manager and decorator
+- Sktimer for statistical timing analysis, pause and resume, context manager and decorator
 
 Philosophy: Make timing operations intuitive while providing powerful analysis capabilities.
 """
@@ -21,7 +21,7 @@ from functools import wraps
 try:
     from ._int.time_ops import (
         _elapsed_time,
-        Timer,
+        Sktimer,
         _timethis_decorator,
         _get_current_time,
         _sleep,
@@ -173,9 +173,9 @@ def elapsed(time1: float, time2: Optional[float] = None) -> float:
 
 
 # ============================================================================
-# Timer - imported directly from _int.time_ops
+# Sktimer - imported directly from _int.time_ops
 # ============================================================================
-# Timer class is now imported directly from the internal module.
+# Sktimer class is now imported directly from the internal module.
 # This simplifies serialization and removes unnecessary wrapper indirection.
 
 
@@ -204,7 +204,7 @@ class TimeThis:
         # create a context manager for an existing timer
         from suitkaise import sktime
 
-        my_timer = sktime.Timer()
+        my_timer = sktime.Sktimer()
     
         def function1():
             with sktime.TimeThis(my_timer):
@@ -238,12 +238,12 @@ class TimeThis:
     Context manager for timing code blocks with automatic timer management.
     
     Provides clean, easy-to-read timing for code blocks. Can work with
-    independent timing contexts or accumulate statistics with explicit `Timer`.
+    independent timing contexts or accumulate statistics with explicit `Sktimer`.
     Supports pause/resume and lap timing within context blocks.
     
     When to Use What:
-    - Use `TimeThis()` without `Timer` for quick, one-off timing measurements
-    - Use `TimeThis(timer)` with explicit `Timer` for statistical analysis across multiple runs
+    - Use `TimeThis()` without `Sktimer` for quick, one-off timing measurements
+    - Use `TimeThis(timer)` with explicit `Sktimer` for statistical analysis across multiple runs
     
     ────────────────────────────────────────────────────────
         ```python
@@ -298,7 +298,7 @@ class TimeThis:
         from suitkaise import sktime
         import requests
 
-        api_timer = sktime.Timer()
+        api_timer = sktime.Sktimer()
         
         # Time multiple API calls to build statistics
         with sktime.TimeThis(api_timer) as timer:
@@ -315,12 +315,12 @@ class TimeThis:
         ────────────────────────────────────────────────────────\n
     
     Args:
-        timer: Timer instance to use (creates new one if None)
+        timer: Sktimer instance to use (creates new one if None)
         threshold: Minimum elapsed time to record (default 0.0)
     """
 
-    def __init__(self, timer: Optional[Timer] = None, threshold: float = 0.0):
-        self.timer = timer or Timer()
+    def __init__(self, timer: Optional[Sktimer] = None, threshold: float = 0.0):
+        self.timer = timer or Sktimer()
         self.threshold = threshold
 
     def pause(self):
@@ -349,15 +349,15 @@ class TimeThis:
 # Timing Decorators
 # ============================================================================
 
-def timethis(timer_instance: Optional[Timer] = None, threshold: float = 0.0) -> Callable:
+def timethis(timer: Optional[Sktimer] = None, threshold: float = 0.0) -> Callable:
     """
-    Create a timing decorator that accumulates statistics in a `Timer` instance.
+    Create a timing decorator that accumulates statistics in a `Sktimer` instance.
     
-    The `@timethis` decorator supports both explicit `Timer` instances and automatic 
+    The `@timethis` decorator supports both explicit `Sktimer` instances and automatic 
     global timer creation, providing the ultimate convenience.
     
     Args:
-        `timer_instance`: `Timer` to accumulate timing data in. If `None`, creates
+        `timer`: `Sktimer` to accumulate timing data in. If `None`, creates
                        a global timer with name pattern: `module_[class_]function_timer`
         `threshold`: Minimum elapsed time to record (default 0.0). Times below
                     this threshold are discarded and not recorded in statistics.
@@ -367,12 +367,12 @@ def timethis(timer_instance: Optional[Timer] = None, threshold: float = 0.0) -> 
 
     ────────────────────────────────────────────────────────\n
 
-    Auto-created `Timer` (quickest way to use `Timer`):
+    Auto-created `Sktimer` (quickest way to use `Sktimer`):
 
         ```python
         from suitkaise import sktime
 
-        # No timer argument - creates global timer automatically
+        # No timer argument - creates global Sktimer automatically
         @sktime.timethis()  
         def quick_function():
             # Code to time
@@ -392,13 +392,13 @@ def timethis(timer_instance: Optional[Timer] = None, threshold: float = 0.0) -> 
         ```
     ────────────────────────────────────────────────────────\n
 
-    Explicit `Timer` (for gathering data from multiple functions):
+    Explicit `Sktimer` (for gathering data from multiple functions):
 
         ```python
         from suitkaise import sktime
         import random
 
-        performance_timer = sktime.Timer()
+        performance_timer = sktime.Sktimer()
         
         @sktime.timethis()
         @sktime.timethis(performance_timer)
@@ -444,15 +444,15 @@ def timethis(timer_instance: Optional[Timer] = None, threshold: float = 0.0) -> 
 
     Note:
         `@timethis` decorator supports multiple decorators on the same function.
-        The `timer_instance` parameter is used to specify the timer to use.
+        The `timer` parameter is used to specify the timer to use.
         If `None`, a global timer is created.
         
     """
     def decorator(func: Callable) -> Callable:
         # Determine timer to use
-        if timer_instance is not None:
+        if timer is not None:
             # Use provided timer directly (no longer a wrapper)
-            wrapper = _timethis_decorator(timer_instance, threshold)(func)
+            wrapper = _timethis_decorator(timer, threshold)(func)
         else:
             # Create global timer with naming convention (do this once at decoration time)
             import inspect
@@ -487,7 +487,7 @@ def timethis(timer_instance: Optional[Timer] = None, threshold: float = 0.0) -> 
             with lock:
                 global_timers = getattr(timethis, '_global_timers')
                 if timer_name not in global_timers:
-                    global_timers[timer_name] = Timer()
+                    global_timers[timer_name] = Sktimer()
             
             wrapper = _timethis_decorator(global_timers[timer_name], threshold)(func)
             
@@ -512,7 +512,7 @@ def clear_global_timers() -> None:
             timers.clear()
 
 
-# Note: We've enhanced timethis() to support both explicit Timer instances and
+# Note: We've enhanced timethis() to support both explicit Sktimer instances and
 # automatic global timer creation, providing the best of both worlds: convenience
 # when you want quick timing, and explicit control when you need detailed analysis.
 
@@ -528,7 +528,7 @@ __all__ = [
     'elapsed',
     
     # Timing classes
-    'Timer',
+    'Sktimer',
 
     # Context managers
     'TimeThis',

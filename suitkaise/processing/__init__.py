@@ -30,7 +30,7 @@ Usage:
     
     # Shared state between processes
     with Share() as share:
-        share.timer = Timer()  # Auto-wrapped for cross-process sharing
+        share.timer = Sktimer()  # Auto-wrapped for cross-process sharing
         share.timer.add_time(1.0)
 """
 

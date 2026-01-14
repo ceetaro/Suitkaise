@@ -55,6 +55,7 @@ exclude = ["tests*", "docs*", "examples*", "suitkaise_depr*", "_suitkaise_wip*"]
 "*" = ["**/*.md"]
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 markers = [
     "basic: SKTime basic function tests",
     "yawn: SKTime Yawn behavior tests",

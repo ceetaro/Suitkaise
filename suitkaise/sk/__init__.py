@@ -26,7 +26,7 @@ Usage:
     
     # Using @sk decorator
     @sk
-    class Timer:
+    class Sktimer:
         ...
     
     # Share compatibility (auto _shared_meta)

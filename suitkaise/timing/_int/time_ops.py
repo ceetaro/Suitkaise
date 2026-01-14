@@ -7,7 +7,7 @@ for performance measurement and time-based operations.
 
 Key Features:
 - Elapsed time calculations with automatic current time detection
-- Timer class for statistical timing analysis with pause and resume
+- Sktimer class for statistical timing analysis with pause and resume
 - Comprehensive timing decorators and context managers
 
 The internal operations handle all the complex timing logic and state management.
@@ -51,7 +51,7 @@ class TimerStats:
         ```python
         from suitkaise import sktime
         
-        timer = sktime.Timer()
+        timer = sktime.Sktimer()
         # ... record multiple timings ...
         
         # Get frozen snapshot
@@ -63,7 +63,7 @@ class TimerStats:
         ```
     ────────────────────────────────────────────────────────\n
 
-    Frozen snapshot of timer statistics returned by `Timer.get_statistics()`.
+    Frozen snapshot of timer statistics returned by `Sktimer.get_statistics()`.
     
     This is an immutable snapshot taken at the time `get_statistics()` was called.
     All values are pre-computed and won't change even if the timer continues recording.
@@ -138,13 +138,13 @@ class TimerStats:
         return self.times[index] if 0 <= index < len(self.times) else None
 
 
-class Timer:
+class Sktimer:
     """
     ────────────────────────────────────────────────────────
         ```python
         from suitkaise import sktime
         
-        timer = sktime.Timer()
+        timer = sktime.Sktimer()
         
         for i in range(100):
             timer.start()
@@ -159,7 +159,7 @@ class Timer:
     ────────────────────────────────────────────────────────
         ```python
         # Pause/resume to exclude user input from timing
-        timer = sktime.Timer()
+        timer = sktime.Sktimer()
         timer.start()
         
         do_initial_work()
@@ -260,7 +260,7 @@ class Timer:
             ```python
             from suitkaise import sktime
             
-            timer = sktime.Timer()
+            timer = sktime.Sktimer()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -478,7 +478,7 @@ class Timer:
         # Warn if there's already an active frame (user might not intend nesting)
         if self._has_active_frame():
             warnings.warn(
-                "Timer.start() called while timing is already in progress. "
+                "Sktimer.start() called while timing is already in progress. "
                 "This creates a nested timing frame. Use stop() or discard() first "
                 "if you want to restart timing.",
                 UserWarning,
@@ -640,7 +640,7 @@ class Timer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            timer = sktime.Timer()
+            timer = sktime.Sktimer()
             
             # Add pre-measured times
             timer.add_time(1.5)
@@ -713,7 +713,7 @@ class Timer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            timer.reset()  # Clears all measurements, like a new Timer()
+            timer.reset()  # Clears all measurements, like a new Sktimer()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -732,7 +732,7 @@ class Timer:
 class TimerSession:
     """Per-thread timing session supporting nested frames (stack)."""
 
-    def __init__(self, manager: Timer):
+    def __init__(self, manager: Sktimer):
         self._manager = manager
         self._frames: Deque[Dict[str, Any]] = deque()
         self._lock = threading.RLock()
@@ -754,14 +754,14 @@ class TimerSession:
 
     def _top(self) -> Dict[str, Any]:
         if not self._frames:
-            raise RuntimeError("Timer is not running. Call start() first.")
+            raise RuntimeError("Sktimer is not running. Call start() first.")
         return self._frames[-1]
 
     def pause(self) -> None:
         with self._lock:
             frame = self._top()
             if frame['paused']:
-                warnings.warn("Timer is already paused. Call resume() first.", UserWarning, stacklevel=2)
+                warnings.warn("Sktimer is already paused. Call resume() first.", UserWarning, stacklevel=2)
                 return
 
             frame['paused'] = True
@@ -771,7 +771,7 @@ class TimerSession:
         with self._lock:
             frame = self._top()
             if not frame['paused']:
-                warnings.warn("Timer is not paused. Call pause() first.", UserWarning, stacklevel=2)
+                warnings.warn("Sktimer is not paused. Call pause() first.", UserWarning, stacklevel=2)
                 return
 
             pause_duration = self._now() - frame['pause_started_at']  # type: ignore
@@ -815,12 +815,12 @@ class TimerSession:
             return elapsed, paused_total
 
 
-def _timethis_decorator(timer_instance: Timer, threshold: float = 0.0):
+def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
     """
     Create a timing decorator for an existing timer instance.
     
     Args:
-        timer_instance: Timer to accumulate statistics in
+        timer: Sktimer to accumulate statistics in
         threshold: Minimum elapsed time to record (default 0.0)
         
     Returns:
@@ -830,16 +830,16 @@ def _timethis_decorator(timer_instance: Timer, threshold: float = 0.0):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Concurrent session-aware: each thread call starts/stops its own session
-            timer_instance.start()
+            timer.start()
             try:
                 result = func(*args, **kwargs)
                 return result
             finally:
                 # Get elapsed time without recording
-                elapsed = timer_instance.discard()
+                elapsed = timer.discard()
                 # Only record if above threshold
                 if elapsed >= threshold:
-                    timer_instance.add_time(elapsed)
+                    timer.add_time(elapsed)
         return wrapper
     return decorator
 

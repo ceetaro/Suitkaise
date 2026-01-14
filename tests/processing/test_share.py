@@ -4,7 +4,7 @@ Share Class Tests
 Tests Share functionality:
 - Coordinator lifecycle (start/stop)
 - Object registration and proxying
-- Timer sharing
+- Sktimer sharing
 - Circuit sharing
 - User class sharing with @sk
 - Multiple workers accessing shared state
@@ -18,7 +18,7 @@ import signal
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.processing import Share
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 from suitkaise.circuits import Circuit
 from suitkaise.sk import Skclass, sk
 
@@ -149,17 +149,17 @@ def test_share_has_stop():
 
 
 # =============================================================================
-# Timer _shared_meta Tests
+# Sktimer _shared_meta Tests
 # =============================================================================
 
 def test_timer_has_shared_meta():
-    """Timer should have _shared_meta for Share compatibility."""
-    assert hasattr(Timer, '_shared_meta')
+    """Sktimer should have _shared_meta for Share compatibility."""
+    assert hasattr(Sktimer, '_shared_meta')
 
 
 def test_timer_shared_meta_structure():
-    """Timer._shared_meta should have correct structure."""
-    meta = Timer._shared_meta
+    """Sktimer._shared_meta should have correct structure."""
+    meta = Sktimer._shared_meta
     
     assert 'methods' in meta
     assert 'properties' in meta
@@ -176,8 +176,8 @@ def test_timer_shared_meta_structure():
 
 
 def test_timer_shared_meta_writes():
-    """Timer._shared_meta methods should declare writes."""
-    meta = Timer._shared_meta
+    """Sktimer._shared_meta methods should declare writes."""
+    meta = Sktimer._shared_meta
     
     # start() writes to _sessions and original_start_time
     start_meta = meta['methods']['start']
@@ -191,8 +191,8 @@ def test_timer_shared_meta_writes():
 
 
 def test_timer_shared_meta_reads():
-    """Timer._shared_meta properties should declare reads."""
-    meta = Timer._shared_meta
+    """Sktimer._shared_meta properties should declare reads."""
+    meta = Sktimer._shared_meta
     
     # mean reads from times
     mean_meta = meta['properties']['mean']
@@ -309,9 +309,9 @@ def test_share_context_manager():
 
 
 def test_share_set_timer():
-    """Share should accept Timer."""
+    """Share should accept Sktimer."""
     with Share() as share:
-        share.timer = Timer()
+        share.timer = Sktimer()
         
         assert hasattr(share, 'timer')
 
@@ -336,7 +336,7 @@ def test_share_set_user_class():
 def test_share_set_multiple_objects():
     """Share should accept multiple objects."""
     with Share() as share:
-        share.timer = Timer()
+        share.timer = Sktimer()
         share.circuit = Circuit(num_shorts_to_trip=3)
         share.counter = Counter()
         
@@ -352,7 +352,7 @@ def test_share_set_multiple_objects():
 def test_share_timer_add_time():
     """Share.timer should support add_time()."""
     with Share() as share:
-        share.timer = Timer()
+        share.timer = Sktimer()
         
         # Add some times
         share.timer.add_time(1.0)
@@ -411,9 +411,9 @@ def test_share_datastore_operations():
 # =============================================================================
 
 def test_share_timer_serializes():
-    """Timer should serialize correctly in Share."""
+    """Sktimer should serialize correctly in Share."""
     with Share() as share:
-        timer = Timer()
+        timer = Sktimer()
         timer.add_time(1.5)
         timer.add_time(2.5)
         
@@ -433,7 +433,7 @@ def test_share_circuit_serializes():
         circuit = Circuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=0.5,
-            factor=2.0
+            backoff_factor=2.0
         )
         
         share.circuit = circuit
@@ -492,11 +492,11 @@ def run_all_tests():
     runner.run_test("Share has start()", test_share_has_start)
     runner.run_test("Share has stop()", test_share_has_stop)
     
-    # Timer _shared_meta tests
-    runner.run_test("Timer has _shared_meta", test_timer_has_shared_meta)
-    runner.run_test("Timer _shared_meta structure", test_timer_shared_meta_structure)
-    runner.run_test("Timer _shared_meta writes", test_timer_shared_meta_writes)
-    runner.run_test("Timer _shared_meta reads", test_timer_shared_meta_reads)
+    # Sktimer _shared_meta tests
+    runner.run_test("Sktimer has _shared_meta", test_timer_has_shared_meta)
+    runner.run_test("Sktimer _shared_meta structure", test_timer_shared_meta_structure)
+    runner.run_test("Sktimer _shared_meta writes", test_timer_shared_meta_writes)
+    runner.run_test("Sktimer _shared_meta reads", test_timer_shared_meta_reads)
     
     # Circuit _shared_meta tests
     runner.run_test("Circuit has _shared_meta", test_circuit_has_shared_meta)
@@ -513,18 +513,18 @@ def run_all_tests():
     runner.run_test("Share creation", test_share_creation, timeout=10)
     runner.run_test("Share start/stop", test_share_start_stop, timeout=10)
     runner.run_test("Share context manager", test_share_context_manager, timeout=10)
-    runner.run_test("Share set Timer", test_share_set_timer, timeout=10)
+    runner.run_test("Share set Sktimer", test_share_set_timer, timeout=10)
     runner.run_test("Share set Circuit", test_share_set_circuit, timeout=10)
     runner.run_test("Share set user class", test_share_set_user_class, timeout=10)
     runner.run_test("Share set multiple objects", test_share_set_multiple_objects, timeout=10)
     
     # Share operations tests
-    runner.run_test("Share Timer add_time()", test_share_timer_add_time, timeout=15)
+    runner.run_test("Share Sktimer add_time()", test_share_timer_add_time, timeout=15)
     runner.run_test("Share Counter increment()", test_share_counter_increment, timeout=15)
     runner.run_test("Share DataStore operations", test_share_datastore_operations, timeout=15)
     
     # Share serialization tests
-    runner.run_test("Share Timer serializes", test_share_timer_serializes, timeout=15)
+    runner.run_test("Share Sktimer serializes", test_share_timer_serializes, timeout=15)
     runner.run_test("Share Circuit serializes", test_share_circuit_serializes, timeout=15)
     runner.run_test("Share user class serializes", test_share_user_class_serializes, timeout=15)
     runner.run_test("Share nested object serializes", test_share_nested_object_serializes, timeout=15)

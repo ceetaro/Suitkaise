@@ -6,10 +6,10 @@ It wraps objects in proxies and manages the coordinator automatically.
 
 Usage:
     from suitkaise.processing import Share
-    from suitkaise.timing import Timer
+    from suitkaise.timing import Sktimer
     
     share = Share()
-    share.timer = Timer()  # Auto-wrapped in proxy
+    share.timer = Sktimer()  # Auto-wrapped in proxy
     share.counter = 0      # Wrapped as SharedCounter
     share.results = {}     # Wrapped as SharedDict
     
@@ -32,7 +32,7 @@ class Share:
     
     Automatically manages:
     - A coordinator process for handling writes
-    - Proxies for suitkaise objects (Timer, Circuit, etc.)
+    - Proxies for suitkaise objects (Sktimer, Circuit, etc.)
     - Shared wrappers for primitives (int → SharedCounter, dict → SharedDict)
     
     Objects with `_shared_meta` are detected and wrapped in proxies.
@@ -40,7 +40,7 @@ class Share:
     
     Usage:
         share = Share()
-        share.timer = Timer()    # Has _shared_meta, gets proxied
+        share.timer = Sktimer()    # Has _shared_meta, gets proxied
         share.counter = 0        # No _shared_meta, stored directly
         share.results = {}       # No _shared_meta, stored directly
         

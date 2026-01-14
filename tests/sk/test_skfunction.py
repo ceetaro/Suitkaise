@@ -227,7 +227,7 @@ def test_skfunction_retry_succeeds():
     reset_flaky()
     
     sk_flaky = Skfunction(flaky_function)
-    sk_retry = sk_flaky.retry(times=5, backoff=0.0)
+    sk_retry = sk_flaky.retry(times=5, delay=0.0)
     
     result = sk_retry()
     
@@ -239,7 +239,7 @@ def test_skfunction_retry_fails():
     reset_flaky()
     
     sk_flaky = Skfunction(flaky_function)
-    sk_retry = sk_flaky.retry(times=2, backoff=0.0)  # Only 2 attempts
+    sk_retry = sk_flaky.retry(times=2, delay=0.0)  # only 2 attempts
     
     try:
         sk_retry()
@@ -380,9 +380,9 @@ def test_skfunction_chain_retry_timeout():
         del slow_flaky.attempts
     
     sk_func = Skfunction(slow_flaky)
-    # Use backoff=0.0 so retry doesn't sleep between attempts
-    # Generous timeout of 5s to allow for test environment overhead
-    sk_chain = sk_func.retry(times=3, backoff=0.0).timeout(5.0)
+    # use delay=0.0 so retry doesn't sleep between attempts
+    # generous timeout of 5s to allow for test environment overhead
+    sk_chain = sk_func.retry(times=3, delay=0.0).timeout(5.0)
     
     result = sk_chain()
     

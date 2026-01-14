@@ -5,13 +5,13 @@ Real-world scenario: An async web scraper that:
 1. Uses Circuit breaker for rate limiting
 2. Uses sleep.asynced() for non-blocking delays
 3. Uses Skfunction.asynced() for blocking I/O
-4. Uses Timer for performance tracking
+4. Uses Sktimer for performance tracking
 5. Uses @timethis for method-level timing
 6. Combines multiple async operations concurrently
 
 This tests the full async integration of:
 - circuits: Circuit.short.asynced(), BreakingCircuit.trip.asynced()
-- timing: sleep.asynced(), Timer, @timethis
+- timing: sleep.asynced(), Sktimer, @timethis
 - sk: Skfunction.asynced(), @sk on classes with blocking methods
 """
 
@@ -23,7 +23,7 @@ import random
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.circuits import Circuit, BreakingCircuit
-from suitkaise.timing import Timer, TimeThis, sleep, timethis
+from suitkaise.timing import Sktimer, TimeThis, sleep, timethis
 from suitkaise.sk import Skfunction, sk, NotAsyncedError
 
 
@@ -142,10 +142,10 @@ def test_circuit_async_rate_limiting():
         circuit = Circuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=0.01,
-            factor=2.0,
+            backoff_factor=2.0,
             max_sleep_time=0.1
         )
-        timer = Timer()
+        timer = Sktimer()
         
         # Simulate rate-limited requests
         for i in range(10):
@@ -260,9 +260,9 @@ def test_mixed_sync_async_circuit():
 
 
 def test_timer_with_async_operations():
-    """Test Timer works correctly with async operations."""
+    """Test Sktimer works correctly with async operations."""
     async def async_test():
-        timer = Timer()
+        timer = Sktimer()
         
         async def timed_operation():
             timer.start()
@@ -276,7 +276,7 @@ def test_timer_with_async_operations():
             timed_operation(),
         )
         
-        # Timer should have 3 measurements
+        # Sktimer should have 3 measurements
         assert timer.num_times == 3, f"Should have 3 measurements, got {timer.num_times}"
         
         # Each should be ~20ms
@@ -292,7 +292,7 @@ def test_full_scraper_pattern():
     Full integration test simulating an async web scraper:
     1. Rate limit requests with Circuit
     2. Use async I/O for network requests
-    3. Track performance with Timer
+    3. Track performance with Sktimer
     4. Handle failures gracefully
     """
     async def async_test():
@@ -300,7 +300,7 @@ def test_full_scraper_pattern():
         rate_limiter = Circuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=0.02,
-            factor=1.0
+            backoff_factor=1.0
         )
         
         # Failure detector: stop after 5 consecutive failures
@@ -310,7 +310,7 @@ def test_full_scraper_pattern():
         )
         
         # Performance tracking
-        request_timer = Timer()
+        request_timer = Sktimer()
         
         # URLs to scrape
         urls = [f"http://example.com/page_{i}" for i in range(10)]
@@ -392,9 +392,9 @@ def test_concurrent_circuits_and_timers():
         }
         
         domain_timers = {
-            "api_a": Timer(),
-            "api_b": Timer(),
-            "api_c": Timer(),
+            "api_a": Sktimer(),
+            "api_b": Sktimer(),
+            "api_c": Sktimer(),
         }
         
         async def make_requests(domain: str, count: int):
@@ -505,7 +505,7 @@ def run_all_tests():
     
     run_scenario(
         "Request Timing",
-        "Tracking performance of async operations with Timer",
+        "Tracking performance of async operations with Sktimer",
         test_timer_with_async_operations, results
     )
     

@@ -8,7 +8,7 @@ Access via process.__run__.timer, process.__prerun__.timer, etc.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from suitkaise.timing import Timer
+    from suitkaise.timing import Sktimer
 
 
 class ProcessTimers:
@@ -24,18 +24,18 @@ class ProcessTimers:
     
     def __init__(self):
         # Import here to avoid circular imports
-        from suitkaise.timing import Timer
+        from suitkaise.timing import Sktimer
         
         # Individual section timers
-        self.prerun: Timer | None = None
-        self.run: Timer | None = None
-        self.postrun: Timer | None = None
-        self.onfinish: Timer | None = None
-        self.result: Timer | None = None
-        self.error: Timer | None = None
+        self.prerun: Sktimer | None = None
+        self.run: Sktimer | None = None
+        self.postrun: Sktimer | None = None
+        self.onfinish: Sktimer | None = None
+        self.result: Sktimer | None = None
+        self.error: Sktimer | None = None
         
         # Aggregate timer for full iteration (prerun + run + postrun)
-        self.full_run: Timer = Timer()
+        self.full_run: Sktimer = Sktimer()
     
     def _update_full_run(self) -> None:
         """
@@ -55,7 +55,7 @@ class ProcessTimers:
         if total > 0:
             self.full_run.add_time(total)
     
-    def _ensure_timer(self, section: str) -> "Timer":
+    def _ensure_timer(self, section: str) -> "Sktimer":
         """
         Get or create a timer for the specified section.
         
@@ -63,13 +63,13 @@ class ProcessTimers:
             section: One of 'prerun', 'run', 'postrun', 'onfinish', 'result', 'error'
         
         Returns:
-            The Timer for that section
+            The Sktimer for that section
         """
-        from suitkaise.timing import Timer
+        from suitkaise.timing import Sktimer
         
         current = getattr(self, section, None)
         if current is None:
-            new_timer = Timer()
+            new_timer = Sktimer()
             setattr(self, section, new_timer)
             return new_timer
         return current
@@ -80,7 +80,7 @@ class ProcessTimers:
         
         Called when a process crashes and restarts with a life.
         """
-        from suitkaise.timing import Timer
+        from suitkaise.timing import Sktimer
         
         self.prerun = None
         self.run = None
@@ -88,4 +88,4 @@ class ProcessTimers:
         self.onfinish = None
         self.result = None
         self.error = None
-        self.full_run = Timer()
+        self.full_run = Sktimer()

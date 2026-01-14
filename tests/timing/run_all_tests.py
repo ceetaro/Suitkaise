@@ -32,8 +32,8 @@ def run_all_tests():
     
     results = []
     
-    print(f"\n{CYAN}Running Timer tests...{RESET}")
-    results.append(("Timer", run_timer_tests()))
+    print(f"\n{CYAN}Running Sktimer tests...{RESET}")
+    results.append(("Sktimer", run_timer_tests()))
     
     print(f"\n{CYAN}Running @timethis Decorator tests...{RESET}")
     results.append(("@timethis Decorator", run_timethis_tests()))

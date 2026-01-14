@@ -15,7 +15,7 @@ from .timers import ProcessTimers
 if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
     from multiprocessing import Queue
-    from suitkaise.timing import Timer
+    from suitkaise.timing import Sktimer
 
 
 class TimedMethod:
@@ -41,7 +41,7 @@ class TimedMethod:
         return self._method(*args, **kwargs)
     
     @property
-    def timer(self) -> "Timer | None":
+    def timer(self) -> "Sktimer | None":
         """Get the timer for this method, or None if not yet timed."""
         if self._process.timers is None:
             return None
@@ -84,7 +84,7 @@ class Process:
     # Class-level attribute declarations for type checking
     process_config: ProcessConfig
     timers: ProcessTimers | None
-    process_timer: "Timer | None"  # Alias for full_run timer
+    process_timer: "Sktimer | None"  # Alias for full_run timer
     error: BaseException | None
     _current_run: int
     _start_time: float | None
@@ -638,7 +638,7 @@ class Process:
             return None
     
     @property
-    def process_timer(self) -> "Timer | None":
+    def process_timer(self) -> "Sktimer | None":
         """
         Get the aggregate timer for full run iterations.
         

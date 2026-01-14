@@ -308,10 +308,10 @@ add a threshold arg to TimeThis and timethis that only records a time above a ce
 
 ```python
 from suitkaise.processing import Share
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 
 share = Share()
-share.timer = Timer() # actually a Timer.shared() instance
+share.timer = Sktimer() # actually a Sktimer.shared() instance
 ```
 
 ### Streamline all module objects
@@ -325,20 +325,20 @@ All module objects need to have:
 How? we wrap each object and function in a class that does this:
 
 ```python
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 
 # regular version
-timer = Timer()
+timer = Sktimer()
 
 # async version
-async_timer = Timer.asynced()
+async_timer = Sktimer.asynced()
 
 # shared state version (users don't see this)
-shared_timer = Timer.shared()
+shared_timer = Sktimer.shared()
 ```
 
 ```python
-class Timer:
+class Sktimer:
 
 
     class regular:
@@ -349,12 +349,12 @@ class Timer:
 ```
 
 ```python
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 from suitkaise.processing import Share
 
 share = Share()
 
-share.timer = Timer() # actually a Timer.shared() instance
+share.timer = Sktimer() # actually a Sktimer.shared() instance
 share.counter = 0
 share.results = {}
 ```
@@ -446,7 +446,7 @@ class MyClass:
 ```
 tests/
   timing/
-    test_timer.py           # Timer class tests
+    test_timer.py           # Sktimer class tests
     test_timethis.py        # TimeThis context manager tests
     test_functions.py       # time(), sleep(), elapsed(), sleep.asynced()
     test_decorators.py      # @timethis decorator tests
@@ -482,7 +482,7 @@ tests/
     test_process.py         # Process class tests
     test_pool.py            # Pool class tests
     test_share.py           # Share class tests
-    test_share_integration.py # Share with Timer, Circuit, user classes
+    test_share_integration.py # Share with Sktimer, Circuit, user classes
     benchmarks.py
     run_all_tests.py
     run_all_benchmarks.py
@@ -497,7 +497,7 @@ tests/
     run_all_benchmarks.py
   
   integration/
-    test_share_timer.py     # Share + Timer multiprocess
+    test_share_timer.py     # Share + Sktimer multiprocess
     test_share_circuit.py   # Share + Circuit multiprocess
     test_async_patterns.py  # Async patterns across modules
     run_all_tests.py
@@ -517,9 +517,9 @@ tests/
 ### Test Categories Per Module
 
 #### timing
-- Timer: start/stop, lap, pause/resume, reset, statistics (mean, median, stdev, etc.)
-- Timer: concurrent/multi-threaded usage, nested timing
-- TimeThis: context manager, with explicit Timer, threshold
+- Sktimer: start/stop, lap, pause/resume, reset, statistics (mean, median, stdev, etc.)
+- Sktimer: concurrent/multi-threaded usage, nested timing
+- TimeThis: context manager, with explicit Sktimer, threshold
 - sleep: basic sleep, sleep.asynced()
 - timethis decorator: auto timer, explicit timer, threshold
 
@@ -544,7 +544,7 @@ tests/
 #### processing
 - Process: lifecycle (__run__, __result__, __error__), timing
 - Pool: map, starmap, async results
-- Share: with Timer, Circuit, user classes
+- Share: with Sktimer, Circuit, user classes
 - Share: auto-wrap with Skclass, proxy behavior
 
 #### sk
@@ -557,7 +557,7 @@ tests/
 ### Benchmark Categories
 
 #### timing
-- Timer.start/stop overhead
+- Sktimer.start/stop overhead
 - Statistics calculation speed (1K, 10K, 100K measurements)
 - sleep precision
 
@@ -584,8 +584,8 @@ tests/
 
 ```python
 def benchmark_timer_start_stop():
-    """Measure Timer.start/stop overhead."""
-    timer = Timer()
+    """Measure Sktimer.start/stop overhead."""
+    timer = Sktimer()
     iterations = 100_000
     
     start = time.perf_counter()
@@ -597,7 +597,7 @@ def benchmark_timer_start_stop():
     ops_per_sec = iterations / elapsed
     us_per_op = (elapsed / iterations) * 1_000_000
     
-    print(f"Timer.start/stop: {ops_per_sec:,.0f} ops/sec ({us_per_op:.2f} µs/op)")
+    print(f"Sktimer.start/stop: {ops_per_sec:,.0f} ops/sec ({us_per_op:.2f} µs/op)")
 ```
 
 ### Running Tests
@@ -620,33 +620,35 @@ python tests/run_all_benchmarks.py
 ```
 
 
-## Changing Skfunction and Skclass
+## Final additions
 
-by removing them!
+add type stubs for IDE autocompletion
 
-cerial has problems with serializing Skfunctions and Skclasses.
+add downloadable tests to the site and pytest fixtures
 
-so we attach _shared_meta and the modifiers to the func or class itself.
+add a CLI
 
-```python
-from suitkaise import sk
+add async variants
 
-@sk()
-def my_function():
-    return 1
+create a changelog for tracking versions
+
+add badges (coverage, CI status, etc) to the README
+
+add a quick start guide to the README and the site
+
+on site and in the README, add pronunciation (its pronounced exactly like suitcase)
+
+add at least a couple of examples to each module's examples page
+
+- examples should also come with a downloadable version of the example code, complete with comments, a runnable result, and verbose output
+
+run all tests on windows and linux (if possible)
+
+maybe update the homepage to have more real content (like a running blog)
+
+add a motto that relates to the suitcase concept
 
 
-def my_function2():
-    return 2
 
 
-skfunction = sk(my_function2)
-```
 
-there are 3 ways user funcs and classes get this info:
-
-1. when they are decorated with @sk
-2. when sk(func or class) is called
-3*. _shared_meta is added when a function or class is used in Share
-
-No more Skfunction and Skclass objects.

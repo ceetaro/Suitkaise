@@ -6,17 +6,17 @@ From `suitkaise/implementation.md`:
 
 ```python
 from suitkaise.processing import Share
-from suitkaise.timing import Timer
+from suitkaise.timing import Sktimer
 
 share = Share()
-share.timer = Timer()  # actually a Timer.shared() instance
+share.timer = Sktimer()  # actually a Sktimer.shared() instance
 share.counter = 0
 share.results = {}
 ```
 
 The `Share` container:
 - Holds arbitrary attributes
-- Auto-converts suitkaise module objects (Timer, etc.) to their `.shared()` versions
+- Auto-converts suitkaise module objects (Sktimer, etc.) to their `.shared()` versions
 - Holds regular values (counter, dict, list)
 - Enables sharing data between processes with automatic synchronization
 
@@ -88,7 +88,7 @@ New writes don't extend the wait time.
 │   │                                                              │          │
 │   │   Mirror objects (local copies)                              │          │
 │   │   ┌────────┐ ┌─────────┐ ┌──────────┐                        │          │
-│   │   │ Timer  │ │ Counter │ │ Results  │                        │          │
+│   │   │Sktimer │ │ Counter │ │ Results  │                        │          │
 │   │   └────────┘ └─────────┘ └──────────┘                        │          │
 │   │                                                              │          │
 │   │   1. Consume command from queue                              │          │
@@ -157,7 +157,7 @@ New writes don't extend the wait time.
 
 | Location | Component | Description |
 |----------|-----------|-------------|
-| `timing/_int/time_ops.py` | `Timer._shared_meta` | Declare reads/writes for Timer methods |
+| `timing/_int/time_ops.py` | `Sktimer._shared_meta` | Declare reads/writes for Sktimer methods |
 | `circuits/api.py` | `Circuit._shared_meta` | Declare reads/writes for Circuit methods |
 
 ---
@@ -211,7 +211,7 @@ suitkaise/processing/_int/share/
 Classes that support sharing define a `_shared_meta` class attribute with this structure:
 
 ```python
-class Timer:
+class Sktimer:
     _shared_meta = {
         'methods': {
             'start': {'reads': [], 'writes': ['_sessions', 'original_start_time']},
@@ -267,6 +267,6 @@ class Timer:
 3. [ ] Implement `coordinator.py`
 4. [ ] Implement `proxy.py`
 5. [ ] Implement `share.py`
-6. [ ] Add `_shared_meta` to Timer
+6. [ ] Add `_shared_meta` to Sktimer
 7. [ ] Integration tests
 8. [ ] Update processing `__init__.py` to export `Share`

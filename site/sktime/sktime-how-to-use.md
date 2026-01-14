@@ -51,13 +51,13 @@ stdev = my_function.timer.stdev
 snapshot = my_function.timer.get_stats()
 ```
 
-You can also use the `@timethis` decorator with a given `Timer` object.
+You can also use the `@timethis` decorator with a given `Sktimer` object.
 
 ```python
 from suitkaise import sktime
 
 # time multiple functions with this one timer
-t = sktime.Timer()
+t = sktime.Sktimer()
 
 class MyClass:
     @sktime.timethis(timer=t)
@@ -82,7 +82,7 @@ You can stack `@timethis` decorators on the same function.
 ```python
 from suitkaise import sktime
 
-t = sktime.Timer()
+t = sktime.Sktimer()
 
 @sktime.timethis()
 @sktime.timethis(timer=t)
@@ -109,7 +109,7 @@ print(my_function_2.timer.mean)
 ```
 ---
 
-## `Timer` class
+## `Sktimer` class
 
 Class that allows you to easily time parts of your code.
 
@@ -120,7 +120,7 @@ Powers the `@timethis` decorator and the `TimeThis` context manager (below)
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 timer.start()
 sktime.sleep(60)
@@ -137,7 +137,7 @@ Timing multiple times over:
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 for i in range(100):
 
@@ -161,7 +161,7 @@ Stop timing but do NOT record the measurement. Useful when an error occurs or fo
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 timer.start()
 try:
@@ -176,7 +176,7 @@ except Exception:
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 timer.start()
 
 for i in range(100):
@@ -198,7 +198,7 @@ or...
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 with sktime.TimeThis(timer):
     for i in range(100):
@@ -217,7 +217,7 @@ print(timer.mean)
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 timer.start()
 
 # Unzip and load a large file
@@ -247,7 +247,7 @@ Add a float time to the timer.
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 timer.add_time(10.0)
 timer.add_time(15.0)
 
@@ -258,7 +258,7 @@ print(timer.mean)  # 12.5
 
 Reset the timer back to its initial state as if it was just created.
 
-### All `Timer` statistics
+### All `Sktimer` statistics
 
 All statistics are accessed directly on the timer:
 
@@ -296,7 +296,7 @@ Get a frozen snapshot of all timer statistics. The snapshot won't change even if
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 # ... record some timings ...
 
@@ -328,7 +328,7 @@ with sktime.TimeThis() as timer:
     # Your code here
     pass
 
-# get the time that was just recorded (returns the Timer object)
+# get the time that was just recorded (returns the Sktimer object)
 print(timer.most_recent)
 ```
 
@@ -339,7 +339,7 @@ If you want to use the same timer every time that code is ran, you can create a 
 ```python
 from suitkaise import sktime
 
-timer = sktime.Timer()
+timer = sktime.Sktimer()
 
 # uses your "timer" every time
 # lets you gather multiple measurements

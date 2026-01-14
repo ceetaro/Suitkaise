@@ -95,7 +95,7 @@ SUITKAISE_SPECIFIC_TYPES = [
     'autopath',         # Decorator (handled by function handler)
     
     # timing - timing utilities  
-    'Timer',            # Elapsed time tracker with laps
+    'Sktimer',            # Elapsed time tracker with laps
     'TimeThis',         # Context manager for timing
     'timethis',         # Decorator (handled by function handler)
     
@@ -763,14 +763,14 @@ class WorstPossibleObject:
         self._track_init('complex', 'custom_root', self.custom_root)
         
         # === SKTime objects ===
-        # Timer - elapsed time tracker
-        self.timer = Timer()
+        # Sktimer - elapsed time tracker
+        self.timer = Sktimer()
         self.timer.start()
         self.timer.lap()  # Record first lap
         self.timer.lap()  # Record second lap
         self._track_init('complex', 'timer (with laps)', self.timer)
         
-        self.timer_empty = Timer()
+        self.timer_empty = Sktimer()
         self._track_init('complex', 'timer_empty', self.timer_empty)
         
         # Circuit - auto-resetting circuit (from circuits module)
