@@ -14,7 +14,7 @@ columns = 2
 rows = 2
 columns = 1
 
-## 1.1: text = "easy_multiprocessing = processing.Process()\n\n# start the process\neasy_multiprocessing.start()"
+## 1.1: text = "easy_multiprocessing = processing.Skprocess()\n\n# start the process\neasy_multiprocessing.start()"
 
 ## 2.1: link = "<--- Learn More"(site/processing/__processing__.md)
 

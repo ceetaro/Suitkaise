@@ -68,6 +68,8 @@ class Share:
         object.__setattr__(self, '_coordinator', _Coordinator(manager))
         object.__setattr__(self, '_proxies', {})  # name -> proxy
         object.__setattr__(self, '_started', False)
+        # Auto-start coordinator on creation
+        self.start()
     
     def __setattr__(self, name: str, value: Any) -> None:
         """
@@ -92,7 +94,16 @@ class Share:
             has_meta = True
         
         # Register the object with coordinator
-        self._coordinator.register_object(name, value)
+        attrs: set[str] = set()
+        if has_meta:
+            meta = getattr(type(value), '_shared_meta', {})
+            for method_meta in meta.get('methods', {}).values():
+                attrs.update(method_meta.get('writes', []))
+                attrs.update(method_meta.get('reads', []))
+            for prop_meta in meta.get('properties', {}).values():
+                attrs.update(prop_meta.get('reads', []))
+                attrs.update(prop_meta.get('writes', []))
+        self._coordinator.register_object(name, value, attrs=attrs if attrs else None)
         
         if has_meta:
             # Create a proxy for this object
@@ -208,3 +219,54 @@ class Share:
             status = "error"
         objects = list(self._proxies.keys())
         return f"Share(status={status}, objects={objects})"
+
+    def exit(self, timeout: float = 5.0) -> bool:
+        """Alias for stop()."""
+        return self.stop(timeout)
+
+    def clear(self) -> None:
+        """Clear all shared objects and counters."""
+        self._coordinator.clear()
+        self._proxies.clear()
+
+    def __serialize__(self) -> dict:
+        """
+        Serialize Share without manager internals.
+        
+        Captures a snapshot of shared objects as cerial bytes.
+        """
+        coordinator = object.__getattribute__(self, '_coordinator')
+        objects: Dict[str, bytes] = {}
+        try:
+            names = list(coordinator._object_names)
+        except Exception:
+            names = []
+        for name in names:
+            try:
+                serialized = coordinator._source_store.get(name)
+            except Exception:
+                serialized = None
+            if serialized is not None:
+                objects[name] = serialized
+        return {
+            "objects": objects,
+            "started": object.__getattribute__(self, '_started'),
+        }
+
+    @staticmethod
+    def __deserialize__(state: dict) -> "Share":
+        """
+        Reconstruct Share from serialized snapshot.
+        """
+        from suitkaise import cerial
+        
+        share = Share()
+        for name, serialized in state.get("objects", {}).items():
+            try:
+                obj = cerial.deserialize(serialized)
+            except Exception:
+                continue
+            setattr(share, name, obj)
+        if state.get("started"):
+            share.start()
+        return share

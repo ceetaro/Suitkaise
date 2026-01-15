@@ -104,6 +104,27 @@ def test_class_with_none_attrs():
     assert result.b is None
 
 
+def test_main_module_class():
+    """Class defined in __main__ should round-trip."""
+    class MainClass:
+        def __init__(self, value: int):
+            self.value = value
+
+        def get_value(self):
+            return self.value
+
+    # Simulate __main__-defined class
+    MainClass.__module__ = "__main__"
+
+    original = MainClass(5)
+    data = serialize(original)
+    result = deserialize(data)
+
+    assert result.__class__.__name__ == "MainClass"
+    assert result.value == 5
+    assert result.get_value() == 5
+
+
 # =============================================================================
 # Large Object Tests
 # =============================================================================
@@ -358,6 +379,7 @@ def run_all_tests():
     # Empty object tests
     runner.run_test("Empty class", test_empty_class)
     runner.run_test("Class with None attrs", test_class_with_none_attrs)
+    runner.run_test("__main__ class", test_main_module_class)
     
     # Large object tests
     runner.run_test("Large list", test_large_list)

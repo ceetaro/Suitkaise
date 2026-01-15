@@ -148,32 +148,11 @@ class MultiprocessingManagerHandler(Handler):
         """
         obj_type_name = type(obj).__name__
         
-        # Try to get the underlying value
-        value = None
-        try:
-            # For proxy objects, try to convert to regular Python object
-            if 'Proxy' in obj_type_name:
-                # Try various methods to get value
-                if hasattr(obj, '_getvalue'):
-                    value = obj._getvalue()
-                elif 'List' in obj_type_name:
-                    value = list(obj)
-                elif 'Dict' in obj_type_name:
-                    value = dict(obj)
-                else:
-                    # Generic: try to copy
-                    value = obj
-        except (AttributeError, TypeError):
-            # Proxy doesn't support value extraction - that's okay
-            pass
-        except Exception as e:
-            # Unexpected error extracting proxy value
-            import warnings
-            warnings.warn(f"Failed to extract manager proxy value: {e}")
-        
+        # Avoid dereferencing proxies or manager internals.
+        # These can contain unpicklable auth keys or locks.
         return {
             "type_name": obj_type_name,
-            "value": value,  # Will be recursively serialized
+            "value": None,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:

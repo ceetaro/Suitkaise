@@ -185,7 +185,7 @@ suitkaise/processing/_int/share/
    **Current plan:** Lazily when objects are assigned, with synchronization.
 
 2. **Blocking reads** — For `wait_for_clear()`:
-   - `Process.listen()` uses `queue.get(timeout=timeout)` which blocks natively
+   - `Skprocess.listen()` uses `queue.get(timeout=timeout)` which blocks natively
    - For write counters, we're checking an atomic int, not a queue
    - Options: busy-wait with small sleeps, or use an Event the coordinator signals
    

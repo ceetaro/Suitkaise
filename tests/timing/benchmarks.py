@@ -122,13 +122,18 @@ def benchmark_timer_start_stop():
     
     # Just start
     timer2 = Sktimer()
-    runner.bench("timer.start()", 100_000, timer2.start)
+    def start_only():
+        timer2.start()
+        timer2.discard()
+    runner.bench("timer.start()", 100_000, start_only)
     
     # Just stop (after start)
     timer3 = Sktimer()
-    for _ in range(100_000):
+    timer3.start()
+    def stop_only():
+        timer3.stop()
         timer3.start()
-    runner.bench("timer.stop()", 100_000, timer3.stop)
+    runner.bench("timer.stop()", 100_000, stop_only)
     
     return runner
 
@@ -142,6 +147,54 @@ def benchmark_timer_add_time():
     
     return runner
 
+
+# =============================================================================
+# Timer Control Benchmarks
+# =============================================================================
+
+def benchmark_timer_discard():
+    """Measure Sktimer.discard() overhead."""
+    runner = BenchmarkRunner("Sktimer discard Benchmarks")
+    
+    timer = Sktimer()
+    def start_discard():
+        timer.start()
+        timer.discard()
+    
+    runner.bench("timer.start() + timer.discard()", 50_000, start_discard)
+    
+    return runner
+
+
+def benchmark_timer_lap():
+    """Measure Sktimer.lap() overhead."""
+    runner = BenchmarkRunner("Sktimer lap Benchmarks")
+    
+    timer = Sktimer()
+    timer.start()
+    def lap_only():
+        timer.lap()
+    
+    runner.bench("timer.lap()", 50_000, lap_only)
+    
+    return runner
+
+
+def benchmark_timer_reset():
+    """Measure Sktimer.reset() overhead."""
+    runner = BenchmarkRunner("Sktimer reset Benchmarks")
+    
+    timer = Sktimer()
+    for i in range(100):
+        timer.add_time(float(i))
+    
+    def reset_and_seed():
+        timer.reset()
+        timer.add_time(1.0)
+    
+    runner.bench("timer.reset()", 10_000, reset_and_seed)
+    
+    return runner
 
 # =============================================================================
 # Statistics Calculation Benchmarks
@@ -199,6 +252,20 @@ def benchmark_pause_resume():
         timer.resume()
     
     runner.bench("timer.pause() + timer.resume()", 50_000, pause_resume)
+    
+    return runner
+
+
+def benchmark_get_time_and_stats():
+    """Measure get_time() and get_stats() overhead."""
+    runner = BenchmarkRunner("get_time/get_stats Benchmarks")
+    
+    timer = Sktimer()
+    for i in range(1_000):
+        timer.add_time(float(i))
+    
+    runner.bench("timer.get_time(10)", 50_000, timer.get_time, 10)
+    runner.bench("timer.get_stats()", 10_000, timer.get_stats)
     
     return runner
 
@@ -289,6 +356,25 @@ def benchmark_timethis():
     return runner
 
 
+def benchmark_timethis_decorator_overhead():
+    """Measure @timethis decorator overhead."""
+    runner = BenchmarkRunner("timethis Decorator Benchmarks")
+    
+    from suitkaise.timing import timethis
+    
+    @timethis()
+    def decorated_noop():
+        return None
+    
+    def undecorated_noop():
+        return None
+    
+    runner.bench("decorated noop", 50_000, decorated_noop)
+    runner.bench("plain noop", 50_000, undecorated_noop)
+    
+    return runner
+
+
 # =============================================================================
 # Comparison with Manual Timing
 # =============================================================================
@@ -343,13 +429,18 @@ def run_all_benchmarks():
         benchmark_timer_creation(),
         benchmark_timer_start_stop(),
         benchmark_timer_add_time(),
+        benchmark_timer_discard(),
+        benchmark_timer_lap(),
+        benchmark_timer_reset(),
         benchmark_statistics_small(),
         benchmark_statistics_large(),
         benchmark_pause_resume(),
+        benchmark_get_time_and_stats(),
         benchmark_time_function(),
         benchmark_elapsed_function(),
         benchmark_sleep_precision(),
         benchmark_timethis(),
+        benchmark_timethis_decorator_overhead(),
         benchmark_vs_manual(),
     ]
     

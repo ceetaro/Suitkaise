@@ -12,10 +12,88 @@ import time as stdlib_time
 import pickle
 import threading
 import logging
+import asyncio
+import contextlib
+import contextvars
+import functools
+import inspect
+import mmap
+import os
+import queue
+import re
+import socket
+import sqlite3
+import subprocess
+import tempfile
+import types
+import uuid
+import weakref
+from collections import deque, Counter, OrderedDict, defaultdict, ChainMap, namedtuple
+from concurrent.futures import Future, ThreadPoolExecutor, ProcessPoolExecutor
+from contextlib import contextmanager
+from dataclasses import dataclass
+from decimal import Decimal
+from enum import Enum, IntEnum, Flag, IntFlag
+from fractions import Fraction
+from pathlib import Path, PurePath, PosixPath, WindowsPath
+from typing import NamedTuple, TypedDict
+import multiprocessing
+from multiprocessing import shared_memory
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.cerial import serialize, deserialize
+from suitkaise.cerial import (
+    serialize,
+    deserialize,
+    SerializationError,
+    DeserializationError,
+)
+from suitkaise.timing import Sktimer, TimeThis
+from suitkaise.circuits import Circuit, BreakingCircuit
+from suitkaise.paths import Skpath, CustomRoot, PathDetectionError
+from suitkaise.processing import (
+    Skprocess,
+    Pool,
+    Share,
+    ProcessTimers,
+    ProcessError,
+    PreRunError,
+    RunError,
+    PostRunError,
+    OnFinishError,
+    ResultError,
+    ErrorHandlerError,
+    ProcessTimeoutError,
+    ResultTimeoutError,
+)
+from suitkaise.sk import Skclass, Skfunction, NotAsyncedError, FunctionTimeoutError
+from suitkaise.cerial._int.worst_possible_object import WorstPossibleObject
+
+
+class _BenchEnum(Enum):
+    A = 1
+
+
+class _BenchIntEnum(IntEnum):
+    A = 1
+
+
+class _BenchFlag(Flag):
+    A = 1
+
+
+class _BenchIntFlag(IntFlag):
+    A = 1
+
+try:
+    import dill
+except Exception:
+    dill = None
+
+try:
+    import cloudpickle
+except Exception:
+    cloudpickle = None
 
 
 # =============================================================================
@@ -67,6 +145,91 @@ class BenchmarkRunner:
         print(f"\n{self.BOLD}{'-'*80}{self.RESET}\n")
 
 
+class CompatibilityResult:
+    def __init__(self, type_name: str, library: str, success: bool, us_per_op: float | None, error: str = ""):
+        self.type_name = type_name
+        self.library = library
+        self.success = success
+        self.us_per_op = us_per_op
+        self.error = error
+
+
+class CompatibilityRunner:
+    def __init__(self, suite_name: str):
+        self.suite_name = suite_name
+        self.results: list[CompatibilityResult] = []
+        self.GREEN = '\033[92m'
+        self.RED = '\033[91m'
+        self.YELLOW = '\033[93m'
+        self.ORANGE = '\033[38;5;208m'
+        self.CYAN = '\033[96m'
+        self.BOLD = '\033[1m'
+        self.RESET = '\033[0m'
+    
+    def check(self, type_name: str, library: str, func):
+        start = stdlib_time.perf_counter()
+        try:
+            func()
+            elapsed = stdlib_time.perf_counter() - start
+            self.results.append(CompatibilityResult(type_name, library, True, elapsed * 1_000_000))
+        except Exception as e:
+            self.results.append(CompatibilityResult(type_name, library, False, None, f"{type(e).__name__}: {e}"))
+    
+    def print_results(self):
+        print(f"\n{self.BOLD}{self.CYAN}{'='*110}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{self.suite_name:^110}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{'='*110}{self.RESET}\n")
+        
+        headers = ["Type", "cerial", "pickle", "dill", "cloudpickle"]
+        print(f"  {headers[0]:<30} {headers[1]:>18} {headers[2]:>18} {headers[3]:>18} {headers[4]:>18}")
+        print(f"  {'-'*30} {'-'*18} {'-'*18} {'-'*18} {'-'*18}")
+        
+        by_type: dict[str, dict[str, CompatibilityResult]] = {}
+        for result in self.results:
+            by_type.setdefault(result.type_name, {})[result.library] = result
+        
+        def _strip_ansi(text: str) -> str:
+            import re
+            return re.sub(r"\x1b\[[0-9;]*m", "", text)
+        
+        def _pad_cell(text: str, width: int) -> str:
+            visible = len(_strip_ansi(text))
+            if visible >= width:
+                return text
+            return text + (" " * (width - visible))
+        
+        for type_name, libs in by_type.items():
+            def format_cell(lib_name: str) -> str:
+                res = libs.get(lib_name)
+                if res is None:
+                    return f"{self.YELLOW}n/a{self.RESET}"
+                if res.success:
+                    return f"{self.GREEN}{res.us_per_op:.1f}µs{self.RESET}"
+                return f"{self.ORANGE}fail{self.RESET}"
+            
+            cerial_cell = _pad_cell(format_cell("cerial"), 18)
+            pickle_cell = _pad_cell(format_cell("pickle"), 18)
+            dill_cell = _pad_cell(format_cell("dill"), 18)
+            cloud_cell = _pad_cell(format_cell("cloudpickle"), 18)
+            print(
+                f"  {type_name:<30} {cerial_cell} {pickle_cell} "
+                f"{dill_cell} {cloud_cell}"
+            )
+        
+        failures = [r for r in self.results if not r.success]
+        cerial_failures = [r for r in failures if r.library == "cerial"]
+        if failures:
+            if cerial_failures:
+                print(f"\n{self.BOLD}{self.ORANGE}Cerial failures:{self.RESET}")
+                for fail in cerial_failures:
+                    print(f"  - {self.ORANGE}{fail.type_name}{self.RESET}: {fail.error}")
+            print(f"\n{self.BOLD}{self.ORANGE}Failures:{self.RESET}")
+            for fail in failures:
+                print(f"  - {self.ORANGE}{fail.type_name}{self.RESET} ({fail.library}): {fail.error}")
+        
+        print(f"\n{self.BOLD}{'-'*110}{self.RESET}\n")
+
+
 # =============================================================================
 # Test Data
 # =============================================================================
@@ -81,6 +244,20 @@ class ClassWithLock:
     def __init__(self, value):
         self.value = value
         self.lock = threading.Lock()
+
+
+class _BenchCustomClass:
+    def __init__(self, value):
+        self.value = value
+    def get_value(self):
+        return self.value
+
+
+class _BenchSkClassDemo:
+    def __init__(self):
+        self.value = 1
+    def inc(self):
+        self.value += 1
 
 
 # =============================================================================
@@ -217,6 +394,554 @@ def benchmark_roundtrip():
 
 
 # =============================================================================
+# Worst Possible Object Benchmarks
+# =============================================================================
+
+def benchmark_worst_possible_object():
+    """Measure serialization for WorstPossibleObject."""
+    runner = BenchmarkRunner("WorstPossibleObject Benchmarks")
+    
+    wpo = WorstPossibleObject()
+    
+    runner.bench("cerial: WorstPossibleObject serialize", 5, lambda: serialize(wpo))
+    wpo_bytes = serialize(wpo)
+    runner.bench("cerial: WorstPossibleObject deserialize", 5, lambda: deserialize(wpo_bytes))
+    runner.bench("cerial: WorstPossibleObject roundtrip", 3, lambda: deserialize(serialize(wpo)))
+    
+    return runner
+
+
+# =============================================================================
+# Supported Types Compatibility Benchmarks
+# =============================================================================
+
+@contextmanager
+def _temp_file_handle():
+    handle = tempfile.NamedTemporaryFile()
+    try:
+        yield handle
+    finally:
+        handle.close()
+
+
+@contextmanager
+def _spooled_temp():
+    f = tempfile.SpooledTemporaryFile()
+    try:
+        yield f
+    finally:
+        f.close()
+
+
+@contextmanager
+def _file_io_handle():
+    with tempfile.NamedTemporaryFile() as tmp:
+        f = __import__("io").FileIO(tmp.name, mode="r")
+        try:
+            yield f
+        finally:
+            f.close()
+
+
+@contextmanager
+def _buffered_reader_handle():
+    with tempfile.NamedTemporaryFile() as tmp:
+        with open(tmp.name, "rb") as raw:
+            reader = __import__("io").BufferedReader(raw)
+            try:
+                yield reader
+            finally:
+                reader.close()
+
+
+@contextmanager
+def _buffered_writer_handle():
+    with tempfile.NamedTemporaryFile() as tmp:
+        with open(tmp.name, "wb") as raw:
+            writer = __import__("io").BufferedWriter(raw)
+            try:
+                yield writer
+            finally:
+                writer.close()
+
+
+@contextmanager
+def _mmap_handle():
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(b"0" * 1024)
+        tmp.flush()
+        mm = mmap.mmap(tmp.fileno(), 0)
+        try:
+            yield mm
+        finally:
+            mm.close()
+
+
+@contextmanager
+def _sqlite_conn():
+    conn = sqlite3.connect(":memory:")
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def _sqlite_cursor():
+    with _sqlite_conn() as conn:
+        cur = conn.cursor()
+        try:
+            yield cur
+        finally:
+            cur.close()
+
+
+@contextmanager
+def _socket_handle():
+    s = socket.socket()
+    try:
+        yield s
+    finally:
+        s.close()
+
+
+@contextmanager
+def _subprocess_popen():
+    proc = subprocess.Popen([sys.executable, "-c", "print('x')"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        yield proc
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
+@contextmanager
+def _shared_memory():
+    shm = shared_memory.SharedMemory(create=True, size=16)
+    try:
+        yield shm
+    finally:
+        shm.close()
+        shm.unlink()
+
+
+@contextmanager
+def _manager():
+    manager = multiprocessing.Manager()
+    try:
+        yield manager
+    finally:
+        manager.shutdown()
+
+
+@contextmanager
+def _pipe():
+    conn1, conn2 = multiprocessing.Pipe()
+    try:
+        yield (conn1, conn2)
+    finally:
+        conn1.close()
+        conn2.close()
+
+
+@contextmanager
+def _asyncio_loop():
+    loop = asyncio.new_event_loop()
+    try:
+        prev_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        prev_loop = None
+    try:
+        asyncio.set_event_loop(loop)
+        yield loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(prev_loop)
+
+
+@contextmanager
+def _asyncio_future():
+    with _asyncio_loop() as loop:
+        fut = loop.create_future()
+        fut.set_result(1)
+        yield fut
+
+
+@contextmanager
+def _asyncio_task():
+    async def _coro():
+        return 1
+    with _asyncio_loop() as loop:
+        task = loop.create_task(_coro())
+        yield task
+        if not task.done():
+            task.cancel()
+        try:
+            loop.run_until_complete(task)
+        except asyncio.CancelledError:
+            pass
+
+
+@contextmanager
+def _coroutine_obj():
+    async def _coro():
+        return 1
+    coro = _coro()
+    try:
+        yield coro
+    finally:
+        coro.close()
+
+
+@contextmanager
+def _async_generator_obj():
+    async def _agen():
+        yield 1
+    ag = _agen()
+    try:
+        yield ag
+    finally:
+        with _asyncio_loop() as loop:
+            loop.run_until_complete(ag.aclose())
+
+
+@contextmanager
+def _requests_session():
+    try:
+        import requests  # type: ignore
+    except Exception:
+        yield None
+        return
+    sess = requests.Session()
+    try:
+        yield sess
+    finally:
+        sess.close()
+
+
+@contextmanager
+def _file_handler():
+    with tempfile.NamedTemporaryFile() as tmp:
+        handler = logging.FileHandler(tmp.name)
+        try:
+            yield handler
+        finally:
+            handler.close()
+
+
+@contextmanager
+def _thread_pool_executor():
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        yield executor
+    finally:
+        executor.shutdown(wait=True)
+
+
+@contextmanager
+def _process_pool_executor():
+    executor = ProcessPoolExecutor(max_workers=1)
+    try:
+        yield executor
+    finally:
+        executor.shutdown(wait=True)
+
+
+@contextmanager
+def _file_descriptor():
+    with tempfile.NamedTemporaryFile() as tmp:
+        fd = os.open(tmp.name, os.O_RDONLY)
+        try:
+            yield fd
+        finally:
+            os.close(fd)
+
+
+@contextmanager
+def _frame_object():
+    frame = inspect.currentframe()
+    try:
+        yield frame
+    finally:
+        del frame
+
+
+def _get_supported_objects():
+    class _Descriptor:
+        def __get__(self, obj, objtype=None):
+            return 1
+    class _Context:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
+    class _WeakRefTarget:
+        pass
+    class _DemoProcess(Skprocess):
+        def __init__(self):
+            self.value = 1
+        def __run__(self):
+            self.value += 1
+        def __result__(self):
+            return self.value
+    class _NamedTuple(NamedTuple):
+        x: int
+    class _TypedDict(TypedDict):
+        x: int
+    Nt = namedtuple("Nt", ["x"])
+
+    def _sample_func():
+        return 1
+    def _blocking_func():
+        import time as _time
+        _time.sleep(0)
+        return 1
+    def _sample_gen():
+        yield 1
+    def _sample_async_gen():
+        yield 1
+
+    @contextmanager
+    def _pipe_fds():
+        r, w = os.pipe()
+        try:
+            yield (r, w)
+        finally:
+            os.close(r)
+            os.close(w)
+
+    @contextmanager
+    def _contextmanager_function():
+        @contextmanager
+        def _ctx():
+            yield "ok"
+        yield _ctx
+
+
+    @contextmanager
+    def _contextvar_token():
+        var = contextvars.ContextVar("x")
+        token = var.set(1)
+        try:
+            yield token
+        finally:
+            var.reset(token)
+    
+    @dataclass
+    class _Dataclass:
+        x: int
+    
+    objects = [
+        ("None", lambda: None),
+        ("bool", lambda: True),
+        ("int", lambda: 1),
+        ("float", lambda: 1.5),
+        ("complex", lambda: 1 + 2j),
+        ("str", lambda: "hello"),
+        ("bytes", lambda: b"bytes"),
+        ("bytearray", lambda: bytearray(b"bytes")),
+        ("Ellipsis", lambda: Ellipsis),
+        ("NotImplemented", lambda: NotImplemented),
+        ("list", lambda: [1, 2, 3]),
+        ("tuple", lambda: (1, 2, 3)),
+        ("dict", lambda: {"a": 1}),
+        ("set", lambda: {1, 2}),
+        ("frozenset", lambda: frozenset({1, 2})),
+        ("range", lambda: range(10)),
+        ("slice", lambda: slice(0, 10, 2)),
+        ("deque", lambda: deque([1, 2])),
+        ("Counter", lambda: Counter({"a": 1})),
+        ("OrderedDict", lambda: OrderedDict([("a", 1)])),
+        ("defaultdict", lambda: defaultdict(int, {"a": 1})),
+        ("ChainMap", lambda: ChainMap({"a": 1}, {"b": 2})),
+        ("namedtuple", lambda: Nt(1)),
+        ("datetime", lambda: __import__("datetime").datetime.utcnow()),
+        ("date", lambda: __import__("datetime").date.today()),
+        ("time", lambda: __import__("datetime").time(12, 0, 0)),
+        ("timedelta", lambda: __import__("datetime").timedelta(seconds=1)),
+        ("timezone", lambda: __import__("datetime").timezone.utc),
+        ("Decimal", lambda: Decimal("1.5")),
+        ("Fraction", lambda: Fraction(1, 3)),
+        ("UUID", lambda: uuid.uuid4()),
+        ("Path", lambda: Path.cwd()),
+        ("PurePath", lambda: PurePath("a/b")),
+        ("PosixPath", lambda: PosixPath("/tmp")),
+        ("WindowsPath", lambda: WindowsPath("C:/Temp") if os.name == "nt" else None),
+        ("Logger", lambda: logging.getLogger("cerial_bench")),
+        ("StreamHandler", lambda: logging.StreamHandler()),
+        ("FileHandler", _file_handler),
+        ("Formatter", lambda: logging.Formatter("%(message)s")),
+        ("threading.Lock", threading.Lock),
+        ("threading.RLock", threading.RLock),
+        ("threading.Semaphore", threading.Semaphore),
+        ("threading.BoundedSemaphore", threading.BoundedSemaphore),
+        ("threading.Barrier", lambda: threading.Barrier(1)),
+        ("threading.Condition", threading.Condition),
+        ("threading.Event", threading.Event),
+        ("threading.Thread", lambda: threading.Thread(target=lambda: None)),
+        ("threading.local", threading.local),
+        ("multiprocessing.Queue", multiprocessing.Queue),
+        ("multiprocessing.Event", multiprocessing.Event),
+        ("multiprocessing.Pipe", _pipe),
+        ("multiprocessing.Manager", _manager),
+        ("SharedMemory", _shared_memory),
+        ("queue.Queue", queue.Queue),
+        ("queue.LifoQueue", queue.LifoQueue),
+        ("queue.PriorityQueue", queue.PriorityQueue),
+        ("queue.SimpleQueue", queue.SimpleQueue),
+        ("TextIOWrapper", _temp_file_handle),
+        ("BufferedReader", _buffered_reader_handle),
+        ("BufferedWriter", _buffered_writer_handle),
+        ("FileIO", _file_io_handle),
+        ("StringIO", lambda: __import__("io").StringIO("hi")),
+        ("BytesIO", lambda: __import__("io").BytesIO(b"hi")),
+        ("NamedTemporaryFile", _temp_file_handle),
+        ("SpooledTemporaryFile", _spooled_temp),
+        ("mmap", _mmap_handle),
+        ("re.Pattern", lambda: re.compile("abc")),
+        ("re.Match", lambda: re.match("abc", "abc")),
+        ("sqlite3.Connection", _sqlite_conn),
+        ("sqlite3.Cursor", _sqlite_cursor),
+        ("requests.Session", _requests_session),
+        ("socket.socket", _socket_handle),
+        ("FunctionType", lambda: _sample_func),
+        ("lambda", lambda: (lambda x: x + 1)),
+        ("functools.partial", lambda: functools.partial(_sample_func)),
+        ("MethodType", lambda: types.MethodType(_sample_func, object())),
+        ("staticmethod", lambda: staticmethod(_sample_func)),
+        ("classmethod", lambda: classmethod(lambda cls: 1)),
+        ("GeneratorType", lambda: _sample_gen()),
+        ("range_iterator", lambda: iter(range(3))),
+        ("enumerate", lambda: enumerate([1, 2])),
+        ("zip", lambda: zip([1], [2])),
+        ("map", lambda: map(lambda x: x + 1, [1, 2])),
+        ("filter", lambda: filter(lambda x: x > 0, [1, -1])),
+        ("CoroutineType", _coroutine_obj),
+        ("AsyncGeneratorType", _async_generator_obj),
+        ("asyncio.Task", _asyncio_task),
+        ("asyncio.Future", _asyncio_future),
+        ("concurrent.futures.Future", lambda: Future()),
+        ("ThreadPoolExecutor", _thread_pool_executor),
+        ("ProcessPoolExecutor", _process_pool_executor),
+        ("weakref.ref", lambda: weakref.ref(_WeakRefTarget())),
+        ("WeakValueDictionary", lambda: weakref.WeakValueDictionary()),
+        ("WeakKeyDictionary", lambda: weakref.WeakKeyDictionary()),
+        ("Enum", lambda: _BenchEnum.A),
+        ("IntEnum", lambda: _BenchIntEnum.A),
+        ("Flag", lambda: _BenchFlag.A),
+        ("IntFlag", lambda: _BenchIntFlag.A),
+        ("ContextVar", lambda: contextvars.ContextVar("x")),
+        ("Token", _contextvar_token),
+        ("contextmanager", _contextmanager_function),
+        ("ContextObject", lambda: _Context()),
+        ("subprocess.Popen", _subprocess_popen),
+        ("CompletedProcess", lambda: subprocess.CompletedProcess(["echo"], 0)),
+        ("CodeType", lambda: _sample_func.__code__),
+        ("FrameType", _frame_object),
+        ("property", lambda: property(lambda self: 1)),
+        ("CustomDescriptor", lambda: _Descriptor()),
+        ("ModuleType", lambda: types.ModuleType("mod")),
+        ("OS pipes", _pipe_fds),
+        ("File descriptors", _file_descriptor),
+        ("typing.NamedTuple", lambda: _NamedTuple(1)),
+        ("typing.TypedDict", lambda: _TypedDict(x=1)),
+        ("Class object", lambda: _BenchCustomClass),
+        ("Class instance", lambda: _BenchCustomClass(1)),
+        ("dataclass", lambda: _Dataclass(1)),
+        ("slots class", lambda: type("S", (), {"__slots__": ("x",), "__init__": lambda self: setattr(self, "x", 1)})()),
+        ("slots+dict class", lambda: type("SD", (), {"__slots__": ("x", "__dict__"), "__init__": lambda self: setattr(self, "x", 1)})()),
+        ("Sktimer", lambda: Sktimer()),
+        ("TimeThis", lambda: TimeThis()),
+        ("Circuit", lambda: Circuit(num_shorts_to_trip=1)),
+        ("BreakingCircuit", lambda: BreakingCircuit(num_shorts_to_trip=1)),
+        ("Skpath", lambda: Skpath("file.txt")),
+        ("CustomRoot", lambda: CustomRoot(os.getcwd())),
+        ("Skprocess", lambda: _DemoProcess()),
+        ("Pool", lambda: Pool(workers=1)),
+        ("Share", lambda: Share()),
+        ("ProcessTimers", lambda: ProcessTimers()),
+        ("ProcessError", lambda: ProcessError("error")),
+        ("PreRunError", lambda: PreRunError(0)),
+        ("RunError", lambda: RunError(0)),
+        ("PostRunError", lambda: PostRunError(0)),
+        ("OnFinishError", lambda: OnFinishError(0)),
+        ("ResultError", lambda: ResultError(0)),
+        ("ErrorHandlerError", lambda: ErrorHandlerError(0)),
+        ("ProcessTimeoutError", lambda: ProcessTimeoutError("run", 1.0, 0)),
+        ("ResultTimeoutError", lambda: ResultTimeoutError("timeout")),
+        ("PathDetectionError", lambda: PathDetectionError("path error")),
+        ("SerializationError", lambda: SerializationError("serialization error")),
+        ("DeserializationError", lambda: DeserializationError("deserialization error")),
+        ("NotAsyncedError", lambda: NotAsyncedError("not asynced")),
+        ("FunctionTimeoutError", lambda: FunctionTimeoutError("timeout")),
+        ("Skclass", lambda: Skclass(_BenchSkClassDemo)),
+        ("Skfunction", lambda: Skfunction(_sample_func)),
+        ("Skfunction.asynced()", lambda: Skfunction(_blocking_func).asynced()),
+    ]
+    return objects
+
+
+def benchmark_supported_types_compatibility():
+    """Attempt serialization of every supported type across serializers."""
+    runner = CompatibilityRunner("Supported Types Compatibility Benchmarks")
+    libs = {
+        "cerial": lambda obj: serialize(obj),
+        "pickle": lambda obj: pickle.dumps(obj),
+        "dill": (lambda obj: dill.dumps(obj)) if dill else None,
+        "cloudpickle": (lambda obj: cloudpickle.dumps(obj)) if cloudpickle else None,
+    }
+    
+    missing = [name for name, func in libs.items() if func is None]
+    if missing:
+        print(f"  [warning] Missing serializers: {', '.join(missing)} (install to compare)")
+    
+    for type_name, factory in _get_supported_objects():
+        obj_or_cm = factory() if callable(factory) else factory
+        if hasattr(obj_or_cm, "__enter__"):
+            with obj_or_cm as obj:
+                if obj is None:
+                    continue
+                for lib_name, func in libs.items():
+                    if func is None:
+                        continue
+                    runner.check(type_name, lib_name, lambda f=func, o=obj: f(o))
+        else:
+            if obj_or_cm is None:
+                continue
+            for lib_name, func in libs.items():
+                if func is None:
+                    continue
+                runner.check(type_name, lib_name, lambda f=func, o=obj_or_cm: f(o))
+    
+    return runner
+
+
+def benchmark_supported_types_throughput():
+    """Measure cerial throughput across all supported types."""
+    runner = BenchmarkRunner("Supported Types Throughput (cerial)")
+    
+    for type_name, factory in _get_supported_objects():
+        obj_or_cm = factory() if callable(factory) else factory
+        if hasattr(obj_or_cm, "__enter__"):
+            with obj_or_cm as obj:
+                if obj is None:
+                    continue
+                try:
+                    runner.bench(f"cerial: {type_name}", 200, lambda o=obj: serialize(o))
+                except Exception as e:
+                    print(f"  [skip] cerial: {type_name} ({type(e).__name__}: {e})")
+        else:
+            if obj_or_cm is None:
+                continue
+            try:
+                runner.bench(f"cerial: {type_name}", 200, lambda o=obj_or_cm: serialize(o))
+            except Exception as e:
+                print(f"  [skip] cerial: {type_name} ({type(e).__name__}: {e})")
+    
+    return runner
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -232,6 +957,9 @@ def run_all_benchmarks():
         benchmark_complex(),
         benchmark_large_data(),
         benchmark_roundtrip(),
+        benchmark_worst_possible_object(),
+        benchmark_supported_types_throughput(),
+        benchmark_supported_types_compatibility(),
     ]
     
     for runner in runners:

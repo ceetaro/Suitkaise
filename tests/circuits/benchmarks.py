@@ -120,6 +120,52 @@ def benchmark_circuit_trip():
 
 
 # =============================================================================
+# Property Access Benchmarks
+# =============================================================================
+
+def benchmark_circuit_properties():
+    """Measure property access overhead."""
+    runner = BenchmarkRunner("Circuit Property Benchmarks")
+    
+    circ = Circuit(10, sleep_time_after_trip=0.0)
+    breaking = BreakingCircuit(10, sleep_time_after_trip=0.0)
+    
+    runner.bench("Circuit.times_shorted", 100_000, lambda: circ.times_shorted)
+    runner.bench("Circuit.total_trips", 100_000, lambda: circ.total_trips)
+    runner.bench("Circuit.current_sleep_time", 100_000, lambda: circ.current_sleep_time)
+    
+    runner.bench("BreakingCircuit.broken", 100_000, lambda: breaking.broken)
+    runner.bench("BreakingCircuit.times_shorted", 100_000, lambda: breaking.times_shorted)
+    runner.bench("BreakingCircuit.total_failures", 100_000, lambda: breaking.total_failures)
+    runner.bench("BreakingCircuit.current_sleep_time", 100_000, lambda: breaking.current_sleep_time)
+    
+    return runner
+
+
+# =============================================================================
+# Reset Benchmarks
+# =============================================================================
+
+def benchmark_circuit_resets():
+    """Measure reset/reset_backoff overhead."""
+    runner = BenchmarkRunner("Circuit Reset Benchmarks")
+    
+    circ = Circuit(10, sleep_time_after_trip=0.0, backoff_factor=1.5)
+    breaking = BreakingCircuit(10, sleep_time_after_trip=0.0, backoff_factor=1.5)
+    
+    runner.bench("Circuit.reset_backoff()", 100_000, circ.reset_backoff)
+    
+    def breaking_reset_cycle():
+        breaking.trip()
+        breaking.reset()
+    
+    runner.bench("BreakingCircuit.reset()", 50_000, breaking_reset_cycle)
+    runner.bench("BreakingCircuit.reset_backoff()", 100_000, breaking.reset_backoff)
+    
+    return runner
+
+
+# =============================================================================
 # Backoff Calculation Benchmarks
 # =============================================================================
 
@@ -134,32 +180,6 @@ def benchmark_backoff_calculation():
     # Without backoff (factor = 1)
     circ_without = Circuit(1, sleep_time_after_trip=0.0, backoff_factor=1.0)
     runner.bench("Circuit.short() no backoff", 50_000, circ_without.short)
-    
-    return runner
-
-
-# =============================================================================
-# Property Access Benchmarks
-# =============================================================================
-
-def benchmark_property_access():
-    """Measure property access overhead."""
-    runner = BenchmarkRunner("Property Access Benchmarks")
-    
-    circ = Circuit(100, sleep_time_after_trip=0.1, backoff_factor=1.5)
-    for _ in range(50):
-        circ.short()
-    
-    runner.bench("Circuit.times_shorted", 100_000, lambda: circ.times_shorted)
-    runner.bench("Circuit.total_trips", 100_000, lambda: circ.total_trips)
-    runner.bench("Circuit.current_sleep_time", 100_000, lambda: circ.current_sleep_time)
-    
-    breaking = BreakingCircuit(100, sleep_time_after_trip=0.1)
-    for _ in range(50):
-        breaking.short()
-    
-    runner.bench("BreakingCircuit.broken", 100_000, lambda: breaking.broken)
-    runner.bench("BreakingCircuit.total_failures", 100_000, lambda: breaking.total_failures)
     
     return runner
 
@@ -238,8 +258,9 @@ def run_all_benchmarks():
         benchmark_circuit_creation(),
         benchmark_circuit_short(),
         benchmark_circuit_trip(),
+        benchmark_circuit_properties(),
+        benchmark_circuit_resets(),
         benchmark_backoff_calculation(),
-        benchmark_property_access(),
         benchmark_vs_manual(),
         benchmark_reset_backoff(),
     ]

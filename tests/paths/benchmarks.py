@@ -13,7 +13,20 @@ from pathlib import Path
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.paths import Skpath, get_project_root, is_valid_filename, streamline_path
+from suitkaise.paths import (
+    Skpath,
+    get_project_root,
+    get_project_paths,
+    get_project_structure,
+    get_formatted_project_tree,
+    get_caller_path,
+    get_current_dir,
+    get_cwd,
+    get_module_path,
+    get_id,
+    is_valid_filename,
+    streamline_path,
+)
 
 
 # =============================================================================
@@ -113,6 +126,7 @@ def benchmark_special_properties():
     path = Skpath(__file__)
     
     runner.bench("Skpath.ap (absolute)", 10_000, lambda: path.ap)
+    runner.bench("Skpath.platform", 10_000, lambda: path.platform)
     runner.bench("Skpath.id", 5_000, lambda: path.id)
     runner.bench("Skpath.rp (relative)", 5_000, lambda: path.rp)
     
@@ -136,7 +150,7 @@ def benchmark_path_operations():
     existing_path = Skpath(__file__)
     existing_stdlib = Path(__file__)
     
-    runner.bench("Skpath.exists()", 5_000, existing_path.exists)
+    runner.bench("Skpath.exists", 5_000, lambda: existing_path.exists)
     runner.bench("Path.exists() [stdlib]", 10_000, existing_stdlib.exists)
     
     return runner
@@ -178,6 +192,44 @@ def benchmark_utilities():
 
 
 # =============================================================================
+# Caller and Project Utility Benchmarks
+# =============================================================================
+
+def benchmark_caller_utilities():
+    """Measure caller-based utilities."""
+    runner = BenchmarkRunner("Caller Utility Benchmarks")
+    
+    runner.bench("get_caller_path()", 5_000, get_caller_path)
+    runner.bench("get_current_dir()", 5_000, get_current_dir)
+    runner.bench("get_cwd()", 10_000, get_cwd)
+    runner.bench("get_module_path(Skpath)", 5_000, lambda: get_module_path(Skpath))
+    
+    return runner
+
+
+def benchmark_id_utilities():
+    """Measure path ID utilities."""
+    runner = BenchmarkRunner("Path ID Benchmarks")
+    
+    path = Skpath(__file__)
+    runner.bench("get_id(Skpath)", 10_000, get_id, path)
+    runner.bench("Skpath(id)", 5_000, lambda: Skpath(path.id))
+    
+    return runner
+
+
+def benchmark_project_utilities():
+    """Measure project tree utilities."""
+    runner = BenchmarkRunner("Project Utilities Benchmarks")
+    
+    runner.bench("get_project_paths()", 20, get_project_paths)
+    runner.bench("get_project_structure()", 10, get_project_structure)
+    runner.bench("get_formatted_project_tree()", 10, get_formatted_project_tree)
+    
+    return runner
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -194,6 +246,9 @@ def run_all_benchmarks():
         benchmark_path_operations(),
         benchmark_root_detection(),
         benchmark_utilities(),
+        benchmark_caller_utilities(),
+        benchmark_id_utilities(),
+        benchmark_project_utilities(),
     ]
     
     for runner in runners:

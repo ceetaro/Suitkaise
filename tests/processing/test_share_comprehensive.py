@@ -206,7 +206,7 @@ def test_share_circuit_serialization():
     original = {
         'num_shorts_to_trip': circuit.num_shorts_to_trip,
         'sleep_time_after_trip': circuit.sleep_time_after_trip,
-        'factor': circuit.factor,
+        'backoff_factor': circuit.backoff_factor,
         'max_sleep_time': circuit.max_sleep_time,
         'times_shorted': circuit.times_shorted,
         'total_trips': circuit.total_trips,

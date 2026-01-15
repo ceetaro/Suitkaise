@@ -4,8 +4,8 @@ Test Process classes for multiprocessing tests.
 These classes are defined in a separate module so they can be properly
 serialized/deserialized by cerial across processes.
 
-Classes defined in __main__ cannot be deserialized in subprocess because
-the subprocess has a different __main__ module.
+Note: cerial now includes __main__ class definitions for reconstruction,
+but module-level classes remain the recommended pattern for stability.
 """
 
 import sys

@@ -228,7 +228,7 @@ def test_skfunction_retry_with_async():
         
         # Use retry then asynced
         # retry creates a new Skfunction, which we can then asynced
-        retry_fetch = sk_fetch.retry(times=5, backoff=0.0)
+        retry_fetch = sk_fetch.retry(times=5, delay=0.0)
         
         # Call the retry version (still sync)
         result = retry_fetch("http://example.com")
@@ -371,7 +371,7 @@ def test_async_skfunction_chaining():
         
         # Get async version and chain with retry
         async_func = sk_func.asynced()
-        async_retry = async_func.retry(times=3, backoff=0.0)
+        async_retry = async_func.retry(times=3, delay=0.0)
         
         result = await async_retry()
         

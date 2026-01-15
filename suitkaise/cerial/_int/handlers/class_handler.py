@@ -99,6 +99,13 @@ class ClassInstanceHandler(Handler):
         nested_classes = self._extract_nested_classes(obj_class)
         if nested_classes:
             state["nested_classes"] = nested_classes
+
+        # If the class lives in __main__, include its definition for reconstruction
+        if obj_class.__module__ == "__main__":
+            state["class_definition"] = self._serialize_class_definition(
+                obj_class,
+                allow_callables=True,
+            )
         
         # Extract state based on strategy
         if strategy == "custom_serialize":
@@ -262,7 +269,7 @@ class ClassInstanceHandler(Handler):
         
         return nested
     
-    def _serialize_class_definition(self, cls: type) -> Dict[str, Any]:
+    def _serialize_class_definition(self, cls: type, allow_callables: bool = False) -> Dict[str, Any]:
         """
         Serialize a class definition (not an instance).
         
@@ -297,6 +304,7 @@ class ClassInstanceHandler(Handler):
             "module": cls.__module__,
             "bases": bases,
             "dict": class_dict,
+            "allow_callables": allow_callables,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -324,6 +332,9 @@ class ClassInstanceHandler(Handler):
                     f"Locally-defined class '{state['qualname']}' has no class definition. "
                     f"Cannot reconstruct."
                 )
+        elif state.get("module") == "__main__" and "class_definition" in state:
+            # __main__ class - reconstruct from definition for cross-process safety
+            cls = self._reconstruct_class_definition(state["class_definition"])
         else:
             # Regular or nested class - try to import
             cls = self._get_class(state["module"], state["qualname"])
@@ -456,25 +467,21 @@ class ClassInstanceHandler(Handler):
         # but that creates circular dependencies. Instead, we create a minimal
         # class definition that can at least be used for isinstance checks.
         
-        # Create a minimal class dict with just the essentials
-        # Skip methods, functions, classmethods, staticmethods, properties
-        # These don't work after dynamic class reconstruction
+        allow_callables = class_def.get("allow_callables", False)
         class_dict = {}
         for key, value in class_def["dict"].items():
             # Skip anything that's a cerial-serialized object (has __cerial_type__)
             if isinstance(value, dict) and "__cerial_type__" in value:
                 continue
-            
-            # Skip methods, functions, and descriptors
-            # These include: function, method, classmethod, staticmethod, property
-            if callable(value) or isinstance(value, (classmethod, staticmethod, property)):
-                continue
-            
-            # Skip special attributes
-            if key.startswith('_'):
-                continue
-            
-            # Include simple attributes (strings, numbers, etc.)
+
+            if not allow_callables:
+                # Skip methods, functions, and descriptors for local classes
+                if callable(value) or isinstance(value, (classmethod, staticmethod, property)):
+                    continue
+                # Skip private/special attributes
+                if key.startswith('_'):
+                    continue
+
             class_dict[key] = value
         
         # Create class using type()

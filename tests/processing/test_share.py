@@ -286,56 +286,79 @@ def test_share_creation():
     share = Share()
     
     assert share is not None
-    assert not share.is_running
+    assert share.is_running
+    share.exit()
 
 
 def test_share_start_stop():
     """Share should start and stop coordinator."""
     share = Share()
     
-    share.start()
     assert share.is_running
-    
-    share.stop()
+    share.exit()
     assert not share.is_running
 
 
-def test_share_context_manager():
-    """Share should work as context manager."""
-    with Share() as share:
-        assert share.is_running
+def test_share_exit_alias():
+    """Share.exit should stop coordinator."""
+    share = Share()
     
+    assert share.is_running
+    share.exit()
     assert not share.is_running
 
 
 def test_share_set_timer():
     """Share should accept Sktimer."""
-    with Share() as share:
+    share = Share()
+    try:
         share.timer = Sktimer()
-        
         assert hasattr(share, 'timer')
+    finally:
+        share.exit()
+
+
+def test_share_clear():
+    """Share.clear should remove objects and counters."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        share.timer = Sktimer()
+        share.clear()
+        try:
+            _ = share.counter
+            assert False, "Expected AttributeError after clear"
+        except AttributeError:
+            pass
+    finally:
+        share.exit()
 
 
 def test_share_set_circuit():
     """Share should accept Circuit."""
-    with Share() as share:
+    share = Share()
+    try:
         # Circuit requires num_shorts_to_trip
         share.circuit = Circuit(num_shorts_to_trip=3)
-        
         assert hasattr(share, 'circuit')
+    finally:
+        share.exit()
 
 
 def test_share_set_user_class():
     """Share should accept @sk user classes."""
-    with Share() as share:
+    share = Share()
+    try:
         share.counter = Counter()
-        
         assert hasattr(share, 'counter')
+    finally:
+        share.exit()
 
 
 def test_share_set_multiple_objects():
     """Share should accept multiple objects."""
-    with Share() as share:
+    share = Share()
+    try:
         share.timer = Sktimer()
         share.circuit = Circuit(num_shorts_to_trip=3)
         share.counter = Counter()
@@ -343,6 +366,8 @@ def test_share_set_multiple_objects():
         assert hasattr(share, 'timer')
         assert hasattr(share, 'circuit')
         assert hasattr(share, 'counter')
+    finally:
+        share.exit()
 
 
 # =============================================================================
@@ -351,7 +376,8 @@ def test_share_set_multiple_objects():
 
 def test_share_timer_add_time():
     """Share.timer should support add_time()."""
-    with Share() as share:
+    share = Share()
+    try:
         share.timer = Sktimer()
         
         # Add some times
@@ -366,11 +392,14 @@ def test_share_timer_add_time():
         timer = share._coordinator.get_object('timer')
         assert timer is not None
         assert len(timer.times) == 3
+    finally:
+        share.exit()
 
 
 def test_share_counter_increment():
     """Share.counter should support increment()."""
-    with Share() as share:
+    share = Share()
+    try:
         share.counter = Counter()
         
         # Increment multiple times
@@ -384,11 +413,14 @@ def test_share_counter_increment():
         counter = share._coordinator.get_object('counter')
         assert counter is not None
         assert counter.value == 5
+    finally:
+        share.exit()
 
 
 def test_share_datastore_operations():
     """Share.datastore should support multiple operations."""
-    with Share() as share:
+    share = Share()
+    try:
         share.store = DataStore()
         
         # Perform operations
@@ -404,6 +436,8 @@ def test_share_datastore_operations():
         assert store is not None
         assert len(store.items) == 2
         assert store.metadata.get("key") == "value"
+    finally:
+        share.exit()
 
 
 # =============================================================================
@@ -412,7 +446,8 @@ def test_share_datastore_operations():
 
 def test_share_timer_serializes():
     """Sktimer should serialize correctly in Share."""
-    with Share() as share:
+    share = Share()
+    try:
         timer = Sktimer()
         timer.add_time(1.5)
         timer.add_time(2.5)
@@ -425,11 +460,14 @@ def test_share_timer_serializes():
         assert len(stored_timer.times) == 2
         assert 1.5 in stored_timer.times
         assert 2.5 in stored_timer.times
+    finally:
+        share.exit()
 
 
 def test_share_circuit_serializes():
     """Circuit should serialize correctly in Share."""
-    with Share() as share:
+    share = Share()
+    try:
         circuit = Circuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=0.5,
@@ -442,11 +480,14 @@ def test_share_circuit_serializes():
         stored_circuit = share._coordinator.get_object('circuit')
         assert stored_circuit is not None
         assert stored_circuit.num_shorts_to_trip == 3
+    finally:
+        share.exit()
 
 
 def test_share_user_class_serializes():
     """User classes should serialize correctly in Share."""
-    with Share() as share:
+    share = Share()
+    try:
         counter = Counter()
         counter.value = 42
         
@@ -456,11 +497,14 @@ def test_share_user_class_serializes():
         stored_counter = share._coordinator.get_object('counter')
         assert stored_counter is not None
         assert stored_counter.value == 42
+    finally:
+        share.exit()
 
 
 def test_share_nested_object_serializes():
     """Nested objects should serialize correctly in Share."""
-    with Share() as share:
+    share = Share()
+    try:
         nested = NestedObject()
         nested.counter = 10
         nested.data['extra'] = 'value'
@@ -472,6 +516,8 @@ def test_share_nested_object_serializes():
         assert stored is not None
         assert stored.counter == 10
         assert stored.data.get('extra') == 'value'
+    finally:
+        share.exit()
 
 
 # =============================================================================
@@ -512,11 +558,12 @@ def run_all_tests():
     # Share creation tests (with multiprocessing)
     runner.run_test("Share creation", test_share_creation, timeout=10)
     runner.run_test("Share start/stop", test_share_start_stop, timeout=10)
-    runner.run_test("Share context manager", test_share_context_manager, timeout=10)
+    runner.run_test("Share exit alias", test_share_exit_alias, timeout=10)
     runner.run_test("Share set Sktimer", test_share_set_timer, timeout=10)
     runner.run_test("Share set Circuit", test_share_set_circuit, timeout=10)
     runner.run_test("Share set user class", test_share_set_user_class, timeout=10)
     runner.run_test("Share set multiple objects", test_share_set_multiple_objects, timeout=10)
+    runner.run_test("Share clear", test_share_clear, timeout=10)
     
     # Share operations tests
     runner.run_test("Share Sktimer add_time()", test_share_timer_add_time, timeout=15)

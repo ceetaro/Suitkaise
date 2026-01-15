@@ -1,7 +1,7 @@
 """
 Processing API - Subprocess-based task execution for Suitkaise
 
-This module provides a Process base class for running tasks in subprocesses
+This module provides a Skprocess base class for running tasks in subprocesses
 with automatic lifecycle management, error handling, and timing support.
 Also provides Pool for batch parallel processing.
 
@@ -14,9 +14,9 @@ Key Features:
 - Pool for batch parallel processing with star() modifier
 
 Usage:
-    from suitkaise.processing import Process, Pool
+    from suitkaise.processing import Skprocess, Pool
     
-    class MyProcess(Process):
+    class MyProcess(Skprocess):
         def __init__(self, value):
             self.value = value
         
@@ -42,7 +42,7 @@ Usage:
 """
 
 # Import internal components
-from ._int.process_class import Process
+from ._int.process_class import Skprocess
 # ProcessConfig is internal - not exported
 from ._int.timers import ProcessTimers
 from ._int.pool import Pool
@@ -55,11 +55,15 @@ from ._int.errors import (
     ResultError,
     ErrorHandlerError,
     ProcessTimeoutError,
+    ResultTimeoutError,
 )
 
 
+Process = Skprocess  # Backwards-compatible alias
+
 __all__ = [
     # Main classes
+    'Skprocess',
     'Process',
     'Pool',
     
@@ -75,4 +79,5 @@ __all__ = [
     'ResultError',
     'ErrorHandlerError',
     'ProcessTimeoutError',
+    'ResultTimeoutError',
 ]

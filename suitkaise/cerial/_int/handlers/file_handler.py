@@ -92,7 +92,7 @@ class FileHandleHandler(Handler):
             from suitkaise.paths.api import Skpath
             sk_path = Skpath(file_path)
             # Store both absolute and relative paths
-            relative_path = str(sk_path.np)
+            relative_path = str(sk_path.rp)
             absolute_path = str(sk_path.ap)
         except ImportError:
             # skpath not available - use absolute path only

@@ -162,6 +162,87 @@ def test_sk_class_without_blocking():
         pass
 
 
+def test_sk_class_method_modifiers_sync():
+    """@sk class should expose modifiers on sync methods."""
+    @sk
+    class Worker:
+        def __init__(self):
+            self.calls = 0
+        
+        def work(self):
+            return "ok"
+        
+        def flaky(self):
+            self.calls += 1
+            if self.calls < 3:
+                raise ValueError("fail")
+            return "ok"
+        
+        def with_timeout_param(self, timeout=None):
+            return timeout
+    
+    worker = Worker()
+    
+    # retry
+    worker.calls = 0
+    assert worker.flaky.retry(times=3)() == "ok"
+    
+    # timeout
+    assert worker.work.timeout(1.0)() == "ok"
+    
+    # background
+    future = worker.work.background()()
+    assert future.result() == "ok"
+    
+    # asynced
+    result = asyncio.run(worker.work.asynced()())
+    assert result == "ok"
+    
+    # timeout param disables modifier
+    try:
+        worker.with_timeout_param.timeout(1.0)()
+        assert False, "Should have raised AttributeError"
+    except AttributeError:
+        pass
+
+
+def test_sk_class_method_modifiers_async():
+    """@sk class should expose modifiers on async methods."""
+    @sk
+    class AsyncWorker:
+        def __init__(self):
+            self.calls = 0
+        
+        async def work(self):
+            await asyncio.sleep(0)
+            return "ok"
+        
+        async def flaky(self):
+            self.calls += 1
+            if self.calls < 3:
+                raise ValueError("fail")
+            return "ok"
+    
+    worker = AsyncWorker()
+    
+    async def run_checks():
+        # asynced (no-op for async)
+        assert await worker.work.asynced()() == "ok"
+        
+        # timeout
+        assert await worker.work.timeout(1.0)() == "ok"
+        
+        # retry
+        worker.calls = 0
+        assert await worker.flaky.retry(times=3)() == "ok"
+        
+        # background returns Task
+        task = worker.work.background()()
+        assert await task == "ok"
+    
+    asyncio.run(run_checks())
+
+
 # =============================================================================
 # @sk on Functions Tests
 # =============================================================================
@@ -287,6 +368,8 @@ def run_all_tests():
     runner.run_test("@sk class has _shared_meta", test_sk_class_has_shared_meta)
     runner.run_test("@sk class with blocking", test_sk_class_with_blocking)
     runner.run_test("@sk class without blocking", test_sk_class_without_blocking)
+    runner.run_test("@sk class method modifiers (sync)", test_sk_class_method_modifiers_sync)
+    runner.run_test("@sk class method modifiers (async)", test_sk_class_method_modifiers_async)
     
     # Function tests
     runner.run_test("@sk on function", test_sk_on_function)

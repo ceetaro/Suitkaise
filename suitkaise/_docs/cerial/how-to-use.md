@@ -2,7 +2,7 @@
 
 `cerial` is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot.
 
-Meant for internal, inter-process communication, not for external or cross-language serialization.
+Meant for internal, cross-process communication, not for external or cross-language serialization.
 
 It contains 2 API functions.
 
@@ -27,7 +27,7 @@ If this happens, you can override the default behavior.
 
 Use `__serialize__` and `__deserialize__` methods in your classes to override the default behavior.
 
-In order for `__serialize__` to work, data must be reduced down to a `dict` with only native `pickle` types, and then converted to bytes.
+In order for `__serialize__` to work, data must be reduced down to a `dict` with only native `pickle` types. Do not convert to bytes, `cerial` will do that for you.
 
 `__deserialize__` needs to take this representation and reconstruct the object.
 
@@ -37,11 +37,12 @@ from suitkaise import cerial
 class MyClass:
 
     def __serialize__(self):
-        return pickle.dumps({"custom": "state"})
+        return {"custom": "state"}
     
     @classmethod
     def __deserialize__(cls, state):
         obj = cls.__new__(cls)
+        obj.custom = state["custom"]
         # custom reconstruction logic...
         return obj
 ```

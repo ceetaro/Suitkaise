@@ -2,80 +2,401 @@
 Pool class for parallel batch processing.
 
 Provides map, imap, async_map, and unordered_imap operations with star() modifier.
-Supports both regular functions and Process-inheriting classes.
+Supports both regular functions and Skprocess-inheriting classes.
 Uses cerial for serialization, avoiding pickle limitations.
 """
 
+import asyncio
 import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Any, Callable, Iterator, TypeVar, Generic, Union, Iterable, TYPE_CHECKING
 import queue as queue_module
 
 if TYPE_CHECKING:
-    from .process_class import Process
+    from .process_class import Skprocess
 
 T = TypeVar('T')
 R = TypeVar('R')
 
+# Shared executor for background operations
+_pool_executor: ThreadPoolExecutor | None = None
 
-class AsyncResult(Generic[T]):
+def _get_pool_executor() -> ThreadPoolExecutor:
+    """Get or create the shared thread pool executor for Pool operations."""
+    global _pool_executor
+    if _pool_executor is None:
+        _pool_executor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="pool_bg_")
+    return _pool_executor
+
+
+# =============================================================================
+# Pool Method Modifiers
+# =============================================================================
+
+class _PoolMapModifier:
     """
-    Future-like object returned by async_map().
+    Bound method wrapper for Pool.map with modifier support.
     
-    Provides methods to check status and retrieve results.
+    Usage:
+        pool.map(fn, items)                    # sync, blocks
+        pool.map.timeout(30)(fn, items)        # sync with timeout
+        pool.map.background()(fn, items)       # returns Future
+        await pool.map.asynced()(fn, items)    # async
     """
     
-    def __init__(self, result_queues: list, workers: list):
-        self._result_queues = result_queues
-        self._workers = workers
-        self._results: list[T] | None = None
-        self._collected = False
+    def __init__(self, pool: "Pool", is_star: bool = False):
+        self._pool = pool
+        self._is_star = is_star
     
-    def ready(self) -> bool:
-        """Check if all results are ready."""
-        if self._collected:
-            return True
-        # Check if all workers are done
-        return all(not w.is_alive() for w in self._workers)
+    def __call__(
+        self,
+        fn_or_process: Union[Callable, type],
+        iterable: Iterable,
+    ) -> list:
+        """Apply function/Skprocess to each item, return list of results."""
+        return self._pool._map_impl(fn_or_process, iterable, is_star=self._is_star)
     
-    def wait(self, timeout: float | None = None) -> None:
-        """Block until all results are ready."""
-        for w in self._workers:
-            w.join(timeout=timeout)
+    def timeout(self, seconds: float) -> "_PoolMapTimeoutModifier":
+        """Add timeout to the map operation."""
+        return _PoolMapTimeoutModifier(self._pool, self._is_star, seconds)
     
-    def get(self, timeout: float | None = None) -> list[T]:
-        """
-        Block until results are ready and return them.
+    def background(self) -> "_PoolMapBackgroundModifier":
+        """Run map in background thread, return Future."""
+        return _PoolMapBackgroundModifier(self._pool, self._is_star)
+    
+    def asynced(self) -> "_PoolMapAsyncModifier":
+        """Get async version of map."""
+        return _PoolMapAsyncModifier(self._pool, self._is_star)
+
+
+class _PoolMapTimeoutModifier:
+    """Timeout modifier for Pool.map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute map with timeout."""
+        return self._pool._map_impl(fn_or_process, iterable, is_star=self._is_star, timeout=self._timeout)
+    
+    def background(self) -> "_PoolMapTimeoutBackgroundModifier":
+        """Run map with timeout in background thread."""
+        return _PoolMapTimeoutBackgroundModifier(self._pool, self._is_star, self._timeout)
+    
+    def asynced(self) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        timeout = self._timeout
         
-        Args:
-            timeout: Maximum seconds to wait per result. None = wait forever.
-        
-        Returns:
-            List of results in order.
-        
-        Raises:
-            TimeoutError: If timeout reached before results ready.
-        """
-        if self._results is not None:
-            return self._results
-        
-        from suitkaise import cerial
-        
-        results = []
-        for q in self._result_queues:
+        async def async_map_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
             try:
-                message = q.get(timeout=timeout)
-                if message["type"] == "error":
-                    error = cerial.deserialize(message["data"])
-                    raise error
-                else:
-                    results.append(cerial.deserialize(message["data"]))
-            except queue_module.Empty:
-                raise TimeoutError("Timeout waiting for result")
+                return await asyncio.wait_for(
+                    asyncio.to_thread(pool._map_impl, fn_or_process, iterable, is_star, None),
+                    timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.map timed out after {timeout}s")
         
-        self._results = results
-        self._collected = True
-        return results
+        return async_map_with_timeout
 
+
+class _PoolMapTimeoutBackgroundModifier:
+    """Background modifier for Pool.map with timeout."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute map with timeout in background, return Future."""
+        executor = _get_pool_executor()
+        return executor.submit(
+            self._pool._map_impl, fn_or_process, iterable, self._is_star, self._timeout
+        )
+
+
+class _PoolMapBackgroundModifier:
+    """Background modifier for Pool.map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute map in background, return Future."""
+        executor = _get_pool_executor()
+        return executor.submit(self._pool._map_impl, fn_or_process, iterable, self._is_star, None)
+    
+    def timeout(self, seconds: float) -> "_PoolMapTimeoutBackgroundModifier":
+        """Add timeout to background map."""
+        return _PoolMapTimeoutBackgroundModifier(self._pool, self._is_star, seconds)
+
+
+class _PoolMapAsyncModifier:
+    """Async modifier for Pool.map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    async def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute map asynchronously."""
+        return await asyncio.to_thread(self._pool._map_impl, fn_or_process, iterable, self._is_star, None)
+    
+    def timeout(self, seconds: float) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        
+        async def async_map_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(pool._map_impl, fn_or_process, iterable, is_star, None),
+                    timeout=seconds
+                )
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.map timed out after {seconds}s")
+        
+        return async_map_with_timeout
+
+
+class _PoolImapModifier:
+    """
+    Bound method wrapper for Pool.imap with modifier support.
+    """
+    
+    def __init__(self, pool: "Pool", is_star: bool = False):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(
+        self,
+        fn_or_process: Union[Callable, type],
+        iterable: Iterable,
+    ) -> Iterator:
+        """Apply function/Skprocess to each item, return iterator of results."""
+        return self._pool._imap_impl(fn_or_process, iterable, is_star=self._is_star)
+    
+    def timeout(self, seconds: float) -> "_PoolImapTimeoutModifier":
+        """Add timeout to the imap operation."""
+        return _PoolImapTimeoutModifier(self._pool, self._is_star, seconds)
+    
+    def background(self) -> "_PoolImapBackgroundModifier":
+        """Run imap collection in background, return Future of list."""
+        return _PoolImapBackgroundModifier(self._pool, self._is_star)
+    
+    def asynced(self) -> "_PoolImapAsyncModifier":
+        """Get async version of imap (returns list, not iterator)."""
+        return _PoolImapAsyncModifier(self._pool, self._is_star)
+
+
+class _PoolImapTimeoutModifier:
+    """Timeout modifier for Pool.imap."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
+        """Execute imap with timeout."""
+        return self._pool._imap_impl(fn_or_process, iterable, is_star=self._is_star, timeout=self._timeout)
+
+
+class _PoolImapBackgroundModifier:
+    """Background modifier for Pool.imap (collects to list)."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute imap in background, return Future of list."""
+        def collect_imap():
+            return list(self._pool._imap_impl(fn_or_process, iterable, self._is_star, None))
+        
+        executor = _get_pool_executor()
+        return executor.submit(collect_imap)
+
+
+class _PoolImapAsyncModifier:
+    """Async modifier for Pool.imap (returns list)."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    async def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute imap asynchronously (returns list)."""
+        def collect_imap():
+            return list(self._pool._imap_impl(fn_or_process, iterable, self._is_star, None))
+        
+        return await asyncio.to_thread(collect_imap)
+    
+    def timeout(self, seconds: float) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        
+        async def async_imap_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            def collect_imap():
+                return list(pool._imap_impl(fn_or_process, iterable, is_star, None))
+            
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(collect_imap), timeout=seconds)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.imap timed out after {seconds}s")
+        
+        return async_imap_with_timeout
+
+
+# =============================================================================
+# Unordered Imap Modifiers
+# =============================================================================
+
+class _PoolUnorderedImapModifier:
+    """
+    Bound method wrapper for Pool.unordered_imap with modifier support.
+    """
+    
+    def __init__(self, pool: "Pool", is_star: bool = False):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(
+        self,
+        fn_or_process: Union[Callable, type],
+        iterable: Iterable,
+    ) -> Iterator:
+        """Apply function/Skprocess to each item, yield results as they complete."""
+        return self._pool._unordered_imap_impl(fn_or_process, iterable, is_star=self._is_star)
+    
+    def timeout(self, seconds: float) -> "_PoolUnorderedImapTimeoutModifier":
+        """Add timeout to unordered_imap - raises if any result takes too long."""
+        return _PoolUnorderedImapTimeoutModifier(self._pool, self._is_star, seconds)
+    
+    def background(self) -> "_PoolUnorderedImapBackgroundModifier":
+        """Run unordered_imap collection in background, return Future of list."""
+        return _PoolUnorderedImapBackgroundModifier(self._pool, self._is_star)
+    
+    def asynced(self) -> "_PoolUnorderedImapAsyncModifier":
+        """Get async version of unordered_imap (returns list)."""
+        return _PoolUnorderedImapAsyncModifier(self._pool, self._is_star)
+
+
+class _PoolUnorderedImapTimeoutModifier:
+    """Timeout modifier for Pool.unordered_imap."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
+        """Execute unordered_imap with timeout per result."""
+        return self._pool._unordered_imap_impl(
+            fn_or_process, iterable, is_star=self._is_star, timeout=self._timeout
+        )
+    
+    def background(self) -> "_PoolUnorderedImapTimeoutBackgroundModifier":
+        """Run with timeout in background."""
+        return _PoolUnorderedImapTimeoutBackgroundModifier(self._pool, self._is_star, self._timeout)
+    
+    def asynced(self) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        timeout = self._timeout
+        
+        async def async_unordered_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            def collect():
+                return list(pool._unordered_imap_impl(fn_or_process, iterable, is_star, timeout))
+            
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(collect), timeout=timeout)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.unordered_imap timed out after {timeout}s")
+        
+        return async_unordered_with_timeout
+
+
+class _PoolUnorderedImapTimeoutBackgroundModifier:
+    """Background modifier for Pool.unordered_imap with timeout."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute unordered_imap with timeout in background."""
+        def collect():
+            return list(self._pool._unordered_imap_impl(
+                fn_or_process, iterable, self._is_star, self._timeout
+            ))
+        
+        executor = _get_pool_executor()
+        return executor.submit(collect)
+
+
+class _PoolUnorderedImapBackgroundModifier:
+    """Background modifier for Pool.unordered_imap (collects to list)."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute unordered_imap in background, return Future of list."""
+        def collect():
+            return list(self._pool._unordered_imap_impl(fn_or_process, iterable, self._is_star))
+        
+        executor = _get_pool_executor()
+        return executor.submit(collect)
+    
+    def timeout(self, seconds: float) -> "_PoolUnorderedImapTimeoutBackgroundModifier":
+        """Add timeout to background unordered_imap."""
+        return _PoolUnorderedImapTimeoutBackgroundModifier(self._pool, self._is_star, seconds)
+
+
+class _PoolUnorderedImapAsyncModifier:
+    """Async modifier for Pool.unordered_imap (returns list)."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        self._pool = pool
+        self._is_star = is_star
+    
+    async def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute unordered_imap asynchronously (returns list)."""
+        def collect():
+            return list(self._pool._unordered_imap_impl(fn_or_process, iterable, self._is_star))
+        
+        return await asyncio.to_thread(collect)
+    
+    def timeout(self, seconds: float) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        
+        async def async_unordered_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            def collect():
+                return list(pool._unordered_imap_impl(fn_or_process, iterable, is_star))
+            
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(collect), timeout=seconds)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.unordered_imap timed out after {seconds}s")
+        
+        return async_unordered_with_timeout
+
+
+# =============================================================================
+# Star Modifier
+# =============================================================================
 
 class StarModifier:
     """
@@ -87,21 +408,20 @@ class StarModifier:
     def __init__(self, pool: "Pool"):
         self._pool = pool
     
-    def map(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
-        """Apply function/Process with tuple unpacking, return list of results."""
-        return self._pool._map_impl(fn_or_process, iterable, is_star=True)
+    @property
+    def map(self) -> _PoolMapModifier:
+        """Get map method with tuple unpacking and modifier support."""
+        return _PoolMapModifier(self._pool, is_star=True)
     
-    def imap(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
-        """Apply function/Process with tuple unpacking, return iterator of ordered results."""
-        return self._pool._imap_impl(fn_or_process, iterable, is_star=True)
+    @property
+    def imap(self) -> _PoolImapModifier:
+        """Get imap method with tuple unpacking and modifier support."""
+        return _PoolImapModifier(self._pool, is_star=True)
     
-    def async_map(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> AsyncResult:
-        """Apply function/Process with tuple unpacking, return AsyncResult immediately."""
-        return self._pool._async_map_impl(fn_or_process, iterable, is_star=True)
-    
-    def unordered_imap(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
-        """Apply function/Process with tuple unpacking, return iterator of unordered results."""
-        return self._pool._unordered_imap_impl(fn_or_process, iterable, is_star=True)
+    @property
+    def unordered_imap(self) -> _PoolUnorderedImapModifier:
+        """Get unordered_imap method with tuple unpacking and modifier support."""
+        return _PoolUnorderedImapModifier(self._pool, is_star=True)
 
 
 class Pool:
@@ -109,21 +429,22 @@ class Pool:
     Pool for parallel batch processing.
     
     Uses cerial for serialization, supporting complex objects that
-    pickle cannot handle. Also supports Process-inheriting classes
+    pickle cannot handle. Also supports Skprocess-inheriting classes
     for structured lifecycle management.
     
     Usage:
         pool = Pool(workers=8)
         
         # Simple function
-        results = pool.map(process_item, items)
+        results = pool.map(fn, items)
         
-        # Process class
+        # Skprocess class
         results = pool.map(MyProcessClass, items)
         
-        # Async (non-blocking)
-        async_result = pool.async_map(fn, items)
-        results = async_result.get()
+        # With modifiers
+        results = pool.map.timeout(30.0)(fn, items)
+        future = pool.map.background()(fn, items)
+        results = await pool.map.asynced()(fn, items)
         
         # Unordered (fastest)
         for result in pool.unordered_imap(fn, items):
@@ -138,7 +459,7 @@ class Pool:
         Create a new Pool.
         
         Args:
-            workers: Number of worker processes. None = number of CPUs.
+            workers: Max concurrent workers. None = number of CPUs.
         """
         self._workers = workers or multiprocessing.cpu_count()
         self._active_processes: list[multiprocessing.Process] = []
@@ -173,152 +494,205 @@ class Pool:
         
         star().map() unpacks tuples as function arguments.
         star().imap() unpacks tuples as function arguments.
-        star().async_map() unpacks tuples as function arguments.
         star().unordered_imap() unpacks tuples as function arguments.
         """
         return StarModifier(self)
     
     # =========================================================================
-    # Main methods
+    # Main methods with modifier support
     # =========================================================================
     
-    def map(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+    @property
+    def map(self) -> _PoolMapModifier:
         """
-        Apply function/Process to each item, return list of results.
+        ────────────────────────────────────────────────────────
+            ```python
+            # Sync - blocks until all complete
+            results = pool.map(fn, items)
+            
+            # With modifiers
+            results = pool.map.timeout(30.0)(fn, items)
+            future = pool.map.background()(fn, items)
+            results = await pool.map.asynced()(fn, items)
+            ```
+        ────────────────────────────────────────────────────────
+        
+        Apply function/Skprocess to each item, return list of results.
         
         Blocks until all items are processed.
         Results are returned in the same order as inputs.
         
         Args:
-            fn_or_process: Function or Process class to apply.
+            fn_or_process: Function or Skprocess class to apply.
             iterable: Items to process.
         
         Returns:
             List of results in order.
+        
+        Modifiers:
+            .timeout(seconds): Raise TimeoutError if exceeded
+            .background(): Return Future immediately
+            .asynced(): Return coroutine for await
         """
-        return self._map_impl(fn_or_process, iterable, is_star=False)
+        return _PoolMapModifier(self, is_star=False)
     
-    def imap(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
+    @property
+    def imap(self) -> _PoolImapModifier:
         """
-        Apply function/Process to each item, return iterator of results.
+        ────────────────────────────────────────────────────────
+            ```python
+            # Sync - iterator, blocks on each next()
+            for result in pool.imap(fn, items):
+                process(result)
+            
+            # With timeout
+            for result in pool.imap.timeout(30.0)(fn, items):
+                process(result)
+            
+            # Background (collects to list)
+            future = pool.imap.background()(fn, items)
+            results = future.result()
+            
+            # Async (collects to list)
+            results = await pool.imap.asynced()(fn, items)
+            ```
+        ────────────────────────────────────────────────────────
+        
+        Apply function/Skprocess to each item, return iterator of results.
         
         Results are yielded in order. If the next result isn't ready,
         iteration blocks until it is.
         
         Args:
-            fn_or_process: Function or Process class to apply.
+            fn_or_process: Function or Skprocess class to apply.
             iterable: Items to process.
         
         Returns:
             Iterator of results in order.
+        
+        Modifiers:
+            .timeout(seconds): Raise TimeoutError if exceeded
+            .background(): Return Future of list
+            .asynced(): Return coroutine for list
         """
-        return self._imap_impl(fn_or_process, iterable, is_star=False)
+        return _PoolImapModifier(self, is_star=False)
     
-    def async_map(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> AsyncResult:
+    @property
+    def unordered_imap(self) -> _PoolUnorderedImapModifier:
         """
-        Apply function/Process to each item, return AsyncResult immediately.
+        ────────────────────────────────────────────────────────
+            ```python
+            # Sync - iterator, yields as results complete
+            for result in pool.unordered_imap(fn, items):
+                process(result)
+            
+            # With timeout
+            for result in pool.unordered_imap.timeout(30.0)(fn, items):
+                process(result)
+            
+            # Background (collects to list)
+            future = pool.unordered_imap.background()(fn, items)
+            results = future.result()
+            
+            # Async (collects to list)
+            results = await pool.unordered_imap.asynced()(fn, items)
+            ```
+        ────────────────────────────────────────────────────────
         
-        Non-blocking. Returns immediately with a future-like object
-        that can be checked for completion and used to retrieve results.
-        
-        Args:
-            fn_or_process: Function or Process class to apply.
-            iterable: Items to process.
-        
-        Returns:
-            AsyncResult with ready(), wait(), and get() methods.
-        """
-        return self._async_map_impl(fn_or_process, iterable, is_star=False)
-    
-    def unordered_imap(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Iterator:
-        """
-        Apply function/Process to each item, yield results as they complete.
+        Apply function/Skprocess to each item, yield results as they complete.
         
         Fastest way to get results, but order is not preserved.
         Results are yielded as soon as they're ready.
         
         Args:
-            fn_or_process: Function or Process class to apply.
+            fn_or_process: Function or Skprocess class to apply.
             iterable: Items to process.
         
         Returns:
             Iterator of results in completion order.
+        
+        Modifiers:
+            .timeout(seconds): Raise TimeoutError if exceeded
+            .background(): Return Future of list
+            .asynced(): Return coroutine for list
         """
-        return self._unordered_imap_impl(fn_or_process, iterable, is_star=False)
+        return _PoolUnorderedImapModifier(self, is_star=False)
     
     # =========================================================================
     # Implementation
     # =========================================================================
     
-    def _spawn_workers(
+    def _spawn_worker(
         self,
-        fn_or_process: Union[Callable, type],
-        iterable: Iterable,
-        is_star: bool
-    ) -> tuple[list[multiprocessing.Queue], list[multiprocessing.Process]]:
-        """Spawn worker processes for all items."""
-        from suitkaise import cerial
-        
-        items = list(iterable)
-        
-        if not items:
-            return [], []
-        
-        # Serialize the function/Process class once
-        serialized_fn = cerial.serialize(fn_or_process)
-        
-        # Spawn workers for each item
-        result_queues = []
-        workers = []
-        
-        for item in items:
-            result_queue = multiprocessing.Queue()
-            serialized_item = cerial.serialize(item)
-            
-            worker = multiprocessing.Process(
-                target=_pool_worker,
-                args=(serialized_fn, serialized_item, is_star, result_queue)
-            )
-            worker.start()
-            
-            result_queues.append(result_queue)
-            workers.append(worker)
-            self._active_processes.append(worker)
-        
-        return result_queues, workers
+        serialized_fn: bytes,
+        serialized_item: bytes,
+        is_star: bool,
+    ) -> tuple[multiprocessing.Queue, multiprocessing.Process]:
+        """Spawn a single worker for one item."""
+        result_queue: multiprocessing.Queue = multiprocessing.Queue()
+        worker = multiprocessing.Process(
+            target=_pool_worker,
+            args=(serialized_fn, serialized_item, is_star, result_queue),
+        )
+        worker.start()
+        self._active_processes.append(worker)
+        return result_queue, worker
     
     def _map_impl(
         self,
         fn_or_process: Union[Callable, type],
         iterable: Iterable,
-        is_star: bool
+        is_star: bool,
+        timeout: float | None = None,
     ) -> list:
         """Internal blocking map implementation."""
         from suitkaise import cerial
         
-        result_queues, workers = self._spawn_workers(fn_or_process, iterable, is_star)
-        
-        if not workers:
+        items = list(iterable)
+        if not items:
             return []
         
-        # Block and collect results in order
-        results = []
-        for q, w in zip(result_queues, workers):
-            w.join()
-            try:
-                message = q.get(timeout=1.0)
-                if message["type"] == "error":
-                    error = cerial.deserialize(message["data"])
-                    raise error
-                else:
-                    results.append(cerial.deserialize(message["data"]))
-            except queue_module.Empty:
-                results.append(None)
+        # Serialize the function/Skprocess class once
+        serialized_fn = cerial.serialize(fn_or_process)
         
-        # Clean up
-        for w in workers:
-            if w in self._active_processes:
-                self._active_processes.remove(w)
+        max_workers = self._workers
+        if max_workers is None:
+            max_workers = len(items)
+        
+        results = [None] * len(items)
+        active: list[tuple[int, multiprocessing.Queue, multiprocessing.Process]] = []
+        next_index = 0
+        
+        def start_one(idx: int) -> None:
+            serialized_item = cerial.serialize(items[idx])
+            q, w = self._spawn_worker(serialized_fn, serialized_item, is_star)
+            active.append((idx, q, w))
+        
+        while active or next_index < len(items):
+            while next_index < len(items) and len(active) < max_workers:
+                start_one(next_index)
+                next_index += 1
+            
+            for idx, q, w in list(active):
+                w.join(timeout=timeout)
+                
+                if w.is_alive():
+                    w.terminate()
+                    raise TimeoutError(f"Pool.map worker {idx} timed out after {timeout}s")
+                
+                try:
+                    message = q.get(timeout=1.0)
+                    if message["type"] == "error":
+                        error = cerial.deserialize(message["data"])
+                        raise error
+                    results[idx] = cerial.deserialize(message["data"])
+                except queue_module.Empty:
+                    results[idx] = None
+                finally:
+                    if w in self._active_processes:
+                        self._active_processes.remove(w)
+                    active.remove((idx, q, w))
+                break
         
         return results
     
@@ -326,51 +700,146 @@ class Pool:
         self,
         fn_or_process: Union[Callable, type],
         iterable: Iterable,
-        is_star: bool
+        is_star: bool,
+        timeout: float | None = None,
     ) -> Iterator:
         """Internal blocking ordered imap implementation."""
-        result_queues, workers = self._spawn_workers(fn_or_process, iterable, is_star)
+        from suitkaise import cerial
         
-        if not workers:
+        items = list(iterable)
+        if not items:
             return iter([])
         
-        return _ordered_results(result_queues, workers, self._active_processes)
-    
-    def _async_map_impl(
-        self,
-        fn_or_process: Union[Callable, type],
-        iterable: Iterable,
-        is_star: bool
-    ) -> AsyncResult:
-        """Internal async map implementation."""
-        result_queues, workers = self._spawn_workers(fn_or_process, iterable, is_star)
-        return AsyncResult(result_queues, workers)
+        serialized_fn = cerial.serialize(fn_or_process)
+        max_workers = self._workers
+        if max_workers is None:
+            max_workers = len(items)
+        
+        def generator() -> Iterator:
+            active: dict[int, tuple[multiprocessing.Queue, multiprocessing.Process]] = {}
+            next_index = 0
+            next_yield = 0
+            
+            def start_one(idx: int) -> None:
+                serialized_item = cerial.serialize(items[idx])
+                q, w = self._spawn_worker(serialized_fn, serialized_item, is_star)
+                active[idx] = (q, w)
+            
+            while next_yield < len(items):
+                while next_index < len(items) and len(active) < max_workers:
+                    start_one(next_index)
+                    next_index += 1
+                
+                if next_yield not in active:
+                    # if not started yet, loop to start
+                    continue
+                
+                q, w = active[next_yield]
+                w.join(timeout=timeout)
+                
+                if w.is_alive():
+                    w.terminate()
+                    raise TimeoutError(f"Pool.imap worker {next_yield} timed out after {timeout}s")
+                
+                try:
+                    message = q.get(timeout=1.0)
+                    if message["type"] == "error":
+                        error = cerial.deserialize(message["data"])
+                        raise error
+                    yield cerial.deserialize(message["data"])
+                except queue_module.Empty:
+                    yield None
+                finally:
+                    if w in self._active_processes:
+                        self._active_processes.remove(w)
+                    active.pop(next_yield, None)
+                    next_yield += 1
+        
+        return generator()
     
     def _unordered_imap_impl(
         self,
         fn_or_process: Union[Callable, type],
         iterable: Iterable,
-        is_star: bool
+        is_star: bool,
+        timeout: float | None = None,
     ) -> Iterator:
         """Internal unordered imap implementation."""
-        result_queues, workers = self._spawn_workers(fn_or_process, iterable, is_star)
+        from suitkaise import cerial
+        import time as time_module
         
-        if not workers:
+        items = list(iterable)
+        if not items:
             return iter([])
         
-        return _unordered_results(result_queues, workers, self._active_processes)
+        serialized_fn = cerial.serialize(fn_or_process)
+        max_workers = self._workers
+        if max_workers is None:
+            max_workers = len(items)
+        
+        def generator() -> Iterator:
+            active: list[tuple[int, multiprocessing.Queue, multiprocessing.Process]] = []
+            next_index = 0
+            start_time = time_module.perf_counter() if timeout else None
+            
+            def start_one(idx: int) -> None:
+                serialized_item = cerial.serialize(items[idx])
+                q, w = self._spawn_worker(serialized_fn, serialized_item, is_star)
+                active.append((idx, q, w))
+            
+            while active or next_index < len(items):
+                while next_index < len(items) and len(active) < max_workers:
+                    start_one(next_index)
+                    next_index += 1
+                
+                for i, (idx, q, w) in enumerate(list(active)):
+                    if w.is_alive():
+                        continue
+                    
+                    w.join(timeout=0)
+                    try:
+                        message = q.get(timeout=1.0)
+                        if message["type"] == "error":
+                            error = cerial.deserialize(message["data"])
+                            raise error
+                        yield cerial.deserialize(message["data"])
+                    except queue_module.Empty:
+                        yield None
+                    finally:
+                        if w in self._active_processes:
+                            self._active_processes.remove(w)
+                        active.pop(i)
+                    break
+                else:
+                    if timeout and start_time is not None:
+                        elapsed = time_module.perf_counter() - start_time
+                        if elapsed >= timeout:
+                            for _, _, w in active:
+                                if w.is_alive():
+                                    w.terminate()
+                            raise TimeoutError(f"Pool.unordered_imap timed out after {timeout}s")
+                    time_module.sleep(0.01)
+        
+        return generator()
 
 
 def _ordered_results(
     result_queues: list,
     workers: list,
-    active_processes: list
+    active_processes: list,
+    timeout: float | None = None,
 ) -> Iterator:
     """Yield results in submission order."""
     from suitkaise import cerial
     
-    for q, w in zip(result_queues, workers):
-        w.join()
+    for i, (q, w) in enumerate(zip(result_queues, workers)):
+        w.join(timeout=timeout)
+        
+        # Check if worker timed out
+        if w.is_alive():
+            w.terminate()
+            raise TimeoutError(f"Pool.imap worker {i} timed out after {timeout}s")
+        
         try:
             message = q.get(timeout=1.0)
             if message["type"] == "error":
@@ -388,14 +857,29 @@ def _ordered_results(
 def _unordered_results(
     result_queues: list,
     workers: list,
-    active_processes: list
+    active_processes: list,
+    timeout: float | None = None,
 ) -> Iterator:
     """Yield results as they complete."""
     from suitkaise import cerial
+    import time as time_module
     
     remaining = list(zip(result_queues, workers))
+    start_time = time_module.perf_counter() if timeout else None
     
     while remaining:
+        # Check timeout
+        if timeout is not None:
+            elapsed = time_module.perf_counter() - start_time
+            if elapsed >= timeout:
+                # Terminate remaining workers
+                for q, w in remaining:
+                    if w.is_alive():
+                        w.terminate()
+                    if w in active_processes:
+                        active_processes.remove(w)
+                raise TimeoutError(f"Pool.unordered_imap timed out after {timeout}s")
+        
         for i, (q, w) in enumerate(remaining):
             if not w.is_alive():
                 # Worker finished, get result
@@ -415,8 +899,7 @@ def _unordered_results(
                 break
         else:
             # No worker finished yet, wait a bit
-            import time
-            time.sleep(0.01)
+            time_module.sleep(0.01)
 
 
 def _pool_worker(
@@ -429,7 +912,7 @@ def _pool_worker(
     Worker function that runs in subprocess.
     
     Uses cerial to deserialize function and arguments.
-    Handles both regular functions and Process classes.
+    Handles both regular functions and Skprocess classes.
     """
     from suitkaise import cerial
     
@@ -447,11 +930,11 @@ def _pool_worker(
         else:
             args = (item,)
         
-        # Check if this is a Process class
-        from .process_class import Process
+        # Check if this is a Skprocess class
+        from .process_class import Skprocess
         
-        if isinstance(fn_or_process, type) and issubclass(fn_or_process, Process):
-            # Create Process instance with args
+        if isinstance(fn_or_process, type) and issubclass(fn_or_process, Skprocess):
+            # Create Skprocess instance with args
             process_instance = fn_or_process(*args)
             
             # Run the process inline (we're already in a subprocess)
@@ -488,9 +971,9 @@ def _pool_worker(
             })
 
 
-def _run_process_inline(process: "Process") -> Any:
+def _run_process_inline(process: "Skprocess") -> Any:
     """
-    Run a Process instance inline (not in a subprocess).
+    Run a Skprocess instance inline (not in a subprocess).
     
     Used by Pool workers since they're already in a subprocess.
     Replicates full engine behavior including:
@@ -617,7 +1100,7 @@ def _run_process_inline(process: "Process") -> Any:
                 return _run_error_sequence_inline(process, e)
 
 
-def _run_finish_sequence_inline(process: "Process") -> Any:
+def _run_finish_sequence_inline(process: "Skprocess") -> Any:
     """Run __onfinish__ and __result__, return result."""
     from .timeout import run_with_timeout
     from .errors import OnFinishError, ResultError, ProcessTimeoutError
@@ -666,7 +1149,7 @@ def _run_finish_sequence_inline(process: "Process") -> Any:
     return result
 
 
-def _run_error_sequence_inline(process: "Process", error: BaseException) -> Any:
+def _run_error_sequence_inline(process: "Skprocess", error: BaseException) -> Any:
     """Call __error__ and return its result."""
     from .timeout import run_with_timeout
     

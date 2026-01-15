@@ -55,6 +55,22 @@ class Skpath:
     """
     
     __slots__ = ("_path", "_root", "_ap", "_rp", "_id", "_hash")
+
+    @classmethod
+    def _from_path(cls, path: Path, root: Path | None = None) -> "Skpath":
+        """
+        Fast-path constructor from a resolved Path.
+
+        Skips path resolution and root detection for bulk scans.
+        """
+        obj = cls.__new__(cls)
+        obj._path = path
+        obj._root = root
+        obj._ap = None
+        obj._rp = None
+        obj._id = None
+        obj._hash = None
+        return obj
     
     def __init__(
         self,

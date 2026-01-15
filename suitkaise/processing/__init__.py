@@ -2,9 +2,9 @@
 Suitkaise Processing - Subprocess-based task execution.
 
 Usage:
-    from suitkaise.processing import Process, Pool, Share
+    from suitkaise.processing import Skprocess, Pool, Share
     
-    class MyWorker(Process):
+    class MyWorker(Skprocess):
         def __init__(self, value):
             self.value = value
         
@@ -36,7 +36,7 @@ Usage:
 
 from .api import (
     # Main classes
-    Process,
+    Skprocess,
     Pool,
     
     # Timers
@@ -51,11 +51,15 @@ from .api import (
     ResultError,
     ErrorHandlerError,
     ProcessTimeoutError,
+    ResultTimeoutError,
 )
 
 from ._int.share import Share
 
+Process = Skprocess  # Backwards-compatible alias
+
 __all__ = [
+    'Skprocess',
     'Process',
     'Pool',
     'Share',
@@ -68,4 +72,5 @@ __all__ = [
     'ResultError',
     'ErrorHandlerError',
     'ProcessTimeoutError',
+    'ResultTimeoutError',
 ]

@@ -18,13 +18,13 @@ text = "
 
 Designed to make using multiple processes really easy.
 
-By inheriting from the `Process` class, you can create a well organized process in a class structure.
+By inheriting from the `Skprocess` class, you can create a well organized process in a class structure.
 
 Since `processing` uses `cerial` (another `suitkaise` module) as its serializer, you can create these process classes with essentially any object you want.
 
 You can also use the `Pool` class for batch processing.
 
-`Pool` also uses `cerial` for serialization, so you can use it with any object you want, and it also allows you to use `Process` inheriting classes instead of just functions.
+`Pool` also uses `cerial` for serialization, so you can use it with any object you want, and it also allows you to use `Skprocess` inheriting classes instead of just functions.
 
 No more `PicklingError: Can't serialize object` errors when you start up your process!
 
@@ -36,25 +36,25 @@ No more `PicklingError: Can't serialize object` errors when you start up your pr
 
 ## Lifecycle Methods
 
-Classes that inherit from `Process` have access to 6 lifecycle methods.
+Classes that inherit from `Skprocess` have access to 6 lifecycle methods.
 
 These methods are what run the actual process when it is created.
 
 Additionally, `__init__` is modified to automatically call `super().__init__()` for you.
 
-In order for `Process` inheriting classes to run correctly, you must implement the `__run__` method.
+In order for `Skprocess` inheriting classes to run correctly, you must implement the `__run__` method.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
         # super().__init__() is called automatically for you
         # setup your process here
         # initalize attributes
-        # configure Process attributes
+        # configure Skprocess attributes
 
 
     def __prerun__(self):
@@ -148,7 +148,7 @@ p.wait()
 ```
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
@@ -199,7 +199,7 @@ p.wait()
 ```
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
@@ -225,7 +225,7 @@ if data[0] == "i have found a corrupt file":
 ```
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
@@ -258,36 +258,36 @@ except ProcessError as e:
 
 ## Configuration
 
-`Process` also has a `config` attribute that allows you to configure the process in the inheriting class.
+`Skprocess` also has a `process_config` attribute that allows you to configure the process in the inheriting class.
 
 The config can only be updated in the `__init__()` method.
 
 All values assigned in the code block below are the defaults.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     # CAN ONLY BE UPDATED IN __INIT__
     def __init__(self):
 
         # None = infinite number of runs
-        self.config.runs = None
+        self.process_config.runs = None
 
         # None = no time limit before auto-joining
-        self.config.join_in = None
+        self.process_config.join_in = None
 
         # 1 = no retries
-        self.config.lives = 1
+        self.process_config.lives = 1
 
         # None = no timeout
-        self.config.timeouts.prerun = None
-        self.config.timeouts.run = None
-        self.config.timeouts.postrun = None
-        self.config.timeouts.onfinish = None
-        self.config.timeouts.result = None
-        self.config.timeouts.error = None
+        self.process_config.timeouts.prerun = None
+        self.process_config.timeouts.run = None
+        self.process_config.timeouts.postrun = None
+        self.process_config.timeouts.onfinish = None
+        self.process_config.timeouts.result = None
+        self.process_config.timeouts.error = None
 ```
 
 Setting any of these numbers to zero or lower will reset them to the default value.
@@ -295,9 +295,9 @@ Setting any of these numbers to zero or lower will reset them to the default val
 ## Timing
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
@@ -341,10 +341,10 @@ result_timer = p.__result__.timer
 error_timer = p.__error__.timer
 
 # adds prerun, run, and postrun times together
-full_run_timer = p.timer
+full_run_timer = p.process_timer
 ```
 
-The `p.timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun__` method timers into one value, and records that value. It does this every iteration/run.
+The `p.process_timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun__` method timers into one value, and records that value. It does this every iteration/run.
 
 All timers are `suitkaise.sktime.Timer` objects, and function exactly the same.
 
@@ -352,16 +352,16 @@ Timers will not be accessible unless you define their respective lifecycle metho
 
 ## `lives` system
 
-Setting `self.config.lives` to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.
+Setting `self.process_config.lives` to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __init__(self):
 
         # 3 attempts total
-        self.config.lives = 3
+        self.process_config.lives = 3
 ```
 
 When a process needs to retry, it retries the current run starting from `__prerun__`. (Does not fully reset to run 0)
@@ -383,7 +383,7 @@ All errors inherit from a `ProcessError` class, and wrap the actual error that h
 
 Base class for all process errors.
 
-If an error occurs outside of one of the inherited `Process` methods, it will be wrapped in a `ProcessError`.
+If an error occurs outside of one of the inherited `Skprocess` methods, it will be wrapped in a `ProcessError`.
 
 ### Error Classes
 
@@ -450,12 +450,12 @@ except ProcessError as e:
 It does 2 things differently.
 
 - uses `cerial` for serialization of complex objects between processes
-- allows for the use of the `Process` inheriting classes mentioned above
+- allows for the use of the `Skprocess` inheriting classes mentioned above
 
 ```python
 from suitkaise.processing import Pool
 
-# a class of type ["processing.Process"]
+# a class of type ["processing.Skprocess"]
 p = MyProcess()
 data_set = get_data()
 
@@ -525,7 +525,7 @@ Each result is returned as it is ready, regardless of order.
 Fastest way to get results, but not in order.
 
 ```python
-# use Process inheriting class UpscaleImage to process each image in data_set
+# use Skprocess inheriting class UpscaleImage to process each image in data_set
 for processed_image in pool.unordered_imap(UpscaleImage, data_set):
 
     upscaled_images.append(processed_image)
@@ -539,30 +539,30 @@ When used, it makes iterators of tuples spread across multiple arguments instead
 
 ```python
 # map - always passes item as single argument
-pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
+pool.map(fn or Skprocess, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
 
 # star map - unpacks tuples as arguments (but only tuples!)
-pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)
+pool.star().map(fn or Skprocess, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)
 ```
 
 ```python
 # imap - always passes item as single argument
-for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
+for result in pool.imap(fn or Skprocess, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
 
 # star imap - unpacks tuples as arguments (but only tuples!)
-for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)
+for result in pool.star().imap(fn or Skprocess, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)
 ```
 
-### Using `Pool` with `Process` inheriting classes
+### Using `Pool` with `Skprocess` inheriting classes
 
-When using `Pool` with `Process` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
+When using `Pool` with `Skprocess` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
 
 The second argument will be an argument (or arguments) to `__init__()`.
 
 Classes run as they would normally, including ones that don't have a run or time limit (you can still use `stop()` to stop them in `Pools`).
 
 ```python
-class UpscaleImage(Process):
+class UpscaleImage(Skprocess):
 
     def __init__(self, image):
         self.image_data = image
@@ -573,7 +573,7 @@ for result in pool.unordered_imap(UpscaleImage, data_set):
 ```
 
 ```python
-class ColorImage(Process):
+class ColorImage(Skprocess):
 
     def __init__(self, image, color, percent_change):
         self.image_data = image

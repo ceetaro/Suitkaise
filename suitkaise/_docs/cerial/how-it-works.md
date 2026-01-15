@@ -54,6 +54,8 @@ Complex objects get converted to dicts with special markers.
 - lets primitive types pass through untouched
 - gives complex types their own dict at each level
 
+When you use `__serialize__` and `__deserialize__`, you are responsible for converting the object to a `dict` with only native `pickle` types. Do not convert to bytes, `cerial` will do that for you.
+
 ---
 
 ## Handlers
@@ -68,30 +70,28 @@ Each handler:
 
 ### Handler Priority
 
-Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are checked before general ones:
+Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are checked before general ones.
 
 1. function handlers
-2. `logging` handlers
-3. `threading` handlers
-4. `queue` handlers
+2. logging handlers
+3. threading handlers
+4. queue handlers
 5. file handlers
 6. database handlers
 7. network handlers
 8. generator and iterator handlers
 9. subprocess handlers
-10. async handlers
-11. context manager handlers
+10. async handler
+11. context manager handler
 12. module handlers
-13. class object handlers
+13. class object handler
 14. class instance handler
-
-For more info on exactly what is covered under each handler, navigate down to "What Can `cerial` Handle?"
 
 ---
 
-## Central Serializer (``cerial`izer`)
+## Main Serializer (`Cerializer`)
 
-Coordinates the entire process.
+Coordinates the entire serialization process.
 
 ### Serialization Flow
 
@@ -132,7 +132,7 @@ Step 6 is especially important in the quest to serialize any complex object. Som
 
 ## Circular Reference Handling
 
-Objects can reference each other or themselves:
+Objects can reference each other or themselves.
 
 ```python
 obj.self_ref = obj  # self-reference
@@ -140,7 +140,7 @@ obj_a.ref = obj_b   # mutual reference
 obj_b.ref = obj_a
 ```
 
-`cerial` handles this with object ID tracking:
+`cerial` handles this with object ID tracking.
 
 ### During Serialization
 
@@ -149,7 +149,7 @@ obj_b.ref = obj_a
 3. If yes, return a reference marker instead of re-serializing
 4. If no, add to seen set and continue
 
-Reference markers look like:
+Reference markers look like this.
 ```python
 {"__cerial_ref__": 140234567890}
 ```
@@ -234,7 +234,7 @@ new_obj.__dict__.update(state)
 ### Handling Special Cases
 
 - **Nested classes** — stores module and qualname for lookup
-- **Classes in `__main__`** — handled specially (pickle can't normally do this)
+- **Classes in `__main__`** — handled specially by embedding class definitions for reconstruction
 - **Classes with `__slots__`** — iterates over slot names
 - **Classes with both `__dict__` and `__slots__`** — handles both
 
@@ -315,6 +315,8 @@ new_obj.__dict__.update(state)
 - shared memory
 - executors
 
+For a full list of supported types, see the supported-types.md file.
+
 ---
 
 ## Debug and Verbose Modes
@@ -363,7 +365,8 @@ The path tells you exactly where in your nested object the failure occurred.
 - **Complex objects** — handler lookup + state extraction + recursion
 - **Circular references** — handled with O(1) lookup in seen set
 
-`cerial` is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base `pickle`. If you need to serialize complex objects that others can't handle, use `cerial`.
+`cerial` is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base `pickle`. Otherwise, use `cerial`. It is better than `cloudpickle` and `dill` in most cases, other than pure speed with simple functions.
+
 
 ---
 
@@ -372,4 +375,6 @@ The path tells you exactly where in your nested object the failure occurred.
 The serializer is designed for single-threaded use within a single serialize/deserialize call. Each call gets fresh state (seen objects, depth counter, etc.).
 
 If you need to serialize from multiple threads, create separate calls — don't share state between them.
+
+
 

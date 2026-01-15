@@ -619,6 +619,40 @@ python tests/run_all_tests.py
 python tests/run_all_benchmarks.py
 ```
 
+## Update docs
+
+Here is the current progress on the docs:
+
+cerial:
+
+- [ done ] how-to-use.md
+- [ done ] how-it-works.md
+- [ done ] supported-types.md
+
+processing:
+
+- [ done ] processing-how-to-use.md
+- [ done ] processing-how-it-works.md
+
+paths:
+
+- [ done ] paths-how-to-use.md
+- [ done ] paths-how-it-works.md
+
+timing:
+
+- [ done ] timing-how-to-use.md
+- [ done ] timing-how-it-works.md
+
+circuits:
+
+- [ done ] circuits-how-to-use.md
+- [ done ] circuits-how-it-works.md
+
+sk:
+
+- [ done ] sk-how-to-use.md
+- [ done ] sk-how-it-works.md
 
 ## Final additions
 

@@ -70,6 +70,13 @@ result = await async_my_function(args, kwargs)
 result = await my_function.asynced()(args, kwargs)
 ```
 
+*What is a blocking call?*
+
+A blocking call is a function that blocks the current thread from continuing to execute other code.
+
+This includes things like `time.sleep()`, `requests.get()`, `open()`, `read()`, `write()`, ...
+
+
 ### Pre-computed shared state metadata
 
 Classes and functions get precalculated data to work with `suitkaise.processing.Share` instances, saving you time and memory during runtime.
@@ -89,16 +96,16 @@ from suitkaise.sk import sk
 
 @sk
 class MyClass:
-    ...
+    # ...
 
 @sk
 def my_function():
-    ...
+    # ...
 ```
 
 ### `sk()` function
 
-Works on both classes and functions.
+Works on both classes and functions. Does the exact same thing as the `@sk` decorator, but usable during runtime.
 
 ```python
 from suitkaise.sk import sk
@@ -113,6 +120,11 @@ for obj in large_sized_objects:
 - `.has_blocking_calls` - whether the class or function has blocking calls
 
 - `.blocking_methods` - a `dict` of method names to their blocking calls. For functions, this just returns all blocking calls within that function (in the same `dict` format as classes)
+
+```python
+print(MyClass.has_blocking_calls) # True
+print(MyClass.blocking_methods) # {'a_blocking_method': ['time.sleep', 'requests.get', 'open']}
+```
 
 ### Async Usage With A Class
 
@@ -140,19 +152,16 @@ result = fetcher.fetch()
 
 # get an async version of the class
 try:
-    WebpageHTMLFetcher_Async = WebpageHTMLFetcher.asynced()
+    async_fetcher = WebpageHTMLFetcher.asynced()("https://api.example.com")
 except NotAsyncedError:
     print("WebpageHTMLFetcher has no blocking calls")
     raise
 
-async_fetcher = WebpageHTMLFetcher_Async("https://api.example.com")
-
-# retry async call (using asyncio.to_thread) 3 times with a 10 second timeout
-try:
-    result = await async_fetcher.fetch.retry(times=3).timeout(10.0)("https://api.example.com")
-except Exception as e:
-    raise e
+# async call ( using asyncio.to_thread() )
+result = await async_fetcher.fetch("https://api.example.com")
 ```
+
+Modifiers like `retry()`, `timeout()`, `background()`, and `asynced()` are available on every method of a class decorated by `@sk`, including async versions for other modifiers when `.asynced()` is called. They are also available on `sk`-wrapped standalone functions.
 
 ### Async Usage With A Function
 
@@ -167,7 +176,7 @@ def fetch_data(url):
 # regular sync call
 result = fetch_data("https://example.com")
 
-# async version using asyncio.to_thread()
+# async version ( using asyncio.to_thread() )
 result = await fetch_data.asynced()("https://example.com")
 
 # combine modifiers
@@ -186,6 +195,8 @@ except Exception as e:
 Modifiers can be chained in any order without affecting the behavior.
 
 When using `retry()` and `timeout()`, the timeout is applied to each retry attempt, not overall.
+
+`background()` is applied last, running the fully modified function in a background thread.
 
 ```python
 # equivalent

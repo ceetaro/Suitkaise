@@ -1,6 +1,6 @@
 # How `circuits` actually works
 
-`circuits` has no dependencies outside of the standard library (uses `suitkaise.timing` for sleep).
+`circuits` has no dependencies outside of the standard library.
 
 It contains two classes: `Circuit` and `BreakingCircuit`.
 
@@ -8,13 +8,13 @@ It contains two classes: `Circuit` and `BreakingCircuit`.
 
 ## `Circuit` class
 
-An auto-resetting circuit for rate limiting and progressive backoff.
+An auto-resetting circuit that I designed for rate limiting and progressive backoff.
 
 Unlike `BreakingCircuit` (which breaks and stops), `Circuit` sleeps and continues. The counter auto-resets after each sleep, and exponential backoff is applied.
 
 ### `Circuit.__init__()`
 
-Arguments:
+Arguments
 - `num_shorts_to_trip`: Number of shorts before circuit trips and sleeps (int)
 - `sleep_time_after_trip`: Base sleep duration in seconds when circuit trips (float, default `0.0`)
 - `backoff_factor`: Exponential backoff multiplier (float, default `1.0`)
@@ -60,10 +60,10 @@ Starts at `sleep_time_after_trip`, multiplied by `backoff_factor` after each tri
 
 Increments the failure count and trips if limit is reached.
 
-Arguments:
+Arguments
 - `custom_sleep`: Optional override for sleep duration if this short causes a trip (float)
 
-Returns:
+Returns
 - `True` if sleep occurred, `False` otherwise
 
 1. Acquires lock
@@ -76,10 +76,10 @@ Returns:
 
 Immediately trips the circuit, bypassing short counting.
 
-Arguments:
+Arguments
 - `custom_sleep`: Optional override for sleep duration (float)
 
-Returns:
+Returns
 - `True` (always sleeps)
 
 1. Calls `_trip_circuit()` immediately
@@ -197,10 +197,10 @@ Current sleep duration after backoff. Backoff is applied when `reset()` is calle
 
 Increments failure count and breaks the circuit if limit is reached.
 
-Arguments:
+Arguments
 - `custom_sleep`: Optional override for sleep duration if this short causes a break (float)
 
-Returns:
+Returns
 - none
 
 1. Acquires lock
@@ -214,10 +214,10 @@ Returns:
 
 Immediately breaks the circuit.
 
-Arguments:
+Arguments
 - `custom_sleep`: Optional override for sleep duration (float)
 
-Returns:
+Returns
 - none
 
 1. Increments `_total_failures` by 1
@@ -227,7 +227,7 @@ Returns:
 
 Resets the circuit to operational state.
 
-Returns:
+Returns
 - none
 
 1. Acquires lock

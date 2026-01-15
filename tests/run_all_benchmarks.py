@@ -98,7 +98,7 @@ def run_all_benchmarks():
     print(f"{BOLD}{CYAN}║{'BENCHMARKS COMPLETE':^78}║{RESET}")
     print(f"{BOLD}{CYAN}╠{'═'*78}╣{RESET}")
     print(f"{BOLD}{CYAN}║{RESET}  {GREEN}All benchmarks completed!{RESET}{' '*51}{BOLD}{CYAN}║{RESET}")
-    print(f"{BOLD}{CYAN}║{RESET}  {DIM}Total time: {elapsed:.2f}s{RESET}{' '*(65-len(f'{elapsed:.2f}'))}{BOLD}{CYAN}║{RESET}")
+    print(f"{BOLD}{CYAN}║{RESET}  {DIM}Total time: {elapsed:.2f}s{RESET}{' '*(64-len(f'{elapsed:.2f}'))}{BOLD}{CYAN}║{RESET}")
     print(f"{BOLD}{CYAN}╚{'═'*78}╝{RESET}")
     print()
 

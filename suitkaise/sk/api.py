@@ -5,6 +5,7 @@ Provides automatic _shared_meta generation and .asynced() support for user class
 """
 
 from typing import Type, TypeVar, Generic, Callable, Any, Dict, List, Tuple, ParamSpec
+import inspect
 from concurrent.futures import Future
 
 from ._int.analyzer import analyze_class, get_blocking_methods, has_blocking_calls
@@ -21,6 +22,7 @@ from ._int.function_wrapper import (
     create_async_retry_wrapper_v2,
     FunctionTimeoutError,
 )
+from ._int.asyncable import _ModifiableMethod, _AsyncModifiableMethod
 
 
 T = TypeVar('T')
@@ -310,7 +312,6 @@ class Skfunction(Generic[P, R]):
     def _detect_blocking_calls(self) -> List[str]:
         """Detect blocking calls in the function."""
         import ast
-        import inspect
         import textwrap
         
         try:
@@ -643,6 +644,40 @@ def sk(cls_or_func):
             return async_cls
         
         cls.asynced = staticmethod(asynced)
+
+        # Attach modifiers to instance methods
+        for name, member in list(cls.__dict__.items()):
+            if name.startswith("__"):
+                continue
+            if isinstance(member, (staticmethod, classmethod, property)):
+                continue
+            if isinstance(member, _ModifiableMethod):
+                continue
+            if inspect.iscoroutinefunction(member):
+                setattr(
+                    cls,
+                    name,
+                    _AsyncModifiableMethod(member, name=name),
+                )
+                continue
+            if not inspect.isfunction(member):
+                continue
+            try:
+                signature = inspect.signature(member)
+                has_timeout_param = "timeout" in signature.parameters
+            except (TypeError, ValueError):
+                has_timeout_param = False
+            setattr(
+                cls,
+                name,
+                _ModifiableMethod(
+                    member,
+                    None,
+                    name=name,
+                    timeout_error=FunctionTimeoutError,
+                    has_timeout_modifier=not has_timeout_param,
+                ),
+            )
         
         # Return the original class
         return cls
@@ -653,7 +688,6 @@ def sk(cls_or_func):
         
         # Detect blocking calls
         import ast
-        import inspect
         import textwrap
         
         blocking_calls = []

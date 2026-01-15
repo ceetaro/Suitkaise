@@ -1,6 +1,6 @@
-# How to use `skpath`
+# How to use `paths`
 
-`skpath` makes file paths much easier to work with.
+`paths` makes path operations a lot easier.
 
 ## `Skpath` class
 
@@ -8,11 +8,25 @@ Special path object. Automatically detects your project root and uses it to norm
 
 - `Skpath.ap` - absolute path. All slashes are streamlined to `/` for cross-platform compatibility.
 
-"Users/john/Documents/projects/myproject/feature1/file.txt"
+```python
+"/Users/john/Documents/projects/myproject/feature1/file.txt"
+```
 
-- `Skpath.rp` - relative path, relative to project root
+- `Skpath.rp` - path relative to project root
 
+```python
 "myproject/feature1/file.txt"
+```
+
+- `Skpath.platform` - absolute path with platform-native separators (`\` on Windows, `/` elsewhere)
+
+```python
+# mac/linux
+"/Users/john/Documents/projects/myproject/feature1/file.txt"
+
+# windows
+"C:\\Users\\john\\Documents\\projects\\myproject\\feature1\\file.txt"
+```
 
 ```python
 from suitkaise.paths import Skpath
@@ -27,7 +41,7 @@ path = Skpath(Path("feature1/file.txt"))
 path = Skpath("feature1/file.txt")
 ```
 
-Recommend not relying on just on file name, add at least the directory too.
+For more consistent results, do not rely just on the file name.
 ```python
 path = Skpath("file.txt") # DON'T DO THIS!
 ```
@@ -37,6 +51,7 @@ path = Skpath("file.txt") # DON'T DO THIS!
 
 - `ap` - absolute path
 - `rp` - path relative to project root
+- `platform` - absolute path with platform-native separators
 
 Unique to `Skpath`
 
@@ -44,9 +59,8 @@ Unique to `Skpath`
 - `root` - project root as `Skpath` object
 - `root_str` - project root as string (normalized separators)
 - `root_path` - project root as `Path` object
-- `platform` - absolute path with OS-native separators (backslashes on Windows)
 
-Pathlib Compatible
+`pathlib` Compatible
 
 - `name` - complete filename (`"file.txt"` -> `"file.txt"`)
 - `stem` - filename without suffix (`"file.txt"` -> `"file"`)
@@ -126,11 +140,13 @@ path.touch(exist_ok=True)
 
 `Skpath` objects attempt to automatically detect your project root and use it to normalize paths.
 
-- gets rid of issues where 2 people have the same project in different locations
+- Gets rid of issues where 2 people have the same project in different locations
 
-- gets rid of cross-platform file path issues, as the project itself won't change just because of a different operating system.
+- Gets rid of cross-platform file path issues, as the project itself won't change just because of a different operating system.
 
 If the file path given is outside of the project root, `Skpath.rp` will be an empty string `""`. However, all `Skpaths` will still have their absolute path, `Skpath.ap`.
+
+Priority
 
 1. Uses custom root if set via `set_custom_root()`
 2. Uses `setup.sk` file if found walking up directories
@@ -161,30 +177,35 @@ Functions
 - `get_custom_root()` - get the custom project root
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-skpath.set_custom_root("Documents/projects/myproject")
+paths.set_custom_root("Documents/projects/myproject")
 
-current_root = skpath.get_custom_root()
+current_root = paths.get_custom_root()
 
-skpath.clear_custom_root()
+paths.clear_custom_root()
 ```
 
-##### Context Manager
+#### `CustomRoot` Context Manager
+
+Temporarily sets a custom root for a code block.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-with skpath.CustomRoot("Documents/projects/myproject"):
+with paths.CustomRoot("Documents/projects/myproject"):
 
     # normalizes to given custom root
     path = Skpath("feature1/file.txt")
+
+# original root restored
+path = Skpath("feature1/file.txt")
 ```
 
-### Creating a Skpath from an ID
+### Creating an `Skpath` from an ID
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
 id = # the path's id from a previous operation
 
@@ -313,7 +334,7 @@ def process_file(path: AnyPath):
 # path will be None
 process_file() 
 
-# uses given file and converts to Skpath
+# uses given file path, converted to Skpath before being passed
 process_file("myproject/feature1/file.txt") 
 ```
 
@@ -339,14 +360,14 @@ Output when a string was normalized:
 
 ### `get_project_root()`
 
-Arguments:
-- `expected_name`: Expected project root name. If provided, the detected root must match this name.
+Arguments
+- `expected_name` - Expected project root name. If provided, the detected root must match this name.
 
-Returns:
+Returns
 - `Skpath` object pointing to project root.
 
-Raises:
-- `PathDetectionError`: If project root detection fails.
+Raises
+- `PathDetectionError` - If project root detection fails.
 
 
 Get the project root.
@@ -358,9 +379,9 @@ Get the project root.
 3. If not 1 or 2, raises a `PathDetectionError`.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-root = skpath.get_project_root()
+root = paths.get_project_root()
 ```
 
 You can also get the project root like this:
@@ -372,18 +393,18 @@ root = Skpath().root
 
 ### `get_caller_path()`
 
-Returns:
+Returns
 - `Skpath` object pointing to the caller's file.
 
-Raises:
-- `PathDetectionError`: If caller detection fails.
+Raises
+- `PathDetectionError` - If caller detection fails.
 
 Get the path of the file that called the current function.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-caller = skpath.get_caller_path()
+caller = paths.get_caller_path()
 ```
 
 You can also get the caller path like this:
@@ -395,73 +416,73 @@ caller = Skpath()
 
 ### `get_module_path()`
 
-Arguments:
-- `obj`: Object to inspect, module name string, or module object
+Arguments
+- `obj` - Object to inspect, module name string, or module object
 
-Returns:
+Returns
 - `Skpath` object pointing to the module file, or `None` if not found
 
-Raises:
-- `ImportError`: If `obj` is a module name string that cannot be imported
+Raises
+- `ImportError` - If `obj` is a module name string that cannot be imported
 
 Get the path of the module that the given object is defined in.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-path = skpath.get_module_path(UnknownObject)
+path = paths.get_module_path(UnknownObject)
 ```
 
 ### `get_current_dir()`
 
-Returns:
+Returns
 - `Skpath` object pointing to the current directory.
 
 Get the directory of the current calling file.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-path = skpath.get_current_dir()
+path = paths.get_current_dir()
 ```
 
 You can also get the current directory like this:
 ```python
 from suitkaise.paths import Skpath
 
-path = Skpath(path="...").parent
+path = Skpath().parent
 ```
 
 ### `get_cwd()`
 
-Returns:
+Returns
 - `Skpath` object pointing to the current working directory.
 
 Get the current working directory.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-path = skpath.get_cwd()
+path = paths.get_cwd()
 ```
 
 ### `get_id()`
 
-Arguments:
-- `path`: Path to generate ID for
+Arguments
+- `path` - Path to generate ID for
 
-Returns:
+Returns
 - base64url encoded ID string (reversible - can be used to reconstruct the path)
 
 Get the reversible ID of a path. The ID can be used to reconstruct the Skpath later.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-path_id = skpath.get_id(path="myproject/feature1/file.txt")
+path_id = paths.get_id(path="myproject/feature1/file.txt")
 
 # Later, reconstruct the path from the ID
-path = skpath.Skpath(path_id)
+path = paths.Skpath(path_id)
 ```
 
 You can also get the ID like this:
@@ -473,31 +494,31 @@ path_id = Skpath(path="...").id  # id is a property, not a method
 
 ### `get_project_paths()`
 
-Arguments:
-- `root`: Custom root directory (defaults to current project root)
-- `exclude`: Paths to exclude from results.
-- `as_strings`: Return string paths instead of `Skpath` objects (memory efficiency)
-- `use_ignore_files`: Respect .*ignore files (default True)
+Arguments
+- `root` - Custom root directory (defaults to current project root)
+- `exclude` - Paths to exclude from results.
+- `as_strings` - Return string paths instead of `Skpath` objects (memory efficiency)
+- `use_ignore_files` - Respect .*ignore files (default True)
 
-Returns:
+Returns
 - list of paths in the project (`Skpath`s or strings based on `as_strings`)
 
-Raises:
-- `PathDetectionError`: If something goes wrong getting the project root.
+Raises
+- `PathDetectionError` - If something goes wrong getting the project root.
 
 Get all paths in the project as a list. 
 
 This also can automatically ignore all paths that are in `.*ignore` files without requiring you to exclude them yourself.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
 # get all paths (use_ignore_files=True, auto detected root)
-paths = skpath.get_project_paths()
+paths = paths.get_project_paths()
 
 
 # get all paths as strings
-paths = skpath.get_project_paths(as_strings=True)
+paths = paths.get_project_paths(as_strings=True)
 
 
 # exclude some paths (list of AnyPaths)
@@ -506,31 +527,32 @@ unwanted_paths = [
     Path("another/path/i/dont/want"),
     Skpath("yet/another/path/i/dont/want"),
     ]
-paths = skpath.get_project_paths(exclude=unwanted_paths)
+paths = paths.get_project_paths(exclude=unwanted_paths)
 
 # use a custom root to start from a subdirectory
-paths = skpath.get_project_paths(root="myproject/feature1")
+paths = paths.get_project_paths(root="myproject/feature1")
+
 ```
 
 ### `get_project_structure()`
 
-Arguments:
-- `root`: Custom root directory (defaults to current project root) (`AnyPath`)
-- `exclude`: Paths to exclude from results. (`AnyPath` or list of `AnyPaths`)
-- `use_ignore_files`: Respect .*ignore files (default `True`)
+Arguments
+- `root` - Custom root directory (defaults to current project root) (`AnyPath`)
+- `exclude` - Paths to exclude from results. (`AnyPath` or list of `AnyPaths`)
+- `use_ignore_files` - Respect .*ignore files (default `True`)
 
-Returns:
+Returns
 - nested dictionary representing the project structure.
 
-Raises:
-- `PathDetectionError`: If something goes wrong getting the project root.
+Raises
+- `PathDetectionError` - If something goes wrong getting the project root.
 
 Provides a hierarchical representation of your project structure, in dictionary form.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-structure = skpath.get_project_structure()
+structure = paths.get_project_structure()
 ```
 
 ```python
@@ -546,26 +568,27 @@ structure = skpath.get_project_structure()
 
 ### `get_formatted_project_tree()`
 
-Arguments:
-- `root`: Custom root directory (defaults to current project root) (`AnyPath`)
-- `exclude`: Paths to exclude from results. (`AnyPath` or list of `AnyPaths`)
-- `use_ignore_files`: Respect .*ignore files (default `True`)
-- `depth`: Maximum depth of the tree to format (default 3) (`int`)
-- `include_files`: Include files in the tree (default `True`)
+Arguments
+- `root` - Custom root directory (defaults to current project root) (`AnyPath`)
+- `exclude` - Paths to exclude from results. (`AnyPath` or list of `AnyPaths`)
+- `use_ignore_files` - Respect .*ignore files (default `True`)
+- `depth` - Maximum depth of the tree to format (default 3) (`int`)
+- `include_files` - Include files in the tree (default `True`)
 
-Returns:
+Returns
 - string representing the project tree.
 
-Raises:
-- `PathDetectionError`: If something goes wrong getting the project root.
+Raises
+- `PathDetectionError` - If something goes wrong getting the project root.
 
 Returns a readable, formatted string using `│`, `├─`, and `└─` characters to create a tree-like visual hierarchy.
 
 ```python
-from suitkaise import skpath
+from suitkaise import paths
 
-tree = skpath.get_formatted_project_tree()
+tree = paths.get_formatted_project_tree()
 print(tree)
+
 ```
 
 root_directory/
@@ -580,11 +603,14 @@ root_directory/
     ├── main.py
     └── utils/
 
----
-
-## Path Validation Utilities
 
 ### `is_valid_filename()`
+
+Arguments
+- `filename` - The filename to check
+
+Returns
+- `True` if the filename is valid, `False` otherwise
 
 Check if a filename is valid across common operating systems.
 
@@ -604,6 +630,14 @@ Checks for:
 - names ending with space or period
 
 ### `streamline_path()`
+
+Arguments
+- `path` - The path or filename to sanitize
+- `max_length` - Maximum length to truncate to (None = no limit)
+- `replacement_char` - Character to replace invalid chars with (default "_")
+- `lowercase` - Convert to lowercase (default False)
+- `strip_whitespace` - Strip leading/trailing whitespace (default True)
+- `allow_unicode` - Allow unicode characters (default True)
 
 Sanitize a path or filename by removing/replacing invalid characters.
 
@@ -626,11 +660,3 @@ streamline_path("file:name.txt", replacement_char="-")
 streamline_path("файл.txt", allow_unicode=False)
 # "____.txt"
 ```
-
-Arguments:
-- `path`: The path or filename to sanitize
-- `max_length`: Maximum length to truncate to (None = no limit)
-- `replacement_char`: Character to replace invalid chars with (default "_")
-- `lowercase`: Convert to lowercase (default False)
-- `strip_whitespace`: Strip leading/trailing whitespace (default True)
-- `allow_unicode`: Allow unicode characters (default True)

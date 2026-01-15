@@ -829,17 +829,27 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Concurrent session-aware: each thread call starts/stops its own session
-            timer.start()
-            try:
-                result = func(*args, **kwargs)
-                return result
-            finally:
-                # Get elapsed time without recording
-                elapsed = timer.discard()
-                # Only record if above threshold
-                if elapsed >= threshold:
-                    timer.add_time(elapsed)
+            # Avoid nested timing frames on the same timer
+            if timer._has_active_frame():
+                start = perf_counter()
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    elapsed = perf_counter() - start
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
+            else:
+                # Concurrent session-aware: each thread call starts/stops its own session
+                timer.start()
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    # Get elapsed time without recording
+                    elapsed = timer.discard()
+                    # Only record if above threshold
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
         return wrapper
     return decorator
 

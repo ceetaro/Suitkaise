@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 class ProcessTimers:
     """
-    Container for timing lifecycle sections of a Process.
+    Container for timing lifecycle sections of a Skprocess.
     
-    Automatically created when Process starts. Each section timer is populated
+    Automatically created when Skprocess starts. Each section timer is populated
     when that section runs.
     
     The full_run timer aggregates the times from prerun, run, and postrun

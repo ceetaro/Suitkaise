@@ -4,8 +4,9 @@
 
 - uses Python's `multiprocessing` module for subprocess spawning
 - uses `suitkaise.cerial` for serialization of complex objects between processes
-- all lifecycle methods are timed using `suitkaise.sktime.Sktimer`
+- all lifecycle methods are timed using `suitkaise.sktime.Sktimer` (timing module alias)
 - communication between parent and subprocess happens via `multiprocessing.Queue` and `multiprocessing.Event`
+- `Share` uses a coordinator process + `multiprocessing.Manager` to keep a source of truth and synchronize proxy access
 
 ---
 
@@ -13,15 +14,15 @@
 
 `processing` uses a subprocess-based architecture.
 
-The parent process creates the `Process` instance, starts the subprocess, waits for results.
+The parent process creates the `Skprocess` instance, starts the subprocess, waits for results.
 
 The subprocess runs the engine, executing your lifecycle methods.
 
-## Process Lifecycle
+## Skprocess Lifecycle
 
 ### Lifecycle Methods
 
-The `Process` class defines six lifecycle methods that users can override in their inheriting class.
+The `Skprocess` class defines six lifecycle methods that users can override in their inheriting class.
 
 1. `__prerun__()` — called before each run iteration
 2. `__run__()` — required - main work — called each iteration
@@ -62,14 +63,14 @@ cleanup queues and exit
 The run loop stops when any of these conditions are met:
 
 1. `stop_event` is set (via `stop()` or `kill()`)
-2. `config.runs` limit reached (`_current_run >= config.runs`)
-3. `config.join_in` time limit reached (elapsed time since start)
+2. `process_config.runs` limit reached (`_current_run >= process_config.runs`)
+3. `process_config.join_in` time limit reached (elapsed time since start)
 
 ## Serialization
 
 ### How `cerial` is used
 
-`processing` uses another `suitkaise` module, `cerial`, to serialize the entire `Process` instance.
+`processing` uses another `suitkaise` module, `cerial`, to serialize the entire `Skprocess` instance.
 
 Serializes:
 - all user-defined attributes from `__init__`
@@ -80,7 +81,7 @@ This allows complex objects (database connections, loggers, custom classes) to b
 
 ### Flow
 
-1. **Before start()** — `cerial.serialize()` captures the entire Process instance.
+1. **Before start()** — `cerial.serialize()` captures the entire Skprocess instance.
    - `instance.__dict__` (all attributes)
    - class name and lifecycle methods
    - user's custom `__serialize__` if defined
@@ -95,10 +96,10 @@ This allows complex objects (database connections, loggers, custom classes) to b
 
 ### Custom Serialization
 
-If a class defines `__serialize__` and `__deserialize__`, those are called alongside the Process serialization:
+If a class defines `__serialize__` and `__deserialize__`, those are called alongside the Skprocess serialization:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __serialize__(self):
         return {"custom": self.custom_data}
     
@@ -115,7 +116,7 @@ class MyProcess(Process):
 
 ### Using `sktime`
 
-`processing` uses another `suitkaise` module, `sktime`, to time the lifecycle methods.
+`processing` uses another `suitkaise` module, `sktime` (alias of `timing`), to time the lifecycle methods.
 
 `sktime` is a time-tracking module that provides a simple interface for timing code.
 
@@ -126,7 +127,7 @@ The base `Sktimer` class is used to time the lifecycle methods, the same one tha
 When a user defines a lifecycle method, `processing` automatically wraps it to provide timer access:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __run__(self):
         # do work
         pass
@@ -154,7 +155,7 @@ class TimedMethod:
         return getattr(self._process.timers, self._timer_name, None)
 ```
 
-The wrapper is created in `_setup_timed_methods()` during `Process._setup()`.
+The wrapper is created in `_setup_timed_methods()` during `Skprocess._setup()`.
 
 ### How Timing Works
 
@@ -226,13 +227,13 @@ On retry, everything is preserved except the failed timing (discarded via `timer
 if lives_remaining > 0:
     # keep user state and run counter - retry current iteration
     # failed timings already discarded via timer.discard()
-    process.config.lives = lives_remaining
+    process.process_config.lives = lives_remaining
     continue  # retry current iteration
 ```
 
 User state, run counter, and previous times are preserved.
 
-`config.lives` is decremented.
+`process_config.lives` is decremented.
 
 ## Timeout System
 
@@ -257,9 +258,9 @@ Windows — thread-based (fallback):
 Each lifecycle method can have its own timeout.
 
 ```python
-self.config.timeouts.prerun = 5.0   # 5 second timeout
-self.config.timeouts.run = 10.0     # 10 second timeout
-self.config.timeouts.result = 2.0   # 2 second timeout
+self.process_config.timeouts.prerun = 5.0   # 5 second timeout
+self.process_config.timeouts.run = 10.0     # 10 second timeout
+self.process_config.timeouts.result = 2.0   # 2 second timeout
 ```
 
 When timeout is reached, `ProcessTimeoutError` is raised with:
@@ -433,7 +434,7 @@ The `result_queue` is NOT canceled — the parent must call `result()` to get th
 
 ---
 
-## Process Control
+## Skprocess Control
 
 ### start()
 
@@ -504,7 +505,7 @@ The `result_queue` is NOT canceled — the parent must call `result()` to get th
 
 ### In Subprocess
 
-- full Process instance deserialized
+- full Skprocess instance deserialized
 - timers accumulate measurements in memory
 - all state released when subprocess exits
 
@@ -512,28 +513,63 @@ The `result_queue` is NOT canceled — the parent must call `result()` to get th
 
 For large results, consider:
 - streaming to files instead of returning directly
-- using shared memory (`multiprocessing.shared_memory`)
+- using `Share` to store the result in a shared memory location
 - chunking results across multiple runs
 
 ---
 
-## Pool
+## `Pool`
 
 ### Overview
 
 The `Pool` class provides batch parallel processing using multiple worker subprocesses.
 
-Like `Process`, it uses `cerial` for serialization, allowing complex objects and `Process` classes.
+Like `Skprocess`, it uses `cerial` for serialization, allowing complex objects and `Skprocess` classes.
 
-### Methods
+### Methods (by behavior)
 
-`fc = function or class of type ["processing.Process"]`
+`fc` = function or class of type["processing.Skprocess"]
 
-- `map(fc, items)` — blocking, returns `[results]`
-- `imap(fc, items)` — blocking iterator, yields results in order
-- `async_map(fc, items)` — non-blocking, returns `AsyncResult`
-- `unordered_imap(fc, items)` — blocking iterator, yields results as completed
-- `star(fc)` — modifier to unpack tuple arguments
+`workers` controls the maximum number of processes that can work concurrently.
+- `None` (default) = one worker per item (no cap)
+- integer = cap concurrent workers to that count
+
+#### `map(fc, items)`
+
+- Blocking call that returns a list of results in input order
+- For each item, spawns a dedicated worker process
+- Each worker has its own result queue
+
+#### `imap(fc, items)`
+
+- Returns an iterator yielding results in input order
+- Blocks on each `next()` until that specific worker finishes
+- Internally spawns one worker per item (same as `map`)
+
+#### `unordered_imap(fc, items)`
+
+- Returns an iterator yielding results as workers complete
+- Order is based on completion time (fastest first)
+- Internally spawns one worker per item
+
+### What each map does (practical view)
+
+- `map` — full list, ordered, blocks until all items finish
+- `imap` — ordered stream, blocks on each next result
+- `unordered_imap` — completion stream, yields as soon as any finishes
+
+#### `star()`
+
+- Modifier that changes argument passing
+- If the item is a tuple, it is unpacked as `fn(*item)`
+- If the item is not a tuple, it is wrapped as `(item,)`
+- Works with `map/imap/unordered_imap`
+
+#### `close()` / `terminate()`
+
+- `close()` joins all active worker processes (graceful)
+- `terminate()` force-kills all active workers (no cleanup)
+- Both clear the internal `_active_processes` list
 
 ### How It Works
 
@@ -545,21 +581,66 @@ results = pool.map(fc, [1, 2, 3, 4])
 ```
 
 Internally, Pool:
-1. Creates worker subprocesses
-2. Serializes function and arguments with `cerial`
-3. Distributes work across workers
-4. Collects and deserializes results
-5. Returns results in the same order as input
+1. Serializes the function/class once with `cerial`
+2. Serializes each item (or arg tuple for `star()`)
+3. Spawns one worker process per item, up to the `workers` cap at a time
+   - if `workers=None`, all items spawn at once (per-item model)
+   - if `workers` is set, workers are started in batches as others finish
+4. Worker deserializes, executes, and sends `{type, data}` via a result queue
+5. Parent joins workers, deserializes results, and returns them in order (or completion order for `unordered_imap`)
 
-### Process Classes in Pool
+### Result Ordering
 
-You can use `Process` subclasses in Pool:
+- `map()` returns results in input order
+- `imap()` yields results in input order (blocking on each next item)
+- `unordered_imap()` yields as each worker completes (fastest first)
+
+### Timeouts and Errors
+
+- A timeout applies per worker: the parent `join()`s each worker with that timeout
+- If a worker exceeds timeout, it is terminated and a `TimeoutError` is raised
+- Worker errors are serialized and re-raised in the parent
+- If error serialization fails, the worker sends a serialized `RuntimeError` with traceback text
+
+### Modifiers
+
+Each of `map/imap/unordered_imap` exposes:
+- `.timeout(seconds)` — timeout per worker
+- `.background()` — run in shared thread pool, returns `Future`
+- `.asynced()` — run in `asyncio.to_thread`, returns coroutine
+
+Timeout modifiers are layered:
+- `map.timeout(...)` applies timeout in the parent join loop
+- `imap.timeout(...)` / `unordered_imap.timeout(...)` apply timeout to each worker join
+
+### Internal Flow (implementation detail)
+
+`Pool` uses a simple per-item worker model:
+
+1. `_spawn_workers()` serializes `fc` once and each item separately
+2. Each worker runs `_pool_worker(serialized_fn, serialized_item, is_star, result_queue)`
+3. The worker deserializes with `cerial`, executes, and puts:
+   - `{type: "result", data: <serialized result>}` or
+   - `{type: "error", data: <serialized exception>}`
+4. Parent collects each queue in order (`map/imap`) or by completion (`unordered_imap`)
+
+### `Skprocess` inside Pool
+
+If the target is a `Skprocess` class:
+- the worker instantiates it with the item/tuple args
+- the lifecycle runs inline in the worker (no extra subprocess)
+- full `process_config` behavior is respected (runs, lives, timeouts, join_in)
+- lifecycle timers are created and updated as normal
+
+### Skprocess Classes in Pool
+
+You can use `Skprocess` subclasses in Pool:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __init__(self, value):
         self.value = value
-        self.config.runs = 3
+        self.process_config.runs = 3
     
     def __run__(self):
         self.value *= 2
@@ -572,7 +653,193 @@ results = pool.map(MyProcess, [1, 2, 3, 4])
 # → [8, 16, 24, 32] (each ran 3 times, doubling each time)
 ```
 
-When using `Process` classes:
-- full lifecycle is respected (`config.runs`, `config.lives`, `stop()`)
-- each instance runs as it normally would
+When using `Skprocess` classes:
+- full lifecycle is respected (`process_config.runs`, `process_config.lives`, `stop()`)
+- each instance runs as it normally would, not just one run
+- classes that do not set `process_config.runs` are expected to `stop()` themselves, `Pool` won't stop them for you
 - results collected via `__result__()`
+
+---
+
+## `Share`
+
+`Share` uses a coordinator process to manage shared state and proxies.
+
+- Objects with `_shared_meta` are wrapped in proxies so method calls and property reads are synchronized.
+- User class instances without `_shared_meta` are auto-wrapped via `Skclass` to generate metadata.
+- Primitives and containers without metadata are stored directly in the coordinator.
+
+The coordinator maintains a source of truth and routes reads/writes from all processes, so shared state stays consistent without manual locks in user code.
+
+### Coordinator Process
+
+The coordinator runs in its own process and uses:
+- `multiprocessing.Manager` for the command queue and source-of-truth store
+- atomic shared-memory counters (`multiprocessing.Value`) for pending/completed flags
+  - keys are registered per attribute (with local lookup tables in each process)
+
+When you assign `share.foo = obj`:
+1. `Share` registers the object name and stores a serialized snapshot in `source_store`
+2. If it has `_shared_meta`, a proxy is created for method/property interception
+3. If not, a plain object is stored and reads fetch the whole object
+
+### Command Format
+
+Each queued command is a tuple:
+```
+(object_name, method_name, serialized_args, serialized_kwargs, written_attrs)
+```
+
+- `serialized_args/kwargs` are `cerial` bytes
+- `written_attrs` is derived from `_shared_meta` (method writes)
+- All command processing is serialized in the coordinator process
+
+### Counters
+
+`Share` uses a “pending/completed” counter per attribute:
+- `pending` increments before a write is queued (atomic counter)
+- `completed` increments after the write is applied (atomic counter)
+- A read captures `target = completed + pending` at snapshot time
+- The read waits until `completed >= target`
+- This prevents read starvation and avoids waiting on new writes that arrive later
+
+
+`Share` uses an **atomic counter registry** separate from the Manager dicts:
+
+- Each counter is a `multiprocessing.Value(ctypes.c_int)`
+- Counters live in shared memory and are protected by their own internal locks
+- Each process keeps a **local cache** of counter handles (fast lookup)
+- The registry itself (mapping key → counter handle) is stored in a Manager dict
+  so counters can be created lazily and discovered by any process
+
+Key format:
+
+- `object_name.attr_name` → (`pending_name`, `completed_name`)
+
+
+Registration:
+
+1. When an object is assigned to `Share`, `_shared_meta` is used to collect attrs
+2. The coordinator registers counters for all read/write attrs
+3. Any later dynamic attr write will **auto-create** its counter on first use
+
+Write path:
+
+1. Proxy calls `increment_pending(key)` (atomic)
+2. Command is enqueued
+3. Coordinator applies the write
+4. Coordinator calls `update_after_write(key)`:
+   - pending = max(pending - 1, 0)
+   - completed += 1
+
+Read path:
+
+1. Proxy determines relevant keys (read attrs)
+2. Captures target = completed + pending for each key
+3. Waits until completed >= target for each key
+4. Reads the object from `source_store`
+
+Why two counters:
+
+- `pending` says "writes in flight"
+- `completed` acts as a monotonically increasing commit index
+- snapshotting `target = completed + pending` guarantees no starvation
+  because later writes do not change the captured target
+
+### Proxy Behavior
+
+`_ObjectProxy` intercepts all access:
+- **Method calls** queue a command and return immediately
+- **Property reads** wait for pending writes, then read from source of truth
+- **Attribute writes** queue a `__setattr__` command
+
+The proxy never mutates the object directly; it always goes through the coordinator.
+
+### `Share` Execution Flow (full chart)
+
+```
+PROCESS A (worker)                         COORDINATOR PROCESS
+──────────────────────────                ──────────────────────────
+share.obj.method(x)
+    │
+    ├─ _MethodProxy.__call__()
+    │    ├─ increment_pending(key)
+    │    └─ queue_command(
+    │         obj_name, method_name,
+    │         serialize(args/kwargs),
+    │         written_attrs
+    │       )
+    │
+    └─ return immediately
+                                      ┌────────────────────────────┐
+                                      │ command_queue.get(timeout) │
+                                      └──────────────┬─────────────┘
+                                                     │
+                                                     ▼
+                                             deserialize args/kwargs
+                                                     │
+                                                     ▼
+                                       fetch object from source_store
+                                                     │
+                                                     ▼
+                                        apply method / setattr locally
+                                                     │
+                                                     ▼
+                                       serialize updated object state
+                                                     │
+                                                     ▼
+                                       store back into source_store
+                                                     │
+                                                     ▼
+                                   increment completed counters (writes)
+                                                     │
+                                                     ▼
+                                             loop for next command
+
+
+PROCESS B (reader)
+──────────────────
+value = share.obj.prop
+    │
+    ├─ _ObjectProxy._read_property()
+    │    ├─ determine read_attrs from _shared_meta
+    │    ├─ wait_for_read(keys)
+    │    └─ coordinator.get_object(obj_name)
+    │
+    └─ return getattr(obj, prop)
+```
+
+### Coordinator Execution Flow
+
+1. Dequeue next command (with a short poll timeout)
+2. Deserialize args/kwargs via `cerial`
+3. Fetch mirror object from `source_store` and deserialize it
+4. Invoke method or setattr on mirror
+5. Serialize updated object back into `source_store`
+6. Increment completed counters for the written attributes
+7. Loop until stop event is set
+
+### Reads (properties and attrs)
+
+Proxy reads are conservative:
+- For properties, `_shared_meta` identifies read attributes
+- For plain attrs, the proxy waits on all pending keys for the object
+- After waiting, it fetches the latest object and reads the attr/property
+
+### What is “shared”
+
+Only the serialized state is shared. Each read returns a fresh deserialized copy.
+Method calls are fire-and-forget; they queue a command and return immediately.
+
+### Failure Behavior
+
+- If the coordinator fails, `has_error` becomes `True`
+- Proxies will still attempt reads/writes, but state will stop updating
+- `Share.stop()` signals the coordinator to exit
+
+### Lifecycle
+
+- `Share()` auto-starts the coordinator process
+- `share.start()` restarts it if you previously stopped it
+- `share.stop()` / `share.exit()` shuts it down gracefully
+- `share.clear()` clears all shared objects and counters

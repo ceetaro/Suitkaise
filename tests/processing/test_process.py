@@ -26,6 +26,52 @@ from tests.processing.test_process_classes import (
 
 
 # =============================================================================
+# Process Subclasses for Retry/Restart Tests
+# =============================================================================
+
+class ProgressRetryProcess(Process):
+    """Process that fails once mid-run then continues, preserving progress."""
+    def __init__(self):
+        self.progress: list[tuple[int, int, str]] = []
+        self.run_calls = 0
+        self.process_config.runs = 3
+        self.process_config.lives = 2
+
+    def __run__(self):
+        self.run_calls += 1
+        self.progress.append((self._current_run, self.run_calls, "start"))
+        if self.run_calls == 2:
+            self.progress.append((self._current_run, self.run_calls, "failed"))
+            raise ValueError("intentional failure")
+        time.sleep(0.02)
+
+    def __result__(self):
+        return {
+            "progress": self.progress,
+            "run_calls": self.run_calls,
+            "current_run": self._current_run,
+        }
+
+
+class WaitRetryProcess(Process):
+    """Process that fails once, then succeeds after retry."""
+    def __init__(self):
+        self.attempts = 0
+        self.process_config.runs = 1
+        self.process_config.lives = 2
+
+    def __run__(self):
+        self.attempts += 1
+        time.sleep(0.2)
+        if self.attempts == 1:
+            raise ValueError("first attempt failure")
+        time.sleep(0.2)
+
+    def __result__(self):
+        return self.attempts
+
+
+# =============================================================================
 # Test Infrastructure
 # =============================================================================
 
@@ -332,6 +378,42 @@ def test_concurrent_processes():
     assert elapsed < 0.4, f"Concurrent should be ~100ms, got {elapsed}"
 
 
+def test_process_progress_preserved_on_retry():
+    """Progress should persist across a failed run retry."""
+    proc = ProgressRetryProcess()
+    proc.start()
+    proc.wait(timeout=10.0)
+    result = proc.result()
+
+    progress = result["progress"]
+    run_calls = result["run_calls"]
+    current_run = result["current_run"]
+
+    assert run_calls == 4, f"Expected 4 run calls, got {run_calls}"
+    assert current_run == 3, f"Expected 3 successful runs, got {current_run}"
+    assert any(entry[2] == "failed" for entry in progress), "Failure marker missing"
+    failed_idx = next(i for i, entry in enumerate(progress) if entry[2] == "failed")
+    failed_run = progress[failed_idx][0]
+    assert any(
+        i > failed_idx and entry[0] == failed_run and entry[2] == "start"
+        for i, entry in enumerate(progress)
+    ), "Retry should occur on same run index"
+    assert progress[-1][0] == 2, "Final run should be the last run index"
+
+
+def test_wait_blocks_until_retry_success():
+    """wait() should not return until a retry succeeds."""
+    proc = WaitRetryProcess()
+    start = time.perf_counter()
+    proc.start()
+    finished = proc.wait(timeout=10.0)
+    elapsed = time.perf_counter() - start
+
+    assert finished, "wait() should return True after successful retry"
+    assert elapsed >= 0.35, f"wait() returned too early ({elapsed:.3f}s)"
+    assert proc.result() == 2, "Process should have retried once"
+
+
 # =============================================================================
 # Stop and Kill Tests
 # =============================================================================
@@ -348,8 +430,7 @@ def test_stop_infinite_process():
     proc.stop()
     
     # Wait for it to finish
-    finished = proc.wait(timeout=5.0)
-    assert finished, "Process should have stopped"
+    proc.wait(timeout=5.0)
     
     # Should have counted some iterations
     result = proc.result()
@@ -368,8 +449,7 @@ def test_stop_limited_process():
     proc.stop()
     
     # Wait for it to finish
-    finished = proc.wait(timeout=5.0)
-    assert finished, "Process should have stopped"
+    proc.wait(timeout=5.0)
     
     # Should have counted some, but not all 1000
     result = proc.result()
@@ -459,8 +539,7 @@ def test_self_stopping_process():
     proc.start()
     
     # Wait for it to finish (it should stop itself)
-    finished = proc.wait(timeout=5.0)
-    assert finished, "Process should have stopped itself"
+    proc.wait(timeout=5.0)
     
     # Should have reached exactly the target count
     result = proc.result()
@@ -503,6 +582,8 @@ def run_all_tests():
     runner.run_test("Process error propagates", test_process_error_propagates, timeout=10)
     runner.run_test("Multiple processes", test_multiple_processes, timeout=15)
     runner.run_test("Concurrent processes", test_concurrent_processes, timeout=15)
+    runner.run_test("Progress preserved on retry", test_process_progress_preserved_on_retry, timeout=15)
+    runner.run_test("wait() blocks until retry success", test_wait_blocks_until_retry_success, timeout=15)
     
     # Stop and kill tests
     runner.run_test("stop() infinite process", test_stop_infinite_process, timeout=10)

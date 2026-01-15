@@ -136,10 +136,7 @@ class _ObjectProxy:
         """
         # Get all pending counter keys for this object
         # This is conservative but safe
-        all_keys = [
-            key for key in self._coordinator._pending_counts.keys()
-            if key.startswith(f"{self._object_name}.")
-        ]
+        all_keys = self._coordinator.get_object_keys(self._object_name)
         
         if all_keys:
             self._coordinator.wait_for_read(all_keys, timeout=10.0)

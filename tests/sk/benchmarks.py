@@ -9,6 +9,8 @@ Performance benchmarks for:
 
 import sys
 import time as stdlib_time
+import time
+import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
@@ -114,6 +116,15 @@ def complex_function(a, b, c=0, d=0, e=0):
     return result + e
 
 
+class BlockingCounter:
+    def __init__(self):
+        self.value = 0
+    
+    def slow_increment(self):
+        time.sleep(0)
+        self.value += 1
+
+
 # =============================================================================
 # Skclass Benchmarks
 # =============================================================================
@@ -206,6 +217,61 @@ def benchmark_skfunction_modifiers():
     return runner
 
 
+def benchmark_skfunction_modifier_calls():
+    """Measure modifier execution overhead."""
+    runner = BenchmarkRunner("Skfunction Modifier Execution Benchmarks")
+    
+    def quick_add(a, b):
+        return a + b
+    
+    def blocking_noop():
+        time.sleep(0)
+        return 1
+    
+    sk_quick = Skfunction(quick_add)
+    sk_block = Skfunction(blocking_noop)
+    
+    retry_once = sk_quick.retry(times=1)
+    timeout_once = sk_quick.timeout(1.0)
+    background_call = sk_quick.background()
+    
+    async_call = sk_block.asynced()
+    loop = asyncio.new_event_loop()
+    
+    def run_retry():
+        return retry_once(1, 2)
+    
+    def run_timeout():
+        return timeout_once(1, 2)
+    
+    def run_background():
+        future = background_call(1, 2)
+        return future.result()
+    
+    def run_asynced():
+        return loop.run_until_complete(async_call())
+    
+    runner.bench("Skfunction.retry(times=1)", 10_000, run_retry)
+    runner.bench("Skfunction.timeout(1.0)", 10_000, run_timeout)
+    runner.bench("Skfunction.background()", 5_000, run_background)
+    runner.bench("Skfunction.asynced()", 5_000, run_asynced)
+    
+    loop.close()
+    
+    return runner
+
+
+def benchmark_skclass_asynced():
+    """Measure Skclass.asynced() creation overhead."""
+    runner = BenchmarkRunner("Skclass.asynced() Benchmarks")
+    
+    SkBlocking = Skclass(BlockingCounter)
+    
+    runner.bench("Skclass.asynced()", 5_000, SkBlocking.asynced)
+    
+    return runner
+
+
 # =============================================================================
 # @sk Decorator Benchmarks
 # =============================================================================
@@ -274,9 +340,11 @@ def run_all_benchmarks():
         benchmark_skclass_wrap(),
         benchmark_skclass_instantiate(),
         benchmark_skclass_method_call(),
+        benchmark_skclass_asynced(),
         benchmark_skfunction_wrap(),
         benchmark_skfunction_call(),
         benchmark_skfunction_modifiers(),
+        benchmark_skfunction_modifier_calls(),
         benchmark_sk_decorator(),
         benchmark_vs_raw(),
     ]

@@ -62,10 +62,15 @@ write flags
 - multiprocessing.Value or shared_memory for raw bytes
 - one flag per writable attr, pre-allocated at setup
 - direct memory read for checking (~10-50ns vs ~50-100μs for Manager dict)
-- keyed by "object_name.attr_name" in local lookup dict
-- set to True when a write to that attr is queued
+- keyed by "object_name.attr_name.pending" and "object_name.attr_name.completed" in local lookup dict
+- "object_name.attr_name.pending" increments before a write is queued
+- "object_name.attr_name.completed" increments after the write is applied
+- a read captures "target = completed + pending" at snapshot time
+- the read waits until "completed >= target"
+- this prevents read starvation and avoids waiting on new writes that arrive later
 - cleared by coordinator after commit
 - used by read barrier to block stale reads
+
 
 atomic flag options
 - multiprocessing.Value(ctypes.c_bool, False) - simple, but must exist before fork

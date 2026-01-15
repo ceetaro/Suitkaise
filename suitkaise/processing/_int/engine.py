@@ -24,7 +24,7 @@ def _engine_main(
     Main entry point for the subprocess engine.
     
     This function runs in the child process and orchestrates:
-    - Deserializing the Process object
+    - Deserializing the Skprocess object
     - Running the lifecycle (prerun → run → postrun)
     - Handling timeouts
     - Managing lives/retry on errors
@@ -32,7 +32,7 @@ def _engine_main(
     - Sending results back to parent
     
     Args:
-        serialized_process: Process object serialized with cerial
+        serialized_process: Skprocess object serialized with cerial
         stop_event: Event to check for stop signal from parent
         result_queue: Queue to send results/errors back to parent
         original_state: Original serialized state for retries (lives system)
@@ -189,7 +189,7 @@ def _run_section_timed(
     Run a lifecycle section with timing and error handling.
     
     Args:
-        process: The Process instance
+        process: The Skprocess instance
         method_name: Name of the method to call (e.g., '__run__')
         timer_name: Name of the timer slot (e.g., 'run')
         error_class: Error class to wrap exceptions in

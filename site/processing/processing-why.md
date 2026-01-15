@@ -59,7 +59,7 @@ Oh, wait...
 
 Classes exist.
 
-`processing` includes the `Process` class.
+`processing` includes the `Skprocess` class.
 
 Inherit from this class like you would inherit `ABC` from `abc`.
 
@@ -70,24 +70,24 @@ class MyAbstractClass(ABC):
 ```
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 ```
 
 And get access to an entire lifecycle of methods to easily separate your code into sensible pieces.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
         # super().__init__() is called automatically for you
         # setup your process here
         # initialize attributes
-        # configure Process attributes
+        # configure Skprocess attributes
 
     def __prerun__(self):
 
@@ -124,14 +124,14 @@ class MyProcess(Process):
 Best part? Once you code the class with at least the `__run__` method, you can just use super simple syntax to run it.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class DoubleThisNumber(Process):
+class DoubleThisNumber(Skprocess):
 
     def __init__(self, starting_num, number_of_doubles):
 
         self.starting_num = 1
-        self.config.runs = number_of_doubles
+        self.process_config.runs = number_of_doubles
 
 
     def __run__(self):
@@ -171,14 +171,14 @@ None of this is enjoyable, per se.
 
 ### `tell()` and `listen()`
 
-`tell()` and `listen()` are methods you inherit from `Process` that allow you to send and receive data between the parent and subprocess.
+`tell()` and `listen()` are methods you inherit from `Skprocess` that allow you to send and receive data between the parent and subprocess.
 
 It's as simple as this.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
         
@@ -229,12 +229,12 @@ So, if something ran for 1000 runs and then crashed, it won't have to rerun the 
 If the process fails too many times and runs out of `lives`, it will automatically call `__error__()` and return an error, plus whatever else you want to return as a result in the failing state.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
-        self.config.lives = 3
+        self.process_config.lives = 3
 ```
 
 (end of dropdown)
@@ -270,9 +270,9 @@ I don't like having to do this. I'm assuming you don't either.
 Say you implement the lifecycle methods in your process.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __prerun__(self):
         # ...
@@ -332,21 +332,21 @@ Then, you have to set up timers manually track if the timeout was reached.
 
 It sounds simple, but in reality it is anything but.
 
-To save you time, `Process` allows you to easily set timeouts for each lifecycle method in one line by updating the `config` attribute.
+To save you time, `Skprocess` allows you to easily set timeouts for each lifecycle method in one line by updating the `process_config` attribute.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
-        self.config.timeouts.prerun = 5.0
-        self.config.timeouts.run = 10.0
-        self.config.timeouts.postrun = 5.0
-        self.config.timeouts.onfinish = 10.0
-        self.config.timeouts.result = 2.0
-        self.config.timeouts.error = 1.0
+        self.process_config.timeouts.prerun = 5.0
+        self.process_config.timeouts.run = 10.0
+        self.process_config.timeouts.postrun = 5.0
+        self.process_config.timeouts.onfinish = 10.0
+        self.process_config.timeouts.result = 2.0
+        self.process_config.timeouts.error = 1.0
 ```
 
 This will automatically raise a `ProcessTimeoutError` if the timeout is reached as well.
@@ -358,7 +358,7 @@ Error handling
 
 We both know that error handling is a necessary evil.
 
-So `Process` raises custom errors depending on the section that the error occurred in, wrapping the original error so you can see what actually happened when.
+So `Skprocess` raises custom errors depending on the section that the error occurred in, wrapping the original error so you can see what actually happened when.
 
 They all inherit from a `ProcessError` class, making it easy to catch all process errors with a single `except ProcessError` block.
 

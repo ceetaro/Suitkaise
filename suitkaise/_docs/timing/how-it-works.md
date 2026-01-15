@@ -616,10 +616,10 @@ These work exactly the same as the ones in the `Sktimer` class.
 Decorator that dedicates a `Sktimer` instance to the function it decorates, timing the function's execution every time it is called.
 
 Arguments
-- `timer_instance` - an optional `Sktimer` instance to use
+- `timer` - an optional `Sktimer` instance to use
 - `threshold` - minimum elapsed time to record (default 0.0)
 
-If `timer_instance` is provided, the decorator will use the provided `Sktimer` instance.
+If `timer` is provided, the decorator will use the provided `Sktimer` instance.
 
 Otherwise, it will create a new `Sktimer` instance, dedicated to the function it decorates.
 
@@ -634,7 +634,7 @@ def my_function():
     pass
 ```
 
-### Mode 1: Explicit timer (`timer_instance` provided)
+### Mode 1: Explicit timer (`timer` provided)
 
 When you pass a `Sktimer` to the decorator, it uses that timer directly.
 
@@ -643,17 +643,17 @@ When you pass a `Sktimer` to the decorator, it uses that timer directly.
     - creates a wrapper function around your original function
 
 2. At call time (every time the decorated function runs):
-    - calls `timer_instance.start()` before the function runs
+    - calls `timer.start()` before the function runs
     - runs your original function
-    - calls `timer_instance.discard()` to get elapsed time
-    - if elapsed >= threshold, calls `timer_instance.add_time(elapsed)`
+    - calls `timer.discard()` to get elapsed time
+    - if elapsed >= threshold, calls `timer.add_time(elapsed)`
     - returns the function's result
 
 This is useful when you want multiple functions to share the same timer for combined statistics.
 
 ### Mode 2: Auto-created global function timer
 
-When `timer_instance` is `None` (the default), the decorator creates and manages a timer for you.
+When `timer` is `None` (the default), the decorator creates and manages a timer for you.
 
 1. At decoration time:
     - uses Python's `inspect` module to figure out where the function is defined

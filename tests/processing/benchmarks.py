@@ -11,7 +11,8 @@ import time as stdlib_time
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.processing import Process, Pool
+from suitkaise.processing import Skprocess, Pool, Share
+from suitkaise.timing import Sktimer
 
 
 # =============================================================================
@@ -60,8 +61,11 @@ class BenchmarkRunner:
 # Test Processes
 # =============================================================================
 
-class NoopProcess(Process):
+class NoopProcess(Skprocess):
     """Minimal process for overhead testing."""
+    def __init__(self):
+        self.process_config.runs = 1
+
     def __run__(self):
         pass
     
@@ -69,11 +73,12 @@ class NoopProcess(Process):
         return None
 
 
-class ComputeProcess(Process):
+class ComputeProcess(Skprocess):
     """Process that does some computation."""
     def __init__(self, n):
         self.n = n
         self._result = None
+        self.process_config.runs = 1
     
     def __run__(self):
         total = 0
@@ -85,13 +90,28 @@ class ComputeProcess(Process):
         return self._result
 
 
+class EchoProcess(Skprocess):
+    """Process that round-trips tell/listen data."""
+    def __init__(self, runs: int = 1):
+        self.process_config.runs = runs
+        self._result = None
+    
+    def __run__(self):
+        data = self.listen()
+        self.tell(data)
+        self._result = data
+    
+    def __result__(self):
+        return self._result
+
+
 # =============================================================================
 # Process Spawn Benchmarks
 # =============================================================================
 
 def benchmark_process_spawn():
     """Measure process spawn overhead."""
-    runner = BenchmarkRunner("Process Spawn Benchmarks")
+    runner = BenchmarkRunner("Skprocess Spawn Benchmarks")
     
     # Single process spawn
     iterations = 10
@@ -103,7 +123,7 @@ def benchmark_process_spawn():
         proc.result()
     elapsed = stdlib_time.perf_counter() - start
     
-    runner.bench_timed("Single Process spawn+run", iterations, elapsed)
+    runner.bench_timed("Single Skprocess spawn+run", iterations, elapsed)
     
     return runner
 
@@ -132,6 +152,151 @@ def benchmark_pool_map():
     return runner
 
 
+def benchmark_pool_imap():
+    """Measure Pool.imap performance."""
+    runner = BenchmarkRunner("Pool.imap Benchmarks")
+    
+    pool = Pool(workers=4)
+    inputs = list(range(8))
+    
+    iterations = 5
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        list(pool.imap(ComputeProcess, inputs))
+    elapsed = stdlib_time.perf_counter() - start
+    
+    runner.bench_timed("Pool.imap(8 items)", iterations * len(inputs), elapsed)
+    
+    return runner
+
+
+def benchmark_pool_unordered_imap():
+    """Measure Pool.unordered_imap performance."""
+    runner = BenchmarkRunner("Pool.unordered_imap Benchmarks")
+    
+    pool = Pool(workers=4)
+    inputs = list(range(8))
+    
+    iterations = 5
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        list(pool.unordered_imap(ComputeProcess, inputs))
+    elapsed = stdlib_time.perf_counter() - start
+    
+    runner.bench_timed("Pool.unordered_imap(8 items)", iterations * len(inputs), elapsed)
+    
+    return runner
+
+
+def benchmark_pool_star():
+    """Measure Pool.star() performance."""
+    runner = BenchmarkRunner("Pool.star Benchmarks")
+    
+    pool = Pool(workers=4)
+    inputs = [(i,) for i in range(8)]
+    
+    iterations = 5
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        pool.star().map(ComputeProcess, inputs)
+    elapsed = stdlib_time.perf_counter() - start
+    
+    runner.bench_timed("Pool.star().map(8 items)", iterations * len(inputs), elapsed)
+    
+    return runner
+
+
+def benchmark_process_methods():
+    """Measure process method overhead."""
+    runner = BenchmarkRunner("Skprocess Method Benchmarks")
+    
+    iterations = 5
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        proc = NoopProcess()
+        proc.start()
+        proc.wait()
+        proc.result()
+    elapsed = stdlib_time.perf_counter() - start
+    
+    runner.bench_timed("Skprocess start/wait/result", iterations, elapsed)
+    
+    return runner
+
+
+# =============================================================================
+# tell/listen Benchmarks
+# =============================================================================
+
+def benchmark_tell_listen():
+    """Measure tell/listen round-trip throughput."""
+    runner = BenchmarkRunner("tell/listen Benchmarks")
+    
+    iterations = 10
+    proc = EchoProcess(runs=iterations)
+    
+    start = stdlib_time.perf_counter()
+    proc.start()
+    for i in range(iterations):
+        proc.tell(i)
+        proc.listen()
+    proc.wait()
+    elapsed = stdlib_time.perf_counter() - start
+    
+    runner.bench_timed("tell+listen roundtrip", iterations, elapsed)
+    
+    return runner
+
+
+# =============================================================================
+# Share Benchmarks
+# =============================================================================
+
+def benchmark_share_primitives():
+    """Measure Share set/get overhead for primitives."""
+    runner = BenchmarkRunner("Share Primitive Benchmarks")
+    
+    iterations = 100
+    with Share() as share:
+        start = stdlib_time.perf_counter()
+        for i in range(iterations):
+            share.counter = i
+        elapsed = stdlib_time.perf_counter() - start
+        runner.bench_timed("Share set int", iterations, elapsed)
+        
+        share.counter = 0
+        start = stdlib_time.perf_counter()
+        for _ in range(iterations):
+            _ = share.counter
+        elapsed = stdlib_time.perf_counter() - start
+        runner.bench_timed("Share get int", iterations, elapsed)
+    
+    return runner
+
+
+def benchmark_share_proxy():
+    """Measure Share proxy overhead for suitkaise objects."""
+    runner = BenchmarkRunner("Share Proxy Benchmarks")
+    
+    iterations = 50
+    with Share() as share:
+        share.timer = Sktimer()
+        
+        start = stdlib_time.perf_counter()
+        for _ in range(iterations):
+            share.timer.add_time(1.0)
+        elapsed = stdlib_time.perf_counter() - start
+        runner.bench_timed("Share proxy add_time", iterations, elapsed)
+        
+        start = stdlib_time.perf_counter()
+        for _ in range(iterations):
+            _ = share.timer.mean
+        elapsed = stdlib_time.perf_counter() - start
+        runner.bench_timed("Share proxy mean", iterations, elapsed)
+    
+    return runner
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -147,7 +312,14 @@ def run_all_benchmarks():
     
     runners = [
         benchmark_process_spawn(),
+        benchmark_process_methods(),
+        benchmark_tell_listen(),
         benchmark_pool_map(),
+        benchmark_pool_imap(),
+        benchmark_pool_unordered_imap(),
+        benchmark_pool_star(),
+        benchmark_share_primitives(),
+        benchmark_share_proxy(),
     ]
     
     for runner in runners:

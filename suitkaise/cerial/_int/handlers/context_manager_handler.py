@@ -74,6 +74,10 @@ class ContextManagerHandler(Handler):
         if isinstance(obj, types.GeneratorType):
             return False
         
+        # Skip custom __serialize__/__deserialize__ objects (ClassInstanceHandler)
+        if hasattr(obj, '__serialize__') and hasattr(type(obj), '__deserialize__'):
+            return False
+        
         # This is a custom context manager - handle it
         return True
     

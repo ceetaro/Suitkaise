@@ -35,8 +35,8 @@ class QueueHandler(Handler):
     type_name = "queue"
     
     def can_handle(self, obj: Any) -> bool:
-        """Check if object is a queue.Queue."""
-        return isinstance(obj, queue.Queue)
+        """Check if object is a queue.Queue or queue.SimpleQueue."""
+        return isinstance(obj, (queue.Queue, queue.SimpleQueue))
     
     def extract_state(self, obj: queue.Queue) -> Dict[str, Any]:
         """
@@ -53,13 +53,26 @@ class QueueHandler(Handler):
         # Determine specific queue type
         queue_type_name = type(obj).__name__
         
-        # Get maxsize
-        maxsize = obj.maxsize
-        
-        # Non-destructive snapshot: access internal queue
-        # queue.Queue uses a collections.deque internally as .queue
-        with obj.mutex:  # Lock the queue to get consistent snapshot
-            items = list(obj.queue)  # Copy the deque contents
+        # SimpleQueue doesn't expose maxsize or a mutex/queue attribute
+        if isinstance(obj, queue.SimpleQueue):
+            maxsize = 0
+            items = []
+            # Snapshot by draining non-blocking, then restore
+            while True:
+                try:
+                    items.append(obj.get_nowait())
+                except Exception:
+                    break
+            for item in items:
+                obj.put(item)
+        else:
+            # Get maxsize
+            maxsize = obj.maxsize
+            
+            # Non-destructive snapshot: access internal queue
+            # queue.Queue uses a collections.deque internally as .queue
+            with obj.mutex:  # Lock the queue to get consistent snapshot
+                items = list(obj.queue)  # Copy the deque contents
         
         return {
             "queue_type": queue_type_name,
@@ -79,7 +92,9 @@ class QueueHandler(Handler):
         queue_type = state["queue_type"]
         maxsize = state["maxsize"]
         
-        if queue_type == "LifoQueue":
+        if queue_type == "SimpleQueue":
+            q = queue.SimpleQueue()
+        elif queue_type == "LifoQueue":
             q = queue.LifoQueue(maxsize=maxsize)
         elif queue_type == "PriorityQueue":
             q = queue.PriorityQueue(maxsize=maxsize)

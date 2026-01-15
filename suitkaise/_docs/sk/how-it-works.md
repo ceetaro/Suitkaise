@@ -10,7 +10,7 @@
 
 ## Overview
 
-The `sk` module provides two main capabilities:
+The `sk` module provides two main capabilities.
 
 1. **Blocking Call Detection** — analyzes source code to find blocking operations
 2. **Async Wrapping** — creates async versions of blocking code
@@ -69,11 +69,11 @@ The visitor walks the AST and collects all matching call patterns into a list.
 
 ### Class Analysis
 
-For classes, `analyze_class()` performs additional work:
+For classes, `analyze_class()` performs additional work.
 
 1. Iterates through all methods
 2. Analyzes each method for blocking calls
-3. Generates `_shared_meta` for Share compatibility
+3. Generates `_shared_meta` for `Share` compatibility
 4. Returns both the metadata and blocking method mapping
 
 ```python
@@ -104,13 +104,13 @@ The analyzer generates `_shared_meta` by detecting which instance attributes eac
 
 Uses AST analysis to find:
 
-**Writes** — assignments to `self.attribute`:
+**Writes** — assignments to `self.attribute`
 ```python
 def increment(self):
     self.value += 1  # writes to 'value'
 ```
 
-**Reads** — access to `self.attribute` without assignment:
+**Reads** — access to `self.attribute` without assignment
 ```python
 def get_double(self):
     return self.value * 2  # reads from 'value'
@@ -130,7 +130,7 @@ _shared_meta = {
 }
 ```
 
-This metadata is used by the Share system for synchronization.
+This metadata is used by the `Share` system for synchronization.
 
 ---
 
@@ -159,7 +159,7 @@ def create_async_class(original_class, blocking_methods):
 
 ### Async Method Wrapper
 
-Each blocking method is wrapped to run in a thread:
+Each blocking method is wrapped to run in a thread.
 
 ```python
 async def async_wrapper(self, *args, **kwargs):
@@ -170,7 +170,7 @@ async def async_wrapper(self, *args, **kwargs):
 
 ### `create_async_wrapper()` for Functions
 
-Similar to class methods, but for standalone functions:
+Similar to class methods, but for standalone functions.
 
 ```python
 def create_async_wrapper(func):
@@ -206,7 +206,8 @@ def create_retry_wrapper(func, times, delay, backoff_factor, exceptions):
     return wrapper
 ```
 
-The `backoff_factor` multiplier increases sleep time between attempts:
+The `backoff_factor` multiplier increases sleep time between attempts.
+
 - attempt 1: fails, sleep 1.0s (initial delay)
 - attempt 2: fails, sleep 2.0s (1.0 × 2.0)
 - attempt 3: fails, sleep 4.0s (2.0 × 2.0)
@@ -214,7 +215,7 @@ The `backoff_factor` multiplier increases sleep time between attempts:
 
 ### Async Retry
 
-The async version uses `asyncio.sleep()` instead:
+The async version uses `asyncio.sleep()` instead.
 
 ```python
 async def async_wrapper(*args, **kwargs):
@@ -229,7 +230,7 @@ async def async_wrapper(*args, **kwargs):
 
 ### `create_timeout_wrapper()`
 
-For synchronous functions, uses threading with a timeout:
+For synchronous functions, uses threading with a timeout.
 
 ```python
 def create_timeout_wrapper(func, seconds):
@@ -262,7 +263,7 @@ Note: The daemon thread continues running after timeout. This is a limitation of
 
 ### Async Timeout
 
-Uses `asyncio.wait_for()` for cleaner cancellation:
+Uses `asyncio.wait_for()` for cleaner cancellation.
 
 ```python
 async def async_wrapper(*args, **kwargs):
@@ -281,7 +282,7 @@ async def async_wrapper(*args, **kwargs):
 
 ### `create_background_wrapper()`
 
-Uses `concurrent.futures.ThreadPoolExecutor` to run functions in background threads:
+Uses `concurrent.futures.ThreadPoolExecutor` to run functions in background threads.
 
 ```python
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -305,7 +306,7 @@ The returned `Future` object provides:
 
 ## `Skclass` Wrapper
 
-The `Skclass` wrapper manages all class-related functionality:
+The `Skclass` wrapper manages all class-related functionality.
 
 ```python
 class Skclass:
@@ -316,6 +317,8 @@ class Skclass:
         
         # attach metadata to original class
         cls._shared_meta = self._shared_meta
+        # wrap instance methods to expose modifiers
+        _attach_method_modifiers(cls)
     
     def __call__(self, *args, **kwargs):
         # creates instance of original class
@@ -334,9 +337,15 @@ class Skclass:
         return self._async_class
 ```
 
+`_attach_method_modifiers()` wraps instance methods with modifier descriptors:
+- sync methods get `.retry()`, `.timeout()`, `.background()`, `.asynced()`
+- async methods get `.retry()`, `.timeout()`, `.background()` (Task), `.asynced()`
+
+For methods or functions that already have a timeout parameter, the timeout modifier is not exposed.
+
 ### Caching
 
-The async class is cached on first creation to avoid re-analysis:
+The async class is cached on first creation to avoid re-analysis.
 
 ```python
 SkCounter = Skclass(Counter)
@@ -385,12 +394,12 @@ class Skfunction:
     def asynced(self):
         if not self._blocking_calls:
             raise NotAsyncedError(...)
-        return AsyncSkfunction(self._func, _config=self._config.copy(), ...)
+        return async_wrapper(self._func, _config=self._config.copy(), ...)
 ```
 
 ### Config-Based Execution
 
-When `__call__` is invoked, all modifiers are applied in a consistent order regardless of how they were chained:
+When `__call__` is invoked, all modifiers are applied in a consistent order regardless of how they were chained.
 
 ```python
 sk_func.retry(3).timeout(10)(args)
@@ -405,7 +414,8 @@ sk_func.timeout(10).retry(3)(args)
 # order of chaining doesn't matter
 ```
 
-This design ensures predictable behavior:
+This design ensures predictable behavior.
+
 - timeouts apply to each retry attempt, not the total operation
 - retry happens after timeout failures
 - `background()` runs the fully modified function in a thread
@@ -414,7 +424,7 @@ This design ensures predictable behavior:
 
 ## `@sk` Decorator
 
-The `@sk` decorator attaches functionality directly to the original class/function:
+The `@sk` decorator attaches functionality directly to the original class/function.
 
 ### For Classes
 
@@ -460,13 +470,11 @@ def sk(cls_or_func):
         return func  # return original function
 ```
 
-The key difference from `Skclass`/`Skfunction` is that `@sk` returns the original object with methods attached, not a wrapper.
-
 ---
 
 ## Thread Safety
 
-The `sk` module is designed for use from any thread:
+The `sk` module is designed for use from any thread.
 
 - analysis happens once at decoration/wrapping time
 - async class creation is idempotent (safe to call multiple times)
@@ -485,13 +493,7 @@ Functions/methods without available source (built-ins, C extensions, lambda with
 
 ### Static Analysis
 
-Detection is based on static AST analysis, not runtime behavior:
-
-```python
-def tricky():
-    func = getattr(requests, 'get')
-    func("https://example.com")  # not detected (dynamic call)
-```
+Detection is based on static AST analysis, not runtime behavior.
 
 ### Timeout Thread Cleanup
 

@@ -248,6 +248,30 @@ def test_pool_map_parallel():
     assert elapsed < 0.5, f"Should be parallel (< 200ms sequential), got {elapsed}"
 
 
+def test_pool_workers_cap():
+    """workers should cap concurrent processes (None spawns all)."""
+    inputs = [1, 2, 3, 4]
+    
+    pool_capped = Pool(workers=1)
+    start = time.perf_counter()
+    results_capped = pool_capped.map(SlowDoubleProcess, inputs)
+    elapsed_capped = time.perf_counter() - start
+    
+    pool_uncapped = Pool(workers=None)
+    start = time.perf_counter()
+    results_uncapped = pool_uncapped.map(SlowDoubleProcess, inputs)
+    elapsed_uncapped = time.perf_counter() - start
+    
+    assert results_capped == [2, 4, 6, 8]
+    assert results_uncapped == [2, 4, 6, 8]
+    
+    # capped should be noticeably slower than uncapped
+    assert elapsed_capped > elapsed_uncapped + 0.05, (
+        f"Expected capped pool to be slower. capped={elapsed_capped:.3f}s "
+        f"uncapped={elapsed_uncapped:.3f}s"
+    )
+
+
 def test_pool_map_ordering():
     """Pool.map should preserve order of results."""
     pool = Pool(workers=4)
@@ -331,6 +355,7 @@ def run_all_tests():
     runner.run_test("Pool.map single", test_pool_map_single, timeout=10)
     runner.run_test("Pool.map large", test_pool_map_large, timeout=30)
     runner.run_test("Pool.map parallel", test_pool_map_parallel, timeout=15)
+    runner.run_test("Pool workers cap", test_pool_workers_cap, timeout=20)
     runner.run_test("Pool.map ordering", test_pool_map_ordering, timeout=15)
     
     # Pool.star().map tests

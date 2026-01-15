@@ -17,7 +17,7 @@ Usage:
     from suitkaise.paths import Skpath
     from suitkaise.circuits import Circuit
     from suitkaise.cerial import serialize, deserialize
-    from suitkaise.processing import Process, Pool
+    from suitkaise.processing import Skprocess, Pool
 """
 
 # ============================================================================
@@ -109,7 +109,7 @@ from .cerial import (
 # ============================================================================
 from .processing import (
     # Main classes
-    Process,
+    Skprocess,
     Pool,
     Share,
     
@@ -182,7 +182,7 @@ __all__ = [
     "DeserializationError",
     
     # Processing
-    "Process",
+    "Skprocess",
     "Pool",
     "Share",
     "ProcessError",

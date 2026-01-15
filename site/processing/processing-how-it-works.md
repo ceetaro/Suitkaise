@@ -27,15 +27,15 @@ text = "
 
 `processing` uses a subprocess-based architecture.
 
-The parent process creates the `Process` instance, starts the subprocess, waits for results.
+The parent process creates the `Skprocess` instance, starts the subprocess, waits for results.
 
 The subprocess runs the engine, executing your lifecycle methods.
 
-## Process Lifecycle
+## Skprocess Lifecycle
 
 ### Lifecycle Methods
 
-The `Process` class defines six lifecycle methods that users can override in their inheriting class.
+The `Skprocess` class defines six lifecycle methods that users can override in their inheriting class.
 
 1. `__prerun__()` — Called before each run iteration
 2. `__run__()` — REQUIRED - main work — called each iteration
@@ -76,14 +76,14 @@ cleanup queues and exit
 The run loop stops when any of these conditions are met:
 
 1. `stop_event` is set (via `stop()` or `kill()`)
-2. `config.runs` limit reached (`_current_run >= config.runs`)
-3. `config.join_in` time limit reached (elapsed time since start)
+2. `process_config.runs` limit reached (`_current_run >= process_config.runs`)
+3. `process_config.join_in` time limit reached (elapsed time since start)
 
 ## Serialization
 
 ### How `cerial` is used
 
-`processing` uses another `suitkaise` module, `cerial`, to serialize the entire `Process` instance.
+`processing` uses another `suitkaise` module, `cerial`, to serialize the entire `Skprocess` instance.
 
 Serializes:
 - All user-defined attributes from `__init__`
@@ -94,7 +94,7 @@ This allows complex objects (database connections, loggers, custom classes) to b
 
 ### Flow
 
-1. **Before start()** — `cerial.serialize()` captures the entire Process instance.
+1. **Before start()** — `cerial.serialize()` captures the entire Skprocess instance.
    - `instance.__dict__` (all attributes)
    - Class name and lifecycle methods
    - User's custom `__serialize__` if defined
@@ -109,10 +109,10 @@ This allows complex objects (database connections, loggers, custom classes) to b
 
 ### Custom Serialization
 
-If a class defines `__serialize__` and `__deserialize__`, those are called alongside the Process serialization:
+If a class defines `__serialize__` and `__deserialize__`, those are called alongside the Skprocess serialization:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __serialize__(self):
         return {"custom": self.custom_data}
     
@@ -140,7 +140,7 @@ The base `Timer` class is used to time the lifecycle methods, the same one that 
 When a user defines a lifecycle method, `processing` automatically wraps it to provide timer access:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __run__(self):
         # do work
         pass
@@ -168,7 +168,7 @@ class TimedMethod:
         return getattr(self._process.timers, self._timer_name, None)
 ```
 
-The wrapper is created in `_setup_timed_methods()` during `Process._setup()`.
+The wrapper is created in `_setup_timed_methods()` during `Skprocess._setup()`.
 
 ### How Timing Works
 
@@ -240,13 +240,13 @@ On retry, everything is preserved except the failed timing (discarded via `timer
 if lives_remaining > 0:
     # Keep user state and run counter - retry current iteration
     # Failed timings already discarded via timer.discard()
-    process.config.lives = lives_remaining
+    process.process_config.lives = lives_remaining
     continue  # retry current iteration
 ```
 
 User state, run counter, and previous times are preserved.
 
-`config.lives` is decremented.
+`process_config.lives` is decremented.
 
 ## Timeout System
 
@@ -271,9 +271,9 @@ Windows — Thread-based (fallback):
 Each lifecycle method can have its own timeout.
 
 ```python
-self.config.timeouts.prerun = 5.0   # 5 second timeout
-self.config.timeouts.run = 10.0     # 10 second timeout
-self.config.timeouts.result = 2.0   # 2 second timeout
+self.process_config.timeouts.prerun = 5.0   # 5 second timeout
+self.process_config.timeouts.run = 10.0     # 10 second timeout
+self.process_config.timeouts.result = 2.0   # 2 second timeout
 ```
 
 When timeout is reached, `ProcessTimeoutError` is raised with:
@@ -447,7 +447,7 @@ The `result_queue` is NOT canceled — the parent must call `result()` to get th
 
 ---
 
-## Process Control
+## Skprocess Control
 
 ### start()
 
@@ -512,13 +512,13 @@ The `result_queue` is NOT canceled — the parent must call `result()` to get th
 
 ### In Parent Process
 
-- Process instance kept in memory for result retrieval
+- Skprocess instance kept in memory for result retrieval
 - Queue holds serialized result until retrieved
 - Timers transferred from subprocess after completion
 
 ### In Subprocess
 
-- Full Process instance deserialized
+- Full Skprocess instance deserialized
 - Timers accumulate measurements in memory
 - All state released when subprocess exits
 
@@ -537,11 +537,11 @@ For large results, consider:
 
 The `Pool` class provides batch parallel processing using multiple worker subprocesses.
 
-Like `Process`, it uses `cerial` for serialization, allowing complex objects and `Process` classes.
+Like `Skprocess`, it uses `cerial` for serialization, allowing complex objects and `Skprocess` classes.
 
 ### Methods
 
-`fc = function or class of type ["processing.Process"]`
+`fc = function or class of type ["processing.Skprocess"]`
 
 - `map(fc, items)` — Blocking, returns `[results]`
 - `imap(fc, items)` — Blocking iterator, yields results in order
@@ -565,15 +565,15 @@ Internally, Pool:
 4. Collects and deserializes results
 5. Returns results in the same order as input
 
-### Process Classes in Pool
+### Skprocess Classes in Pool
 
-You can use `Process` subclasses in Pool:
+You can use `Skprocess` subclasses in Pool:
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __init__(self, value):
         self.value = value
-        self.config.runs = 3
+        self.process_config.runs = 3
     
     def __run__(self):
         self.value *= 2
@@ -586,7 +586,7 @@ results = pool.map(MyProcess, [1, 2, 3, 4])
 # → [8, 16, 24, 32] (each ran 3 times, doubling each time)
 ```
 
-When using `Process` classes:
-- Full lifecycle is respected (`config.runs`, `config.lives`, `stop()`)
+When using `Skprocess` classes:
+- Full lifecycle is respected (`process_config.runs`, `process_config.lives`, `stop()`)
 - Each instance runs as it normally would
 - Results collected via `__result__()`

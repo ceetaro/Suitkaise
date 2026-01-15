@@ -14,6 +14,8 @@ import multiprocessing
 from multiprocessing import Process, Event
 from multiprocessing.managers import SyncManager
 from typing import Any, Dict, Optional
+
+from .primitives import _AtomicCounterRegistry
 import time
 import traceback
 
@@ -45,12 +47,8 @@ class _Coordinator:
         # Shared primitives - all use Manager for cross-process access
         self._command_queue = self._manager.Queue()
         
-        # Write tracking with completion counters (prevents read starvation)
-        # pending_counts: how many writes are currently queued (goes up and down)
-        # completed_counts: how many writes have finished (monotonically increasing)
-        self._pending_counts = self._manager.dict()    # key -> int
-        self._completed_counts = self._manager.dict()  # key -> int
-        self._counter_lock = self._manager.Lock()
+        # Write tracking with atomic counters (prevents read starvation)
+        self._counter_registry = _AtomicCounterRegistry(self._manager)
         
         self._source_store = self._manager.dict()  # object_name -> serialized bytes
         self._source_lock = self._manager.Lock()
@@ -66,7 +64,7 @@ class _Coordinator:
         # Configuration
         self._poll_timeout = 0.1  # How long to wait for commands
     
-    def register_object(self, object_name: str, obj: Any) -> None:
+    def register_object(self, object_name: str, obj: Any, attrs: set[str] | None = None) -> None:
         """
         Register an object for the coordinator to manage.
         
@@ -85,6 +83,9 @@ class _Coordinator:
         
         if object_name not in list(self._object_names):
             self._object_names.append(object_name)
+        
+        if attrs:
+            self._counter_registry.register_keys(object_name, attrs)
     
     def get_object(self, object_name: str) -> Optional[Any]:
         """
@@ -148,11 +149,7 @@ class _Coordinator:
         Returns:
             New pending count.
         """
-        with self._counter_lock:
-            current = self._pending_counts.get(key, 0)
-            new_value = current + 1
-            self._pending_counts[key] = new_value
-            return new_value
+        return self._counter_registry.increment_pending(key)
     
     def get_read_target(self, key: str) -> int:
         """
@@ -170,10 +167,8 @@ class _Coordinator:
         Returns:
             Target completion count to wait for.
         """
-        with self._counter_lock:
-            completed = self._completed_counts.get(key, 0)
-            pending = self._pending_counts.get(key, 0)
-            return completed + pending
+        targets = self._counter_registry.get_read_targets([key])
+        return targets.get(key, 0)
     
     def wait_for_read(self, keys: list[str], timeout: float = 1.0) -> bool:
         """
@@ -191,30 +186,26 @@ class _Coordinator:
         Returns:
             True if all attrs are safe to read, False if timeout.
         """
-        # Capture targets for all keys atomically
-        with self._counter_lock:
-            targets = {}
-            for key in keys:
-                completed = self._completed_counts.get(key, 0)
-                pending = self._pending_counts.get(key, 0)
-                targets[key] = completed + pending
-        
-        # Wait for each key to reach its target
-        start = time.perf_counter()
-        for key, target in targets.items():
-            while True:
-                with self._counter_lock:
-                    completed = self._completed_counts.get(key, 0)
-                
-                if completed >= target:
-                    break
-                
-                if time.perf_counter() - start > timeout:
-                    return False
-                
-                time.sleep(0.0001)  # 100μs
-        
-        return True
+        return self._counter_registry.wait_for_read(keys, timeout=timeout)
+
+    def get_object_keys(self, object_name: str) -> list[str]:
+        """Get all registered counter keys for an object."""
+        return self._counter_registry.keys_for_object(object_name)
+
+    def clear(self) -> None:
+        """Clear all registered objects and counters."""
+        with self._source_lock:
+            self._source_store.clear()
+        try:
+            self._object_names[:] = []
+        except Exception:
+            try:
+                self._object_names.clear()
+            except Exception:
+                pass
+        self._counter_registry.reset()
+        # Clear coordinator-side mirrors
+        self._command_queue.put(("__clear__", None, None, None, None))
     
     def start(self) -> None:
         """
@@ -232,9 +223,7 @@ class _Coordinator:
             target=_coordinator_main,
             args=(
                 self._command_queue,
-                self._pending_counts,
-                self._completed_counts,
-                self._counter_lock,
+                self._counter_registry,
                 self._source_store,
                 self._source_lock,
                 self._stop_event,
@@ -271,7 +260,11 @@ class _Coordinator:
             self._process.terminate()
             self._process.join(timeout=1.0)
             return False
-        
+        # Cleanup shared-memory counters after stopping
+        try:
+            self._counter_registry.reset()
+        except Exception:
+            pass
         return True
     
     def kill(self) -> None:
@@ -304,9 +297,7 @@ class _Coordinator:
 
 def _coordinator_main(
     command_queue,
-    pending_counts,
-    completed_counts,
-    counter_lock,
+    counter_registry: _AtomicCounterRegistry,
     source_store,
     source_lock,
     stop_event: Event,
@@ -349,6 +340,10 @@ def _coordinator_main(
             # Unpack command
             object_name, method_name, serialized_args, serialized_kwargs, written_attrs = command
             
+            if object_name == "__clear__":
+                mirrors.clear()
+                continue
+            
             # Deserialize args/kwargs
             args = cerial.deserialize(serialized_args)
             kwargs = cerial.deserialize(serialized_kwargs)
@@ -364,10 +359,7 @@ def _coordinator_main(
             
             if mirror is None:
                 # Object not found, update counters and skip
-                _update_counters_after_write(
-                    pending_counts, completed_counts, counter_lock,
-                    object_name, written_attrs
-                )
+                _update_counters_after_write(counter_registry, object_name, written_attrs)
                 continue
             
             # Execute the method on the mirror
@@ -384,10 +376,7 @@ def _coordinator_main(
                 source_store[object_name] = serialized
             
             # Update counters: decrement pending, increment completed
-            _update_counters_after_write(
-                pending_counts, completed_counts, counter_lock,
-                object_name, written_attrs
-            )
+            _update_counters_after_write(counter_registry, object_name, written_attrs)
     
     except Exception as e:
         # Fatal error in coordinator loop
@@ -397,9 +386,7 @@ def _coordinator_main(
 
 
 def _update_counters_after_write(
-    pending_counts,
-    completed_counts,
-    counter_lock,
+    counter_registry: _AtomicCounterRegistry,
     object_name: str,
     written_attrs: list[str],
 ) -> None:
@@ -416,14 +403,6 @@ def _update_counters_after_write(
         object_name: Name of the shared object.
         written_attrs: List of attr names that were written.
     """
-    with counter_lock:
-        for attr in written_attrs:
-            key = f"{object_name}.{attr}"
-            
-            # Decrement pending
-            pending = pending_counts.get(key, 0)
-            pending_counts[key] = max(0, pending - 1)
-            
-            # Increment completed
-            completed = completed_counts.get(key, 0)
-            completed_counts[key] = completed + 1
+    for attr in written_attrs:
+        key = f"{object_name}.{attr}"
+        counter_registry.update_after_write(key)

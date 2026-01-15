@@ -1,46 +1,54 @@
 # How to use `processing`
 
-`processing` provides a much simpler way to run Python code in subprocesses. 
+`processing` provides a much simpler way to run Python code across multiple processes. 
 
-Designed to make using multiple processes really easy.
+It contains 3 features -- `Skprocess`, `Share`, and `Pool`.
 
-By inheriting from the `Process` class, you can create a well organized process in a class structure.
+`Skprocess` turns complicated process code into a simple class structure.
+
+`Share` allows you to share data between processes with ease.
+
+`Pool` is for quick and flexible batch processing.
+
+All 3 of them are built with `cerial`, a custom engine that handles an expansive range of objects that `pickle`, `cloudpickle`, and even `dill` cannot.
+
+
+## `Skprocess`
+
+By inheriting from the `Skprocess` class, you can create a well organized process in a class structure.
 
 Since `processing` uses `cerial` (another `suitkaise` module) as its serializer, you can create these process classes with essentially any object you want.
 
-You can also use the `Pool` class for batch processing.
-
-`Pool` also uses `cerial` for serialization, so you can use it with any object you want, and it also allows you to use `Process` inheriting classes instead of just functions.
-
-No more `PicklingError: Can't serialize object` errors when you start up your process!
+No more `PicklingError: Can't serialize object` errors when you start up your process.
 
 - no more manual serialization
 - no more queue management
 - lifecycle methods for setup and teardown including error handling
 - built in timing
 - automatic retries with `lives` system
+- automatically supports `Share`
 
-## Lifecycle Methods
+### Lifecycle Methods
 
-Classes that inherit from `Process` have access to 6 lifecycle methods.
+Classes that inherit from `Skprocess` have access to 6 lifecycle methods.
 
 These methods are what run the actual process when it is created.
 
-Additionally, `__init__` is modified to automatically call `super().__init__()` for you.
+Additionally, `__init__` is modified to automatically call internal setup for you.
 
-In order for `Process` inheriting classes to run correctly, you must implement the `__run__` method.
+In order for `Skprocess` inheriting classes to run correctly, you must implement the `__run__` method.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
-        # super().__init__() is called automatically for you
+        # internal setup runs automatically for you
         # setup your process here
         # initalize attributes
-        # configure Process attributes
+        # configure Skprocess attributes
 
 
     def __prerun__(self):
@@ -51,7 +59,7 @@ class MyProcess(Process):
         # read files
 
 
-    def __run__(self): # required
+    def __run__(self): # REQUIRED
 
         # this is the main part
         # you can just write your code here
@@ -73,7 +81,7 @@ class MyProcess(Process):
         # send emails or do other actions
 
 
-    def __result__(self):
+    def __result__(self): # If you don't define this, your process will always return None
 
         # this returns the result of the process
         # don't have to worry about confusing returns
@@ -84,12 +92,12 @@ class MyProcess(Process):
     def __error__(self):
 
         # this is __result__() when an error occurs
-
+        # allows for custom return behavior when an error occurs
 ```
 
-## Methods
+### Methods
 
-### `start()`
+#### `start()`
 
 Starts the process.
 
@@ -98,7 +106,7 @@ p = MyProcess()
 p.start()
 ```
 
-### `wait()`
+#### `wait()`
 
 Blocks until the process finishes.
 
@@ -112,9 +120,27 @@ p.wait()
 something_else()
 ```
 
-### `stop()`
+```python
+# with timeout - returns False if timeout reached
+finished = p.wait(timeout=10.0)
+```
+
+
+##### `sk` Modifiers
+
+```python
+# async - returns coroutine for await
+finished = await p.wait.asynced()()
+```
+
+`wait()` does not support `retry()`, `timeout()`, or `background()` modifiers.
+
+
+#### `stop()`
 
 Signals to the subprocess to finish its current run and clean up. 
+
+The subprocess can also call `stop()` itself!
 
 Does not block (so you can stop other processes without having to wait)
 
@@ -133,8 +159,9 @@ p.stop()
 p.wait()
 ```
 
+Subprocess stops when it encounters a `self.stop()` call from either side.
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
@@ -146,7 +173,7 @@ class MyProcess(Process):
             # ...  
 ```
 
-### `kill()`
+#### `kill()`
 
 Forcefully terminates the process immediately without cleanup.
 
@@ -156,6 +183,7 @@ Do not use this unless something goes wrong (like a process hanging).
 - does not finish current run
 - does not call `__onfinish__()`
 - does not call `__result__()` or `__error__()`
+- does not add a result for the parent to retrieve
 
 ```python
 p = MyProcess()
@@ -166,9 +194,9 @@ p.kill() # immediate termination
 # p.result() will be None
 ```
 
-### `tell()`
+#### `tell()`
 
-Sends data to the other process.
+Sends data to the other process using `cerial` serialization.
 
 If the other process calls `listen()`, it will receive the data from `tell()`.
 
@@ -185,18 +213,16 @@ p.wait()
 ```
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
         self.tell(("i have found a corrupt file", "corrupt_file.txt"))
 ```
 
-### `listen()`
+#### `listen()`
 
 Blocks until data is received from the other process.
-
-Optional timeout.
 
 ```python
 corrupt_files = []
@@ -204,23 +230,43 @@ corrupt_files = []
 p = MyProcess()
 p.start()
 
-data = p.listen(timeout=1.0)
+data = p.listen()
 
 if data[0] == "i have found a corrupt file":
     corrupt_files.append(data[1])
 ```
 
 ```python
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __run__(self):
 
         command = self.listen(timeout=5.0)
 
         if not command:
-            raise ProcessTimeoutError("No command received")
+            raise TimeoutError("No command received")
         else:
             run_command(command)
+```
+
+```python
+# with timeout - returns None if timeout reached
+data = p.listen(timeout=5.0)
+```
+
+
+##### `sk` Modifiers
+
+`background()`
+
+```python
+# background - returns Future immediately
+future = p.listen.background()()
+data = future.result()  # blocks here
+
+
+# async - returns coroutine for await
+data = await p.listen.asynced()()
 ```
 
 ### `result()`
@@ -242,48 +288,64 @@ except ProcessError as e:
     print(f"{e}")
 ```
 
+#### `sk` Modifiers
+
+```python
+# with timeout - raises ResultTimeoutError if exceeded
+data = p.result.timeout(10.0)()
+
+
+# background - returns Future immediately
+future = p.result.background()()
+data = future.result()  # blocks here
+
+
+# async - returns coroutine for await
+data = await p.result.asynced()()
+```
+
+`result()` does not support `retry()`.
+
 ## Configuration
 
-`Process` also has a `config` attribute that allows you to configure the process in the inheriting class.
+`Skprocess` also has a `process_config` attribute that allows you to configure the process in the inheriting class.
 
-The config can only be updated in the `__init__()` method.
+The config can only be updated in the `__init__()` method, and it already exists before your `__init__()` runs.
 
 All values assigned in the code block below are the defaults.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
-    # can only be updated IN __INIT__
+    # can ONLY be updated in __init__
     def __init__(self):
 
         # none = infinite number of runs
-        self.config.runs = None
+        self.process_config.runs = None
 
         # none = no time limit before auto-joining
-        self.config.join_in = None
+        self.process_config.join_in = None
 
         # 1 = no retries
-        self.config.lives = 1
+        self.process_config.lives = 1
 
         # none = no timeout
-        self.config.timeouts.prerun = None
-        self.config.timeouts.run = None
-        self.config.timeouts.postrun = None
-        self.config.timeouts.onfinish = None
-        self.config.timeouts.result = None
-        self.config.timeouts.error = None
+        self.process_config.timeouts.prerun = None
+        self.process_config.timeouts.run = None
+        self.process_config.timeouts.postrun = None
+        self.process_config.timeouts.onfinish = None
+        self.process_config.timeouts.result = None
+        self.process_config.timeouts.error = None
 ```
-
-Setting any of these numbers to zero or lower will reset them to the default value.
 
 ## Timing
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
 
     def __init__(self):
 
@@ -327,27 +389,29 @@ result_timer = p.__result__.timer
 error_timer = p.__error__.timer
 
 # adds prerun, run, and postrun times together
-full_run_timer = p.timer
+full_run_timer = p.process_timer
 ```
 
-The `p.timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun__` method timers into one value, and records that value. It does this every iteration/run.
+The `process_timer` adds up the times from the `__prerun__`, `__run__`, and `__postrun__` method timers into one value, and records that value. It does this every iteration/run.
 
-All timers are `suitkaise.sktime.Sktimer` objects, and function exactly the same.
+All timers are `suitkaise.timing.Sktimer` objects, and function exactly the same.
 
 Timers will not be accessible unless you define their respective lifecycle methods yourself.
 
 ## `lives` system
 
-Setting `self.config.lives` to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.
+Setting `self.process_config.lives` to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.
+
+Retries restart from end of the latest successful run, not from the beginning.
 
 ```python
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 
-class MyProcess(Process):
+class MyProcess(Skprocess):
     def __init__(self):
 
         # 3 attempts total
-        self.config.lives = 3
+        self.process_config.lives = 3
 ```
 
 When a process needs to retry, it retries the current run starting from `__prerun__`. (Does not fully reset to run 0)
@@ -369,7 +433,7 @@ All errors inherit from a `ProcessError` class, and wrap the actual error that h
 
 Base class for all process errors.
 
-If an error occurs outside of one of the inherited `Process` methods, it will be wrapped in a `ProcessError`.
+If an error occurs outside of one of the inherited `Skprocess` methods, it will be wrapped in a `ProcessError`.
 
 ### Error Classes
 
@@ -383,11 +447,13 @@ If an error occurs outside of one of the inherited `Process` methods, it will be
 
 - `ResultError` - error raised when an error occurs in the `__result__` method.
 
+- `ErrorHandlerError` - error raised when an error occurs in the `__error__` method itself.
+
 ### Timeout Errors
 
-If a timeout occurs, a `ProcessTimeoutError` will be raised. It contains the section name, timeout value, and current run number.
+If a lifecycle timeout occurs, a `ProcessTimeoutError` will be raised. It contains the section name, timeout value, and current run number.
 
-### Error Examples
+If a modifier timeout occurs via `result().timeout(...)`, a `ResultTimeoutError` will be raised. Pool timeouts raise `TimeoutError`.
 
 ```text
 Traceback (most recent call last):
@@ -424,38 +490,107 @@ except ProcessError as e:
     print(f"Run number: {e.current_run}")
 
 # output:
-# process error: Error in __run__ on run 5
-# original error: ConnectionError('Failed to connect to server')
-# run number: 5
+# Process error: Error in __run__ on run 5
+# Original error: ConnectionError('Failed to connect to server')
+# Run number: 5
+```
+
+## `Share`
+
+`Share` lets you share data between processes with ease.
+
+Works with `Skprocess` inheriting classes and uses `cerial` for serialization of complex objects.
+
+It routes all writes through a single coordinator, and ensures reads wait until all writes that are still "sharing" have completed.
+
+Super simple - just create the instance and add objects to it, then pass it to subprocesses when you make them.
+
+```python
+from suitkaise.processing import Share, Skprocess
+from suitkaise import timing
+
+class Worker(Skprocess):
+
+    def __init__(self, share):
+        self.share = share
+
+    def __run__(self):
+        self.share.counter += 1
+        self.share.timer.add_time(0.1)
+
+        if self.share.counter >= 100:
+            self.stop()
+
+
+share = Share()  # starts automatically
+
+share.timer = timing.Sktimer()
+share.counter = 0
+
+for _ in range(10):
+    worker = Worker(share)
+    worker.start()
+    
+    while share.counter < 100:
+        timing.sleep(0.1)
+
+for _ in range(10):
+    worker.wait()
+
+final_count = share.counter
+
+# stop sharing
+share.exit()
+
+# start sharing again
+share.start()
+
+# clear the share of all objects
+share.clear()
 ```
 
 ## `Pool`
 
 `Pool` allows you to run multiple processes in parallel.
 
-It does 2 things differently.
+It does 3 things differently from other process pool libraries.
 
 - uses `cerial` for serialization of complex objects between processes
-- allows for the use of the `Process` inheriting classes mentioned above
+- allows for the use of `Skprocess` inheriting classes as well as functions
+- super flexible mapping patterns using modifiers
 
 ```python
 from suitkaise.processing import Pool
 
-# a class of type ["processing.Process"]
-p = MyProcess()
-data_set = get_data()
-
 pool = Pool(workers=8)
 ```
 
+
 ### `map()`
 
-Takes a function and a list of arguments.
+Takes a function or `Skprocess` class and a list of arguments.
 
 Blocks until all processes finish, and then returns a list of results in the same order as the arguments.
 
+
 ```python
-results = pool.map(p, data_set)
+results = pool.map(MyProcess, data_set)
+```
+
+#### `sk` Modifiers
+
+```python
+# with timeout - raises TimeoutError if exceeded
+results = pool.map.timeout(30.0)(MyProcess, data_set)
+
+
+# background - returns Future immediately
+future = pool.map.background()(MyProcess, data_set)
+results = future.result()  # blocks here
+
+
+# async - returns coroutine for await
+results = await pool.map.asynced()(MyProcess, data_set)
 ```
 
 ### `imap()`
@@ -478,31 +613,25 @@ for result in pool.imap(upscale_image_section, data_set):
     full_image_data.append(result)
 ```
 
-
-### `async_map()`
-
-Non-blocking version of `map()`.
-
-It returns immediately, with several methods to check and get the results.
+#### `sk` Modifiers
 
 ```python
-results = pool.async_map(p, data_set)
+# with timeout - raises TimeoutError if exceeded
+for result in pool.imap.timeout(30.0)(upscale_image_section, data_set):
+    full_image_data.append(result)
 
-# check if results are ready
-if results.ready():
-    # ...
 
-# block and wait for results to be ready but don't get them
-results.wait()
+# background - returns Future with list
+future = pool.imap.background()(upscale_image_section, data_set)
+full_image_data.extend(future.result())
 
-# block until results are ready and get them
-actual_results = results.get()
 
-# block until results are ready and get them or until timeout
-actual_results = results.get(timeout=1.0)
+# async - returns list for await
+results = await pool.imap.asynced()(upscale_image_section, data_set)
+full_image_data.extend(results)
 ```
 
-#### `unordered_imap()`
+### `unordered_imap()`
 
 Returns an iterator of results.
 
@@ -511,47 +640,67 @@ Each result is returned as it is ready, regardless of order.
 Fastest way to get results, but not in order.
 
 ```python
-# use Process inheriting class UpscaleImage to process each image in data_set
+# use Skprocess inheriting class UpscaleImage to process each image in data_set
 for processed_image in pool.unordered_imap(UpscaleImage, data_set):
 
     upscaled_images.append(processed_image)
 ```
 
+#### `sk` Modifiers
+
+```python
+# with timeout - raises TimeoutError if exceeded
+for result in pool.unordered_imap.timeout(30.0)(UpscaleImage, data_set):
+    upscaled_images.append(result)
+
+
+# background - returns Future with list
+future = pool.unordered_imap.background()(UpscaleImage, data_set)
+upscaled_images.extend(future.result())
+
+
+# async - returns list for await
+results = await pool.unordered_imap.asynced()(UpscaleImage, data_set)
+upscaled_images.extend(results)
+```
+
 ### `star()`
 
-Modifier of `map()`, `imap()`, `async_map()`, and `unordered_imap()`.
+Modifier of `map()`, `imap()`, and `unordered_imap()`.
 
 When used, it makes iterators of tuples spread across multiple arguments instead of the entire tuple being passed as a single argument.
 
 ```python
 # map - always passes item as single argument
-pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
+pool.map(fn or Skprocess, [(1, 2), (a, b)])  # fn((1, 2), ), fn((a, b), )
 
 # star map - unpacks tuples as arguments (but only tuples!)
-pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)
+pool.star().map(fn or Skprocess, [(1, 2), (a, b)])  # fn(1, 2), fn(a, b)
 ```
 
 ```python
 # imap - always passes item as single argument
-for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
+for result in pool.imap(fn or Skprocess, [(1, 2), (a, b)]): # fn((1, 2), ), fn((a, b), )
 
 # star imap - unpacks tuples as arguments (but only tuples!)
-for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)
+for result in pool.star().imap(fn or Skprocess, [(1, 2), (a, b)]): # fn(1, 2), fn(a, b)
 ```
 
-### Using `Pool` with `Process` inheriting classes
+### Using `Pool` with `Skprocess` inheriting classes
 
-When using `Pool` with `Process` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
+When using `Pool` with `Skprocess` inheriting classes, pass the class itself (not an instance) as the first argument to `map()` or `imap()`.
 
 The second argument will be an argument (or arguments) to `__init__()`.
 
-Classes run as they would normally, including ones that don't have a run or time limit (you can still use `stop()` to stop them in `Pools`).
+Classes run as they would normally, including ones that don't have a run or time limit. (you can still use `stop()` inside class code to have them stop themselves)
 
 ```python
-class UpscaleImage(Process):
+class UpscaleImage(Skprocess):
 
     def __init__(self, image):
         self.image_data = image
+        self.process_config.runs = 1
+        self.process_config.lives = 2
 
 for result in pool.unordered_imap(UpscaleImage, data_set):
 
@@ -559,12 +708,16 @@ for result in pool.unordered_imap(UpscaleImage, data_set):
 ```
 
 ```python
-class ColorImage(Process):
+class ColorImage(Skprocess):
 
     def __init__(self, image, color, percent_change):
+        self.process_config.runs = 1
+        self.process_config.lives = 2
+        
         self.image_data = image
         self.color = color
         self.percent_change = percent_change
+
 
 colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))
 ```

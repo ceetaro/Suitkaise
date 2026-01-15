@@ -2,6 +2,20 @@
 
 Complete list of all Python types that `cerial` can serialize and deserialize.
 
+## All `suitkaise` object types
+
+- `Sktimer`
+- `TimeThis`
+- `Circuit`
+- `BreakingCircuit`
+- `Skpath`
+- `CustomRoot`
+- `Skprocess`
+- `Pool`
+- `Share`
+- `ProcessTimers`
+- all `suitkaise` error classes
+
 ---
 
 ## Primitives

@@ -129,3 +129,22 @@ class ProcessTimeoutError(ProcessError):
             current_run,
             None
         )
+
+
+class ResultTimeoutError(ProcessError):
+    """Error raised when result(), wait(), or listen() times out via .timeout() modifier."""
+    
+    def __init__(self, message: str):
+        super().__init__(message, current_run=0, original_error=None)
+
+
+class DuplicateTimeoutError(ProcessError):
+    """Error raised when timeout is specified both as parameter and via .timeout() modifier."""
+    
+    def __init__(self, method_name: str):
+        super().__init__(
+            f"Timeout specified both as parameter and via .timeout() modifier in {method_name}(). "
+            f"Use one or the other, not both.",
+            current_run=0,
+            original_error=None
+        )

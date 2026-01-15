@@ -1,7 +1,7 @@
 """
-Configuration dataclasses for Process.
+Configuration dataclasses for Skprocess.
 
-Created automatically by Process._setup() before user's __init__ runs.
+Created automatically by Skprocess._setup() before user's __init__ runs.
 Users can override defaults by assigning to self.process_config.* in their __init__.
 """
 
@@ -26,7 +26,7 @@ class TimeoutConfig:
 @dataclass
 class ProcessConfig:
     """
-    Configuration for a Process instance.
+    Configuration for a Skprocess instance.
     
     Attributes:
         runs: Number of run iterations before auto-stopping.

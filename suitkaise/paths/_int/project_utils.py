@@ -180,62 +180,58 @@ def get_project_paths(
     
     # Collect paths
     result_paths: list[Any] = []
-    
+
+    def add_result(path: Path) -> None:
+        abs_path = normalize_separators(str(path))
+        if as_strings:
+            result_paths.append(abs_path)
+        else:
+            result_paths.append(Skpath._from_path(path, root=root_path))
+
+    def should_skip_dir(dir_path: Path) -> bool:
+        if not use_ignore_files:
+            return False
+        try:
+            rel_dir = normalize_separators(str(dir_path.relative_to(root_path)))
+        except ValueError:
+            return False
+        if not rel_dir:
+            return False
+        return _matches_any_pattern(rel_dir, ignore_patterns)
+
+    def should_skip_entry(path: Path) -> bool:
+        abs_path = normalize_separators(str(path))
+        if abs_path in exclude_set:
+            return True
+        if not use_ignore_files:
+            return False
+        try:
+            rel_path = normalize_separators(str(path.relative_to(root_path)))
+        except ValueError:
+            return False
+        return _matches_any_pattern(rel_path, ignore_patterns)
+
     for dirpath, dirnames, filenames in os.walk(root_path):
         dir_path = Path(dirpath)
-        
-        # Check if this directory should be skipped
-        rel_dir = normalize_separators(str(dir_path.relative_to(root_path)))
-        
-        if rel_dir and use_ignore_files:
-            if _matches_any_pattern(rel_dir, ignore_patterns):
-                dirnames.clear()  # Don't descend into ignored directories
-                continue
-        
-        # Filter out ignored subdirectories
+        if should_skip_dir(dir_path):
+            dirnames.clear()
+            continue
         if use_ignore_files:
             dirnames[:] = [
                 d for d in dirnames
-                if not _matches_any_pattern(
-                    normalize_separators(str((dir_path / d).relative_to(root_path))),
-                    ignore_patterns
-                )
+                if not should_skip_entry(dir_path / d)
             ]
-        
-        # Add files
         for filename in filenames:
             file_path = dir_path / filename
-            abs_path = normalize_separators(str(file_path))
-            
-            # Check exclude list
-            if abs_path in exclude_set:
+            if should_skip_entry(file_path):
                 continue
-            
-            # Check ignore patterns
-            if use_ignore_files:
-                rel_path = normalize_separators(str(file_path.relative_to(root_path)))
-                if _matches_any_pattern(rel_path, ignore_patterns):
-                    continue
-            
-            if as_strings:
-                result_paths.append(abs_path)
-            else:
-                result_paths.append(Skpath(file_path))
-        
-        # Add directories
+            add_result(file_path)
         for dirname in dirnames:
             subdir_path = dir_path / dirname
-            abs_path = normalize_separators(str(subdir_path))
-            
-            # Check exclude list
-            if abs_path in exclude_set:
+            if should_skip_entry(subdir_path):
                 continue
-            
-            if as_strings:
-                result_paths.append(abs_path)
-            else:
-                result_paths.append(Skpath(subdir_path))
-    
+            add_result(subdir_path)
+
     return result_paths
 
 
@@ -354,7 +350,33 @@ def get_formatted_project_tree(
     
     # Build tree
     lines: list[str] = [f"{root_path.name}/"]
-    
+
+    def should_skip_entry(path: Path) -> bool:
+        abs_path = normalize_separators(str(path))
+        if abs_path in exclude_set:
+            return True
+        if not use_ignore_files:
+            return False
+        try:
+            rel_path = normalize_separators(str(path.relative_to(root_path)))
+        except ValueError:
+            return False
+        return _matches_any_pattern(rel_path, ignore_patterns)
+
+    def list_filtered(dir_path: Path) -> list[Path]:
+        try:
+            items = sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+        except (PermissionError, OSError):
+            return []
+        filtered_items: list[Path] = []
+        for item in items:
+            if should_skip_entry(item):
+                continue
+            if not include_files and item.is_file():
+                continue
+            filtered_items.append(item)
+        return filtered_items
+
     def _format_tree(
         dir_path: Path,
         prefix: str,
@@ -362,38 +384,9 @@ def get_formatted_project_tree(
     ) -> None:
         if current_depth > depth:
             return
-        
-        try:
-            items = sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
-        except (PermissionError, OSError):
-            return
-        
-        # Filter items
-        filtered_items: list[Path] = []
-        for item in items:
-            abs_path = normalize_separators(str(item))
-            
-            # Check exclude
-            if abs_path in exclude_set:
-                continue
-            
-            # Check ignore patterns
-            if use_ignore_files:
-                try:
-                    rel_path = normalize_separators(str(item.relative_to(root_path)))
-                    if _matches_any_pattern(rel_path, ignore_patterns):
-                        continue
-                except ValueError:
-                    pass
-            
-            # Filter files if not included
-            if not include_files and item.is_file():
-                continue
-            
-            filtered_items.append(item)
-        
-        for i, item in enumerate(filtered_items):
-            is_last = i == len(filtered_items) - 1
+        items = list_filtered(dir_path)
+        for i, item in enumerate(items):
+            is_last = i == len(items) - 1
             connector = "└── " if is_last else "├── "
             
             if item.is_dir():

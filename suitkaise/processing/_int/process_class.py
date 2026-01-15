@@ -1,16 +1,19 @@
 """
-Process base class for subprocess-based task execution.
+Skprocess base class for subprocess-based task execution.
 
-Users inherit from Process, define lifecycle methods, and the engine
+Users inherit from Skprocess, define lifecycle methods, and the engine
 handles running, timing, error recovery, and subprocess management.
 """
 
+import asyncio
 import multiprocessing
 import queue as queue_module
 from typing import Any, TYPE_CHECKING
 
 from .config import ProcessConfig
 from .timers import ProcessTimers
+from .errors import ResultTimeoutError
+from suitkaise.sk._int.asyncable import _ModifiableMethod
 
 if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
@@ -32,7 +35,7 @@ class TimedMethod:
         print(p.__prerun__.timer.total)
     """
     
-    def __init__(self, method, process: "Process", timer_name: str):
+    def __init__(self, method, process: "Skprocess", timer_name: str):
         self._method = method
         self._process = process
         self._timer_name = timer_name
@@ -48,7 +51,7 @@ class TimedMethod:
         return getattr(self._process.timers, self._timer_name, None)
 
 
-class Process:
+class Skprocess:
     """
     Base class for subprocess-based process execution.
     
@@ -61,7 +64,7 @@ class Process:
     - __error__(): Handle errors when all lives exhausted
     
     Usage:
-        class MyProcess(Process):
+        class MyProcess(Skprocess):
             def __init__(self):
                 self.counter = 0
                 self.process_config.runs = 10
@@ -115,9 +118,9 @@ class Process:
         
         Also handles serialization for cerial:
         - If user defined __serialize__/__deserialize__, we wrap them to include
-          Process internals (lifecycle methods, class attrs) while preserving
+          Skprocess internals (lifecycle methods, class attrs) while preserving
           user's custom state.
-        - If not defined, we provide Process's serialization methods.
+        - If not defined, we provide Skprocess's serialization methods.
         """
         super().__init_subclass__(**kwargs)
         
@@ -127,7 +130,7 @@ class Process:
             
             def wrapped_init(self, *args, **kwargs):
                 # Run parent setup first
-                Process._setup(self)
+                Skprocess._setup(self)
                 # Then run user's __init__
                 original_init(self, *args, **kwargs)
             
@@ -138,7 +141,7 @@ class Process:
         else:
             # No __init__ defined, but we still need setup to run
             def default_init(self, *args, **kwargs):
-                Process._setup(self)
+                Skprocess._setup(self)
             
             cls.__init__ = default_init
         
@@ -153,15 +156,15 @@ class Process:
         #   cerial calls: cls.__deserialize__(state["custom_state"])
         #
         # If user defined their own __serialize__/__deserialize__, we capture them
-        # and wrap to include Process internals alongside user's custom state.
+        # and wrap to include Skprocess internals alongside user's custom state.
         
         user_serialize = cls.__dict__.get('__serialize__')
         user_deserialize = cls.__dict__.get('__deserialize__')
         
-        # Create the __serialize__ method that handles both Process state and user state
+        # Create the __serialize__ method that handles both Skprocess state and user state
         def make_serialize(user_ser):
             def __serialize__(self):
-                return Process._serialize_with_user(self, user_ser)
+                return Skprocess._serialize_with_user(self, user_ser)
             return __serialize__
         
         cls.__serialize__ = make_serialize(user_serialize)
@@ -174,7 +177,7 @@ class Process:
             # cerial calls: deserialize_func(cls, state["custom_state"])
             def make_deserialize_static(user_deser):
                 def __deserialize__(reconstructed_cls, state):
-                    return Process._deserialize_with_user(reconstructed_cls, state, user_deser)
+                    return Skprocess._deserialize_with_user(reconstructed_cls, state, user_deser)
                 return staticmethod(__deserialize__)
             
             cls.__deserialize__ = make_deserialize_static(user_deserialize)
@@ -184,7 +187,7 @@ class Process:
             def make_deserialize_classmethod(user_deser):
                 @classmethod
                 def __deserialize__(inner_cls, state):
-                    return Process._deserialize_with_user(inner_cls, state, user_deser)
+                    return Skprocess._deserialize_with_user(inner_cls, state, user_deser)
                 return __deserialize__
             
             cls.__deserialize__ = make_deserialize_classmethod(user_deserialize)
@@ -200,9 +203,9 @@ class Process:
     )
     
     @staticmethod
-    def _serialize_with_user(instance: "Process", user_serialize=None) -> dict:
+    def _serialize_with_user(instance: "Skprocess", user_serialize=None) -> dict:
         """
-        Serialize this Process instance for cerial.
+        Serialize this Skprocess instance for cerial.
         
         Captures:
         - Instance __dict__ (all instance attributes)
@@ -211,14 +214,14 @@ class Process:
         - User's custom state if they defined __serialize__
         
         Args:
-            instance: The Process instance to serialize
+            instance: The Skprocess instance to serialize
             user_serialize: User's __serialize__ method (if they defined one)
         """
         cls = instance.__class__
         
-        # Capture lifecycle methods defined on THIS class (not inherited from Process)
+        # Capture lifecycle methods defined on THIS class (not inherited from Skprocess)
         lifecycle_methods = {}
-        for name in Process._LIFECYCLE_METHODS:
+        for name in Skprocess._LIFECYCLE_METHODS:
             if name in cls.__dict__:
                 # This is a method defined on the subclass
                 lifecycle_methods[name] = cls.__dict__[name]
@@ -256,9 +259,9 @@ class Process:
         return state
     
     @staticmethod
-    def _deserialize_with_user(reconstructed_cls: type, state: dict, user_deserialize=None) -> "Process":
+    def _deserialize_with_user(reconstructed_cls: type, state: dict, user_deserialize=None) -> "Skprocess":
         """
-        Deserialize a Process instance from cerial state.
+        Deserialize a Skprocess instance from cerial state.
         
         Args:
             reconstructed_cls: The class cerial reconstructed (we ignore this and build our own)
@@ -266,7 +269,7 @@ class Process:
             user_deserialize: User's __deserialize__ method (if they defined one)
         
         Recreates the subclass dynamically with type() and restores state.
-        If user had custom deserialize, applies it after Process reconstruction.
+        If user had custom deserialize, applies it after Skprocess reconstruction.
         """
         # Build class dict with lifecycle methods and class attributes
         class_dict = {}
@@ -277,7 +280,7 @@ class Process:
         # Note: This triggers __init_subclass__ which sets up __init__ wrapping
         new_class = type(
             state['class_name'],
-            (Process,),
+            (Skprocess,),
             class_dict
         )
         
@@ -289,7 +292,7 @@ class Process:
         obj.__dict__.update(state['instance_dict'])
         
         # Set up timed method wrappers
-        Process._setup_timed_methods(obj)
+        Skprocess._setup_timed_methods(obj)
         
         # If user defined their own __deserialize__, apply it now
         if state.get('has_user_serialize') and user_deserialize is not None:
@@ -325,22 +328,22 @@ class Process:
         
         return obj
     
-    # Fallback for direct calls on Process base class
+    # Fallback for direct calls on Skprocess base class
     def __serialize__(self) -> dict:
-        """Serialize this Process instance (base class fallback)."""
-        return Process._serialize_with_user(self, None)
+        """Serialize this Skprocess instance (base class fallback)."""
+        return Skprocess._serialize_with_user(self, None)
     
     @classmethod
-    def __deserialize__(cls, state: dict) -> "Process":
+    def __deserialize__(cls, state: dict) -> "Skprocess":
         """Deserialize for module-level classes (base class fallback)."""
-        return Process._deserialize_with_user(cls, state, None)
+        return Skprocess._deserialize_with_user(cls, state, None)
     
     # =========================================================================
     # Internal setup
     # =========================================================================
     
     @staticmethod
-    def _setup(instance: "Process") -> None:
+    def _setup(instance: "Skprocess") -> None:
         """
         Initialize internal process state.
         
@@ -373,10 +376,10 @@ class Process:
         instance._has_result = False
         
         # Set up timed method wrappers
-        Process._setup_timed_methods(instance)
+        Skprocess._setup_timed_methods(instance)
     
     @staticmethod
-    def _setup_timed_methods(instance: "Process") -> None:
+    def _setup_timed_methods(instance: "Skprocess") -> None:
         """
         Create TimedMethod wrappers for user-defined lifecycle methods.
         
@@ -394,7 +397,7 @@ class Process:
         }
         
         for method_name, timer_name in method_to_timer.items():
-            # Check if user defined this method (not just inherited from Process)
+            # Check if user defined this method (not just inherited from Skprocess)
             if method_name in cls.__dict__:
                 # Get the actual method
                 method = getattr(instance, method_name)
@@ -444,7 +447,7 @@ class Process:
         """
         Start the process in a new subprocess.
         
-        Serializes this Process object, spawns a subprocess, and runs
+        Serializes this Skprocess object, spawns a subprocess, and runs
         the engine there.
         """
         # Import here to avoid circular imports
@@ -507,7 +510,15 @@ class Process:
             if self._subprocess.is_alive():
                 self._subprocess.kill()
     
-    def wait(self, timeout: float | None = None) -> bool:
+    # -------------------------------------------------------------------------
+    # Async wait implementation for modifiers
+    # -------------------------------------------------------------------------
+    
+    async def _async_wait(self, timeout: float | None = None) -> bool:
+        """Async implementation of wait()."""
+        return await asyncio.to_thread(self._sync_wait, timeout)
+    
+    def _sync_wait(self, timeout: float | None = None) -> bool:
         """
         Wait for the process to finish.
         
@@ -528,12 +539,49 @@ class Process:
         # Must drain result queue BEFORE waiting for subprocess
         # Otherwise deadlock: subprocess can't exit until queue is drained,
         # but we can't drain until subprocess exits
-        self._drain_result_queue(timeout)
+        self._drain_result_queue()
         
         self._subprocess.join(timeout=timeout)
         return not self._subprocess.is_alive()
     
-    def _drain_result_queue(self, timeout: float | None = None) -> None:
+    wait = _ModifiableMethod(
+        _sync_wait,
+        _async_wait,
+        timeout_error=ResultTimeoutError,
+        has_timeout_modifier=False,
+        has_background_modifier=False,
+        has_retry_modifier=False,
+    )
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        # Sync - blocks until finished
+        finished = process.wait()
+        finished = process.wait(timeout=10.0)
+        
+        # Async - await in async code
+        finished = await process.wait.asynced()()
+        ```
+    ────────────────────────────────────────────────────────
+    
+    Wait for the process to finish.
+    
+    Blocks until the process completes successfully. If the process
+    crashes and has lives remaining, wait() continues blocking during
+    the restart - it only returns when the process finishes (success
+    or out of lives).
+    
+    Args:
+        timeout: Maximum seconds to wait. None = wait forever.
+    
+    Returns:
+        True if process finished, False if timeout reached.
+    
+    Modifiers:
+        .asynced(): Return coroutine for await
+    """
+    
+    def _drain_result_queue(self) -> None:
         """
         Read result from queue and store internally.
         
@@ -548,12 +596,12 @@ class Process:
         
         try:
             # Use short timeout for polling - subprocess may still be producing
-            message = self._result_queue.get(timeout=timeout if timeout else 1.0)
+            message = self._result_queue.get(timeout=1.0)
             
             # Update timers from subprocess
             if 'timers' in message and message['timers'] is not None:
                 self.timers = cerial.deserialize(message['timers'])
-                Process._setup_timed_methods(self)
+                Skprocess._setup_timed_methods(self)
             
             if message["type"] == "error":
                 error_data = cerial.deserialize(message["data"])
@@ -572,7 +620,22 @@ class Process:
             # No result yet - subprocess may still be running
             pass
     
-    def result(self) -> Any:
+    # -------------------------------------------------------------------------
+    # Async result implementation for modifiers
+    # -------------------------------------------------------------------------
+    
+    async def _async_result(self) -> Any:
+        """Async implementation of result()."""
+        await asyncio.to_thread(self.wait)
+        
+        if self._has_result:
+            if isinstance(self._result, BaseException):
+                raise self._result
+            return self._result
+        
+        return None
+    
+    def _sync_result(self) -> Any:
         """
         Get the result from the process.
         
@@ -597,6 +660,49 @@ class Process:
         # No result retrieved - subprocess may have crashed silently
         return None
     
+    result = _ModifiableMethod(
+        _sync_result,
+        _async_result,
+        timeout_error=ResultTimeoutError,
+        has_retry_modifier=False,
+    )
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        # Sync - blocks until result ready
+        data = process.result()
+        
+        # With timeout - raises ProcessTimeoutError if exceeded
+        data = process.result.timeout(10.0)()
+        
+        # Background - returns Future immediately
+        future = process.result.background()()
+        # ... do other work ...
+        data = future.result()
+        
+        # Async - await in async code
+        data = await process.result.asynced()()
+        ```
+    ────────────────────────────────────────────────────────
+    
+    Get the result from the process.
+    
+    Blocks until the process finishes if not already done.
+    If the process crashes and has lives remaining, this continues
+    blocking during restarts.
+    
+    Returns:
+        Whatever __result__() returned.
+    
+    Raises:
+        ProcessError: If the process failed (after exhausting lives).
+    
+    Modifiers:
+        .timeout(seconds): Raise ProcessTimeoutError if exceeded
+        .background(): Return Future immediately
+        .asynced(): Return coroutine for await
+    """
+    
     def tell(self, data: Any) -> None:
         """
         Send data to the subprocess.
@@ -614,7 +720,15 @@ class Process:
         serialized = cerial.serialize(data)
         self._tell_queue.put(serialized)
     
-    def listen(self, timeout: float | None = None) -> Any:
+    # -------------------------------------------------------------------------
+    # Async listen implementation for modifiers
+    # -------------------------------------------------------------------------
+    
+    async def _async_listen(self, timeout: float | None = None) -> Any:
+        """Async implementation of listen()."""
+        return await asyncio.to_thread(self._sync_listen, timeout)
+    
+    def _sync_listen(self, timeout: float | None = None) -> Any:
         """
         Receive data from the subprocess.
         
@@ -636,6 +750,42 @@ class Process:
             return cerial.deserialize(serialized)
         except queue_module.Empty:
             return None
+    
+    listen = _ModifiableMethod(
+        _sync_listen,
+        _async_listen,
+        timeout_error=ResultTimeoutError,
+        has_timeout_modifier=False,
+    )
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        # Sync - blocks until data received
+        data = process.listen()
+        data = process.listen(timeout=5.0)
+        
+        # Background - returns Future immediately
+        future = process.listen.background()()
+        
+        # Async - await in async code
+        data = await process.listen.asynced()()
+        ```
+    ────────────────────────────────────────────────────────
+    
+    Receive data from the subprocess.
+    
+    Blocks until data is received from the subprocess via tell().
+    
+    Args:
+        timeout: Maximum seconds to wait. None = wait forever.
+    
+    Returns:
+        The data sent by the subprocess, or None if timeout reached.
+    
+    Modifiers:
+        .background(): Return Future immediately
+        .asynced(): Return coroutine for await
+    """
     
     @property
     def process_timer(self) -> "Sktimer | None":

@@ -9,6 +9,7 @@ Usage:
 
 import sys
 import time
+import re
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
@@ -154,13 +155,21 @@ def run_all_tests():
     # =========================================================================
     # FINAL SUMMARY
     # =========================================================================
+    def _strip_ansi(text: str) -> str:
+        return re.sub(r"\x1b\[[0-9;]*m", "", text)
+    
+    def _pad_ansi(text: str, width: int) -> str:
+        visible = len(_strip_ansi(text))
+        if visible >= width:
+            return text
+        return text + (" " * (width - visible))
     print()
     print(f"{BOLD}{CYAN}╔{'═'*78}╗{RESET}")
     print(f"{BOLD}{CYAN}║{'FINAL SUMMARY':^78}║{RESET}")
     print(f"{BOLD}{CYAN}╠{'═'*78}╣{RESET}")
     
     # Unit test results
-    print(f"{BOLD}{CYAN}║{RESET}  {BOLD}Unit Tests:{RESET}{' '*66}{BOLD}{CYAN}║{RESET}")
+    print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(f'  {BOLD}Unit Tests:{RESET}', 78)}{BOLD}{CYAN}║{RESET}")
     unit_passed = 0
     unit_failed = 0
     for name, passed in unit_results:
@@ -171,12 +180,12 @@ def run_all_tests():
             status = f"{RED}✗ FAIL{RESET}"
             unit_failed += 1
         line = f"    {status}  {name}"
-        print(f"{BOLD}{CYAN}║{RESET}{line:<77}{BOLD}{CYAN}║{RESET}")
+        print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(line, 78)}{BOLD}{CYAN}║{RESET}")
     
-    print(f"{BOLD}{CYAN}║{RESET}{' '*78}{BOLD}{CYAN}║{RESET}")
+    print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi('', 78)}{BOLD}{CYAN}║{RESET}")
     
     # Real-world test results
-    print(f"{BOLD}{CYAN}║{RESET}  {BOLD}Real-World Scenarios:{RESET}{' '*56}{BOLD}{CYAN}║{RESET}")
+    print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(f'  {BOLD}Real-World Scenarios:{RESET}', 78)}{BOLD}{CYAN}║{RESET}")
     rw_passed = 0
     rw_failed = 0
     for name, passed in real_world_results:
@@ -187,7 +196,7 @@ def run_all_tests():
             status = f"{RED}✗ FAIL{RESET}"
             rw_failed += 1
         line = f"    {status}  {name}"
-        print(f"{BOLD}{CYAN}║{RESET}{line:<77}{BOLD}{CYAN}║{RESET}")
+        print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(line, 78)}{BOLD}{CYAN}║{RESET}")
     
     print(f"{BOLD}{CYAN}╠{'═'*78}╣{RESET}")
     
@@ -199,8 +208,9 @@ def run_all_tests():
     else:
         summary = f"  {YELLOW}Passed: {total_passed}{RESET}  |  {RED}Failed: {total_failed}{RESET}"
     
-    print(f"{BOLD}{CYAN}║{RESET}{summary:<77}{BOLD}{CYAN}║{RESET}")
-    print(f"{BOLD}{CYAN}║{RESET}  {DIM}Total time: {elapsed:.2f}s{RESET}{' '*(65-len(f'{elapsed:.2f}'))}{BOLD}{CYAN}║{RESET}")
+    print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(summary, 78)}{BOLD}{CYAN}║{RESET}")
+    total_time_line = f"  {DIM}Total time: {elapsed:.2f}s{RESET}"
+    print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(total_time_line, 78)}{BOLD}{CYAN}║{RESET}")
     print(f"{BOLD}{CYAN}╚{'═'*78}╝{RESET}")
     print()
     
