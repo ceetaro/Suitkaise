@@ -1,10 +1,6 @@
 /*
 
-interactive tests to practice using the cerial module.
-
-all tests use text entry blocks where you directly edit code to solve the problem.
-
-there are 3 tests (easy, medium, hard)
+overview of how the module is tested. + a video showing the tests in action, and a downloadable for the tests and instructions to run them.
 
 */
 

@@ -1,6 +1,6 @@
 /*
 
-visual and downloadable examples of the cerial module.
+visual and downloadable examples of the cerial module, possibly including videos.
 
 */
 

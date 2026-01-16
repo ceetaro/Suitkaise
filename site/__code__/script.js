@@ -160,39 +160,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function styleAPIHighlights() {
         // API identifiers to highlight
-        const apiModules = new Set(['suitkaise', 'sktime', 'skpath', 'circuit', 'cerial', 'processing', 'docs']);
+        const apiModules = new Set([
+            'suitkaise',
+            'timing',
+            'paths',
+            'circuits',
+            'cerial',
+            'processing',
+            'sk',
+            'docs',
+        ]);
         const apiClasses = new Set([
-            // skpath
-            'SKPath', 'AnyPath', 'CustomRoot', 'PathDetectionError',
-            // sktime
-            'Timer', 'TimeThis', 'Yawn',
-            // circuit
-            'Circuit',
+            // paths
+            'Skpath', 'AnyPath', 'CustomRoot', 'PathDetectionError',
+            // timing
+            'Sktimer', 'TimeThis',
+            // circuits
+            'Circuit', 'BreakingCircuit',
             // cerial
             'Cerializer', 'Decerializer', 'SerializationError', 'DeserializationError',
             // processing
-            'Process', 'ProcessConfig', 'TimeoutConfig', 'ProcessTimers',
-            'PreloopError', 'MainLoopError', 'PostLoopError', 'OnFinishError', 'ResultError',
+            'Skprocess', 'Process', 'Pool', 'Share', 'ProcessTimers',
+            'ProcessError', 'PreRunError', 'RunError', 'PostRunError', 'OnFinishError',
+            'ResultError', 'ErrorHandlerError', 'ProcessTimeoutError', 'ResultTimeoutError',
+            // sk
+            'Skclass', 'Skfunction', 'AsyncSkfunction', 'SkModifierError', 'FunctionTimeoutError',
         ]);
         // Note: 'time' and 'sleep' are NOT included here because they conflict with time.time() and time.sleep()
         // They still get highlighted as part of sktime.time() chains since 'sktime' is in apiModules
         const apiMethods = new Set([
-            // sktime
-            'timethis', 'elapsed', 'clear_global_timers',
-            // skpath
+            // timing
+            'elapsed', 'timethis', 'clear_global_timers',
+            // paths
             'autopath', 'get_project_root', 'set_custom_root', 'get_custom_root', 'clear_custom_root',
             'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
             'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
+            'is_valid_filename', 'streamline_path',
             // cerial
             'serialize', 'deserialize',
-            // processing
-            'timesection',
+            // sk
+            'sk',
         ]);
         
         // Overrides: properties that should highlight word.property.chain patterns
         // These only activate if their associated decorator is found in the code block
         const overrideConfig = {
-            'timer': '@sktime.timethis'  // timer property only highlights if @sktime.timethis decorator exists
+            'timer': '@timing.timethis'  // timer property only highlights if @timing.timethis decorator exists
         };
         
         // Find all code blocks
@@ -219,10 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Find variable assignments like: varname = sktime.Timer()
             const assignmentPatterns = [
-                /(\w+)\s*=\s*(?:sktime|skpath|circuit|cerial|processing)\.\w+/g,
+                /(\w+)\s*=\s*(?:suitkaise|timing|paths|circuits|cerial|processing|sk)\.\w+/g,
                 new RegExp(`(\\w+)\\s*=\\s*(?:${classesPattern})\\s*\\(`, 'g'),
                 new RegExp(`(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
-                /with\s+(?:sktime|skpath|circuit|cerial|processing)\.\w+[^:]*\s+as\s+(\w+)/g,
+                /with\s+(?:suitkaise|timing|paths|circuits|cerial|processing|sk)\.\w+[^:]*\s+as\s+(\w+)/g,
             ];
             
             assignmentPatterns.forEach(pattern => {
@@ -773,7 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Processing
         'processing', 'processing-how-it-works', 'processing-examples', 'processing-why',
         // Cerial
-        'cerial', 'cerial-how-it-works', 'cerial-examples', 'cerial-why',
+        'cerial', 'cerial-how-it-works', 'cerial-examples', 'cerial-why', 'cerial-supported-types', 'cerial-learn',
         // Sktime
         'sktime', 'sktime-how-it-works', 'sktime-examples', 'sktime-why',
         // Skpath

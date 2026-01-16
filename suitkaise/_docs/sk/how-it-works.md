@@ -326,7 +326,7 @@ class Skclass:
     
     def asynced(self):
         if not self._blocking_methods:
-            raise NotAsyncedError(f"{self._original_class.__name__} has no blocking calls")
+            raise SkModifierError(f"{self._original_class.__name__} has no blocking calls")
         
         if self._async_class is None:
             self._async_class = create_async_class(
@@ -393,7 +393,7 @@ class Skfunction:
     
     def asynced(self):
         if not self._blocking_calls:
-            raise NotAsyncedError(...)
+            raise SkModifierError(...)
         return async_wrapper(self._func, _config=self._config.copy(), ...)
 ```
 
@@ -442,7 +442,7 @@ def sk(cls_or_func):
         
         def asynced():
             if not blocking_methods:
-                raise NotAsyncedError(f"{cls.__name__} has no blocking calls")
+                raise SkModifierError(f"{cls.__name__} has no blocking calls")
             return create_async_class(cls, blocking_methods)
         
         cls.asynced = staticmethod(asynced)

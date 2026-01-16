@@ -5,7 +5,7 @@ Tests Skclass wrapper functionality:
 - Auto _shared_meta generation
 - Blocking call detection
 - .asynced() for classes with blocking calls
-- NotAsyncedError for non-blocking classes
+- SkModifierError for non-blocking classes
 """
 
 import sys
@@ -14,7 +14,7 @@ import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.sk import Skclass, NotAsyncedError
+from suitkaise.sk import Skclass, SkModifierError
 
 
 # =============================================================================
@@ -242,13 +242,13 @@ def test_skclass_blocking_methods():
 # =============================================================================
 
 def test_skclass_asynced_raises_for_non_blocking():
-    """asynced() should raise NotAsyncedError for non-blocking class."""
+    """asynced() should raise SkModifierError for non-blocking class."""
     SkCounter = Skclass(SimpleCounter)
     
     try:
         SkCounter.asynced()
-        assert False, "Should have raised NotAsyncedError"
-    except NotAsyncedError as e:
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError as e:
         assert "SimpleCounter" in str(e)
         assert "no blocking calls" in str(e)
 

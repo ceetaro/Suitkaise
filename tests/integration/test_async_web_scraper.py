@@ -24,7 +24,7 @@ sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.timing import Sktimer, TimeThis, sleep, timethis
-from suitkaise.sk import Skfunction, sk, NotAsyncedError
+from suitkaise.sk import Skfunction, sk, SkModifierError
 
 
 # =============================================================================

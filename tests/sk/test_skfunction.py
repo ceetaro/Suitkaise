@@ -8,7 +8,7 @@ Tests Skfunction wrapper functionality:
 - .retry()
 - .timeout()
 - .background()
-- NotAsyncedError for non-blocking functions
+- SkModifierError for non-blocking functions
 - FunctionTimeoutError
 """
 
@@ -18,7 +18,7 @@ import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.sk import Skfunction, NotAsyncedError, FunctionTimeoutError
+from suitkaise.sk import Skfunction, SkModifierError, FunctionTimeoutError
 
 
 # =============================================================================
@@ -169,13 +169,13 @@ def test_skfunction_has_blocking():
 # =============================================================================
 
 def test_skfunction_asynced_raises_for_non_blocking():
-    """asynced() should raise NotAsyncedError for non-blocking function."""
+    """asynced() should raise SkModifierError for non-blocking function."""
     sk_add = Skfunction(fast_add)
     
     try:
         sk_add.asynced()
-        assert False, "Should have raised NotAsyncedError"
-    except NotAsyncedError as e:
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError as e:
         assert "fast_add" in str(e)
         assert "no blocking calls" in str(e)
 

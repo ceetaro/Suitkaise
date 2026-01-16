@@ -17,166 +17,258 @@ Is built as `PicklingError: Can't serialize object`'s mortal enemy.
 
 It is also the engine that the `processing` module uses instead of `pickle`.
 
-<br>
-- allows for serialization of complex objects that `pickle`, `cloudpickle`, and `dill` cannot handle
-<br>
-- 2x faster than `cloudpickle` when it comes to dataclasses
-<br>
-- builds directly on top of `pickle`, meaning no dependencies
-<br>
-
 If you need fast speed for simple types, use base `pickle`.
 
-If you want to serialize functions or simple `dicts` quickly, use `cloudpickle`.
+But if you want to serialize everything else, then you should be using `cerial`.
 
-If you want to serialize simple `classes` quickly, use `dill`.
+(start of dropdown 1)
+## Full List of Supported Types
 
-But if you want to serialize...
+For a full list of supported types, head to the supported types page.
+(start of dropdown 1)
+### Things that `cerial` handles that `pickle`, `cloudpickle`, and `dill` cannot
 
-(start of main dropdown)
-Everything Else
-(start of function dropdown)
-Functions
-
-- regular functions
-- nested functions
-- functions in `__main__`
-- lambdas
-- `functools.partial` functions
-- bound methods
-- `@staticmethods`
-- `@classmethods`
-- `@property` methods
-
-(end of function dropdown)
-
-(start of class and instance dropdown)
-Classes and Instances
-
-- dataclasses
-- enums
-- instances with `__dict__`
-- instances with `__slots__`
-- instances with both `__dict__` and `__slots__`
-- nested classes
-- dynamic classes created with `type()`
-- `namedtuples` (both `collections.namedtuple` and `typing.NamedTuple`)
-
-(end of class and instance dropdown)
-
-(start of threading and syncing dropdown)
-`threading`
-
-- `Lock` and `RLock`
-- `Semaphore` and `BoundedSemaphore`
-- `Barrier`
-- `Condition`
-- `Event`
-- `threading.local`
-
-(end of threading and syncing dropdown)
-
-(start of queues dropdown)
-Queues
-
-- `queue`
-  - `Queue`
-  - `LifoQueue`
-  - `PriorityQueue`
-
-- `multiprocessing`
-  - `Queue`
-  - `Event`
-
-(end of queues dropdown)
-
-(start of file and I/O dropdown)
-File and I/O
-
-- file handles (open files)
-- temporary files (`tempfile.NamedTemporaryFile`)
-- `StringIO`
-- `BytesIO`
-- memory-mapped files (`mmap`)
-
-(end of file and I/O dropdown)
-
-(start of logging dropdown)
-`logging`
-
-- `Logger`
-- `StreamHandler`
-- `FileHandler`
-- `Formatter`
-
-(end of logging dropdown)
-
-(start of database dropdown)
-Database
-
-- `sqlite3` connections and cursors
-- generic database connections (with limitations)
-
-(end of database dropdown)
-
-(start of network dropdown)
-Network
-
-- `HTTP` sessions (`requests.Session`)
-- `sockets` (`socket.socket`)
-
-(end of network dropdown)
-
-(start of subprocess dropdown)
-`subprocess`
-
-- `subprocess.Popen`
-- `subprocess.CompletedProcess`
-
-(end of subprocess dropdown)
-
-(start of async/await dropdown)
-`async` and `await`
-
-- coroutines (`async def` functions)
+- generators (with state)
+- coroutines
 - async generators
 - `asyncio.Task`
 - `asyncio.Future`
+- `concurrent.futures.ThreadPoolExecutor`
+- `concurrent.futures.ProcessPoolExecutor`
+- `threading.local`
+- `multiprocessing.Queue`
+- `multiprocessing.Event`
+- `multiprocessing.Manager`
+- `queue.SimpleQueue`
+- `mmap`
+- `re.Match`
+- `sqlite3.Connection`
+- `sqlite3.Cursor`
+- `socket.socket`
+- `ThreadPoolExecutor`
+- `ProcessPoolExecutor`
+- `ContextVar`
+- `Token` (context tokens)
+- `subprocess.Popen`
+- `FrameType` (frame objects)
+- a large number of user created classes and objects
+- circular references
 
-(end of async/await dropdown)
+(end of dropdown 1)
 
-(start of context managers dropdown)
-Context Managers
+(start of dropdown 2)
+### Things that `cerial` handles the fastest
 
-- custom context managers (`__enter__` and `__exit__`)
-- `contextlib.contextmanager` decorators
+(all comparisons are against the 2nd fastest serializer. `pickle` fails to serialize all of these but one.)
 
-(end of context managers dropdown)
+- `requests.Session` — slightly faster than even base `pickle`
 
-(start of advanced Python dropdown)
-Advanced `Python`
+- `TextIOWrapper` — 47x faster than `dill`
+- `NamedTemporaryFile` — 46x faster than `dill`
+- `threading.Thread` — 8x faster than `dill`
+- `queue.PriorityQueue` — 7x faster than `dill`
+- `queue.LifoQueue` — 7x faster than `dill`
+- `typing.NamedTuple` — 7x faster than `dill`
+- `StreamHandler` — 7x faster than `dill`
+- `threading.Barrier` — 6x faster than `dill`
+- `WeakValueDictionary` — 6x faster than `dill`
+- `WeakKeyDictionary` — 6x faster than `dill`
+- `threading.Event` — 6x faster than `dill`
+- `namedtuple` — 5x faster than `dill`
+- `queue.Queue` — 5x faster than `dill`
+- `FileHandler` — 4x faster than `dill`
+- `dataclass` — 3x faster than `cloudpickle`
+- `concurrent.futures.Future` — 3x faster than `dill`
+- `classmethod` — 2x faster than `cloudpickle`
+- `__slots__ class` — 2x faster than `cloudpickle`
+- `__slots__ + __dict__ class` — 2x faster than `cloudpickle`
+- `weakref.ref` — 52% faster than `dill`
+- `FunctionType` — 38% faster than `dill`
+- `ContextObject` — 32% faster than `cloudpickle`
 
-- generators (with state)
-- iterators (enumerate, zip, filter, map, etc.)
-- regex patterns (`re.Pattern`)
-- weak references (`weakref.ref`, `WeakValueDictionary`, etc.)
-- code objects (`types.CodeType`)
-- properties and descriptors
-- context variables (`contextvars.ContextVar`)
-- pipes (`multiprocessing.Pipe`)
-- shared memory (`multiprocessing.shared_memory.SharedMemory`)
-- executors (`ThreadPoolExecutor`, `ProcessPoolExecutor`)
+(end of dropdown 2)
 
-(end of advanced Python dropdown)
+(start of dropdown 3)
+### Things that `cerial` handles faster than all others besides `pickle`
 
-- circular references with automatic detection and handling
-- two-pass reconstruction for complex circular structures
+(all comparisons are against the 2nd fastest serializer other than `pickle`)
 
-- Dynamic modules (`types.ModuleType`)
+
+- `int` — 2x faster than `cloudpickle`
+- `IntFlag` — 2x faster than `cloudpickle`
+- `IntEnum` — 2x faster than `cloudpickle`
+- `complex` — 2x faster than `cloudpickle`
+- `defaultdict` — 2x faster than `cloudpickle`
+- `bool` — 2x faster than `cloudpickle`
+- `threading.BoundedSemaphore` — 2x faster than `cloudpickle`
+- `threading.Semaphore` — 2x faster than `cloudpickle`
+- `bytes` — 1.6x faster than `cloudpickle`
+- `threading.RLock` — 1.6x faster than `cloudpickle`
+- `slice` — 1.5x faster than `cloudpickle`
+- `range` — 1.4x faster than `cloudpickle`
+- `str` — 1.4x faster than `cloudpickle`
+- `threading.Lock` — 1.2x faster than `cloudpickle`
+(end of dropdown 3)
+
+(start of dropdown 4)
+Benchmark Data Used
+
+```
+==============================================================================================================
+                                   Supported Types Compatibility Benchmarks                                   
+==============================================================================================================
+
+  Type                                       cerial             pickle               dill        cloudpickle
+  ------------------------------ ------------------ ------------------ ------------------ ------------------
+  bool                           8.4µs              0.8µs              48.7µs             10.8µs            
+  int                            1.2µs              0.3µs              9.1µs              2.4µs             
+  float                          1.2µs              0.3µs              8.1µs              1.6µs             
+  complex                        7.0µs              1.2µs              45.5µs             12.7µs            
+  str                            1.3µs              0.3µs              7.8µs              1.5µs             
+  bytes                          0.8µs              0.3µs              5.6µs              1.3µs             
+  bytearray                      2.9µs              2.1µs              22.4µs             1.6µs             
+  Ellipsis                       5.5µs              1.6µs              23.9µs             6.7µs             
+  NotImplemented                 5.0µs              1.2µs              16.8µs             4.2µs             
+  list                           6.0µs              0.3µs              10.0µs             1.6µs             
+  tuple                          3.9µs              0.4µs              6.5µs              1.4µs             
+  dict                           3.7µs              0.4µs              12.1µs             1.5µs             
+  set                            4.0µs              0.4µs              6.7µs              1.3µs             
+  frozenset                      3.3µs              0.6µs              5.9µs              1.4µs             
+  range                          4.3µs              1.0µs              14.5µs             6.2µs             
+  slice                          3.7µs              1.0µs              19.5µs             5.8µs             
+  deque                          13.9µs             1.7µs              20.3µs             6.0µs             
+  Counter                        4.4µs              1.1µs              22.5µs             4.7µs             
+  OrderedDict                    5.3µs              1.6µs              16.3µs             5.3µs             
+  defaultdict                    8.3µs              1.8µs              28.2µs             9.7µs             
+  ChainMap                       7.4µs              1.4µs              27.9µs             5.6µs             
+  namedtuple                     5.8µs              fail               31.1µs             364.9µs           
+  datetime                       7.1µs              1.2µs              20.4µs             4.9µs             
+  date                           5.9µs              1.0µs              15.4µs             4.2µs             
+  time                           4.9µs              0.9µs              13.2µs             4.0µs             
+  timedelta                      4.8µs              0.9µs              13.7µs             3.8µs             
+  timezone                       13.4µs             2.0µs              24.2µs             7.2µs             
+  Decimal                        7.9µs              1.1µs              12.5µs             3.9µs             
+  Fraction                       6.7µs              0.9µs              13.8µs             4.6µs             
+  UUID                           8.8µs              1.5µs              21.2µs             4.7µs             
+  Path                           6.2µs              1.2µs              18.0µs             4.0µs             
+  PurePath                       23.7µs             1.5µs              15.2µs             4.5µs             
+  PosixPath                      5.0µs              1.0µs              13.2µs             3.7µs             
+  Logger                         14.6µs             3.9µs              14.1µs             3.8µs             
+  StreamHandler                  9.3µs              fail               64.9µs             fail              
+  FileHandler                    15.5µs             fail               69.7µs             fail              
+  Formatter                      10.2µs             6.0µs              32.9µs             7.1µs             
+  threading.Lock                 1.4µs              0.3µs              5.2µs              1.5µs             
+  threading.RLock                0.8µs              0.3µs              3.7µs              1.2µs             
+  threading.Semaphore            0.7µs              0.2µs              3.7µs              1.3µs             
+  threading.BoundedSemaphore     0.6µs              0.2µs              3.6µs              1.2µs             
+  threading.Barrier              10.4µs             fail               67.2µs             fail              
+  threading.Condition            1.5µs              0.3µs              4.7µs              1.5µs             
+  threading.Event                9.5µs              fail               55.7µs             fail              
+  threading.Thread               54.3µs             fail               444.7µs            fail              
+  threading.local                14.8µs             fail               fail               fail              
+  multiprocessing.Queue          13.4µs             fail               fail               fail              
+  multiprocessing.Event          30.8µs             fail               fail               fail              
+  multiprocessing.Pipe           38.7µs             3.6µs              31.3µs             6.5µs             
+  multiprocessing.Manager        108.8µs            fail               fail               fail              
+  SharedMemory                   52.5µs             9.2µs              42.5µs             12.6µs            
+  queue.Queue                    30.7µs             fail               141.0µs            fail              
+  queue.LifoQueue                15.1µs             fail               102.5µs            fail              
+  queue.PriorityQueue            13.7µs             fail               99.1µs             fail              
+  queue.SimpleQueue              13.2µs             fail               fail               fail              
+  TextIOWrapper                  37.7µs             fail               1769.1µs           fail              
+  BufferedReader                 1934.9µs           fail               31.2µs             fail              
+  BufferedWriter                 1824.8µs           fail               27.9µs             fail              
+  FileIO                         1693.7µs           fail               26.7µs             fail              
+  StringIO                       13.4µs             3.2µs              19.5µs             5.9µs             
+  BytesIO                        10.9µs             2.3µs              16.8µs             5.4µs             
+  NamedTemporaryFile             27.7µs             fail               1276.3µs           fail              
+  SpooledTemporaryFile           34.6µs             6.7µs              46.8µs             9.1µs             
+  mmap                           25.0µs             fail               fail               fail              
+  re.Pattern                     15.6µs             2.2µs              18.7µs             5.8µs             
+  re.Match                       22.5µs             fail               fail               fail              
+  sqlite3.Connection             77.3µs             fail               fail               fail              
+  sqlite3.Cursor                 42.2µs             fail               fail               fail              
+  requests.Session               32.5µs             41.4µs             308.5µs            36.8µs            
+  socket.socket                  26.0µs             fail               fail               fail              
+  FunctionType                   46.1µs             fail               63.8µs             67.0µs            
+  lambda                         41.5µs             fail               59.1µs             35.1µs            
+  functools.partial              49.6µs             fail               72.1µs             20.5µs            
+  MethodType                     21.7µs             3.7µs              73.6µs             21.0µs            
+  staticmethod                   18.7µs             fail               64.3µs             18.9µs            
+  classmethod                    15.2µs             fail               63.0µs             28.4µs            
+  GeneratorType                  14.2µs             fail               fail               fail              
+  range_iterator                 13.5µs             4.0µs              23.7µs             8.1µs             
+  enumerate                      16.3µs             3.8µs              25.0µs             7.2µs             
+  zip                            14.5µs             2.9µs              28.2µs             7.4µs             
+  map                            12.2µs             fail               70.5µs             36.8µs            
+  filter                         14.1µs             fail               70.8µs             35.3µs            
+  CoroutineType                  38.0µs             fail               fail               fail              
+  AsyncGeneratorType             10.1µs             fail               fail               fail              
+  asyncio.Task                   13.0µs             fail               fail               fail              
+  asyncio.Future                 13.7µs             fail               fail               fail              
+  concurrent.futures.Future      36.0µs             fail               93.8µs             fail              
+  ThreadPoolExecutor             11.9µs             fail               fail               fail              
+  ProcessPoolExecutor            10.2µs             fail               fail               fail              
+  weakref.ref                    10.5µs             fail               16.0µs             fail              
+  WeakValueDictionary            14.7µs             fail               94.9µs             fail              
+  WeakKeyDictionary              14.2µs             fail               89.1µs             fail              
+  Enum                           17.5µs             3.5µs              18.1µs             5.9µs             
+  IntEnum                        2.5µs              1.0µs              16.5µs             5.1µs             
+  Flag                           13.1µs             1.3µs              15.8µs             4.7µs             
+  IntFlag                        2.0µs              0.8µs              14.1µs             4.9µs             
+  ContextVar                     11.1µs             fail               fail               fail              
+  Token                          10.0µs             fail               fail               fail              
+  contextmanager                 83.9µs             fail               570.5µs            70.2µs            
+  ContextObject                  56.5µs             fail               145.0µs            74.4µs            
+  subprocess.Popen               187.1µs            fail               fail               fail              
+  CompletedProcess               19.0µs             4.9µs              29.7µs             6.6µs             
+  CodeType                       33.0µs             fail               41.3µs             12.0µs            
+  FrameType                      2575.5µs           fail               fail               fail              
+  property                       60.0µs             fail               79.1µs             50.8µs            
+  CustomDescriptor               61.9µs             fail               102.0µs            60.6µs            
+  ModuleType                     84.3µs             fail               19.0µs             6.4µs             
+  OS pipes                       4.2µs              0.4µs              7.6µs              1.7µs             
+  File descriptors               1.8µs              0.4µs              6.2µs              1.6µs             
+  typing.NamedTuple              5.8µs              fail               38.9µs             125.9µs           
+  typing.TypedDict               4.6µs              0.6µs              10.8µs             2.0µs             
+  Class object                   6.2µs              0.6µs              11.2µs             3.3µs             
+  Class instance                 6.8µs              2.5µs              18.4µs             4.8µs             
+  dataclass                      70.5µs             fail               1078.3µs           224.8µs           
+  slots class                    31.8µs             fail               109.1µs            55.9µs            
+  slots+dict class               32.9µs             fail               107.8µs            55.9µs            
+  Sktimer                        28.3µs             fail               42.4µs             fail              
+  TimeThis                       49.8µs             fail               74.6µs             fail              
+  Circuit                        26.0µs             fail               36.5µs             fail              
+  BreakingCircuit                24.1µs             fail               40.0µs             fail              
+  Skpath                         24.0µs             5.7µs              42.0µs             8.6µs             
+  CustomRoot                     7.8µs              3.7µs              21.0µs             5.3µs             
+  Skprocess                      201.0µs            fail               528.0µs            213.0µs           
+  Pool                           20.6µs             2.7µs              24.1µs             5.7µs             
+  Share                          696.0µs            fail               fail               fail              
+  ProcessTimers                  94.1µs             fail               99.3µs             fail              
+  ProcessError                   9.8µs              3.2µs              24.3µs             5.9µs             
+  PreRunError                    7.8µs              2.7µs              20.7µs             5.0µs             
+  RunError                       6.5µs              1.3µs              19.9µs             4.3µs             
+  PostRunError                   6.1µs              1.3µs              18.8µs             4.3µs             
+  OnFinishError                  5.8µs              1.1µs              18.2µs             4.3µs             
+  ResultError                    5.5µs              1.3µs              18.8µs             4.0µs             
+  ErrorHandlerError              6.2µs              1.4µs              18.5µs             3.8µs             
+  ProcessTimeoutError            7.1µs              1.7µs              22.2µs             4.1µs             
+  ResultTimeoutError             5.7µs              1.2µs              17.3µs             3.9µs             
+  PathDetectionError             6.5µs              3.1µs              17.7µs             4.7µs             
+  SerializationError             6.0µs              1.7µs              17.3µs             4.2µs             
+  DeserializationError           6.6µs              1.4µs              16.6µs             4.0µs             
+  SkModifierError                5.9µs              2.7µs              16.8µs             4.1µs             
+  FunctionTimeoutError           7.3µs              2.0µs              14.3µs             3.7µs             
+  Skclass                        53.3µs             7.2µs              132.2µs            9.7µs             
+  Skfunction                     71.9µs             fail               91.2µs             33.5µs            
+  Skfunction.asynced()           59.1µs             fail               80.8µs             62.2µs
+  ```
+
+(end of dropdown 4)
 
 (end of main dropdown)
 
-then you should be using `cerial`.
 
 Cerial deconstructs objects down to a level where `pickle` can handle them, using nested dicts and base `pickle` types within.
 
@@ -214,14 +306,16 @@ It isn't the same object, but a functionally equivalent copy.
 
 With this, `cerial` can serialize almost anything, even your most complex classes and objects that others cannot.
 
-This is the Worst Possible Object. If your object contains only things found in this object, then `cerial` can serialize it.
+To prove this to you, I have create a special class object.
 
 (start of worst possible object dropdown)
-Worst Possible Object
+This is the WorstPossibleObject.
 
-The Worst Possible Object is a comprehensive test of `cerial`'s ability to serialize and deserialize complex objects.
+The WorstPossibleObject is a comprehensive test of `cerial`'s ability to serialize and deserialize complex objects.
 
-It contains every type that `cerial` can handle, in a deeply nested, circular-referenced, randomly-generated structure.
+It contains every type that `cerial` can handle, in a super nested, circular-referenced, randomly-generated structure.
+
+Each WorstPossibleObject is different from the last, and they all have ways to verify that they remain intact after being converted to and from bytes.
 
 (start of worst possible object code dropdown)
 Code
@@ -307,21 +401,23 @@ COMPLEX_TYPES_THAT_CERIAL_CAN_HANDLE = [
 
 # sktime
 # skpath
-from suitkaise.skpath import *
-from suitkaise.sktime import *
-from suitkaise.circuit import *
+from suitkaise.paths import *
+from suitkaise.timing import *
+from suitkaise.circuits import *
 from suitkaise.processing import *
+# NOTE: processing configs are intentionally internal (not public API).
+# WorstPossibleObject still exercises them for serialization coverage.
+from suitkaise.processing._int.config import ProcessConfig, TimeoutConfig
 
 # Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [
     # skpath - project-aware path handling
-    'SKPath',           # Main path class with project root awareness
+    'Skpath',           # Main path class with project root awareness
     'CustomRoot',       # Custom root management
     'autopath',         # Decorator (handled by function handler)
     
-    # sktime - timing utilities  
-    'Timer',            # Elapsed time tracker with laps
-    'Yawn',             # Sleep utility
+    # timing - timing utilities  
+    'Sktimer',            # Elapsed time tracker with laps
     'TimeThis',         # Context manager for timing
     'timethis',         # Decorator (handled by function handler)
     
@@ -976,12 +1072,12 @@ class WorstPossibleObject:
         
         self._log("  [INIT] Suitkaise objects")
         
-        # === SKPath objects ===
-        # SKPath - project-aware path object
-        self.skpath_current_file = SKPath(__file__)
+        # === Skpath objects ===
+        # Skpath - project-aware path object
+        self.skpath_current_file = Skpath(__file__)
         self._track_init('complex', 'skpath_current_file', self.skpath_current_file)
         
-        self.skpath_project_root = SKPath('.')
+        self.skpath_project_root = Skpath('.')
         self._track_init('complex', 'skpath_project_root', self.skpath_project_root)
         
         # CustomRoot - for custom project root management
@@ -989,25 +1085,25 @@ class WorstPossibleObject:
         self._track_init('complex', 'custom_root', self.custom_root)
         
         # === SKTime objects ===
-        # Timer - elapsed time tracker
-        self.timer = Timer()
+        # Sktimer - elapsed time tracker
+        self.timer = Sktimer()
         self.timer.start()
         self.timer.lap()  # Record first lap
         self.timer.lap()  # Record second lap
         self._track_init('complex', 'timer (with laps)', self.timer)
         
-        self.timer_empty = Timer()
+        self.timer_empty = Sktimer()
         self._track_init('complex', 'timer_empty', self.timer_empty)
         
-        # Yawn - sleep utility (sleep_duration, yawn_threshold)
-        self.yawn = Yawn(sleep_duration=0.001, yawn_threshold=5)
-        self._track_init('complex', 'yawn', self.yawn)
+        # Circuit - auto-resetting circuit (from circuits module)
+        self.circuit_auto = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.001)
+        self._track_init('complex', 'circuit_auto', self.circuit_auto)
         
         # TimeThis - context manager for timing
         self.timethis_ctx = TimeThis("test_operation")
         self._track_init('complex', 'timethis_ctx', self.timethis_ctx)
         
-        # SKPath module-level functions
+        # Skpath module-level functions
         self.skpath_autopath_decorator = autopath
         self._track_init('complex', 'autopath (decorator)', self.skpath_autopath_decorator)
         
@@ -1055,7 +1151,7 @@ class WorstPossibleObject:
         # === Processing objects ===
         # ProcessConfig - configuration for processes (dataclass)
         self.process_config = ProcessConfig(
-            num_loops=100,
+            runs=100,
             join_in=60.0,
             lives=3
         )
@@ -1063,9 +1159,9 @@ class WorstPossibleObject:
         
         # TimeoutConfig - timeout configuration (dataclass)
         self.timeout_config = TimeoutConfig(
-            preloop=30.0,
-            loop=300.0,
-            postloop=60.0,
+            prerun=30.0,
+            run=300.0,
+            postrun=60.0,
             onfinish=60.0
         )
         self._track_init('complex', 'timeout_config', self.timeout_config)
@@ -1074,9 +1170,7 @@ class WorstPossibleObject:
         self.process_timers = ProcessTimers()
         self._track_init('complex', 'process_timers', self.process_timers)
         
-        # Processing module-level functions/decorators
-        self.processing_timesection_decorator = timesection
-        self._track_init('complex', 'timesection (decorator)', self.processing_timesection_decorator)
+        # Note: timesection decorator removed - not in current processing API
 
     def generate_random_nested_collection(self, collection_type):
         """Generate a random nested collection of primitives, collections, and complex objects."""
@@ -1521,13 +1615,13 @@ class WorstPossibleObject:
             'skpath_project_root_type': type(self.skpath_project_root).__name__,
             'custom_root_type': type(self.custom_root).__name__,
             'timer_type': type(self.timer).__name__,
-            'yawn_sleep_duration': self.yawn.sleep_duration,
-            'yawn_threshold': self.yawn.yawn_threshold,
+            'circuit_auto_sleep_time': self.circuit_auto.sleep_time_after_trip,
+            'circuit_auto_threshold': self.circuit_auto.num_shorts_to_trip,
             'circuit_num_shorts_to_trip': self.circuit.num_shorts_to_trip,
-            'process_config_num_loops': self.process_config.num_loops,
+            'process_config_runs': self.process_config.runs,
             'process_config_lives': self.process_config.lives,
-            'timeout_config_preloop': self.timeout_config.preloop,
-            'timeout_config_loop': self.timeout_config.loop,
+            'timeout_config_prerun': self.timeout_config.prerun,
+            'timeout_config_run': self.timeout_config.run,
             
             # Suitkaise module-level functions (verify they're callable)
             'autopath_callable': callable(self.skpath_autopath_decorator),
@@ -1540,7 +1634,6 @@ class WorstPossibleObject:
             'elapsed_callable': callable(self.sktime_elapsed_func),
             'timethis_callable': callable(self.sktime_timethis_decorator),
             'clear_global_timers_callable': callable(self.sktime_clear_global_timers_func),
-            'timesection_callable': callable(self.processing_timesection_decorator),
         }
         
         return self._verification_checksums
@@ -1617,8 +1710,16 @@ class WorstPossibleObject:
             failures.append(f"lambda_function: error calling - {e}")
         
         try:
-            if other.partial_function(y=5) != 15:  # partial(test_function, 5) called with y=5
-                failures.append("partial_function: does not compute correctly")
+            # In _init_functions:
+            #   def test_function(x, y=10): return x + y
+            #   self.partial_function = partial(test_function, 5)
+            # So:
+            #   partial_function() == 15 (uses default y=10)
+            #   partial_function(y=5) == 10 (overrides default y)
+            if other.partial_function() != 15:
+                failures.append("partial_function: does not compute correctly (default y)")
+            if other.partial_function(y=5) != 10:
+                failures.append("partial_function: does not compute correctly (override y)")
         except Exception as e:
             failures.append(f"partial_function: error calling - {e}")
         
@@ -1894,3 +1995,7 @@ class WorstPossibleObject:
 (end of worst possible object code dropdown)
 
 (end of worst possible object dropdown)
+
+`cerial` can serialize and deserialize these WorstPossibleObjects hundreds of times in a row. 
+
+So if it can do that, I hope it can do the same for your objects, making your life much, much easier.

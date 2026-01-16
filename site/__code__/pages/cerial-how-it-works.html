@@ -4,9 +4,11 @@
         <a href="#cerial-why" class="module-bar-link" data-page="cerial-why">why</a>
         <a href="#cerial" class="module-bar-link" data-page="cerial">how to use</a>
         <a href="#cerial-how-it-works" class="module-bar-link active" data-page="cerial-how-it-works">how it works</a>
-        <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+        <a href="#cerial-supported-types" class="module-bar-link" data-page="cerial-supported-types">supported types</a>
         <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
         <a href="#cerial-examples" class="module-bar-link" data-page="cerial-examples">examples</a>
+        <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+        <a href="#cerial-learn" class="module-bar-link" data-page="cerial-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
@@ -68,6 +70,8 @@ bytes → pickle.loads() → IR → Handler(s) → Object</code></pre>
         <li>Gives complex types their own dict at each level</li>
     </ul>
 
+    <p>When you use <code>__serialize__</code> and <code>__deserialize__</code>, you are responsible for converting the object to a <code>dict</code> with only native <code>pickle</code> types. Do not convert to bytes, <code>cerial</code> will do that for you.</p>
+
     <hr>
 
     <h2>Handlers</h2>
@@ -107,7 +111,7 @@ bytes → pickle.loads() → IR → Handler(s) → Object</code></pre>
 
     <hr>
 
-    <h2>Central Serializer (<code>Cerializer</code>)</h2>
+    <h2>Main Serializer (<code>Cerializer</code>)</h2>
 
     <p>Coordinates the entire process.</p>
 
@@ -254,7 +258,7 @@ new_obj.__dict__.update(state)</code></pre>
 
     <ul>
         <li><strong>Nested classes</strong> — Stores module and qualname for lookup</li>
-        <li><strong>Classes in <code>__main__</code></strong> — Handled specially (pickle can't normally do this)</li>
+        <li><strong>Classes in <code>__main__</code></strong> — Handled specially by embedding class definitions for reconstruction</li>
         <li><strong>Classes with <code>__slots__</code></strong> — Iterates over slot names</li>
         <li><strong>Classes with both <code>__dict__</code> and <code>__slots__</code></strong> — Handles both</li>
     </ul>
@@ -358,6 +362,8 @@ new_obj.__dict__.update(state)</code></pre>
             <li>Shared memory</li>
             <li>Executors</li>
         </ul>
+
+        <p>For a full list of supported types, see the supported-types page.</p>
     </details>
 
     <hr>
@@ -406,7 +412,7 @@ Object repr: &lt;MyHandler at 0x...&gt;
         <li><strong>Circular references</strong> — Handled with O(1) lookup in seen set</li>
     </ul>
 
-    <p><code>cerial</code> is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base <code>pickle</code>. If you need to serialize complex objects that others can't handle, use <code>cerial</code>.</p>
+    <p><code>cerial</code> is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base <code>pickle</code>. Otherwise, use <code>cerial</code>. It is better than <code>cloudpickle</code> and <code>dill</code> in most cases, other than pure speed with simple functions.</p>
 
     <hr>
 

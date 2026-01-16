@@ -19,6 +19,11 @@ R = TypeVar('R')
 # Shared executor for background operations
 _background_executor: ThreadPoolExecutor | None = None
 
+
+class SkModifierError(Exception):
+    """Raised when an unsupported sk modifier is accessed."""
+    pass
+
 def _get_executor() -> ThreadPoolExecutor:
     """Get or create the shared thread pool executor."""
     global _background_executor
@@ -314,7 +319,7 @@ class _ModifiableBoundMethod:
             Not available for methods that have a timeout parameter.
         """
         if not self._has_timeout_modifier:
-            raise AttributeError(
+            raise SkModifierError(
                 f"'{self._name}' has a timeout parameter. "
                 f"Use {self._name}(timeout=...) instead of {self._name}.timeout(...)()."
             )
@@ -337,7 +342,7 @@ class _ModifiableBoundMethod:
         Add retry behavior to the method call.
         """
         if not self._has_retry_modifier:
-            raise AttributeError(f"{self._name} does not support .retry()")
+            raise SkModifierError(f"{self._name} does not support .retry()")
         from .function_wrapper import create_retry_wrapper
         
         instance = self._instance
@@ -367,7 +372,7 @@ class _ModifiableBoundMethod:
             result = future.result()
         """
         if not self._has_background_modifier:
-            raise AttributeError(f"{self._name} does not support .background()")
+            raise SkModifierError(f"{self._name} does not support .background()")
         return _BackgroundModifier(
             self._instance,
             self._sync_method,

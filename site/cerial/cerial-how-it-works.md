@@ -15,11 +15,9 @@ title = "How `cerial` actually works"
 # 1.2
 
 text = "
-# How `cerial` actually works
-
 `cerial` has no dependencies outside of the standard library.
 
-It is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot
+It is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot.
 
 ---
 
@@ -27,15 +25,15 @@ It is a serialization engine that handles complex Python objects that `pickle`, 
 
 `cerial` uses a two-phase approach.
 
-1. **Transform** — Convert unpickleable objects into an intermediate representation (IR) using handlers for complex objects
+1. **Transform** — convert unpickleable objects into an intermediate representation (IR) using handlers for complex objects
 
-2. **Serialize** — Use standard `pickle.dumps()` on the IR
+2. **Serialize** — use standard `pickle.dumps()` on the IR
 
 Deserialization is the reverse.
 
-1. **Deserialize** — Use `pickle.loads()` to get the IR
+1. **Deserialize** — use `pickle.loads()` to get the IR
 
-2. **Reconstruct** — Convert the IR back into the original objects using the handlers
+2. **Reconstruct** — convert the IR back into the original objects using the handlers
 
 ```
 Object → Handler(s) → IR (nested dicts) → pickle.dumps() → bytes
@@ -66,10 +64,12 @@ Complex objects get converted to dicts with special markers.
 }
 ```
 
-- Mirrors the original object structure
-- Can nest infinitely deep
-- Lets primitive types pass through untouched
-- Gives complex types their own dict at each level
+- mirrors the original object structure
+- can nest infinitely deep
+- lets primitive types pass through untouched
+- gives complex types their own dict at each level
+
+When you use `__serialize__` and `__deserialize__`, you are responsible for converting the object to a `dict` with only native `pickle` types. Do not convert to bytes, `cerial` will do that for you.
 
 ---
 
@@ -78,68 +78,66 @@ Complex objects get converted to dicts with special markers.
 Handlers are responsible for serializing and deserializing specific object types.
 
 Each handler:
-- Defines a `type_name` (e.g., "lock", "logger", "class_instance")
-- Implements `can_handle(obj)` to check if it handles this type
-- Implements `extract_state(obj)` to extract serializable state
-- Implements `reconstruct(state)` to rebuild the object
+- defines a `type_name` (e.g., "lock", "logger", "class_instance")
+- implements `can_handle(obj)` to check if it handles this type
+- implements `extract_state(obj)` to extract serializable state
+- implements `reconstruct(state)` to rebuild the object
 
 ### Handler Priority
 
-Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are checked before general ones:
+Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are checked before general ones.
 
 1. function handlers
-2. `logging` handlers
-3. `threading` handlers
-4. `queue` handlers
+2. logging handlers
+3. threading handlers
+4. queue handlers
 5. file handlers
 6. database handlers
 7. network handlers
 8. generator and iterator handlers
 9. subprocess handlers
-10. async handlers
-11. context manager handlers
+10. async handler
+11. context manager handler
 12. module handlers
-13. class object handlers
+13. class object handler
 14. class instance handler
-
-For more info on exactly what is covered under each handler, navigate down to "What Can `cerial` Handle?"
 
 ---
 
-## Central Serializer (``cerial`izer`)
+## Main Serializer (`Cerializer`)
 
-Coordinates the entire process.
+Coordinates the entire serialization process.
 
 ### Serialization Flow
 
-1. **Reset state** — Clear circular reference tracker, depth counter, etc.
-2. **Recursive serialization** — Build the IR by walking the object tree
-3. **Pickle** — Call `pickle.dumps()` on the IR
+1. **Reset state** — clear circular reference tracker, depth counter, etc.
+2. **Recursive serialization** — build the IR by walking the object tree
+3. **Pickle** — call `pickle.dumps()` on the IR
 4. **Return bytes**
 
 ### `_serialize_recursive()`
 
 This is the main function that builds the intermediate representation.
 
-1. **Check recursion depth** — Prevent stack overflow on deeply nested objects
+1. **Check recursion depth** — prevent stack overflow on deeply nested objects
 
 2. **Check for circular references**
-   - If we've seen this exact object before, return a reference marker
-   - If not, mark it as seen and continue
+   - if we've seen this exact object before, return a reference marker
+   - if not, mark it as seen and continue
 
 3. **Check if pickle-native**
-   - Primitives (int, str, None, etc.) → return as-is
-   - Collections (dict, list, tuple, set) → recursively serialize contents
+   - primitives (int, str, None, etc.) → return as-is
+   - collections (dict, list, tuple, set) → recursively serialize contents
 
-4. **Find handler** — Match the object to a handler
+4. **Find handler** — match the object to a handler
 
-5. **Extract state** — Handler converts object to a dict/list
+5. **Extract state** — handler converts object to a dict/list
 
-6. **Recursively serialize state** — The extracted state might contain more complex objects!
+6. **Recursively serialize state** — the extracted state might contain more complex objects!
 
-7. **Wrap in metadata** — Add `__cerial_type__`, `__handler__`, `__object_id__`
+7. **Wrap in metadata** — add `__cerial_type__`, `__handler__`, `__object_id__`
 
-8. **Return** — The fully serialized structure
+8. **Return** — the fully serialized structure
 
 Step 6 is especially important in the quest to serialize any complex object. Some objects may have other complex objects inside them.
 
@@ -149,7 +147,7 @@ Step 6 is especially important in the quest to serialize any complex object. Som
 
 ## Circular Reference Handling
 
-Objects can reference each other or themselves:
+Objects can reference each other or themselves.
 
 ```python
 obj.self_ref = obj  # self-reference
@@ -157,7 +155,7 @@ obj_a.ref = obj_b   # mutual reference
 obj_b.ref = obj_a
 ```
 
-`cerial` handles this with object ID tracking:
+`cerial` handles this with object ID tracking.
 
 ### During Serialization
 
@@ -166,7 +164,7 @@ obj_b.ref = obj_a
 3. If yes, return a reference marker instead of re-serializing
 4. If no, add to seen set and continue
 
-Reference markers look like:
+Reference markers look like this.
 ```python
 {"__cerial_ref__": 140234567890}
 ```
@@ -176,12 +174,12 @@ Reference markers look like:
 Some circular structures need two passes.
 
 **Pass 1: Create shells**
-- Create empty/placeholder objects
-- Store by object ID in a lookup table
+- create empty/placeholder objects
+- store by object ID in a lookup table
 
 **Pass 2: Fill in state**
-- Now that all objects exist, populate their state
-- References can be resolved because all objects are in the lookup
+- now that all objects exist, populate their state
+- references can be resolved because all objects are in the lookup
 
 This handles cases like:
 ```python
@@ -240,45 +238,44 @@ class Config:
 Works for most simple classes:
 
 ```python
-# Extraction
+# extraction
 state = obj.__dict__.copy()
 
-# Reconstruction
+# reconstruction
 new_obj = SomeClass.__new__(SomeClass)
 new_obj.__dict__.update(state)
 ```
 
 ### Handling Special Cases
 
-- **Nested classes** — Stores module and qualname for lookup
-- **Classes in `__main__`** — Handled specially (pickle can't normally do this)
-- **Classes with `__slots__`** — Iterates over slot names
-- **Classes with both `__dict__` and `__slots__`** — Handles both
+- **Nested classes** — stores module and qualname for lookup
+- **Classes in `__main__`** — handled specially by embedding class definitions for reconstruction
+- **Classes with `__slots__`** — iterates over slot names
+- **Classes with both `__dict__` and `__slots__`** — handles both
 
 ---
 
-(start of drop down)
 ## What Can `cerial` Handle?
 
 ### Functions
-- Regular functions
-- Nested functions
-- Functions in `__main__`
-- Lambdas
+- regular functions
+- nested functions
+- functions in `__main__`
+- lambdas
 - `functools.partial` functions
-- Bound methods
+- bound methods
 - `@staticmethod` and `@classmethod`
 - `@property` methods
 
 ### Classes and Instances
-- Dataclasses
-- Enums
-- Instances with `__dict__`
-- Instances with `__slots__`
-- Instances with both
-- Nested classes
-- Dynamic classes (created with `type()`)
-- NamedTuples
+- dataclasses
+- enums
+- instances with `__dict__`
+- instances with `__slots__`
+- instances with both
+- nested classes
+- dynamic classes (created with `type()`)
+- namedTuples
 
 ### Threading
 - `Lock` and `RLock`
@@ -293,11 +290,11 @@ new_obj.__dict__.update(state)
 - `multiprocessing.Queue`, `Event`
 
 ### File and I/O
-- File handles (open files)
-- Temporary files (`tempfile.NamedTemporaryFile`)
+- file handles (open files)
+- temporary files (`tempfile.NamedTemporaryFile`)
 - `StringIO`
 - `BytesIO`
-- Memory-mapped files (`mmap`)
+- memory-mapped files (`mmap`)
 
 ### Logging
 - `Logger`
@@ -309,30 +306,31 @@ new_obj.__dict__.update(state)
 
 ### Network
 - HTTP sessions (`requests.Session`)
-- Sockets
+- sockets
 
 ### Subprocess
 - `subprocess.Popen`
 - `subprocess.CompletedProcess`
 
 ### Async
-- Coroutines
-- Async generators
+- coroutines
+- async generators
 - `asyncio.Task`
 - `asyncio.Future`
 
 ### Advanced Python
-- Generators (with state)
-- Iterators
-- Regex patterns (`re.Pattern`)
-- Weak references
-- Code objects
-- Properties and descriptors
-- Context variables
-- Pipes
-- Shared memory
-- Executors
-(end of drop down)
+- generators (with state)
+- iterators
+- regex patterns (`re.Pattern`)
+- weak references
+- code objects
+- properties and descriptors
+- context variables
+- pipes
+- shared memory
+- executors
+
+For a full list of supported types, see the supported-types.md file.
 
 ---
 
@@ -377,12 +375,13 @@ The path tells you exactly where in your nested object the failure occurred.
 
 ## Performance Considerations
 
-- **Primitive types** — Pass through with minimal overhead
-- **Collections** — Contents are processed recursively
-- **Complex objects** — Handler lookup + state extraction + recursion
-- **Circular references** — Handled with O(1) lookup in seen set
+- **Primitive types** — pass through with minimal overhead
+- **Collections** — contents are processed recursively
+- **Complex objects** — handler lookup + state extraction + recursion
+- **Circular references** — handled with O(1) lookup in seen set
 
-`cerial` is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base `pickle`. If you need to serialize complex objects that others can't handle, use `cerial`.
+`cerial` is optimized for coverage over raw speed. If you need the fastest serialization for simple types, use base `pickle`. Otherwise, use `cerial`. It is better than `cloudpickle` and `dill` in most cases, other than pure speed with simple functions.
+
 
 ---
 
@@ -391,4 +390,6 @@ The path tells you exactly where in your nested object the failure occurred.
 The serializer is designed for single-threaded use within a single serialize/deserialize call. Each call gets fresh state (seen objects, depth counter, etc.).
 
 If you need to serialize from multiple threads, create separate calls — don't share state between them.
+
+
 

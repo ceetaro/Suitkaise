@@ -54,7 +54,7 @@ Available for functions and methods of classes that have blocking calls like `ti
 
 Returns a coroutine that can be awaited.
 
-This will raise a `NotAsyncedError` if the function has no blocking calls.
+This will raise a `SkModifierError` if the function has no blocking calls.
 
 ```python
 def my_function():
@@ -153,7 +153,7 @@ result = fetcher.fetch()
 # get an async version of the class
 try:
     async_fetcher = WebpageHTMLFetcher.asynced()("https://api.example.com")
-except NotAsyncedError:
+except SkModifierError:
     print("WebpageHTMLFetcher has no blocking calls")
     raise
 
@@ -259,16 +259,16 @@ print(MyClass.blocking_methods) # {'blocking_method': ['time.sleep', 'requests.g
 
 ## Errors
 
-### `NotAsyncedError`
+### `SkModifierError`
 
 Raised when calling `.asynced()` on a class or function with no detected blocking calls.
 
 ```python
-from suitkaise.sk import NotAsyncedError
+from suitkaise.sk import SkModifierError
 
 try:
     AsyncVersion = NonBlockingClass.asynced()
-except NotAsyncedError as e:
+except SkModifierError as e:
     print(f"Cannot create async version: {e}")
 ```
 

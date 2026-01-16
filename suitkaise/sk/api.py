@@ -22,32 +22,12 @@ from ._int.function_wrapper import (
     create_async_retry_wrapper_v2,
     FunctionTimeoutError,
 )
-from ._int.asyncable import _ModifiableMethod, _AsyncModifiableMethod
+from ._int.asyncable import _ModifiableMethod, _AsyncModifiableMethod, SkModifierError
 
 
 T = TypeVar('T')
 P = ParamSpec('P')
 R = TypeVar('R')
-
-
-class NotAsyncedError(Exception):
-    """
-    Raised when .asynced() is called on a class/function with no blocking calls.
-    
-    This indicates that there's nothing to make async - all operations are
-    already non-blocking (CPU-bound), so wrapping with to_thread() would
-    add overhead without benefit.
-    
-    Example:
-        >>> @sk
-        ... class Counter:
-        ...     def increment(self):
-        ...         self.value += 1
-        ...
-        >>> Counter.asynced()  # Raises NotAsyncedError
-        NotAsyncedError: Counter has no blocking calls
-    """
-    pass
 
 
 class Skclass(Generic[T]):
@@ -145,10 +125,10 @@ class Skclass(Generic[T]):
             Async version of the wrapped class
             
         Raises:
-            NotAsyncedError: If the class has no blocking calls
+        SkModifierError: If the class has no blocking calls
         """
         if not self.has_blocking_calls:
-            raise NotAsyncedError(
+            raise SkModifierError(
                 f"{self._original_class.__name__} has no blocking calls"
             )
         
@@ -348,10 +328,10 @@ class Skfunction(Generic[P, R]):
             AsyncSkfunction wrapping the async version
             
         Raises:
-            NotAsyncedError: If the function has no blocking calls
+            SkModifierError: If the function has no blocking calls
         """
         if not self.has_blocking_calls:
-            raise NotAsyncedError(
+            raise SkModifierError(
                 f"{self._func.__name__} has no blocking calls"
             )
         
@@ -636,9 +616,9 @@ def sk(cls_or_func):
         
         # Create asynced staticmethod
         def asynced():
-            """Get async version of this class. Raises NotAsyncedError if no blocking calls."""
+            """Get async version of this class. Raises SkModifierError if no blocking calls."""
             if not blocking_methods:
-                raise NotAsyncedError(f"{cls.__name__} has no blocking calls")
+                raise SkModifierError(f"{cls.__name__} has no blocking calls")
             async_cls = create_async_class(cls, blocking_methods)
             async_cls._shared_meta = shared_meta
             return async_cls
@@ -707,9 +687,9 @@ def sk(cls_or_func):
         
         # Attach methods that use Skfunction internally for chaining
         def asynced():
-            """Get async version. Raises NotAsyncedError if no blocking calls."""
+            """Get async version. Raises SkModifierError if no blocking calls."""
             if not blocking_calls:
-                raise NotAsyncedError(f"{func.__name__} has no blocking calls")
+                raise SkModifierError(f"{func.__name__} has no blocking calls")
             return Skfunction(func).asynced()
         
         def retry(times: int = 3, delay: float = 1.0, backoff_factor: float = 1.0, exceptions: tuple = (Exception,)):
@@ -741,6 +721,6 @@ __all__ = [
     'Skfunction',
     'AsyncSkfunction',
     'sk',
-    'NotAsyncedError',
+    'SkModifierError',
     'FunctionTimeoutError',
 ]

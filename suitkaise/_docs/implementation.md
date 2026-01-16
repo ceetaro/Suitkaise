@@ -552,7 +552,7 @@ tests/
 - Skfunction: .asynced(), .retry(), .timeout(), .background()
 - AsyncSkfunction: chaining .timeout().retry()
 - @sk decorator: on classes, on functions
-- NotAsyncedError: raised for non-blocking
+- SkModifierError: raised for unsupported modifiers
 
 ### Benchmark Categories
 

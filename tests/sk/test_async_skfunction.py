@@ -10,7 +10,7 @@ Tests the AsyncSkfunction class:
 
 Note: AsyncSkfunction only works with functions that have blocking calls
 (e.g., time.sleep, file I/O, network calls). Functions without blocking
-calls will raise NotAsyncedError when calling .asynced().
+calls will raise SkModifierError when calling .asynced().
 """
 
 import sys
@@ -20,7 +20,7 @@ import time as stdlib_time
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.sk import Skfunction, sk
-from suitkaise.sk.api import AsyncSkfunction, NotAsyncedError
+from suitkaise.sk.api import AsyncSkfunction, SkModifierError
 
 
 # =============================================================================
@@ -170,7 +170,7 @@ async def test_asyncskfunction_with_kwargs():
 
 
 def test_non_blocking_raises_error():
-    """Calling asynced() on non-blocking function should raise NotAsyncedError."""
+    """Calling asynced() on non-blocking function should raise SkModifierError."""
     def pure_func():
         return 42
     
@@ -178,8 +178,8 @@ def test_non_blocking_raises_error():
     
     try:
         sk_func.asynced()
-        assert False, "Should have raised NotAsyncedError"
-    except NotAsyncedError:
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError:
         pass  # Expected
 
 

@@ -129,7 +129,7 @@ from .processing import (
 # ============================================================================
 from .sk import (
     sk,
-    NotAsyncedError,
+    SkModifierError,
     FunctionTimeoutError,
 )
 
@@ -196,6 +196,6 @@ __all__ = [
     
     # Sk
     "sk",
-    "NotAsyncedError",
+    "SkModifierError",
     "FunctionTimeoutError",
 ]

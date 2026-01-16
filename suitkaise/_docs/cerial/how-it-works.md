@@ -2,7 +2,7 @@
 
 `cerial` has no dependencies outside of the standard library.
 
-It is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot
+It is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot.
 
 ---
 

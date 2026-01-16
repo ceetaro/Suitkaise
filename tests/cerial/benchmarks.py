@@ -66,7 +66,7 @@ from suitkaise.processing import (
     ProcessTimeoutError,
     ResultTimeoutError,
 )
-from suitkaise.sk import Skclass, Skfunction, NotAsyncedError, FunctionTimeoutError
+from suitkaise.sk import Skclass, Skfunction, SkModifierError, FunctionTimeoutError
 from suitkaise.cerial._int.worst_possible_object import WorstPossibleObject
 
 
@@ -872,7 +872,7 @@ def _get_supported_objects():
         ("PathDetectionError", lambda: PathDetectionError("path error")),
         ("SerializationError", lambda: SerializationError("serialization error")),
         ("DeserializationError", lambda: DeserializationError("deserialization error")),
-        ("NotAsyncedError", lambda: NotAsyncedError("not asynced")),
+        ("SkModifierError", lambda: SkModifierError("not asynced")),
         ("FunctionTimeoutError", lambda: FunctionTimeoutError("timeout")),
         ("Skclass", lambda: Skclass(_BenchSkClassDemo)),
         ("Skfunction", lambda: Skfunction(_sample_func)),

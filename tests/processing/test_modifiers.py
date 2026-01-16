@@ -8,6 +8,7 @@ import pytest
 from concurrent.futures import Future
 
 from suitkaise.processing import Process, Pool, ResultTimeoutError
+from suitkaise.sk import SkModifierError
 
 
 # =============================================================================
@@ -162,23 +163,19 @@ class TestProcessWaitModifiers:
         finished = p.wait()
         assert finished is True
     
-    def test_wait_timeout_success(self):
-        """wait.timeout() succeeds when process completes in time."""
+    def test_wait_timeout_unsupported(self):
+        """wait.timeout() raises SkModifierError (timeout param exists)."""
         p = QuickProcess(5)
         p.start()
-        finished = p.wait.timeout(5.0)()
-        assert finished is True
+        with pytest.raises(SkModifierError):
+            p.wait.timeout(5.0)()
     
-    def test_wait_background(self):
-        """wait.background() returns Future immediately."""
+    def test_wait_background_unsupported(self):
+        """wait.background() raises SkModifierError."""
         p = QuickProcess(5)
         p.start()
-        
-        future = p.wait.background()()
-        
-        assert isinstance(future, Future)
-        finished = future.result(timeout=5.0)
-        assert finished is True
+        with pytest.raises(SkModifierError):
+            p.wait.background()()
     
     @pytest.mark.asyncio
     async def test_wait_asynced(self):

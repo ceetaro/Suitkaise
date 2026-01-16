@@ -10,7 +10,7 @@ import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
-from suitkaise.sk import sk, Skclass, Skfunction, NotAsyncedError
+from suitkaise.sk import sk, Skclass, Skfunction, SkModifierError
 
 
 # =============================================================================
@@ -154,11 +154,11 @@ def test_sk_class_without_blocking():
     # has_blocking_calls is now a class attribute
     assert FastCounter.has_blocking_calls == False
     
-    # asynced() should raise NotAsyncedError
+    # asynced() should raise SkModifierError
     try:
         FastCounter.asynced()
-        assert False, "Should have raised NotAsyncedError"
-    except NotAsyncedError:
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError:
         pass
 
 
@@ -201,8 +201,8 @@ def test_sk_class_method_modifiers_sync():
     # timeout param disables modifier
     try:
         worker.with_timeout_param.timeout(1.0)()
-        assert False, "Should have raised AttributeError"
-    except AttributeError:
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError:
         pass
 
 

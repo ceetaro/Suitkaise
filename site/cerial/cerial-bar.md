@@ -9,9 +9,9 @@ this bar goes below the nav bar.
 */
 
 rows = 1
-columns = 7
+columns = 9
 
-how to use, how it works, videos, tests, examples, why
+order = [why, how to use, how it works, supported types, tests, examples, videos, learn]
 
 # 1.1
 
@@ -19,60 +19,40 @@ text = "suitkaise.cerial"
 
 # 1.2
 
-button = "how to use" (site/cerial/cerial-how-to-use.md)
-
-/*
-
-if the user is on the cerial-how-to-use page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "why"
+link = "cerial-why.md"
 
 # 1.3
 
-button = "how it works" (site/cerial/cerial-how-it-works.md)
-
-/*
-
-if the user is on the cerial-how-it-works page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how to use"
+link = "cerial-how-to-use.md"
 
 # 1.4
 
-button = "videos" (site/cerial/cerial-videos.md)
-
-/*
-
-if the user is on the cerial-videos page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how it works"
+link = "cerial-how-it-works.md"
 
 # 1.5
 
-button = "tests" (site/cerial/cerial-tests.md)
-
-/*
-
-if the user is on the cerial-tests page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "supported types"
+link = "cerial-supported-types.md"
 
 # 1.6
 
-button = "examples" (site/cerial/cerial-examples.md)
-
-/*
-
-if the user is on the cerial-examples page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "tests"
+link = "cerial-tests.md"
 
 # 1.7
 
-button = "why" (site/cerial/cerial-why.md)
+button = "examples"
+link = "cerial-examples.md"
 
-/*
+# 1.8
 
-if the user is on the cerial-why page, the button should not do anything, and be slightly highlighted to show that it is the current page.
+button = "videos"
+link = "cerial-videos.md"
 
-*/
+# 1.9
+
+button = "learn"
+link = "cerial-learn.md"

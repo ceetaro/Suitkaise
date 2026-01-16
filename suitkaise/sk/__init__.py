@@ -2,7 +2,7 @@
 Suitkaise Sk - Class and function wrappers for Share and async support.
 
 Usage:
-    from suitkaise.sk import Skclass, sk, NotAsyncedError
+    from suitkaise.sk import Skclass, sk, SkModifierError
     
     # Using Skclass directly
     class Counter:
@@ -37,7 +37,7 @@ from .api import (
     Skclass,
     Skfunction,
     sk,
-    NotAsyncedError,
+    SkModifierError,
     FunctionTimeoutError,
 )
 
@@ -45,6 +45,6 @@ __all__ = [
     'Skclass',
     'Skfunction',
     'sk',
-    'NotAsyncedError',
+    'SkModifierError',
     'FunctionTimeoutError',
 ]

@@ -4,15 +4,19 @@
         <a href="#cerial-why" class="module-bar-link" data-page="cerial-why">why</a>
         <a href="#cerial" class="module-bar-link active" data-page="cerial">how to use</a>
         <a href="#cerial-how-it-works" class="module-bar-link" data-page="cerial-how-it-works">how it works</a>
-        <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+        <a href="#cerial-supported-types" class="module-bar-link" data-page="cerial-supported-types">supported types</a>
         <a href="#cerial-tests" class="module-bar-link" data-page="cerial-tests">tests</a>
         <a href="#cerial-examples" class="module-bar-link" data-page="cerial-examples">examples</a>
+        <a href="#cerial-videos" class="module-bar-link" data-page="cerial-videos">videos</a>
+        <a href="#cerial-learn" class="module-bar-link" data-page="cerial-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1>How to use <code>cerial</code></h1>
 
-    <p><code>cerial</code> is a serialization engine that handles complex Python objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot.</p><br>
+    <p><code>cerial</code> is a serialization engine that handles complex Python objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot.</p>
+
+    <p>Meant for internal, cross-process communication, not for external or cross-language serialization.</p><br>
 
     <h2>API Functions</h2>
 
@@ -36,6 +40,10 @@ my_class = cerial.deserialize(bytes)</code></pre>
     <p>If this happens, you can override the default behavior.</p>
 
     <p>Use <code>__serialize__</code> and <code>__deserialize__</code> methods in your classes to override the default behavior.</p>
+
+    <p>In order for <code>__serialize__</code> to work, data must be reduced down to a <code>dict</code> with only native <code>pickle</code> types. Do not convert to bytes, <code>cerial</code> will do that for you.</p>
+
+    <p><code>__deserialize__</code> needs to take this representation and reconstruct the object.</p>
 
 <pre><code class="language-python">from suitkaise import cerial
 
@@ -164,6 +172,8 @@ print(ir)</code></pre>
         </ul>
 
         <p>For objects with locks, loggers, or other unpicklables, you'll see how cerial represents them in a pickle-safe format.</p>
+
+        <p>Simple class instances and functions may look slightly different, as they are not subjected to the entire process.</p>
     </details>
 
 </section>
