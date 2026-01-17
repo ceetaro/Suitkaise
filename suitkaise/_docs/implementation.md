@@ -700,6 +700,8 @@ add rolling stats (keep only last N measurements)
 
 find a way to advertise cerial when people look up cant pickle X
 
+add a JSON output converter for cerial IRs
+
 ## IGNORE THIS SECTION
 
 Let me address some of your concerns:
