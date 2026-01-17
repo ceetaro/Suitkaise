@@ -28,6 +28,7 @@ def run_all_tests():
     from tests.sk.test_async_chaining import run_all_tests as run_async_chaining_tests
     from tests.sk.test_async_skfunction import run_all_tests as run_async_skfunction_tests
     from tests.sk.test_shared_meta import run_all_tests as run_shared_meta_tests
+    from tests.sk.test_function_wrapper import run_all_tests as run_function_wrapper_tests
     
     results = []
     
@@ -48,6 +49,9 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running _shared_meta tests...{RESET}")
     results.append(("_shared_meta", run_shared_meta_tests()))
+
+    print(f"\n{CYAN}Running Function Wrapper tests...{RESET}")
+    results.append(("Function Wrapper", run_function_wrapper_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

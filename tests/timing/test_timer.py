@@ -15,12 +15,14 @@ import sys
 import time
 import threading
 import asyncio
+import warnings
 from typing import List, Tuple
 
 # Add project root to path
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.timing import Sktimer
+from suitkaise.timing._int.time_ops import _timethis_decorator
 
 
 # =============================================================================
@@ -230,6 +232,33 @@ def test_timer_total_paused():
     assert timer.total_time_paused > 0.025, f"Paused time should be ~30ms, got {timer.total_time_paused}"
 
 
+def test_timer_pause_resume_warnings():
+    """Pause twice or resume when not paused should warn."""
+    timer = Sktimer()
+    timer.start()
+    timer.pause()
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        timer.pause()
+        assert any("already paused" in str(w.message) for w in captured)
+    timer.resume()
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        timer.resume()
+        assert any("not paused" in str(w.message) for w in captured)
+    timer.stop()
+
+
+def test_timer_pause_without_start_raises():
+    """Pause without start should raise RuntimeError."""
+    timer = Sktimer()
+    try:
+        timer.pause()
+        assert False, "Expected RuntimeError when pausing without start"
+    except RuntimeError:
+        pass
+
+
 def test_timer_multiple_pause_resume():
     """Multiple pause/resume cycles should work correctly."""
     timer = Sktimer()
@@ -320,6 +349,14 @@ def test_timer_variance():
     assert abs(timer.variance - 2.5) < 0.001, f"Variance should be 2.5, got {timer.variance}"
 
 
+def test_timer_stdev_variance_single_value():
+    """Stdev/variance should be None for <=1 value."""
+    timer = Sktimer()
+    timer.add_time(1.0)
+    assert timer.stdev is None
+    assert timer.variance is None
+
+
 def test_timer_percentile():
     """Sktimer should calculate percentiles correctly."""
     timer = Sktimer()
@@ -333,6 +370,26 @@ def test_timer_percentile():
     assert abs(p50 - 50.5) < 2.0, f"50th percentile should be ~50, got {p50}"
     assert abs(p90 - 90.5) < 2.0, f"90th percentile should be ~90, got {p90}"
     assert abs(p99 - 99.5) < 2.0, f"99th percentile should be ~99, got {p99}"
+
+
+def test_timer_percentile_invalid_and_empty():
+    """Percentile should validate bounds and return None when empty."""
+    timer = Sktimer()
+    assert timer.percentile(50) is None
+    timer.add_time(1.0)
+    try:
+        timer.percentile(-1)
+        assert False, "Expected ValueError for invalid percentile"
+    except ValueError:
+        pass
+
+
+def test_timer_get_time_invalid():
+    """get_time should return None for invalid index."""
+    timer = Sktimer()
+    timer.add_time(1.0)
+    assert timer.get_time(-1) is None
+    assert timer.get_time(5) is None
 
 
 def test_timer_get_statistics():
@@ -350,6 +407,29 @@ def test_timer_get_statistics():
     assert hasattr(stats, 'max'), "Stats should have max"
     assert hasattr(stats, 'stdev'), "Stats should have stdev"
     assert stats.mean == 3.0, f"Stats mean should be 3.0, got {stats.mean}"
+
+
+def test_timer_get_statistics_empty_and_alias():
+    """get_statistics/get_stats should return None when empty."""
+    timer = Sktimer()
+    assert timer.get_statistics() is None
+    assert timer.get_stats() is None
+
+
+def test_timer_stats_percentile_interpolation_and_bounds():
+    """TimerStats.percentile should interpolate and validate bounds."""
+    timer = Sktimer()
+    for t in [1.0, 2.0, 3.0, 4.0]:
+        timer.add_time(t)
+    stats = timer.get_statistics()
+    assert stats is not None
+    p25 = stats.percentile(25.0)
+    assert p25 is not None
+    try:
+        stats.percentile(101)
+        assert False, "Expected ValueError for invalid percentile"
+    except ValueError:
+        pass
 
 
 # =============================================================================
@@ -376,6 +456,28 @@ def test_timer_fastest_slowest_index():
     
     assert timer.fastest_index == 1, f"Fastest index should be 1, got {timer.fastest_index}"
     assert timer.slowest_index == 2, f"Slowest index should be 2, got {timer.slowest_index}"
+
+
+def test_timer_result_alias_and_total_paused_none():
+    """result alias and total_time_paused should behave with no pauses."""
+    timer = Sktimer()
+    timer.add_time(0.01)
+    assert timer.result == timer.most_recent
+    assert timer.total_time_paused == 0.0
+
+
+def test_timethis_decorator_nested_frame():
+    """_timethis_decorator should add time when nested frame exists."""
+    timer = Sktimer()
+    timer.start()
+
+    @_timethis_decorator(timer)
+    def work():
+        return "ok"
+
+    work()
+    timer.stop()
+    assert timer.num_times >= 1
 
 
 # =============================================================================
@@ -514,6 +616,8 @@ def run_all_tests():
     runner.run_test("Sktimer pause/resume", test_timer_pause_resume)
     runner.run_test("Sktimer total paused", test_timer_total_paused)
     runner.run_test("Sktimer multiple pause/resume", test_timer_multiple_pause_resume)
+    runner.run_test("Sktimer pause/resume warnings", test_timer_pause_resume_warnings)
+    runner.run_test("Sktimer pause without start", test_timer_pause_without_start_raises)
     
     # Statistics tests
     runner.run_test("Sktimer mean", test_timer_mean)
@@ -522,8 +626,14 @@ def run_all_tests():
     runner.run_test("Sktimer min/max", test_timer_min_max)
     runner.run_test("Sktimer stdev", test_timer_stdev)
     runner.run_test("Sktimer variance", test_timer_variance)
+    runner.run_test("Sktimer stdev/variance single", test_timer_stdev_variance_single_value)
     runner.run_test("Sktimer percentile", test_timer_percentile)
+    runner.run_test("Sktimer percentile invalid/empty", test_timer_percentile_invalid_and_empty)
+    runner.run_test("Sktimer get_time invalid", test_timer_get_time_invalid)
     runner.run_test("Sktimer get_statistics", test_timer_get_statistics)
+    runner.run_test("Sktimer get_statistics empty", test_timer_get_statistics_empty_and_alias)
+    runner.run_test("TimerStats percentile", test_timer_stats_percentile_interpolation_and_bounds)
+    runner.run_test("Sktimer result alias", test_timer_result_alias_and_total_paused_none)
     
     # Index tests
     runner.run_test("Sktimer most_recent_index", test_timer_most_recent_index)
@@ -541,6 +651,7 @@ def run_all_tests():
     runner.run_test("Sktimer single measurement", test_timer_single_measurement)
     runner.run_test("Sktimer very small times", test_timer_very_small_times)
     runner.run_test("Sktimer very large times", test_timer_very_large_times)
+    runner.run_test("timethis decorator nested", test_timethis_decorator_nested_frame)
     
     return runner.print_results()
 

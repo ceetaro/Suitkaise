@@ -11,7 +11,7 @@ This module provides the core primitives used by the Share system:
 import ctypes
 import struct
 import time
-from multiprocessing import Queue, Manager
+from multiprocessing import Queue, Manager, Value, Lock
 from multiprocessing import shared_memory
 from multiprocessing.managers import SyncManager
 from typing import Any, Dict, Optional, Tuple

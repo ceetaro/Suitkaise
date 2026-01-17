@@ -28,7 +28,13 @@ def run_all_tests():
     from tests.processing.test_share_comprehensive import run_all_tests as run_share_comprehensive_tests
     from tests.processing.test_config import run_all_tests as run_config_tests
     from tests.processing.test_timers import run_all_tests as run_timers_tests
+    from tests.processing.test_engine import run_all_tests as run_engine_tests
+    from tests.processing.test_timeout import run_all_tests as run_timeout_tests
     from tests.processing.test_errors import run_all_tests as run_errors_tests
+    from tests.processing.test_share_primitives import run_all_tests as run_share_primitives_tests
+    from tests.processing.test_share_proxy import run_all_tests as run_share_proxy_tests
+    from tests.processing.test_pool_internal import run_all_tests as run_pool_internal_tests
+    from tests.processing.test_coordinator import run_all_tests as run_coordinator_tests
     
     results = []
     
@@ -49,9 +55,27 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running Timers tests...{RESET}")
     results.append(("Timers", run_timers_tests()))
+
+    print(f"\n{CYAN}Running Engine tests...{RESET}")
+    results.append(("Engine", run_engine_tests()))
+
+    print(f"\n{CYAN}Running Timeout tests...{RESET}")
+    results.append(("Timeout", run_timeout_tests()))
     
     print(f"\n{CYAN}Running Error Types tests...{RESET}")
     results.append(("Error Types", run_errors_tests()))
+
+    print(f"\n{CYAN}Running Share Primitives tests...{RESET}")
+    results.append(("Share Primitives", run_share_primitives_tests()))
+
+    print(f"\n{CYAN}Running Share Proxy tests...{RESET}")
+    results.append(("Share Proxy", run_share_proxy_tests()))
+
+    print(f"\n{CYAN}Running Pool Internal tests...{RESET}")
+    results.append(("Pool Internal", run_pool_internal_tests()))
+
+    print(f"\n{CYAN}Running Coordinator tests...{RESET}")
+    results.append(("Coordinator", run_coordinator_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

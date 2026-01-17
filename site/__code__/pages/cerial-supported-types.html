@@ -14,7 +14,7 @@
 <section class="module-page">
     <h1>Supported Types</h1>
 
-    <p>Complete list of all Python types that <code>cerial</code> can serialize and deserialize.</p>
+    <p>Complete list of all Python types that <code>cerial</code> can serialize and deserialize, and the time it takes to handle each type.</p>
 
     <h2>All <code>suitkaise</code> object types</h2>
 
@@ -29,7 +29,7 @@
         <li><code>Pool</code> — 10.6µs</li>
         <li><code>Share</code> — 47.5µs</li>
         <li><code>ProcessTimers</code> — 29.7µs</li>
-        <li>all <code>suitkaise</code> error classes — 3.3-3.7µs</li>
+        <li>all <code>suitkaise</code> error classes — 4.0µs</li>
     </ul>
 
     <hr>
@@ -39,7 +39,7 @@
     <p>These types are handled directly by <code>pickle</code> — <code>cerial</code> passes them through.</p>
 
     <ul>
-        <li><code>None</code></li>
+        <li><code>None</code> — 0.4µs</li>
         <li><code>bool</code> — 0.5µs</li>
         <li><code>int</code> — 0.5µs</li>
         <li><code>float</code> — 0.4µs</li>
@@ -103,7 +103,7 @@
         <li><code>pathlib.Path</code> — 2.9µs</li>
         <li><code>pathlib.PurePath</code> — 12.9µs</li>
         <li><code>pathlib.PosixPath</code> — 2.8µs</li>
-        <li><code>pathlib.WindowsPath</code></li>
+        <li><code>pathlib.WindowsPath</code> — n/a (windows only)</li>
     </ul>
 
     <hr>
@@ -333,7 +333,7 @@
         <li>Class instances — 3.3µs</li>
         <li><code>@dataclass</code> classes — 23.8µs</li>
         <li><code>__slots__</code> classes — 8.4µs</li>
-        <li><code>__dict__</code> classes</li>
+        <li><code>__dict__</code> classes — 3.7µs</li> 
         <li>classes with both <code>__dict__</code> and <code>__slots__</code> — 10.1µs</li>
     </ul>
 

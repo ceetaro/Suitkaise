@@ -764,7 +764,7 @@ body {
     font-size: 0.95rem;
     line-height: 1.75;
     margin-bottom: 14px;
-    color: rgba(109, 233, 149, 0.6);
+    color: rgb(66, 255, 173);
 }
 
 /* ============================================
@@ -822,7 +822,7 @@ body {
     font-size: 0.95rem;
     line-height: 1.7;
     margin-bottom: 6px;
-    color: rgba(109, 233, 149, 0.5);
+    color: rgba(109, 233, 149, 0.75);
 }
 
 /* Nested lists */
@@ -984,6 +984,37 @@ body {
     color: rgba(109, 233, 149, 0.5);
     font-size: 0.9rem;
     user-select: none;
+}
+
+.module-page details summary.dropdown-title-h2 {
+    list-style: none;
+}
+
+.module-page details summary.dropdown-title-h2::marker {
+    content: "";
+}
+
+.module-page details summary.dropdown-title-h2::-webkit-details-marker {
+    display: none;
+}
+
+.module-page details summary.dropdown-title-h2 h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.module-page details summary.dropdown-title-h2 h2::before {
+    content: "▸";
+    font-size: inherit;
+    color: inherit;
+}
+
+.module-page details[open] summary.dropdown-title-h2 h2::before {
+    content: "▾";
 }
 
 .module-page details summary:hover {

@@ -451,6 +451,71 @@ def test_autopath_special_chars():
 
 
 # =============================================================================
+# Extended Coverage Tests
+# =============================================================================
+
+def test_autopath_use_caller_defaults():
+    """@autopath(use_caller) should fill caller path when None."""
+    @autopath(use_caller=True)
+    def caller_path(path: Skpath | None = None) -> Skpath:
+        assert path is not None
+        return path
+    
+    result = caller_path(None)
+    assert result.name.endswith("test_autopath.py")
+
+
+def test_autopath_debug_mode():
+    """@autopath debug should still convert types."""
+    @autopath(debug=True)
+    def get_path_str(path: str) -> str:
+        return path
+    
+    result = get_path_str("./some/path.txt")
+    assert isinstance(result, str)
+    assert result.endswith("path.txt")
+
+
+def test_autopath_iterable_list():
+    """@autopath should convert list of path-like values."""
+    @autopath()
+    def names(paths: list[Skpath]) -> list[str]:
+        return [p.name for p in paths]
+    
+    result = names(["/a.txt", "/b.txt"])
+    assert result == ["a.txt", "b.txt"]
+
+
+def test_autopath_iterable_tuple():
+    """@autopath should convert tuple of paths."""
+    @autopath()
+    def suffixes(paths: tuple[Path, ...]) -> list[str]:
+        return [p.suffix for p in paths]
+    
+    result = suffixes(("/a.py", "/b.md"))
+    assert result == [".py", ".md"]
+
+
+def test_autopath_union_prefers_skpath():
+    """@autopath should prefer Skpath within Union types."""
+    @autopath()
+    def return_type(path: Union[str, Skpath]) -> type:
+        return type(path)
+    
+    result = return_type("/some/path")
+    assert result is Skpath
+
+
+def test_autopath_forward_ref():
+    """@autopath should handle forward reference annotations."""
+    @autopath()
+    def forward(path: "Skpath") -> str:
+        return path.name
+    
+    assert forward("/tmp/test.txt") == "test.txt"
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -502,6 +567,14 @@ def run_all_tests():
     runner.run_test("@autopath no annotation", test_autopath_no_annotation)
     runner.run_test("@autopath unicode path", test_autopath_unicode_path)
     runner.run_test("@autopath special chars", test_autopath_special_chars)
+
+    # Extended coverage
+    runner.run_test("@autopath use_caller defaults", test_autopath_use_caller_defaults)
+    runner.run_test("@autopath debug mode", test_autopath_debug_mode)
+    runner.run_test("@autopath iterable list", test_autopath_iterable_list)
+    runner.run_test("@autopath iterable tuple", test_autopath_iterable_tuple)
+    runner.run_test("@autopath union prefers Skpath", test_autopath_union_prefers_skpath)
+    runner.run_test("@autopath forward ref", test_autopath_forward_ref)
     
     return runner.print_results()
 

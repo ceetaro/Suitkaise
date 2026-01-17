@@ -11,6 +11,7 @@ Tests Pool functionality:
 import sys
 import time
 import signal
+import asyncio
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
@@ -20,6 +21,19 @@ from suitkaise.processing import Process, Pool
 from tests.processing.test_process_classes import (
     DoubleProcess, AddProcess, SlowDoubleProcess, FailingDoubleProcess
 )
+
+
+def _double(x: int) -> int:
+    return x * 2
+
+
+def _add(x: int, y: int) -> int:
+    return x + y
+
+
+def _slow_double(x: int) -> int:
+    time.sleep(0.2)
+    return x * 2
 
 
 # =============================================================================
@@ -283,6 +297,33 @@ def test_pool_map_ordering():
     assert results == expected
 
 
+def test_pool_map_timeout():
+    """Pool.map timeout should raise TimeoutError."""
+    pool = Pool(workers=1)
+    try:
+        pool.map.timeout(0.1)(_slow_double, [1])
+        assert False, "Expected TimeoutError"
+    except TimeoutError:
+        pass
+
+
+def test_pool_map_background():
+    """Pool.map background should return Future."""
+    pool = Pool(workers=2)
+    future = pool.map.background()(_double, [1, 2, 3])
+    assert future.result(timeout=5) == [2, 4, 6]
+
+
+def test_pool_map_asynced():
+    """Pool.map asynced should return coroutine."""
+    async def run():
+        return await pool.map.asynced()(_double, [2, 3])
+
+    pool = Pool(workers=2)
+    result = asyncio.run(run())
+    assert result == [4, 6]
+
+
 # =============================================================================
 # Pool.star().map Tests
 # =============================================================================
@@ -309,6 +350,82 @@ def test_pool_star_map_single():
     
     results = pool.star().map(AddProcess, [(10, 20)])
     assert results == [30]
+
+
+def test_pool_imap_basic():
+    """Pool.imap should return ordered iterator."""
+    pool = Pool(workers=2)
+    results = list(pool.imap(_double, [1, 2, 3]))
+    assert results == [2, 4, 6]
+
+
+def test_pool_imap_timeout():
+    """Pool.imap timeout should raise TimeoutError."""
+    pool = Pool(workers=1)
+    try:
+        list(pool.imap.timeout(0.1)(_slow_double, [1]))
+        assert False, "Expected TimeoutError"
+    except TimeoutError:
+        pass
+
+
+def test_pool_imap_background():
+    """Pool.imap background should return Future list."""
+    pool = Pool(workers=2)
+    future = pool.imap.background()(_double, [1, 2])
+    assert future.result(timeout=5) == [2, 4]
+
+
+def test_pool_imap_asynced():
+    """Pool.imap asynced should return coroutine list."""
+    async def run():
+        return await pool.imap.asynced()(_double, [2, 4])
+
+    pool = Pool(workers=2)
+    result = asyncio.run(run())
+    assert result == [4, 8]
+
+
+def test_pool_unordered_imap_basic():
+    """Pool.unordered_imap should yield results without ordering."""
+    pool = Pool(workers=2)
+    results = list(pool.unordered_imap(_double, [1, 2, 3]))
+    assert sorted(results) == [2, 4, 6]
+
+
+def test_pool_unordered_imap_timeout():
+    """Pool.unordered_imap timeout should raise TimeoutError."""
+    pool = Pool(workers=1)
+    try:
+        list(pool.unordered_imap.timeout(0.1)(_slow_double, [1]))
+        assert False, "Expected TimeoutError"
+    except TimeoutError:
+        pass
+
+
+def test_pool_unordered_imap_background():
+    """Pool.unordered_imap background should return Future list."""
+    pool = Pool(workers=2)
+    future = pool.unordered_imap.background()(_double, [1, 2])
+    results = future.result(timeout=5)
+    assert sorted(results) == [2, 4]
+
+
+def test_pool_unordered_imap_asynced():
+    """Pool.unordered_imap asynced should return coroutine list."""
+    async def run():
+        return await pool.unordered_imap.asynced()(_double, [2, 3])
+
+    pool = Pool(workers=2)
+    result = asyncio.run(run())
+    assert sorted(result) == [4, 6]
+
+
+def test_pool_context_manager():
+    """Pool should support context manager usage."""
+    with Pool(workers=1) as pool:
+        results = pool.map(_double, [1, 2])
+    assert results == [2, 4]
 
 
 # =============================================================================
@@ -362,6 +479,20 @@ def run_all_tests():
     runner.run_test("Pool.star().map basic", test_pool_star_map_basic, timeout=15)
     runner.run_test("Pool.star().map empty", test_pool_star_map_empty, timeout=10)
     runner.run_test("Pool.star().map single", test_pool_star_map_single, timeout=10)
+
+    # Modifiers and imap tests
+    runner.run_test("Pool.map timeout", test_pool_map_timeout, timeout=10)
+    runner.run_test("Pool.map background", test_pool_map_background, timeout=10)
+    runner.run_test("Pool.map asynced", test_pool_map_asynced, timeout=10)
+    runner.run_test("Pool.imap basic", test_pool_imap_basic, timeout=10)
+    runner.run_test("Pool.imap timeout", test_pool_imap_timeout, timeout=10)
+    runner.run_test("Pool.imap background", test_pool_imap_background, timeout=10)
+    runner.run_test("Pool.imap asynced", test_pool_imap_asynced, timeout=10)
+    runner.run_test("Pool.unordered_imap basic", test_pool_unordered_imap_basic, timeout=10)
+    runner.run_test("Pool.unordered_imap timeout", test_pool_unordered_imap_timeout, timeout=10)
+    runner.run_test("Pool.unordered_imap background", test_pool_unordered_imap_background, timeout=10)
+    runner.run_test("Pool.unordered_imap asynced", test_pool_unordered_imap_asynced, timeout=10)
+    runner.run_test("Pool context manager", test_pool_context_manager, timeout=10)
     
     # Error handling
     runner.run_test("Pool.map with failure", test_pool_map_with_failure, timeout=15)

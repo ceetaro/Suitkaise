@@ -44,6 +44,7 @@ dependencies = []
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "coverage>=7.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -52,7 +53,10 @@ include = ["suitkaise*"]
 exclude = ["tests*", "docs*", "examples*", "suitkaise_depr*", "_suitkaise_wip*"]
 
 [tool.setuptools.package-data]
-"*" = ["**/*.md"]
+"*" = ["**/*.md", "**/*.pyi", "py.typed"]
+
+[project.scripts]
+suitkaise = "suitkaise.cli:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -10,6 +10,7 @@ Tests Skpath functionality:
 
 import sys
 import os
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
@@ -186,6 +187,26 @@ def test_skpath_parent():
     assert parent.name == "to"
 
 
+def test_skpath_suffixes():
+    """Skpath.suffixes should return all suffixes."""
+    path = Skpath("/path/archive.tar.gz")
+    assert path.suffixes == [".tar", ".gz"]
+
+
+def test_skpath_parts():
+    """Skpath.parts should return path parts."""
+    path = Skpath("/path/to/file.txt")
+    assert "path" in path.parts
+
+
+def test_skpath_parents():
+    """Skpath.parents should return tuple of parents."""
+    path = Skpath("/path/to/file.txt")
+    parents = path.parents
+    assert isinstance(parents, tuple)
+    assert parents[0].name == "to"
+
+
 # =============================================================================
 # Path Operations Tests
 # =============================================================================
@@ -198,6 +219,91 @@ def test_skpath_join():
     assert isinstance(joined, Skpath)
     assert "subdir" in joined.ap
     assert "file.txt" in joined.ap
+
+
+def test_skpath_relative_to():
+    """Skpath.relative_to should return relative Skpath."""
+    base = Skpath("/path/to")
+    child = Skpath("/path/to/sub/file.txt")
+    rel = child.relative_to(base)
+    assert rel.ap.endswith("sub/file.txt")
+
+
+def test_skpath_with_name_stem_suffix():
+    """Skpath should update name/stem/suffix."""
+    path = Skpath("/path/to/file.txt")
+    assert path.with_name("other.md").name == "other.md"
+    assert path.with_stem("new").name == "new.txt"
+    assert path.with_suffix(".py").name == "file.py"
+
+
+def test_skpath_mkdir_touch_iterdir():
+    """Skpath mkdir/touch/iterdir should operate on filesystem."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Skpath(tmpdir)
+        sub = root / "sub"
+        sub.mkdir(parents=True, exist_ok=True)
+        file_path = sub / "a.txt"
+        file_path.touch()
+        entries = list(sub.iterdir())
+        assert any(p.name == "a.txt" for p in entries)
+
+
+def test_skpath_glob_rglob():
+    """Skpath glob/rglob should find matching files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Skpath(tmpdir)
+        (root / "a.txt").touch()
+        (root / "b.md").touch()
+        matches = list(root.glob("*.txt"))
+        assert len(matches) == 1
+        all_matches = list(root.rglob("*.*"))
+        assert len(all_matches) >= 2
+
+
+def test_skpath_stat_lstat_symlink():
+    """Skpath stat/lstat/is_symlink should behave."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Skpath(tmpdir)
+        target = root / "target.txt"
+        target.touch()
+        link = root / "link.txt"
+        try:
+            os.symlink(target.ap, link.ap)
+        except (OSError, NotImplementedError):
+            return
+        assert link.is_symlink
+        assert link.lstat is not None
+        assert link.stat is not None
+
+
+def test_skpath_as_dict_and_platform():
+    """Skpath.as_dict and platform should return metadata."""
+    path = Skpath(__file__)
+    data = path.as_dict
+    assert data["ap"] == path.ap
+    platform_path = path.platform
+    assert isinstance(platform_path, str)
+    assert platform_path.replace(os.sep, "/") == path.ap
+
+
+def test_skpath_repr_fspath_and_hash():
+    """Skpath string/representation helpers should work."""
+    path = Skpath(__file__)
+    assert str(path)
+    assert "Skpath" in repr(path)
+    assert os.fspath(path) == path.ap
+    assert hash(path)
+
+
+def test_skpath_bool_len_iter_contains():
+    """Skpath bool/len/iter/contains should work."""
+    path = Skpath("/path/to/file.txt")
+    assert bool(path)
+    assert len(path) > 0
+    assert "file.txt" in path
+    parts = list(iter(path))
+    assert "path" in parts
 
 
 def test_skpath_exists():
@@ -306,12 +412,23 @@ def run_all_tests():
     runner.run_test("Skpath.stem", test_skpath_stem)
     runner.run_test("Skpath.suffix", test_skpath_suffix)
     runner.run_test("Skpath.parent", test_skpath_parent)
+    runner.run_test("Skpath.suffixes", test_skpath_suffixes)
+    runner.run_test("Skpath.parts", test_skpath_parts)
+    runner.run_test("Skpath.parents", test_skpath_parents)
     
     # Path operations tests
     runner.run_test("Skpath / join", test_skpath_join)
     runner.run_test("Skpath.exists()", test_skpath_exists)
     runner.run_test("Skpath.is_file()", test_skpath_is_file)
     runner.run_test("Skpath.is_dir()", test_skpath_is_dir)
+    runner.run_test("Skpath.relative_to()", test_skpath_relative_to)
+    runner.run_test("Skpath.with_name/stem/suffix", test_skpath_with_name_stem_suffix)
+    runner.run_test("Skpath.mkdir/touch/iterdir", test_skpath_mkdir_touch_iterdir)
+    runner.run_test("Skpath.glob/rglob", test_skpath_glob_rglob)
+    runner.run_test("Skpath.stat/lstat/symlink", test_skpath_stat_lstat_symlink)
+    runner.run_test("Skpath.as_dict/platform", test_skpath_as_dict_and_platform)
+    runner.run_test("Skpath repr/fspath/hash", test_skpath_repr_fspath_and_hash)
+    runner.run_test("Skpath bool/len/iter/contains", test_skpath_bool_len_iter_contains)
     
     # Comparison tests
     runner.run_test("Skpath equality", test_skpath_equality)

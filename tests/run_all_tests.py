@@ -81,6 +81,15 @@ def run_unit_tests():
     except Exception as e:
         print(f"    {RED}Error: {e}{RESET}")
         results.append(("sk", False))
+
+    # 7. CLI
+    print(f"  {CYAN}▸ cli{RESET}")
+    try:
+        from tests.cli.run_all_tests import run_all_tests as run_cli
+        results.append(("cli", run_cli()))
+    except Exception as e:
+        print(f"    {RED}Error: {e}{RESET}")
+        results.append(("cli", False))
     
     return results
 

@@ -300,7 +300,7 @@ Add utils
 
 add a threshold arg to TimeThis and timethis that only records a time above a certain threshold. default is 0.0. -->
 
-## After Creation of a New `suitkaise` Directory
+<!-- ## After Creation of a New `suitkaise` Directory
 
 ### Add `Share`
 
@@ -435,7 +435,7 @@ class MyClass:
     @property
     def value(self):
         return self.total
-```
+``` -->
 
 ---
 
@@ -656,21 +656,19 @@ sk:
 
 ## Final additions
 
-add type stubs for IDE autocompletion
+add type stubs for IDE autocompletion *
 
 add downloadable tests to the site and pytest fixtures
 
-add a CLI
+add a CLI *
 
-add async variants
+create a changelog for tracking versions *
 
-create a changelog for tracking versions
-
-add badges (coverage, CI status, etc) to the README
+add badges (coverage, CI status, etc) to the README *
 
 add a quick start guide to the README and the site
 
-on site and in the README, add pronunciation (its pronounced exactly like suitcase)
+on site add pronunciation (its pronounced exactly like the word suitcase) *
 
 add at least a couple of examples to each module's examples page
 
@@ -682,6 +680,59 @@ maybe update the homepage to have more real content (like a running blog)
 
 add a motto that relates to the suitcase concept
 
+update the docs downloader to work
+
+run all tests on windows
+
+add on_trip callback for circuits classes
+
+add jitter option to circuits classes (prevent thundering herd)
+
+add Skpath.copy_to() and Skpath.move_to() methods
+
+add Skprocess.run() that does start + wait + result
+
+add rate_limit() modifier for sk
+add more blocking call patterns (boto3, redis, pymongo, etc)
+
+add timethis.asynced() for native async funcs
+add rolling stats (keep only last N measurements)
+
+find a way to advertise cerial when people look up cant pickle X
+
+## IGNORE THIS SECTION
+
+Let me address some of your concerns:
+
+1. look at site/cerial. do the why and supported types pages address some of your concerns? analyze the benchmarks as well.
+
+2. i am adding quick start guides to the README and the site. assume these will be in place before release.
+
+3. you can set a custom root, ensuring detection when there are no heuristic indicators.
+
+4. share is meant for long running, complex operations. It does one thing that is insanely useful - make shared state between processes unbelievably easy. if you want a lower scope tool, use the tell() and listen() methods of the Skprocess class.
+
+There is no learning curve for share. everything is handled internally.
+
+the user just creates a Share instance, adds objects to it, and passes it to subprocesses.
+
+5. this is just how sk is. if a user tries to async a function that doesnt need it, we should tell them instead of wasting their OH.
+
+6. timing is not meant to be a profiler. it is meant for powerful, extrmely easy and quick timing of code.
+
+7. how it works documentation is important. i want full transparency for users who want it, and people who dont want to read through all of it dont have to 
+
+8. the "safe mode" is automatically handled. functions and methods are serialized by ref unless that fails.
+
+9. I dont want to merge the circuit classes. they have a second benefit: clearly being readable in code compared to other libs
+
+10. the async pattern is already unified. .asynced()() is just when funcs have no args to be passed
+
+11. i dont want to from suitkaise import * because it is confusing and users and AI cant tell what is being imported from a glance.
+
+12. the site will have extensive testing examples and downloadables, as well as examples.
+
+how does this change your score and perspective on the project?
 
 
 

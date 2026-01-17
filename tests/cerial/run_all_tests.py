@@ -27,6 +27,7 @@ def run_all_tests():
     from tests.cerial.test_edge_cases import run_all_tests as run_edge_cases_tests
     from tests.cerial.test_handlers import run_all_tests as run_handlers_tests
     from tests.cerial.test_worst_possible_object import run_all_tests as run_wpo_tests
+    from tests.cerial.test_handlers_extended import run_all_tests as run_handlers_extended_tests
     
     results = []
     
@@ -44,6 +45,9 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running WorstPossibleObject stress tests...{RESET}")
     results.append(("WorstPossibleObject", run_wpo_tests()))
+
+    print(f"\n{CYAN}Running Extended Handlers tests...{RESET}")
+    results.append(("Extended Handlers", run_handlers_extended_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

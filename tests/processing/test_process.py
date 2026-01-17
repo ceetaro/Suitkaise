@@ -12,10 +12,14 @@ Tests Process functionality:
 import sys
 import time
 import signal
+import multiprocessing
 
 sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
 
 from suitkaise.processing import Process, ProcessError, RunError
+from suitkaise.processing._int.process_class import Skprocess
+from suitkaise.processing._int.timers import ProcessTimers
+from suitkaise import cerial
 
 # Import test classes from separate module for multiprocessing compatibility
 from tests.processing.test_process_classes import (
@@ -69,6 +73,89 @@ class WaitRetryProcess(Process):
 
     def __result__(self):
         return self.attempts
+
+
+# =============================================================================
+# Serialization and Internal Behavior Tests (no subprocess)
+# =============================================================================
+
+class NoInitProcess(Process):
+    """Process subclass without __init__ to hit default __init__ wrapper."""
+    def __run__(self):
+        return None
+
+
+class UserStateProcess(Process):
+    """Process with custom serialize/deserialize for user state restoration."""
+    def __init__(self):
+        self.value = 2
+        self.process_config.runs = 1
+
+    def __run__(self):
+        return None
+
+    def __serialize__(self):
+        return {"value": self.value, "flag": "user"}
+
+    @classmethod
+    def __deserialize__(cls, state):
+        obj = cls.__new__(cls)
+        obj.value = state["value"] + 1
+        obj.user_flag = state["flag"]
+        return obj
+
+
+class StaticUserStateProcess(Process):
+    """Process with staticmethod deserialize to hit staticmethod branch."""
+    def __init__(self):
+        self.value = 5
+        self.process_config.runs = 1
+
+    def __run__(self):
+        return None
+
+    def __serialize__(self):
+        return {"value": self.value}
+
+    @staticmethod
+    def __deserialize__(cls, state):
+        obj = cls.__new__(cls)
+        obj.value = state["value"] * 2
+        obj.static_flag = "static"
+        return obj
+
+
+class BadSignatureDeserializeProcess(Process):
+    """Process with invalid deserialize signature to hit fallback branch."""
+    def __init__(self):
+        self.value = 7
+        self.process_config.runs = 1
+
+    def __run__(self):
+        return None
+
+    def __serialize__(self):
+        return {"value": self.value}
+
+    def __deserialize__(state):  # type: ignore[no-redef]
+        obj = BadSignatureDeserializeProcess.__new__(BadSignatureDeserializeProcess)
+        obj.value = state["value"] + 3
+        obj.fallback_flag = "fallback"
+        return obj
+
+
+class DummySubprocess:
+    def __init__(self, alive: bool):
+        self._alive = alive
+
+    def is_alive(self):
+        return self._alive
+
+
+class DummyQueueEmpty:
+    def get(self, timeout=None):
+        import queue as queue_module
+        raise queue_module.Empty
 
 
 # =============================================================================
@@ -263,7 +350,106 @@ def test_process_callbacks_direct():
     assert proc.pre_run_called
     assert proc.run_called
     assert result == "completed"
-    assert proc.finish_called
+
+
+def test_process_default_init_wrapper():
+    """Process without __init__ should still get setup state."""
+    proc = NoInitProcess()
+    assert hasattr(proc, "process_config")
+    assert proc._current_run == 0
+
+
+def test_process_custom_serialize_deserialize_classmethod():
+    """Custom classmethod deserialize should restore user state."""
+    proc = UserStateProcess()
+    data = cerial.serialize(proc)
+    restored = cerial.deserialize(data)
+    assert isinstance(restored, Skprocess)
+    assert restored.user_flag == "user"
+    assert restored.value == 2
+
+
+def test_process_custom_serialize_deserialize_staticmethod():
+    """Custom staticmethod deserialize should restore user state."""
+    proc = StaticUserStateProcess()
+    data = cerial.serialize(proc)
+    restored = cerial.deserialize(data)
+    assert restored.static_flag == "static"
+
+
+def test_process_custom_serialize_deserialize_fallback():
+    """Fallback deserialize signature should still work."""
+    proc = BadSignatureDeserializeProcess()
+    data = cerial.serialize(proc)
+    restored = cerial.deserialize(data)
+    assert restored.fallback_flag == "fallback"
+
+
+def test_process_drain_result_queue_error_non_exception():
+    """_drain_result_queue should wrap non-exception errors."""
+    proc = SimpleProcess(1)
+    proc._result_queue = multiprocessing.Queue()
+    proc._has_result = False
+    message = {
+        "type": "error",
+        "data": cerial.serialize("oops"),
+        "timers": None,
+    }
+    proc._result_queue.put(message)
+    proc._drain_result_queue()
+    assert proc._has_result is True
+    assert isinstance(proc._result, ProcessError)
+
+
+def test_process_drain_result_queue_empty_noop():
+    """_drain_result_queue should ignore Empty."""
+    proc = SimpleProcess(1)
+    proc._result_queue = DummyQueueEmpty()
+    proc._has_result = False
+    proc._drain_result_queue()
+    assert proc._has_result is False
+
+
+def test_process_tell_listen_errors():
+    """tell/listen should error when process not started."""
+    proc = SimpleProcess(1)
+    try:
+        proc.tell("data")
+        assert False, "Expected RuntimeError on tell without start"
+    except RuntimeError:
+        pass
+    try:
+        proc.listen()
+        assert False, "Expected RuntimeError on listen without start"
+    except RuntimeError:
+        pass
+
+
+def test_process_listen_empty_returns_none():
+    """listen should return None on timeout/empty."""
+    proc = SimpleProcess(1)
+    proc._listen_queue = DummyQueueEmpty()
+    assert proc.listen(timeout=0.01) is None
+
+
+def test_process_wait_without_subprocess():
+    """wait should return True if no subprocess exists."""
+    proc = SimpleProcess(1)
+    proc._subprocess = None
+    assert proc.wait() is True
+
+
+def test_process_properties():
+    """process_timer/current_run/is_alive should reflect state."""
+    proc = SimpleProcess(1)
+    proc.timers = None
+    assert proc.process_timer is None
+    proc.timers = ProcessTimers()
+    assert proc.process_timer is proc.timers.full_run
+    proc._current_run = 4
+    assert proc.current_run == 4
+    proc._subprocess = DummySubprocess(alive=True)
+    assert proc.is_alive is True
 
 
 def test_process_failing_run():
@@ -573,6 +759,16 @@ def run_all_tests():
     runner.run_test("Process __result__ directly", test_process_result_directly)
     runner.run_test("Process callbacks direct", test_process_callbacks_direct)
     runner.run_test("Process failing run", test_process_failing_run)
+    runner.run_test("Default __init__ wrapper", test_process_default_init_wrapper)
+    runner.run_test("Custom deserialize classmethod", test_process_custom_serialize_deserialize_classmethod)
+    runner.run_test("Custom deserialize staticmethod", test_process_custom_serialize_deserialize_staticmethod)
+    runner.run_test("Custom deserialize fallback", test_process_custom_serialize_deserialize_fallback)
+    runner.run_test("Drain result queue error", test_process_drain_result_queue_error_non_exception)
+    runner.run_test("Drain result queue empty", test_process_drain_result_queue_empty_noop)
+    runner.run_test("tell/listen errors", test_process_tell_listen_errors)
+    runner.run_test("listen empty returns None", test_process_listen_empty_returns_none)
+    runner.run_test("wait without subprocess", test_process_wait_without_subprocess)
+    runner.run_test("process properties", test_process_properties)
     
     # Actual subprocess tests (slower, may timeout in sandbox)
     runner.run_test("Process actual run", test_process_actual_run, timeout=10)

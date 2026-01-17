@@ -68,7 +68,9 @@
         <details>
             <summary><strong>Things that <code>cerial</code> handles the fastest</strong></summary>
 
-            <p>(all comparisons are against the 2nd fastest serializer. <code>pickle</code> fails to serialize all of these but one.)</p>
+            <p>(all comparisons are against the 2nd fastest serializer)</p>
+            
+            <p>(<code>pickle</code> fails to serialize all of these but one)</p>
 
             <ul>
                 <li><code>requests.Session</code> — slightly faster than even base <code>pickle</code></li>
@@ -125,7 +127,7 @@
 
             <p>Please keep in mind that these are all estimates, and many factors can affect the results.</p>
 
-            <p>All types above within 2x the speed of second place were remeasured several times to get more accurate results.</p>
+            <p>All types above within 2x the speed of second place were remeasured several times to get more accurate results. This is just one snapshot of the data.</p>
 
 <pre><code>==============================================================================================================
                                    Supported Types Compatibility Benchmarks                                   
@@ -314,10 +316,10 @@
 
     <p>With this, <code>cerial</code> can serialize almost anything, even your most complex classes and objects that others cannot.</p>
 
-    <p>To prove this to you, I have created a special class object.</p>
+    <h3>To prove this to you, I have created a special class object.</h3>
 
     <details>
-        <summary><strong>The WorstPossibleObject</strong></summary>
+        <summary class="dropdown-title-h2"><h2>WorstPossibleObject</h2></summary>
 
         <p>The WorstPossibleObject is a comprehensive test of <code>cerial</code>'s ability to serialize and deserialize complex objects.</p>
 
