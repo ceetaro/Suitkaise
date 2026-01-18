@@ -676,25 +676,26 @@ add a motto that relates to the suitcase concept
 
 update the docs downloader to work
 
-run all tests on windows
+fix benchmark tests on windows
 
-add on_trip callback for circuits classes
-
-add jitter option to circuits classes (prevent thundering herd)
 
 add Skpath.copy_to() and Skpath.move_to() methods
 
 add Skprocess.run() that does start + wait + result
 
 add rate_limit() modifier for sk
+- lets explore this more
+
 add more blocking call patterns (boto3, redis, pymongo, etc)
 
 add timethis.asynced() for native async funcs
-add rolling stats (keep only last N measurements)
 
-find a way to advertise cerial when people look up "cant pickle X"
+add rolling stats to Sktimer (keep only last N measurements)
+- how do we determine how many measurements to keep?
 
 add a JSON output converter for cerial IRs
+
+find a way to advertise cerial when people look up "cant pickle X"
 
 update cerial benchmarks in docs and supported types to reflect improvements
 

@@ -28,6 +28,7 @@ A "circuit breaker" that trips and can stop execution after a certain number of 
 Initialize with:
 - `num_shorts_to_trip`: Maximum number of shorts before the circuit trips (int)
 - `sleep_time_after_trip`: Sleep duration in seconds when circuit trips (`float`, default `0.0`)
+- `jitter`: Random +/- percent of sleep time to spread retries (`float`, default `0.0`)
 
 ```python
 from suitkaise.circuit import Circuit

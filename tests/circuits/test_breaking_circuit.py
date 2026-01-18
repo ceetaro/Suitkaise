@@ -28,6 +28,7 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.circuits import BreakingCircuit
+from suitkaise.circuits import api as circuits_api
 
 
 # =============================================================================
@@ -111,6 +112,7 @@ def test_breaking_circuit_defaults():
     assert circ.sleep_time_after_trip == 0.0
     assert circ.backoff_factor == 1.0
     assert circ.max_sleep_time == 10.0
+    assert circ.jitter == 0.0
 
 
 # =============================================================================
@@ -203,6 +205,22 @@ def test_breaking_trip_sleeps():
     elapsed = time.perf_counter() - start
     
     assert elapsed >= 0.018, f"Should sleep ~20ms, got {elapsed}"
+
+
+def test_breaking_jitter_applies():
+    """Sleep duration should include jitter."""
+    circ = BreakingCircuit(1, sleep_time_after_trip=0.02, jitter=0.5)
+    
+    original_uniform = circuits_api.random.uniform
+    try:
+        circuits_api.random.uniform = lambda low, high: high  # max jitter
+        start = time.perf_counter()
+        circ.short()  # break and sleep
+        elapsed = time.perf_counter() - start
+    finally:
+        circuits_api.random.uniform = original_uniform
+    
+    assert elapsed >= 0.026, f"Should sleep with jitter, got {elapsed}"
 
 
 def test_breaking_custom_sleep():

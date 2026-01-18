@@ -13,6 +13,7 @@ Methods `short()` and `trip()` support `.asynced()` for async usage:
 """
 
 import asyncio
+import random
 import threading
 
 # import timing
@@ -51,6 +52,7 @@ class Circuit:
         sleep_time_after_trip: Base sleep duration (seconds) when circuit trips
         backoff_factor: Exponential backoff multiplier (default 1 = no backoff)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
+        jitter: Random +/- percent of sleep_time to prevent thundering herd
         
     Attributes:
         times_shorted: Number of shorts since last trip
@@ -100,12 +102,14 @@ class Circuit:
         num_shorts_to_trip: int, 
         sleep_time_after_trip: float = 0.0,
         backoff_factor: float = 1.0,
-        max_sleep_time: float = 10.0
+        max_sleep_time: float = 10.0,
+        jitter: float = 0.0
     ):
         self.num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
         self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
+        self.jitter = jitter
         
         self._times_shorted = 0
         self._total_trips = 0
@@ -147,6 +151,7 @@ class Circuit:
                     self.max_sleep_time
                 )
         
+        sleep_duration = self._apply_jitter(sleep_duration)
         if sleep_duration > 0:
             await asyncio.sleep(sleep_duration)
         
@@ -262,10 +267,21 @@ class Circuit:
                     self.max_sleep_time
                 )
         
+        sleep_duration = self._apply_jitter(sleep_duration)
         if sleep_duration > 0:
             timing.sleep(sleep_duration)
         
         return True
+
+    def _apply_jitter(self, sleep_duration: float) -> float:
+        """Apply randomized jitter to sleep duration."""
+        if sleep_duration <= 0:
+            return sleep_duration
+        jitter_fraction = abs(self.jitter)
+        if jitter_fraction <= 0:
+            return sleep_duration
+        delta = sleep_duration * jitter_fraction
+        return max(0.0, sleep_duration + random.uniform(-delta, delta))
     
     def reset_backoff(self) -> None:
         """
@@ -317,6 +333,7 @@ class BreakingCircuit:
         sleep_time_after_trip: Base sleep duration (seconds) when circuit trips
         backoff_factor: Exponential backoff multiplier applied on reset (default 1)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
+        jitter: Random +/- percent of sleep_time to prevent thundering herd
         
     Attributes:
         broken: True if circuit has tripped
@@ -375,12 +392,14 @@ class BreakingCircuit:
         num_shorts_to_trip: int, 
         sleep_time_after_trip: float = 0.0,
         backoff_factor: float = 1.0,
-        max_sleep_time: float = 10.0
+        max_sleep_time: float = 10.0,
+        jitter: float = 0.0
     ):
         self.num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
         self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
+        self.jitter = jitter
         
         self._broken = False
         self._times_shorted = 0
@@ -422,6 +441,7 @@ class BreakingCircuit:
             self._broken = True
             self._times_shorted = 0
 
+        sleep_duration = self._apply_jitter(sleep_duration)
         if sleep_duration > 0:
             await asyncio.sleep(sleep_duration)
     
@@ -562,8 +582,19 @@ class BreakingCircuit:
             self._broken = True
             self._times_shorted = 0
 
+        sleep_duration = self._apply_jitter(sleep_duration)
         if sleep_duration > 0:
             timing.sleep(sleep_duration)
+
+    def _apply_jitter(self, sleep_duration: float) -> float:
+        """Apply randomized jitter to sleep duration."""
+        if sleep_duration <= 0:
+            return sleep_duration
+        jitter_fraction = abs(self.jitter)
+        if jitter_fraction <= 0:
+            return sleep_duration
+        delta = sleep_duration * jitter_fraction
+        return max(0.0, sleep_duration + random.uniform(-delta, delta))
 
 
 # ============================================================================

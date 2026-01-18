@@ -19,6 +19,7 @@ Arguments
 - `sleep_time_after_trip`: Base sleep duration in seconds when circuit trips (float, default `0.0`)
 - `backoff_factor`: Exponential backoff multiplier (float, default `1.0`)
 - `max_sleep_time`: Maximum sleep duration cap (float, default `10.0`)
+- `jitter`: Random +/- percent of sleep_time to spread retries (float, default `0.0`)
 
 1. Stores configuration values
 2. Sets `_times_shorted` to `0` (no failures yet)
@@ -149,6 +150,7 @@ Arguments (same as `Circuit`):
 - `sleep_time_after_trip`: Base sleep duration when circuit trips (float, default `0.0`)
 - `backoff_factor`: Exponential backoff multiplier applied on reset (float, default `1.0`)
 - `max_sleep_time`: Maximum sleep duration cap (float, default `10.0`)
+- `jitter`: Random +/- percent of sleep_time to spread retries (float, default `0.0`)
 
 1. Stores configuration values
 2. Sets `_broken` to `False` (circuit starts operational)

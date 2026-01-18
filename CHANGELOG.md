@@ -34,5 +34,8 @@ As of version 0.3.0, the project is still unreleased.
   - BufferedWriter - >2000µs --> 50µs (40x)
   - FrameType - >2500µs --> 12µs (208x)
 
+- fixed some internal handling issues with builtin types and methods on Windows
+
+
 
 
