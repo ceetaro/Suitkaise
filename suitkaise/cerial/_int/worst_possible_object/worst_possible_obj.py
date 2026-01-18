@@ -691,8 +691,12 @@ class WorstPossibleObject:
         
         # CompletedProcess - result from subprocess.run()
         # Use a simple, fast command that works on all platforms
+        if sys.platform == "win32":
+            completed_cmd = ["cmd", "/c", "echo", "test output"]
+        else:
+            completed_cmd = ["echo", "test output"]
         self.subprocess_completed = subprocess.run(
-            ['echo', 'test output'],
+            completed_cmd,
             capture_output=True,
             text=True
         )
@@ -700,8 +704,12 @@ class WorstPossibleObject:
         
         # Popen - actively running or recently completed process
         # Use a quick command that completes immediately
+        if sys.platform == "win32":
+            popen_cmd = ["cmd", "/c", "echo", "popen test"]
+        else:
+            popen_cmd = ["echo", "popen test"]
         self.subprocess_popen = subprocess.Popen(
-            ['echo', 'popen test'],
+            popen_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -759,7 +767,9 @@ class WorstPossibleObject:
         self._track_init('complex', 'skpath_project_root', self.skpath_project_root)
         
         # CustomRoot - for custom project root management
-        self.custom_root = CustomRoot('/tmp/test_project')
+        temp_project_root = Path(tempfile.gettempdir()) / "suitkaise_test_project"
+        temp_project_root.mkdir(parents=True, exist_ok=True)
+        self.custom_root = CustomRoot(str(temp_project_root))
         self._track_init('complex', 'custom_root', self.custom_root)
         
         # === SKTime objects ===

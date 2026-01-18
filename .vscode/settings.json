@@ -9,5 +9,6 @@
     "python.analysis.diagnosticMode": "workspace",
     "code-runner.executorMap": {
         "python": "/opt/homebrew/bin/python3.11"
-    }
+    },
+    "terminal.integrated.scrollback": 20000
 }

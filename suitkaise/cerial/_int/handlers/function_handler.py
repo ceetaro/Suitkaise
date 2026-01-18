@@ -338,6 +338,8 @@ class BoundMethodHandler(Handler):
         obj = MyClass()
         method = obj.some_method  # This is a bound method
     
+    Also handles built-in bound methods (e.g., list.append).
+    
     They contain:
     - The instance (self)
     - The underlying function
@@ -348,8 +350,12 @@ class BoundMethodHandler(Handler):
     type_name = "bound_method"
     
     def can_handle(self, obj: Any) -> bool:
-        """Check if object is a bound method."""
-        return isinstance(obj, types.MethodType)
+        """Check if object is a bound method (Python or built-in)."""
+        if isinstance(obj, types.MethodType):
+            return obj.__self__ is not None
+        if isinstance(obj, types.BuiltinMethodType):
+            return obj.__self__ is not None
+        return False
     
     def extract_state(self, obj: types.MethodType) -> Dict[str, Any]:
         """
@@ -363,11 +369,19 @@ class BoundMethodHandler(Handler):
         itself, because the function is part of the class definition
         and will already exist when we reconstruct.
         """
+        instance = obj.__self__
+        if isinstance(obj, types.MethodType):
+            function_name = obj.__func__.__name__
+        else:
+            function_name = getattr(obj, "__name__", None)
+            if function_name is None:
+                raise FunctionSerializationError("Cannot determine built-in method name.")
+        
         return {
-            "instance": obj.__self__,  # Will be recursively serialized
-            "function_name": obj.__func__.__name__,
-            "class_name": obj.__self__.__class__.__name__,
-            "module": obj.__self__.__class__.__module__,
+            "instance": instance,  # Will be recursively serialized
+            "function_name": function_name,
+            "class_name": instance.__class__.__name__,
+            "module": instance.__class__.__module__,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> types.MethodType:

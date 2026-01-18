@@ -12,10 +12,22 @@ Tests the @autopath decorator functionality:
 """
 
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional, Union
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import Skpath, autopath
 
@@ -97,7 +109,7 @@ def test_autopath_string_absolute():
     """@autopath should handle absolute string paths."""
     @autopath()
     def is_absolute(path: Skpath) -> bool:
-        return path.ap.startswith("/")
+        return Path(path.ap).is_absolute()
     
     result = is_absolute("/absolute/path")
     
@@ -512,7 +524,8 @@ def test_autopath_forward_ref():
     def forward(path: "Skpath") -> str:
         return path.name
     
-    assert forward("/tmp/test.txt") == "test.txt"
+    tmp_path = Path(tempfile.gettempdir()) / "test.txt"
+    assert forward(str(tmp_path)) == "test.txt"
 
 
 # =============================================================================

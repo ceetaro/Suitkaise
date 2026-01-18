@@ -24,7 +24,18 @@ import time
 import random
 import signal
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import Skpath, get_project_root, get_project_paths
 from suitkaise.processing import Process, Pool, Share

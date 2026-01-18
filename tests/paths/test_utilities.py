@@ -11,8 +11,12 @@ Tests path utility functions:
 
 import sys
 import os
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+# Add project root to path (this script is in tests/paths/, so go up two levels)
+project_root = Path(__file__).parent.parent.parent.resolve()
+sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import (
     is_valid_filename,
@@ -256,9 +260,11 @@ def test_custom_root_context_manager():
     clear_custom_root()
     original_root = get_project_root()
     
-    with CustomRoot("/tmp"):
-        temp_root = get_project_root()
-        assert temp_root.name == "tmp" or str(temp_root.ap) == "/tmp"
+    # Use temporary directory that exists on all platforms
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with CustomRoot(tmpdir):
+            temp_root = get_project_root()
+            assert Path(tmpdir).name == temp_root.name or str(temp_root.ap) == str(Path(tmpdir).resolve())
     
     # After context, should restore
     restored_root = get_project_root()
@@ -271,16 +277,18 @@ def test_custom_root_nested():
     
     clear_custom_root()
     
-    with CustomRoot("/tmp"):
-        outer = get_project_root()
-        
-        with CustomRoot("/var"):
-            inner = get_project_root()
-            assert inner.name == "var" or str(inner.ap) == "/var"
-        
-        # Back to outer context
-        after_inner = get_project_root()
-        assert after_inner.ap == outer.ap
+    with tempfile.TemporaryDirectory() as outer_tmp:
+        with CustomRoot(outer_tmp):
+            outer = get_project_root()
+            
+            with tempfile.TemporaryDirectory() as inner_tmp:
+                with CustomRoot(inner_tmp):
+                    inner = get_project_root()
+                    assert Path(inner_tmp).name == inner.name or str(inner.ap) == str(Path(inner_tmp).resolve())
+            
+            # Back to outer context
+            after_inner = get_project_root()
+            assert after_inner.ap == outer.ap
 
 
 def test_custom_root_exception_cleanup():
@@ -291,8 +299,9 @@ def test_custom_root_exception_cleanup():
     original_root = get_project_root()
     
     try:
-        with CustomRoot("/tmp"):
-            raise ValueError("Test exception")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with CustomRoot(tmpdir):
+                raise ValueError("Test exception")
     except ValueError:
         pass
     

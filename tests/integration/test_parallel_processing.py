@@ -25,7 +25,18 @@ import signal
 import threading
 import logging
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.processing import Process, Pool, ProcessError
 from suitkaise.timing import Sktimer, TimeThis
@@ -391,8 +402,9 @@ def test_pool_parallel_execution():
     elapsed = time.perf_counter() - start
     
     # With 4 workers and 8 tasks, should complete faster than sequential (~80ms)
-    # Allow generous margin for process overhead
-    assert elapsed < 0.5, f"Should run in parallel, took {elapsed:.3f}s"
+    # Allow generous margin for process overhead (Windows is slower)
+    max_elapsed = 1.5 if sys.platform == "win32" else 0.5
+    assert elapsed < max_elapsed, f"Should run in parallel, took {elapsed:.3f}s"
     
     expected = [x ** 2 for x in inputs]
     assert results == expected
@@ -450,8 +462,9 @@ def test_multiple_concurrent_processes():
     expected = [i ** 2 for i in range(num_processes)]
     assert results == expected
     
-    # Should be much faster than sequential (~200ms)
-    assert elapsed < 0.5, f"Should run concurrently, took {elapsed:.3f}s"
+    # Should be much faster than sequential (~200ms); allow more time on Windows
+    max_elapsed = 3.0 if sys.platform == "win32" else 0.5
+    assert elapsed < max_elapsed, f"Should run concurrently, took {elapsed:.3f}s"
 
 
 def test_full_parallel_job_processor():

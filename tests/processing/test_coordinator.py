@@ -13,7 +13,18 @@ import multiprocessing
 import io
 import contextlib
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise import cerial
 from suitkaise.processing._int.share.coordinator import _Coordinator, _coordinator_main
@@ -116,7 +127,12 @@ def test_coordinator_register_get_queue():
         fetched = coordinator.get_object("counter")
         assert fetched.value == 0
         coordinator.queue_command("counter", "inc", (2,), {}, ["value"])
-        time.sleep(0.1)
+        # Give the coordinator time to process the queue (Windows can be slower)
+        deadline = time.time() + (1.5 if sys.platform == "win32" else 0.5)
+        while time.time() < deadline:
+            if coordinator.get_object("counter").value == 2:
+                break
+            time.sleep(0.05)
         assert coordinator.get_object("counter").value == 2
     finally:
         coordinator.stop()

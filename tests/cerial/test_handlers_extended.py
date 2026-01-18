@@ -27,7 +27,18 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from collections import namedtuple
 from typing import NamedTuple
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise import cerial
 from suitkaise.cerial._int.handlers.enum_handler import EnumHandler, EnumClassHandler, EnumSerializationError
@@ -1012,7 +1023,8 @@ def test_http_session_handler_roundtrip():
     session.auth = ("user", "pass")
     session.proxies = {"http": "http://proxy"}
     session.verify = False
-    session.cert = "/tmp/cert.pem"
+    tmp_cert = str(Path(tempfile.gettempdir()) / "cert.pem")
+    session.cert = tmp_cert
     session.max_redirects = 5
     state = handler.extract_state(session)
     restored = handler.reconstruct(state)
@@ -1021,7 +1033,7 @@ def test_http_session_handler_roundtrip():
     assert restored.auth == ("user", "pass")
     assert restored.proxies.get("http") == "http://proxy"
     assert restored.verify is False
-    assert restored.cert == "/tmp/cert.pem"
+    assert restored.cert == tmp_cert
     assert restored.max_redirects == 5
 
 

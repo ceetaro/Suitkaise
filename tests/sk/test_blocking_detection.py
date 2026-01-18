@@ -7,7 +7,18 @@ Tests that all blocking call patterns are correctly detected by the analyzer.
 import sys
 import time as stdlib_time
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.sk import Skfunction
 from suitkaise.sk._int.analyzer import BLOCKING_CALLS, BLOCKING_METHOD_PATTERNS

@@ -218,6 +218,9 @@ class SharedMemoryHandler(Handler):
                 "Cannot reconstruct SharedMemory: not available in Python < 3.8"
             )
         
+        content = state["content"]
+        expected_size = len(content)
+
         # Try to attach to existing shared memory block
         try:
             shm = shared_memory.SharedMemory(
@@ -225,16 +228,28 @@ class SharedMemoryHandler(Handler):
                 create=False,
                 size=state["size"]
             )
+            # Some platforms may attach with a different size; if so, write what fits
         except FileNotFoundError:
             # Shared memory block doesn't exist, create new one
-            shm = shared_memory.SharedMemory(
-                name=state["name"],
-                create=True,
-                size=state["size"]
-            )
+            try:
+                shm = shared_memory.SharedMemory(
+                    name=state["name"],
+                    create=True,
+                    size=expected_size
+                )
+            except FileExistsError:
+                # Another process created it; attach instead
+                shm = shared_memory.SharedMemory(
+                    name=state["name"],
+                    create=False,
+                    size=state["size"]
+                )
         
-        # Write content
-        shm.buf[:] = state["content"]
+        # Write content (truncate if existing shared memory is smaller)
+        if shm.size >= expected_size:
+            shm.buf[:expected_size] = content
+        else:
+            shm.buf[:] = content[:shm.size]
         
         return shm
 
