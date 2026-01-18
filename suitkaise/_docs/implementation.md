@@ -656,19 +656,13 @@ sk:
 
 ## Final additions
 
-add type stubs for IDE autocompletion *
-
 add downloadable tests to the site and pytest fixtures
 
-add a CLI *
-
-create a changelog for tracking versions *
-
-add badges (coverage, CI status, etc) to the README *
+add badges (coverage, CI status, etc) to the README
 
 add a quick start guide to the README and the site
 
-on site add pronunciation (its pronounced exactly like the word suitcase) *
+on site add pronunciation (its pronounced exactly like the word suitcase)
 
 add at least a couple of examples to each module's examples page
 
@@ -698,6 +692,11 @@ add more blocking call patterns (boto3, redis, pymongo, etc)
 add timethis.asynced() for native async funcs
 add rolling stats (keep only last N measurements)
 
-find a way to advertise cerial when people look up cant pickle X
+find a way to advertise cerial when people look up "cant pickle X"
 
 add a JSON output converter for cerial IRs
+
+update cerial benchmarks in docs and supported types to reflect improvements
+
+refactor site to have a more interactive home page that shows off things more
+
