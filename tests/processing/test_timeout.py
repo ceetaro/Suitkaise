@@ -8,8 +8,20 @@ from __future__ import annotations
 
 import sys
 import time
+import signal
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.processing._int.timeout import (
     run_with_timeout,
@@ -110,6 +122,9 @@ def test_run_with_timeout_none():
 
 def test_signal_based_timeout_raises():
     """Signal timeout should raise ProcessTimeoutError."""
+    if not hasattr(signal, "SIGALRM"):
+        # Windows does not support SIGALRM
+        return
     try:
         _signal_based_timeout(lambda: _slow_sleep(1.5), 1.0, "run", 2)
         assert False, "Expected timeout"

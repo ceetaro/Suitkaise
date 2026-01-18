@@ -10,8 +10,17 @@ Usage:
 import sys
 import time
 import re
+from pathlib import Path
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+# Configure UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Add project root to path (this script is in tests/, so go up one level)
+project_root = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(project_root))
 
 # Colors
 GREEN = '\033[92m'

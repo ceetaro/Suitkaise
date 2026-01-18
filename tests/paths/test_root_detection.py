@@ -8,8 +8,12 @@ Tests project root detection:
 """
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+# Add project root to path (this script is in tests/paths/, so go up two levels)
+project_root = Path(__file__).parent.parent.parent.resolve()
+sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import (
     Skpath,
@@ -122,7 +126,8 @@ def test_set_custom_root():
     """set_custom_root() should set custom root."""
     clear_custom_root()
     
-    custom = "/tmp"
+    # Use temp directory that exists on all platforms
+    custom = tempfile.gettempdir()
     set_custom_root(custom)
     
     result = get_custom_root()
@@ -144,14 +149,15 @@ def test_get_custom_root_none():
 
 def test_clear_custom_root():
     """clear_custom_root() should clear custom root."""
-    set_custom_root("/tmp")
+    temp_dir = tempfile.gettempdir()
+    set_custom_root(temp_dir)
     clear_custom_root()
     
     # After clearing, should use auto-detection
     root = get_project_root()
     
-    # Should not be /tmp
-    assert str(root.ap) != "/tmp"
+    # Should not be the temp dir
+    assert str(root.ap) != str(Path(temp_dir).resolve())
 
 
 def test_custom_root_priority():
@@ -162,12 +168,14 @@ def test_custom_root_priority():
     auto_root = get_project_root()
     
     # Set different custom root
-    set_custom_root("/tmp")
+    temp_dir = tempfile.gettempdir()
+    set_custom_root(temp_dir)
     custom_root = get_project_root()
     
-    # Custom should be different (if auto is not /tmp)
-    if str(auto_root.ap) != "/tmp":
-        assert str(custom_root.ap) == "/tmp" or custom_root.name == "tmp"
+    # Custom should be different (if auto is not the temp dir)
+    temp_resolved = str(Path(temp_dir).resolve())
+    if str(auto_root.ap) != temp_resolved:
+        assert str(custom_root.ap) == temp_resolved or custom_root.name == Path(temp_dir).name
     
     clear_custom_root()
 

@@ -272,11 +272,23 @@ class TemporaryFileHandler(Handler):
         This is tricky because NamedTemporaryFile returns a file-like object.
         We check if it has the 'delete' attribute which is specific to temp files.
         """
-        return (
-            hasattr(obj, 'name') and 
-            hasattr(obj, 'delete') and
-            '/tmp' in str(obj.name)  # Heuristic: temp files usually in /tmp
-        )
+        if not (hasattr(obj, 'name') and hasattr(obj, 'delete')):
+            return False
+        
+        try:
+            name_value = obj.name
+        except Exception:
+            return False
+        
+        if isinstance(name_value, int):
+            return False
+        
+        try:
+            name_path = Path(str(name_value)).resolve()
+            temp_dir = Path(tempfile.gettempdir()).resolve()
+            return name_path == temp_dir or temp_dir in name_path.parents
+        except Exception:
+            return False
     
     def extract_state(self, obj: Any) -> Dict[str, Any]:
         """

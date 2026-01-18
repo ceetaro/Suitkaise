@@ -13,7 +13,18 @@ import os
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, '/Users/ctaro/projects/code/Suitkaise')
+from pathlib import Path
+
+# Add project root to path (auto-detect by marker files)
+
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import Skpath, PathDetectionError
 
@@ -120,8 +131,10 @@ def test_skpath_ap():
     """Skpath.ap should return absolute path string."""
     path = Skpath(".")
     
-    # ap is a string starting with /
-    assert path.ap.startswith("/")
+    # ap should be an absolute path (starts with / on Unix, or drive letter like C:/ on Windows)
+    # On Windows, after normalization it would be like "C:/..." or just "/" on Unix
+    assert path.ap.startswith("/") or (path.ap[1:2] == ":" and path.ap[2:3] == "/"), \
+        f"ap should be absolute path, got: {path.ap}"
 
 
 def test_skpath_rp():
@@ -292,7 +305,8 @@ def test_skpath_repr_fspath_and_hash():
     path = Skpath(__file__)
     assert str(path)
     assert "Skpath" in repr(path)
-    assert os.fspath(path) == path.ap
+    # os.fspath uses OS-native separators, so normalize before comparing
+    assert os.fspath(path).replace(os.sep, "/") == path.ap
     assert hash(path)
 
 
