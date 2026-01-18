@@ -25,3 +25,15 @@ As of version 0.3.0, the project is still unreleased.
 - `suitkaise` CLI entrypoint with version and module info.
 - CI workflow for running the full test suite.
 - README badges for quick project metadata.
+- increased test coverage to 85%
+  - WorstPossibleObject causes this number to be lower than it would be otherwise
+
+- increased speed for:
+  - FileIO - >2000µs --> 45µs (44x)
+  - BufferedReader - >2000µs --> 85µs (23x)
+  - BufferedWriter - >2000µs --> 50µs (40x)
+  - FrameType - >2500µs --> 12µs (208x)
+
+
+
+

@@ -213,15 +213,12 @@ class FrameObjectHandler(Handler):
         - Previous frame (forms call stack)
         
         Note: Fully serializing frames is extremely complex.
-        We extract what we can.
+        We only extract lightweight metadata for performance.
         """
         return {
-            "f_code": obj.f_code,  # Will be recursively serialized
-            "f_locals": dict(obj.f_locals),  # Local variables
-            "f_globals": dict(obj.f_globals),  # Global variables (careful!)
-            "f_lineno": obj.f_lineno,  # Current line number
-            # Note: We DON'T serialize f_back (previous frame) to avoid
-            # serializing the entire call stack
+            "file": obj.f_code.co_filename,
+            "function": obj.f_code.co_name,
+            "lineno": obj.f_lineno,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> types.FrameType:

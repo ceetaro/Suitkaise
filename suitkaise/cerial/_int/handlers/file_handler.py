@@ -9,6 +9,11 @@ import io
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+try:
+    from suitkaise.paths.api import detect_project_root
+except Exception:  # pragma: no cover - optional dependency
+    detect_project_root = None
 from .base_class import Handler
 
 
@@ -32,6 +37,25 @@ class FileHandleHandler(Handler):
     """
     
     type_name = "file_handle"
+    _project_root: Path | None = None
+    _project_root_checked: bool = False
+    
+    @classmethod
+    def _get_project_root(cls) -> Path | None:
+        if cls._project_root_checked:
+            return cls._project_root
+        
+        cls._project_root_checked = True
+        if detect_project_root is None:
+            cls._project_root = None
+            return None
+        
+        try:
+            cls._project_root = detect_project_root()
+        except Exception:
+            cls._project_root = None
+        
+        return cls._project_root
     
     def can_handle(self, obj: Any) -> bool:
         """
@@ -85,29 +109,20 @@ class FileHandleHandler(Handler):
                 "is_pipe": is_pipe,
             }
         
-        # Try to make path relative using skpath (if available)
+        # Try to compute a relative path only if the file is inside the project root.
+        # Avoid Skpath on temp/system paths to prevent expensive root detection and exceptions.
         relative_path: Optional[str] = None
-        absolute_path: str
         try:
-            from suitkaise.paths.api import Skpath
-            sk_path = Skpath(file_path)
-            # Store both absolute and relative paths
-            relative_path = str(sk_path.rp)
-            absolute_path = str(sk_path.ap)
-        except ImportError:
-            # skpath not available - use absolute path only
-            relative_path = None
+            absolute_path = str(Path(file_path).resolve())
+        except Exception:
             absolute_path = str(file_path)
-        except (ValueError, TypeError):
-            # Path outside project or invalid path - use absolute only
-            relative_path = None
-            absolute_path = str(file_path)
-        except Exception as e:
-            # Unexpected skpath error - log and use absolute path
-            import warnings
-            warnings.warn(f"Unexpected error using skpath for file {file_path}: {e}")
-            relative_path = None
-            absolute_path = str(file_path)
+        
+        project_root = self._get_project_root()
+        if project_root is not None:
+            try:
+                relative_path = Path(absolute_path).relative_to(project_root).as_posix()
+            except ValueError:
+                relative_path = None
         
         # Get current position in file
         try:
