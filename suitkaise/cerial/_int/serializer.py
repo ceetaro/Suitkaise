@@ -159,6 +159,37 @@ class Cerializer:
                 f"\nError: {e}\n"
                 f"{'='*70}"
             ) from e
+
+    def serialize_ir(self, obj: Any) -> Any:
+        """
+        Build and return the intermediate representation (IR) without pickling.
+        """
+        # Reset state for fresh serialization
+        self.seen_objects = {}
+        self._serialization_depth = 0
+        self._object_path = []
+        self._all_object_ids = set()
+        self._all_circular_refs = set()
+        self._circular_ref_details = []
+        
+        if self.verbose:
+            print(f"[CERIAL] Starting IR build for {type(obj).__name__}")
+        
+        try:
+            return self._serialize_recursive(obj)
+        except SerializationError:
+            raise
+        except Exception as e:
+            path_str = " -> ".join(self._object_path) if self._object_path else "root"
+            raise SerializationError(
+                f"\n{'='*70}\n"
+                f"IR BUILD FAILED\n"
+                f"{'='*70}\n"
+                f"Path: {path_str}\n"
+                f"Type: {type(obj).__name__}\n"
+                f"Error: {e}\n"
+                f"{'='*70}"
+            ) from e
     
     def _serialize_recursive(self, obj: Any) -> Any:
         """

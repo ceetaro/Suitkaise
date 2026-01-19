@@ -246,6 +246,23 @@ class TestRunner:
         else:
             print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 
@@ -304,6 +321,14 @@ def test_process_has_result_accessor():
     
     assert hasattr(proc, 'result')
     assert callable(proc.result)
+
+
+def test_process_has_run_helper():
+    """Process should have run() helper method."""
+    proc = SimpleProcess(5)
+    
+    assert hasattr(proc, 'run')
+    assert callable(proc.run)
 
 
 # =============================================================================
@@ -498,6 +523,15 @@ def test_process_result():
     result = proc.result()
     
     assert result == 20
+
+
+def test_process_run_helper_returns_result():
+    """run() should start, wait, and return result."""
+    proc = SimpleProcess(7)
+    
+    result = proc.run()
+    
+    assert result == 14
 
 
 def test_process_slow_run():
@@ -761,6 +795,7 @@ def run_all_tests():
     runner.run_test("Process has start()", test_process_has_start_method)
     runner.run_test("Process has wait()", test_process_has_wait_method)
     runner.run_test("Process has result()", test_process_has_result_accessor)
+    runner.run_test("Process has run()", test_process_has_run_helper)
     
     # Error class tests
     runner.run_test("ProcessError exists", test_process_error_exists)
@@ -786,6 +821,7 @@ def run_all_tests():
     # Actual subprocess tests (slower, may timeout in sandbox)
     runner.run_test("Process actual run", test_process_actual_run, timeout=10)
     runner.run_test("Process result", test_process_result, timeout=10)
+    runner.run_test("Process run() helper", test_process_run_helper_returns_result, timeout=10)
     runner.run_test("Process slow run", test_process_slow_run, timeout=10)
     runner.run_test("Process.start() non-blocking", test_process_start_returns_immediately, timeout=10)
     runner.run_test("Process error propagates", test_process_error_propagates, timeout=10)

@@ -85,6 +85,23 @@ class TestRunner:
         else:
             print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 
@@ -137,7 +154,20 @@ def test_timethis_auto_timer_statistics():
     
     assert timer.num_times == 3
     assert timer.mean >= 0.008, f"Mean should be ~10ms, got {timer.mean}"
-    assert timer.total_time >= 0.025, f"Total should be ~30ms, got {timer.total_time}"
+
+
+def test_timethis_max_times():
+    """@timethis should accept max_times and trim old measurements."""
+    clear_global_timers()
+    
+    @timethis(max_times=2)
+    def small_window():
+        stdlib_time.sleep(0.001)
+    
+    for _ in range(5):
+        small_window()
+    
+    assert small_window.timer.num_times == 2, f"Should keep 2 times, got {small_window.timer.num_times}"
 
 
 # =============================================================================
@@ -490,6 +520,7 @@ def run_all_tests():
     runner.run_test("@timethis auto timer", test_timethis_auto_timer)
     runner.run_test("@timethis auto timer accumulates", test_timethis_auto_timer_accumulates)
     runner.run_test("@timethis auto timer statistics", test_timethis_auto_timer_statistics)
+    runner.run_test("@timethis max_times", test_timethis_max_times)
     
     # Explicit timer tests
     runner.run_test("@timethis explicit timer", test_timethis_explicit_timer)

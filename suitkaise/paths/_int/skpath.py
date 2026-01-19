@@ -8,6 +8,7 @@ cross-platform path normalization, and rich functionality.
 from __future__ import annotations
 
 import os
+import shutil
 import threading
 from collections.abc import Generator, Iterator
 from pathlib import Path
@@ -480,6 +481,102 @@ class Skpath:
             exist_ok: Don't raise if file exists
         """
         self._path.touch(mode=mode, exist_ok=exist_ok)
+    
+    def copy_to(
+        self,
+        destination: str | Path | "Skpath",
+        *,
+        overwrite: bool = False,
+        parents: bool = True,
+    ) -> "Skpath":
+        """
+        Copy this path to a destination.
+        
+        Args:
+            destination: Target path or directory
+            overwrite: Remove existing destination if True
+            parents: Create parent directories if needed
+        
+        Returns:
+            Skpath pointing to the copied path
+        """
+        if not self._path.exists():
+            raise FileNotFoundError(f"Source path not found: {self._path}")
+        
+        if isinstance(destination, Skpath):
+            dest_path = destination._path
+        elif isinstance(destination, Path):
+            dest_path = destination
+        else:
+            dest_path = Path(destination)
+        
+        if dest_path.exists() and dest_path.is_dir():
+            if self._path.is_file() or self._path.is_dir():
+                dest_path = dest_path / self._path.name
+        
+        if parents:
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if dest_path.exists():
+            if not overwrite:
+                raise FileExistsError(f"Destination already exists: {dest_path}")
+            if dest_path.is_dir():
+                shutil.rmtree(dest_path)
+            else:
+                dest_path.unlink()
+        
+        if self._path.is_dir():
+            shutil.copytree(self._path, dest_path)
+        else:
+            shutil.copy2(self._path, dest_path)
+        
+        return Skpath(dest_path)
+    
+    def move_to(
+        self,
+        destination: str | Path | "Skpath",
+        *,
+        overwrite: bool = False,
+        parents: bool = True,
+    ) -> "Skpath":
+        """
+        Move this path to a destination.
+        
+        Args:
+            destination: Target path or directory
+            overwrite: Remove existing destination if True
+            parents: Create parent directories if needed
+        
+        Returns:
+            Skpath pointing to the moved path
+        """
+        if not self._path.exists():
+            raise FileNotFoundError(f"Source path not found: {self._path}")
+        
+        if isinstance(destination, Skpath):
+            dest_path = destination._path
+        elif isinstance(destination, Path):
+            dest_path = destination
+        else:
+            dest_path = Path(destination)
+        
+        if dest_path.exists() and dest_path.is_dir():
+            if self._path.is_file() or self._path.is_dir():
+                dest_path = dest_path / self._path.name
+        
+        if parents:
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if dest_path.exists():
+            if not overwrite:
+                raise FileExistsError(f"Destination already exists: {dest_path}")
+            if dest_path.is_dir():
+                shutil.rmtree(dest_path)
+            else:
+                dest_path.unlink()
+        
+        shutil.move(str(self._path), str(dest_path))
+        return Skpath(dest_path)
     
     def resolve(self) -> "Skpath":
         """

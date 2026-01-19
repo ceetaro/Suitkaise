@@ -101,12 +101,13 @@ elapsed = timing.elapsed(start_time)
 
 It is also the base for the context manager `TimeThis`, the timing decorator `@timethis`, and `processing.Skprocess` timers.
 
-No arguments are needed to initialize the `Sktimer` class.
+You can optionally set a rolling window size to keep only the last N measurements.
 
 ```python
 from suitkaise import timing
 
 t = timing.Sktimer()
+t_rolling = timing.Sktimer(max_times=100)
 ```
 
 1. Creates a `Sktimer` instance
@@ -116,6 +117,7 @@ t = timing.Sktimer()
    - `_paused_durations` - empty list to track pause time for each measurement
    - `_lock` - creates a `threading.RLock()` for thread safety
    - `_sessions` - empty dictionary to track timing sessions per thread (keyed by thread ID)
+   - `_max_times` - rolling window size (None means keep all measurements)
 Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
 
 ### Statistics properties and methods
@@ -718,7 +720,7 @@ This is useful for thread safety, as it allows the same thread to acquire the lo
 
 ### Memory Management
 
-The `Sktimer` stores all measurements in memory:
+The `Sktimer` stores all measurements in memory (unless `max_times` is set):
 - each measurement is a single `float` (8 bytes)
 - each pause duration is a single `float` (8 bytes)
 - 1 million measurements ≈ 16 MB of memory

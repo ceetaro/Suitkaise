@@ -481,6 +481,14 @@ class Skprocess:
                   original_state, self._tell_queue, self._listen_queue)
         )
         self._subprocess.start()
+
+    def run(self) -> Any:
+        """
+        Start, wait, and return the result in one call.
+        """
+        self.start()
+        self.wait()
+        return self.result()
     
     def stop(self) -> None:
         """

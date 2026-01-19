@@ -14,6 +14,8 @@ Key Features:
 
 from ._int.serializer import Cerializer, SerializationError
 from ._int.deserializer import Decerializer, DeserializationError
+from ._int.ir_json import ir_to_json as _ir_to_json
+from ._int.ir_json import ir_to_jsonable as _ir_to_jsonable
 
 # Convenient default instances
 _default_serializer = Cerializer()
@@ -76,6 +78,32 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
     return _default_serializer.serialize(obj)
 
 
+def serialize_ir(obj, debug: bool = False, verbose: bool = False):
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        ir = cerial.serialize_ir(my_complex_object)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Build and return the intermediate representation (IR) without pickling.
+    
+    Args:
+        obj: Object to convert to IR
+        debug: Enable debug mode for detailed error messages
+        verbose: Enable verbose mode to print serialization progress
+        
+    Returns:
+        IR: Nested dict/list structure of pickle-native types
+    """
+    if debug or verbose:
+        serializer = Cerializer(debug=debug, verbose=verbose)
+        return serializer.serialize_ir(obj)
+    return _default_serializer.serialize_ir(obj)
+
+
 def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     """
     ────────────────────────────────────────────────────────
@@ -133,6 +161,77 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     return _default_deserializer.deserialize(data)
 
 
+def ir_to_jsonable(ir):
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        ir = cerial.serialize_ir(obj)
+        jsonable = cerial.ir_to_jsonable(ir)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Convert a cerial IR into a JSON-serializable structure.
+    """
+    return _ir_to_jsonable(ir)
+
+
+def ir_to_json(ir, *, indent: int | None = 2, sort_keys: bool = True) -> str:
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        ir = cerial.serialize_ir(obj)
+        json_text = cerial.ir_to_json(ir)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Convert a cerial IR into JSON text.
+    """
+    return _ir_to_json(ir, indent=indent, sort_keys=sort_keys)
+
+
+def to_jsonable(obj, debug: bool = False, verbose: bool = False):
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        jsonable = cerial.to_jsonable(obj)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Serialize an object to IR and return a JSON-serializable structure.
+    """
+    ir = serialize_ir(obj, debug=debug, verbose=verbose)
+    return _ir_to_jsonable(ir)
+
+
+def to_json(
+    obj,
+    *,
+    indent: int | None = 2,
+    sort_keys: bool = True,
+    debug: bool = False,
+    verbose: bool = False,
+) -> str:
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        json_text = cerial.to_json(obj)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Serialize an object to IR and return JSON text.
+    """
+    ir = serialize_ir(obj, debug=debug, verbose=verbose)
+    return _ir_to_json(ir, indent=indent, sort_keys=sort_keys)
+
+
 # ============================================================================
 # Module Exports
 # ============================================================================
@@ -140,7 +239,12 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
 __all__ = [
     # Main functions
     'serialize',
+    'serialize_ir',
     'deserialize',
+    'ir_to_jsonable',
+    'ir_to_json',
+    'to_jsonable',
+    'to_json',
     
     # Classes for advanced usage
     'Cerializer',

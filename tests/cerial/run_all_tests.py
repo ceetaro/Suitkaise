@@ -39,6 +39,7 @@ def run_all_tests():
     from tests.cerial.test_handlers import run_all_tests as run_handlers_tests
     from tests.cerial.test_worst_possible_object import run_all_tests as run_wpo_tests
     from tests.cerial.test_handlers_extended import run_all_tests as run_handlers_extended_tests
+    from tests.cerial.test_ir_json import run_all_tests as run_ir_json_tests
     
     results = []
     
@@ -59,6 +60,9 @@ def run_all_tests():
 
     print(f"\n{CYAN}Running Extended Handlers tests...{RESET}")
     results.append(("Extended Handlers", run_handlers_extended_tests()))
+    
+    print(f"\n{CYAN}Running IR JSON tests...{RESET}")
+    results.append(("IR JSON", run_ir_json_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

@@ -59,6 +59,8 @@ Unique to `Skpath`
 - `root` - project root as `Skpath` object
 - `root_str` - project root as string (normalized separators)
 - `root_path` - project root as `Path` object
+- `copy_to` - copy file or directory to a destination
+- `move_to` - move file or directory to a destination
 
 `pathlib` Compatible
 
@@ -133,6 +135,12 @@ path.mkdir(parents=True, exist_ok=True)
 
 # create/touch file
 path.touch(exist_ok=True)
+
+# copy file or directory
+copied = path.copy_to("backups/")
+
+# move file or directory
+moved = path.move_to("archive/file.txt")
 ```
 
 

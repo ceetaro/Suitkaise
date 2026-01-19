@@ -109,6 +109,18 @@ def quick_function():
     pass
 ```
 
+### `max_times` parameter
+
+Keep only the most recent N measurements (rolling window):
+
+```python
+from suitkaise import timing
+
+@timing.timethis(max_times=100)
+def my_function():
+    pass
+```
+
 ### `clear_global_timers()`
 
 If you're using auto-created `@timethis()` timers, you can clear them to reset all accumulated stats.
@@ -200,6 +212,12 @@ timer = timing.Sktimer()
 timer.start()
 timing.sleep(60)
 time_after_sleeping = timer.stop() # returns a float
+```
+
+You can keep only the last N measurements with `max_times`:
+
+```python
+timer = timing.Sktimer(max_times=100)
 ```
 
 When you call `start()`, the timer starts recording the time.

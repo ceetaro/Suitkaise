@@ -106,6 +106,15 @@ p = MyProcess()
 p.start()
 ```
 
+#### `run()`
+
+Starts the process, waits for completion, and returns the result.
+
+```python
+p = MyProcess()
+result = p.run()
+```
+
 #### `wait()`
 
 Blocks until the process finishes.

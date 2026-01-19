@@ -139,6 +139,11 @@ def run_real_world_tests():
 def run_all_tests():
     """Run all test suites."""
     print()
+    try:
+        from tests._failure_registry import clear as _clear_failures
+        _clear_failures()
+    except Exception:
+        pass
     print(f"{BOLD}{CYAN}╔{'═'*78}╗{RESET}")
     print(f"{BOLD}{CYAN}║{'SUITKAISE - COMPLETE TEST SUITE':^78}║{RESET}")
     print(f"{BOLD}{CYAN}╚{'═'*78}╝{RESET}")
@@ -231,6 +236,12 @@ def run_all_tests():
     print(f"{BOLD}{CYAN}║{RESET}{_pad_ansi(total_time_line, 78)}{BOLD}{CYAN}║{RESET}")
     print(f"{BOLD}{CYAN}╚{'═'*78}╝{RESET}")
     print()
+    
+    try:
+        from tests._failure_registry import print_recap as _print_recap
+        _print_recap()
+    except Exception:
+        pass
     
     return total_failed == 0
 

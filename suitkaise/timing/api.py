@@ -349,7 +349,11 @@ class TimeThis:
 # Timing Decorators
 # ============================================================================
 
-def timethis(timer: Optional[Sktimer] = None, threshold: float = 0.0) -> Callable:
+def timethis(
+    timer: Optional[Sktimer] = None,
+    threshold: float = 0.0,
+    max_times: Optional[int] = None,
+) -> Callable:
     """
     Create a timing decorator that accumulates statistics in a `Sktimer` instance.
     
@@ -361,6 +365,7 @@ def timethis(timer: Optional[Sktimer] = None, threshold: float = 0.0) -> Callabl
                        a global timer with name pattern: `module_[class_]function_timer`
         `threshold`: Minimum elapsed time to record (default 0.0). Times below
                     this threshold are discarded and not recorded in statistics.
+        `max_times`: Keep only the most recent N measurements (rolling window).
 
     Returns:
         Decorator function
@@ -451,6 +456,8 @@ def timethis(timer: Optional[Sktimer] = None, threshold: float = 0.0) -> Callabl
     def decorator(func: Callable) -> Callable:
         # Determine timer to use
         if timer is not None:
+            if max_times is not None:
+                timer.set_max_times(max_times)
             # Use provided timer directly (no longer a wrapper)
             wrapper = _timethis_decorator(timer, threshold)(func)
         else:
@@ -487,7 +494,9 @@ def timethis(timer: Optional[Sktimer] = None, threshold: float = 0.0) -> Callabl
             with lock:
                 global_timers = getattr(timethis, '_global_timers')
                 if timer_name not in global_timers:
-                    global_timers[timer_name] = Sktimer()
+                    global_timers[timer_name] = Sktimer(max_times=max_times)
+                elif max_times is not None:
+                    global_timers[timer_name].set_max_times(max_times)
             
             wrapper = _timethis_decorator(global_timers[timer_name], threshold)(func)
             

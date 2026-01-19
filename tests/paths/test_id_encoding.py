@@ -85,6 +85,23 @@ class TestRunner:
         else:
             print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 

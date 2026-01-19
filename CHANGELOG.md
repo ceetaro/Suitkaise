@@ -36,6 +36,14 @@ As of version 0.3.0, the project is still unreleased.
 
 - fixed some internal handling issues with builtin types and methods on Windows
 
+- `Circuit`/`BreakingCircuit` jitter option to spread retry sleep times.
 
+- `Skpath.copy_to()` and `Skpath.move_to()` convenience file operations.
+
+- `Skprocess.run()` helper to start + wait + return result in one call.
+
+- Rolling window support in `Sktimer` (`max_times`) and `@timethis(max_times=...)`.
+
+- Cerial IR helpers: `serialize_ir`, `ir_to_jsonable`, `ir_to_json`, `to_jsonable`, `to_json`.
 
 

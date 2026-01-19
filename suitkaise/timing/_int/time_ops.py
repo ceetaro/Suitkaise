@@ -188,6 +188,7 @@ class Sktimer:
         - Supports nested timing (stackable frames)
         - Pause/resume functionality
         - Discard unwanted measurements
+        - Optional rolling window (keep last N measurements)
     
     Control Methods:
         `start()`: Start timing
@@ -196,6 +197,7 @@ class Sktimer:
         `lap()`: Record time and continue timing
         `pause()` / `resume()`: Pause/resume timing
         `add_time(float)`: Manually add a measurement
+        `set_max_times(int|None)`: Set rolling window size
         `reset()`: Clear all measurements
     
     Statistics Properties:
@@ -228,6 +230,7 @@ class Sktimer:
             'pause': {'writes': ['_sessions']},
             'resume': {'writes': ['_sessions']},
             'add_time': {'writes': ['times', '_paused_durations']},
+            'set_max_times': {'writes': ['times', '_paused_durations', '_max_times']},
             'reset': {'writes': ['times', '_sessions', '_paused_durations', 'original_start_time']},
             'get_statistics': {'writes': []},
             'get_stats': {'writes': []},
@@ -251,10 +254,11 @@ class Sktimer:
             'max': {'reads': ['times']},
             'stdev': {'reads': ['times']},
             'variance': {'reads': ['times']},
+            'max_times': {'reads': ['_max_times']},
         }
     }
     
-    def __init__(self):
+    def __init__(self, max_times: Optional[int] = None):
         """
         ────────────────────────────────────────────────────────
             ```python
@@ -269,6 +273,9 @@ class Sktimer:
         Supports multiple concurrent timing sessions (one per thread by default),
         each with stackable measurements in the same thread. The manager aggregates
         all recorded times across sessions for statistics.
+        
+        Args:
+            max_times: Keep only the most recent N measurements (rolling window)
         """
         # Earliest start across all sessions
         self.original_start_time: Optional[float] = None
@@ -277,12 +284,18 @@ class Sktimer:
         self.times: List[float] = []
         # Parallel list of paused durations per recorded time
         self._paused_durations: List[float] = []
+        
+        # Optional rolling window size (None = keep all)
+        self._max_times: Optional[int] = None
 
         # Thread safety lock for manager state (times, sessions)
         self._lock = threading.RLock()
 
         # Session management: keyed by thread ident
         self._sessions: Dict[int, "TimerSession"] = {}
+        
+        if max_times is not None:
+            self.set_max_times(max_times)
         
     # =========================================================================
     # Statistics Properties (live, always up-to-date)
@@ -293,6 +306,12 @@ class Sktimer:
         """Number of timing measurements recorded."""
         with self._lock:
             return len(self.times)
+    
+    @property
+    def max_times(self) -> Optional[int]:
+        """Maximum number of timing measurements to keep (rolling window)."""
+        with self._lock:
+            return self._max_times
     
     @property
     def most_recent(self) -> Optional[float]:
@@ -521,6 +540,7 @@ class Sktimer:
         with self._lock:
             self.times.append(elapsed)
             self._paused_durations.append(paused_total)
+            self._trim_to_max()
         return elapsed
 
     def discard(self) -> float:
@@ -587,6 +607,7 @@ class Sktimer:
         with self._lock:
             self.times.append(elapsed)
             self._paused_durations.append(paused_total)
+            self._trim_to_max()
         return elapsed
 
     def pause(self) -> None:
@@ -659,6 +680,7 @@ class Sktimer:
         with self._lock:
             self.times.append(elapsed_time)
             self._paused_durations.append(0.0)
+            self._trim_to_max()
     
     
     def get_statistics(self) -> Optional[TimerStats]:
@@ -727,6 +749,30 @@ class Sktimer:
             # Reset sessions as well
             self._sessions.clear()
             self._paused_durations.clear()
+
+    def set_max_times(self, max_times: Optional[int]) -> None:
+        """
+        Set the rolling window size for stored measurements.
+        
+        Args:
+            max_times: Keep only the most recent N times. None keeps all.
+        """
+        if max_times is not None and max_times <= 0:
+            raise ValueError("max_times must be a positive integer or None")
+        
+        with self._lock:
+            self._max_times = max_times
+            self._trim_to_max()
+
+    def _trim_to_max(self) -> None:
+        """Trim stored measurements to the rolling window size."""
+        if self._max_times is None:
+            return
+        excess = len(self.times) - self._max_times
+        if excess <= 0:
+            return
+        del self.times[:excess]
+        del self._paused_durations[:excess]
 
 
 class TimerSession:

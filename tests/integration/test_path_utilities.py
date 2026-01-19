@@ -111,6 +111,23 @@ class TestRunner:
         else:
             print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 
@@ -321,6 +338,58 @@ def test_get_id_matches_skpath_id():
     skpath_id = Skpath(path_str).id
     
     assert func_id == skpath_id, f"IDs should match: {func_id} vs {skpath_id}"
+
+
+# =============================================================================
+# Skpath File Operations Tests
+# =============================================================================
+
+def test_skpath_copy_to_file():
+    """Skpath.copy_to should copy files to a directory."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src = Path(tmpdir) / "source.txt"
+        src.write_text("hello")
+        
+        dest_dir = Path(tmpdir) / "dest"
+        dest_dir.mkdir()
+        
+        sk = Skpath(src)
+        copied = sk.copy_to(dest_dir)
+        
+        assert copied.exists, "Copied file should exist"
+        assert copied.name == "source.txt"
+        assert Path(copied.platform).read_text() == "hello"
+
+
+def test_skpath_copy_to_directory():
+    """Skpath.copy_to should copy directories."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src_dir = Path(tmpdir) / "src_dir"
+        src_dir.mkdir()
+        (src_dir / "a.txt").write_text("a")
+        
+        sk = Skpath(src_dir)
+        dest_dir = Path(tmpdir) / "dest_dir"
+        copied = sk.copy_to(dest_dir)
+        
+        assert copied.exists and copied.is_dir, "Copied directory should exist"
+        assert (Path(copied.platform) / "a.txt").exists(), "File should be copied"
+
+
+def test_skpath_move_to_file():
+    """Skpath.move_to should move files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src = Path(tmpdir) / "move.txt"
+        src.write_text("move")
+        
+        dest = Path(tmpdir) / "moved.txt"
+        
+        sk = Skpath(src)
+        moved = sk.move_to(dest)
+        
+        assert not sk.exists, "Original file should be gone"
+        assert moved.exists, "Moved file should exist"
+        assert Path(moved.platform).read_text() == "move"
 
 
 # =============================================================================
@@ -624,6 +693,12 @@ def run_all_tests():
     run_scenario("Unique IDs", "Different paths get different IDs", test_get_id_different_for_different_paths, results)
     run_scenario("Skpath.id Property", "Access ID from Skpath object", test_skpath_id_property, results)
     run_scenario("ID Consistency", "get_id and .id match", test_get_id_matches_skpath_id, results)
+    
+    # File operations
+    print(f"\n  {BOLD}File Operations:{RESET}")
+    run_scenario("Copy File", "Copy a file to a directory", test_skpath_copy_to_file, results)
+    run_scenario("Copy Directory", "Copy a directory tree", test_skpath_copy_to_directory, results)
+    run_scenario("Move File", "Move a file to a new location", test_skpath_move_to_file, results)
     
     # Filename validation
     print(f"\n  {BOLD}Filename Validation & Sanitization:{RESET}")

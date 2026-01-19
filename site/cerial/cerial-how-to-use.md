@@ -19,10 +19,12 @@ text = "
 
 Meant for internal, cross-process communication, not for external or cross-language serialization.
 
-It contains 2 API functions.
+It contains a few core API functions.
 
 - `cerial.serialize(obj)` - serialize an object to bytes
 - `cerial.deserialize(bytes)` - deserialize bytes back to an object
+- `cerial.serialize_ir(obj)` - build the intermediate representation (IR)
+- `cerial.to_json(obj)` - serialize to IR and return JSON text
 
 ```python
 from suitkaise import cerial
@@ -32,6 +34,19 @@ obj = MyClass()
 bytes = cerial.serialize(obj)
 
 my_class = cerial.deserialize(bytes)
+```
+
+## IR + JSON output
+
+If you want to inspect the IR or emit JSON for debugging/logging, use the IR helpers.
+
+```python
+from suitkaise import cerial
+
+obj = MyClass()
+
+ir = cerial.serialize_ir(obj)
+json_text = cerial.to_json(obj)
 ```
 
 ## Custom serialization and deserialization
@@ -177,3 +192,38 @@ The representation includes:
 For objects with locks, loggers, or other unpicklables, you'll see how cerial represents them in a pickle-safe format.
 
 Simple class instances and functions may look slightly different, as they are not subjected to the entire process.
+
+## JSON Output (Simplified)
+
+```json
+{
+  "__cerial_type__": "class_instance",
+  "__handler__": "ClassInstanceHandler",
+  "__object_id__": 4371208656,
+  "state": {
+    "__cerial_type__": "dict",
+    "items": {
+      "__cerial_json__": "dict",
+      "items": [
+        ["module", "__main__"],
+        ["qualname", "GameState"],
+        ["strategy", "dict"],
+        ["instance_dict", {
+          "__cerial_type__": "dict",
+          "items": {
+            "__cerial_json__": "dict",
+            "items": [
+              ["player", "Gurphy"],
+              ["score", 100],
+              ["items", {
+                "__cerial_type__": "list",
+                "items": ["sword", "shield"]
+              }]
+            ]
+          }
+        }]
+      ]
+    }
+  }
+}
+```

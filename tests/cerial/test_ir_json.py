@@ -1,19 +1,9 @@
 """
-WorstPossibleObject (WPO) Stress Tests (Cerial)
-
-WPO was designed specifically to validate cerial's ability to serialize and
-deserialize extremely complex, semi-randomly generated objects.
-
-This suite uses WPO's built-in verification (`WorstPossibleObject.verify`) and
-performs repeated roundtrips to catch flaky, "fails sometimes" serialization bugs.
-
-Target:
-- 100 roundtrip iterations
-- across 5 distinct WPO objects (different deterministic seeds)
+Cerial IR JSON Conversion Tests
 """
 
 import sys
-import random
+import json
 
 from pathlib import Path
 
@@ -28,7 +18,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.cerial import serialize, deserialize
+from suitkaise import cerial
 
 
 # =============================================================================
@@ -107,56 +97,62 @@ class TestRunner:
 
 
 # =============================================================================
-# WPO Stress Tests
+# IR JSON Tests
 # =============================================================================
 
-def _safe_cleanup(obj) -> None:
-    """Best-effort cleanup to avoid leaking file descriptors/sockets across iterations."""
-    try:
-        if obj is not None and hasattr(obj, "cleanup"):
-            obj.cleanup()
-    except Exception:
-        pass
+def _find_marker(node, marker: str) -> bool:
+    if isinstance(node, dict):
+        if node.get("__cerial_json__") == marker:
+            return True
+        return any(_find_marker(v, marker) for v in node.values())
+    if isinstance(node, list):
+        return any(_find_marker(item, marker) for item in node)
+    return False
 
 
-def test_wpo_roundtrip_100_iterations_across_5_objects():
-    """
-    Create 5 distinct WPO objects (different deterministic seeds).
+def _find_cerial_type(node, cerial_type: str) -> bool:
+    if isinstance(node, dict):
+        if node.get("__cerial_type__") == cerial_type:
+            return True
+        return any(_find_cerial_type(v, cerial_type) for v in node.values())
+    if isinstance(node, list):
+        return any(_find_cerial_type(item, cerial_type) for item in node)
+    return False
+
+
+def test_ir_to_json_output_is_valid():
+    """ir_to_json should return valid JSON text."""
+    obj = {"a": {1, 2}, 3: b"hi", "t": (1, 2), "c": complex(1, 2)}
+    ir = cerial.serialize_ir(obj)
+    json_text = cerial.ir_to_json(ir)
     
-    Then perform 100 roundtrip iterations PER OBJECT (500 total roundtrips):
-        serialize -> deserialize -> verify()
+    parsed = json.loads(json_text)
+    assert isinstance(parsed, dict), "JSON output should parse to dict"
+
+
+def test_to_json_matches_ir_path():
+    """to_json should produce valid JSON without manual IR step."""
+    obj = {"a": {1, 2}, 3: b"hi", "t": (1, 2), "c": complex(1, 2)}
+    json_text = cerial.to_json(obj)
+    parsed = json.loads(json_text)
+    assert isinstance(parsed, dict), "JSON output should parse to dict"
+
+
+def test_ir_to_jsonable_contains_markers():
+    """ir_to_jsonable should tag non-JSON-native structures."""
+    obj = {"a": {1, 2}, 3: b"hi", "t": (1, 2), "c": complex(1, 2)}
+    ir = cerial.serialize_ir(obj)
+    jsonable = cerial.ir_to_jsonable(ir)
     
-    This catches non-deterministic serialization failures that only appear
-    after repeated cycles.
-    """
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
-    
-    # 5 distinct objects
-    seeds = [0, 1, 2, 3, 4]
-    wpos = []
-    try:
-        for seed in seeds:
-            random.seed(seed)
-            wpos.append(WorstPossibleObject(verbose=False))
-        
-        # 100 iterations across these 5 objects (100 per object)
-        for obj_index, wpo in enumerate(wpos):
-            for iteration in range(100):
-                restored = None
-                try:
-                    data = serialize(wpo)
-                    restored = deserialize(data)
-                    
-                    ok, failures = wpo.verify(restored)
-                    assert ok, (
-                        f"WPO verify failed (object={obj_index}, iteration={iteration}).\n"
-                        + "\n".join(failures[:80])
-                    )
-                finally:
-                    _safe_cleanup(restored)
-    finally:
-        for wpo in wpos:
-            _safe_cleanup(wpo)
+    assert _find_marker(jsonable, "dict") or _find_cerial_type(jsonable, "dict"), \
+        "Should represent dicts in JSON output"
+    assert _find_marker(jsonable, "bytes"), "Should mark bytes values"
+    assert _find_marker(jsonable, "set") or _find_cerial_type(jsonable, "set"), \
+        "Should represent sets in JSON output"
+    assert _find_marker(jsonable, "tuple") or _find_cerial_type(jsonable, "tuple"), \
+        "Should represent tuples in JSON output"
+    assert _find_marker(jsonable, "complex") or _find_cerial_type(jsonable, "complex"), \
+        "Should represent complex numbers in JSON output"
 
 
 # =============================================================================
@@ -164,13 +160,13 @@ def test_wpo_roundtrip_100_iterations_across_5_objects():
 # =============================================================================
 
 def run_all_tests():
-    """Run all WPO stress tests."""
-    runner = TestRunner("WorstPossibleObject (Cerial) Stress Tests")
-    runner.run_test("WPO 100 iterations across 5 objects", test_wpo_roundtrip_100_iterations_across_5_objects)
+    runner = TestRunner("Cerial IR JSON Tests")
+    runner.run_test("JSON output is valid", test_ir_to_json_output_is_valid)
+    runner.run_test("to_json output is valid", test_to_json_matches_ir_path)
+    runner.run_test("JSON markers present", test_ir_to_jsonable_contains_markers)
     return runner.print_results()
 
 
 if __name__ == '__main__':
     success = run_all_tests()
     sys.exit(0 if success else 1)
-

@@ -102,6 +102,23 @@ class TestRunner:
         
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
         
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 
@@ -427,6 +444,45 @@ def test_timer_get_statistics_empty_and_alias():
     assert timer.get_stats() is None
 
 
+def test_timer_max_times_trims():
+    """Sktimer should keep only the last N measurements."""
+    timer = Sktimer(max_times=3)
+    for i in range(5):
+        timer.add_time(float(i))
+    
+    assert timer.num_times == 3
+    assert timer.times == [2.0, 3.0, 4.0], f"Unexpected times: {timer.times}"
+
+
+def test_timer_set_max_times_trims_existing():
+    """set_max_times should trim existing measurements."""
+    timer = Sktimer()
+    for i in range(4):
+        timer.add_time(float(i + 1))
+    
+    timer.set_max_times(2)
+    assert timer.times == [3.0, 4.0], f"Unexpected times after trim: {timer.times}"
+    
+    timer.add_time(5.0)
+    assert timer.times == [4.0, 5.0], f"Rolling window should keep last two: {timer.times}"
+
+
+def test_timer_max_times_validation():
+    """max_times should reject non-positive values."""
+    try:
+        Sktimer(max_times=0)
+        assert False, "Should raise ValueError for max_times=0"
+    except ValueError:
+        pass
+    
+    timer = Sktimer()
+    try:
+        timer.set_max_times(-1)
+        assert False, "Should raise ValueError for max_times < 0"
+    except ValueError:
+        pass
+
+
 def test_timer_stats_percentile_interpolation_and_bounds():
     """TimerStats.percentile should interpolate and validate bounds."""
     timer = Sktimer()
@@ -643,6 +699,9 @@ def run_all_tests():
     runner.run_test("Sktimer get_time invalid", test_timer_get_time_invalid)
     runner.run_test("Sktimer get_statistics", test_timer_get_statistics)
     runner.run_test("Sktimer get_statistics empty", test_timer_get_statistics_empty_and_alias)
+    runner.run_test("Sktimer max_times trims", test_timer_max_times_trims)
+    runner.run_test("Sktimer set_max_times trims", test_timer_set_max_times_trims_existing)
+    runner.run_test("Sktimer max_times validation", test_timer_max_times_validation)
     runner.run_test("TimerStats percentile", test_timer_stats_percentile_interpolation_and_bounds)
     runner.run_test("Sktimer result alias", test_timer_result_alias_and_total_paused_none)
     

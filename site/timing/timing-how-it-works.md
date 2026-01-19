@@ -211,12 +211,13 @@ The `Sktimer` is an advanced timer that can be used to time code execution, comp
 
 It is also the base for the context manager `TimeThis`, the timing decorator `@timethis`, and the `processing` module's `@timesection` decorator.
 
-No arguments are needed to initialize the `Sktimer` class.
+You can optionally set a rolling window size to keep only the last N measurements.
 
 ```python
 from suitkaise import sktime
 
 t = sktime.Sktimer()
+t_rolling = sktime.Sktimer(max_times=100)
 ```
 
 1. Creates a `Sktimer` instance
@@ -227,6 +228,7 @@ t = sktime.Sktimer()
    - `_lock`: creates a `threading.RLock()` for thread safety
    - `_sessions`: empty dictionary to track timing sessions per thread (keyed by thread ID)
    - `_stats_view`: a `SktimerStatsView` instance for accessing statistics
+   - `_max_times`: rolling window size (None means keep all measurements)
 
 Each timing operation is tracked separately. If you start timing from multiple places at once (like in parallel code), they won't interfere with each other — each gets its own independent tracking.
 
@@ -781,7 +783,7 @@ This is useful for thread safety, as it allows the same thread to acquire the lo
 
 ### Memory Management
 
-The `Sktimer` stores all measurements in memory:
+The `Sktimer` stores all measurements in memory (unless `max_times` is set):
 - Each measurement is a single float (8 bytes)
 - Each pause duration is a single float (8 bytes)
 - 1 million measurements ≈ 16 MB of memory

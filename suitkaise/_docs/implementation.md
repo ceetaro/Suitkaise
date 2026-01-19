@@ -684,7 +684,15 @@ add Skpath.copy_to() and Skpath.move_to() methods
 add Skprocess.run() that does start + wait + result
 
 add rate_limit() modifier for sk
-- lets explore this more
+
+```python
+@sk
+def my_function():
+    time.sleep(1)
+    return "Hello, world!"
+
+my_function.rate_limit(per_second=N)
+```
 
 add more blocking call patterns (boto3, redis, pymongo, etc)
 
@@ -693,7 +701,31 @@ add timethis.asynced() for native async funcs
 add rolling stats to Sktimer (keep only last N measurements)
 - how do we determine how many measurements to keep?
 
+```python
+from suitkaise.timing import Sktimer, timethis
+
+t = Sktimer(max_times=100)
+
+@timethis(max_times=100)
+def my_function():
+    time.sleep(1)
+    return "Hello, world!"
+
+for i in range(100):
+    my_function()
+
+print(t.mean)
+
+```
+
 add a JSON output converter for cerial IRs
+
+```python
+from suitkaise import cerial
+
+# serializes to python dict IR and then converts to JSON
+cerial.to_json(obj)
+```
 
 find a way to advertise cerial when people look up "cant pickle X"
 
@@ -701,3 +733,19 @@ update cerial benchmarks in docs and supported types to reflect improvements
 
 refactor site to have a more interactive home page that shows off things more
 
+upload version to test pypi
+
+2 paragraph summary on how modules work a d finish quick start guide
+
+
+### Real world example
+
+poker machine simulation
+
+6 different ML models play poker against each other in shared memory
+
+-------
+
+creating a language app based on the most common words
+
+- scan japanese website text and find the most common words and characters
