@@ -6,7 +6,7 @@ All public APIs are exported from api.py.
 """
 
 # Exceptions
-from .exceptions import PathDetectionError
+from .exceptions import PathDetectionError, NotAFileError
 
 # Types
 from .types import AnyPath
@@ -57,6 +57,7 @@ from .project_utils import (
 __all__ = [
     # Exceptions
     "PathDetectionError",
+    "NotAFileError",
     
     # Types
     "AnyPath",

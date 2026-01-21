@@ -1,26 +1,27 @@
 """
-Systematic Policy Evaluator using Skprocess Architecture
+Policy training and evaluation for PokerML.
 
 Architecture:
-  Parent spawns 6 EvaluatorWorker sub-processes.
-  Each sub handles 442 unique states (2652 / 6).
-  Each sub runs 6 rotations using .background() so every model sees every hand.
-  Results aggregate via Share.
+  Single-threaded evaluation of 169 canonical hands per agent.
+  Each hand tested at all 4 stages (pre-flop, flop, turn, river).
+  Policies learn online during evaluation (weights update immediately).
+  Mastered hands (all agents correct) are skipped in future epochs.
 
 This showcases:
-  - Skprocess for sub-workers
-  - .background() for internal parallelism
-  - Share for cross-process result aggregation
+  - Skprocess for isolated worker processes
+  - @blocking decorator for CPU-heavy methods
+  - .background() for parallel execution
+  - Share for cross-process data
 """
 
 from __future__ import annotations
 
 import random
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from suitkaise.processing import Skprocess, Share
+from suitkaise.sk import sk, blocking
 
 from .cards import Card, RANKS, SUITS
 from .policy import (
@@ -30,9 +31,7 @@ from .policy import (
 )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# HAND KNOWLEDGE - Pre-encoded poker knowledge for agents
-# ═══════════════════════════════════════════════════════════════════════════════
+# hand knowledge
 
 HAND_RANKINGS = {
     0: "High Card",
@@ -46,48 +45,68 @@ HAND_RANKINGS = {
     8: "Straight Flush",
 }
 
-# Pre-flop hand tiers (5=premium, 1=trash)
+# pre-flop hand tiers (5=premium, 1=trash)
 PREFLOP_TIERS: Dict[Tuple[int, int, bool], int] = {}
 
 
 def _init_preflop_tiers():
-    """Initialize pre-flop hand strength tiers for all 169 canonical hands."""
+    """
+    Initialize pre-flop hand strength tiers for all 169 canonical hands.
+    
+    There are 169 unique starting hands in poker:
+    - 13 pairs (AA, KK, ..., 22)
+    - 78 suited hands (AKs, AQs, ...)
+    - 78 offsuit hands (AKo, AQo, ...)
+    
+    Tiers (5=best, 1=worst):
+    - 5: Premium (AA, KK, QQ, JJ, TT, AKs, AQs)
+    - 4: Strong (99-77, AJs, KQs, AKo)
+    - 3: Playable (66-44, suited connectors, KQo)
+    - 2: Marginal (33-22, weak suited, Axo)
+    - 1: Trash (low offsuit, disconnected)
+    """
     for r1 in RANKS:
         for r2 in RANKS:
             if r1 < r2:
-                continue
+                continue  # skip duplicates (keep r1 >= r2)
             for suited in [True, False]:
                 if r1 == r2 and suited:
-                    continue
+                    continue  # pairs can't be suited
                 
                 key = (r1, r2, suited)
                 
-                if r1 == r2:  # Pairs
-                    if r1 >= 10:
+                # pairs
+                if r1 == r2:
+                    if r1 >= 10:        # TT+
                         PREFLOP_TIERS[key] = 5
-                    elif r1 >= 7:
+                    elif r1 >= 7:       # 77-99
                         PREFLOP_TIERS[key] = 4
-                    else:
+                    else:               # 22-66
                         PREFLOP_TIERS[key] = 3
+                
+                # suited hands
                 elif suited:
-                    if r1 >= 14 and r2 >= 10:
+                    if r1 >= 14 and r2 >= 10:    # ATs+
                         PREFLOP_TIERS[key] = 5
-                    elif r1 >= 13 and r2 >= 10:
+                    elif r1 >= 13 and r2 >= 10:  # KTs+
                         PREFLOP_TIERS[key] = 4
-                    elif abs(r1 - r2) <= 2:
+                    elif abs(r1 - r2) <= 2:      # suited connectors/gappers
                         PREFLOP_TIERS[key] = 3
-                    else:
+                    else:                         # other suited
                         PREFLOP_TIERS[key] = 2
+                
+                # offsuit hands
                 else:
-                    if r1 >= 14 and r2 >= 12:
+                    if r1 >= 14 and r2 >= 12:    # AQo+
                         PREFLOP_TIERS[key] = 4
-                    elif r1 >= 13 and r2 >= 11:
+                    elif r1 >= 13 and r2 >= 11:  # KJo+
                         PREFLOP_TIERS[key] = 3
-                    elif r1 >= 12:
+                    elif r1 >= 12:               # Qxo+
                         PREFLOP_TIERS[key] = 2
-                    else:
+                    else:                         # trash
                         PREFLOP_TIERS[key] = 1
 
+# initialize the tiers dict at module load
 _init_preflop_tiers()
 
 
@@ -98,10 +117,7 @@ def get_preflop_tier(card1: Card, card2: Card) -> int:
     return PREFLOP_TIERS.get((r1, r2, suited), 2)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# EVALUATION STATE
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# eval state
 @dataclass
 class EvalState:
     """A single evaluation state with hole cards, community cards, and game context."""
@@ -137,13 +153,13 @@ def generate_random_community(
     available = [c for c in all_cards if c not in exclude]
     rng.shuffle(available)
     
-    if stage == 0:  # Pre-flop
+    if stage == 0:  # pre-flop
         return []
-    elif stage == 1:  # Flop
+    elif stage == 1:  # flop
         return available[:3]
-    elif stage == 2:  # Turn
+    elif stage == 2:  # turn
         return available[:4]
-    else:  # River
+    else:  # river
         return available[:5]
 
 
@@ -165,20 +181,20 @@ def generate_eval_states_for_worker(
     """
     all_hands = generate_all_hands()
     
-    # Distribute hands among workers
+    # distribute hands among workers
     start_idx = worker_id * len(all_hands) // num_workers
     end_idx = (worker_id + 1) * len(all_hands) // num_workers
     worker_hands = all_hands[start_idx:end_idx]
     
     states = []
     for card1, card2 in worker_hands:
-        # Random stage (weighted toward later streets for more learning)
+        # random stage (weighted toward later streets for more learning)
         stage = rng.choices([0, 1, 2, 3], weights=[1, 2, 2, 2])[0]
         
-        # Generate random community cards
+        # generate random community cards
         community = generate_random_community(rng, [card1, card2], stage)
         
-        # Randomize game state within realistic ranges
+        # randomize game state within realistic ranges
         stack = int(base_stack * (1 + rng.uniform(-variance, variance)))
         pot = rng.choice([3, 6, 10, 15, 20, 30, 50, 80])
         to_call = rng.choice([0, 0, 0, 2, 4, 6, 10, 15, 25])  # More checks
@@ -200,24 +216,22 @@ def generate_eval_states_for_worker(
     return states
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# EVALUATION LOGIC
-# ═══════════════════════════════════════════════════════════════════════════════
+# eval logic
 
 def _win_prob_to_bucket(win_prob: float) -> int:
     """Convert win probability to a learnable bucket (0-5)."""
     if win_prob < 0.2:
-        return 0  # Very weak
+        return 0  # very weak
     elif win_prob < 0.35:
-        return 1  # Weak
+        return 1  # weak
     elif win_prob < 0.5:
-        return 2  # Marginal
+        return 2  # marginal
     elif win_prob < 0.65:
-        return 3  # Good
+        return 3  # good
     elif win_prob < 0.8:
-        return 4  # Strong
+        return 4  # strong
     else:
-        return 5  # Very strong
+        return 5  # very strong
 
 
 def evaluate_single_state(
@@ -239,7 +253,7 @@ def evaluate_single_state(
     community = state.community
     stage = state.stage
     
-    # Calculate optimal action using poker math
+    # calculate optimal action using poker math
     win_prob = estimate_win_rate(hole, community, rng, samples)
     pot_odds = 0.0 if state.to_call == 0 else state.to_call / max(state.pot + state.to_call, 1)
     hand_potential = calculate_hand_potential(hole, community, rng, samples)
@@ -258,19 +272,19 @@ def evaluate_single_state(
         implied_odds=implied_odds,
     )
     
-    # Use win_prob bucket so policy sees what optimal_action sees
+    # use win_prob bucket so policy sees what optimal_action sees
     hand_strength_bucket = _win_prob_to_bucket(win_prob)
     
-    # Get policy's action using actual hand strength
+    # get policy's action using actual hand strength
     state_key = build_state_key(
         stage, state.position, state.stack, state.pot,
         state.to_call, hand_strength_bucket, style_bucket
     )
     
-    # Use BEST action (deterministic) for scoring, not random sampling
+    # use BEST action (deterministic) for scoring, not random sampling
     predicted = policy.best_action(state_key)
     
-    # Score matching
+    # score matching
     if predicted == optimal:
         score = 1.0
     elif predicted in ("raise", "all_in") and optimal in ("raise", "all_in"):
@@ -280,12 +294,12 @@ def evaluate_single_state(
     else:
         score = 0.0
     
-    # ACTUAL LEARNING: Reinforce correct actions, punish incorrect ones
+    # ACTUAL LEARNING - reinforce correct actions, punish incorrect ones
     if learn:
-        # Always reinforce the optimal action strongly
+        # always reinforce the optimal action strongly
         policy.update(state_key, optimal, +1.5, learning_rate)
         if predicted != optimal:
-            # Punish the wrong action
+            # punish the wrong action
             policy.update(state_key, predicted, -0.8, learning_rate)
     
     return score, optimal, predicted
@@ -310,10 +324,7 @@ def evaluate_policy_on_states(
     return total / len(states)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# EVALUATOR WORKER (Skprocess)
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# actual worker to do evaluation
 @dataclass
 class EvalConfig:
     """Configuration for an evaluation worker."""
@@ -325,27 +336,62 @@ class EvalConfig:
     seed: int
 
 
+@sk  # enables .background() for running methods in threads
 class EvaluatorWorker(Skprocess):
     """
-    Sub-worker that evaluates policies against a batch of hands.
+    Parallel policy evaluator running in a separate process.
     
-    Uses .background() to run rotations in parallel, ensuring every
-    model sees every hand in this worker's batch.
+    This is an Skprocess subclass, meaning it runs in its own process
+    and can communicate with the parent via Share.
+    
+    Lifecycle (inherited from Skprocess):
+      __init__   -> called in parent process
+      __prerun__ -> called in child process before main work
+      __run__    -> main work loop
+      __postrun__ -> cleanup, store results
+      __result__ -> return value to parent
+      __error__  -> return value on failure
+    
+    Each worker:
+      1. Generates its share of hands (2652 total / num_workers)
+      2. Runs rotations using .background() for parallelism
+      3. Evaluates policies with learning enabled
+      4. Stores results in Share for parent to collect
+    
+    Showcases:
+      - @sk decorator for .background() support
+      - timing.sleep() to make methods detectable as blocking
+      - .background() to run blocking code in thread pool
     """
     
-    def __init__(self, share: Any, config: EvalConfig):
+    def __init__(self, share: Share, config: EvalConfig):
+        # share object for cross-process communication
         self.share = share
         self.config = config
+        
+        # each worker gets its own rng (seeded by worker_id for reproducibility)
         self.rng = random.Random(config.seed + config.worker_id)
         
+        # Skprocess config - run once, one life (no retries)
         self.process_config.runs = 1  # type: ignore[attr-defined]
         self.process_config.lives = 1  # type: ignore[attr-defined]
         
+        # state populated in __prerun__
         self._states: List[EvalState] = []
         self._results: Dict[str, float] = {}
+
+        # NOTE: I recommend populating state in __prerun__, so that 
+        # if the process is doing multiple runs, things get initialized
+        # per run correctly.
+
+        # NOTE: only if you always want state to persist 
+        # between runs should you populate state in __init__
     
     def __prerun__(self):
-        """Generate this worker's share of evaluation states."""
+        """
+        Called in child process before __run__.
+        Generate this worker's share of evaluation states.
+        """
         self._states = generate_eval_states_for_worker(
             worker_id=self.config.worker_id,
             num_workers=self.config.num_workers,
@@ -353,6 +399,7 @@ class EvaluatorWorker(Skprocess):
             base_stack=self.config.base_stack,
         )
     
+    @blocking  # explicitly marks as blocking, enabling .background()
     def _evaluate_rotation(
         self,
         rotation_id: int,
@@ -361,6 +408,8 @@ class EvaluatorWorker(Skprocess):
         """
         Evaluate all policies on a rotated subset of states.
         Each rotation shifts which states each policy sees.
+        
+        Uses @blocking decorator to enable .background() for parallel execution.
         
         Returns (scores, updated_snapshots).
         """
@@ -371,18 +420,18 @@ class EvaluatorWorker(Skprocess):
         if n_policies == 0 or n_states == 0:
             return {}, {}
         
-        # Divide states among policies for this rotation
+        # divide states among policies for this rotation
         states_per_policy = max(1, n_states // n_policies)
         
         results: Dict[str, float] = {}
         updated_snapshots: Dict[str, Dict[str, List[float]]] = {}
         
         for idx, (agent_id, snapshot) in enumerate(policies.items()):
-            # Rotate starting position based on rotation_id
+            # rotate starting position based on rotation_id
             start = ((idx + rotation_id) * states_per_policy) % n_states
             end = min(start + states_per_policy, n_states)
             
-            # Wrap around if needed
+            # wrap around if needed
             policy_states = self._states[start:end]
             if end > n_states:
                 policy_states.extend(self._states[:end - n_states])
@@ -391,13 +440,13 @@ class EvaluatorWorker(Skprocess):
             policy.load_snapshot(snapshot)
             style_bucket = 1 if rotation_rng.random() >= 0.5 else 0
             
-            # Evaluate WITH learning enabled
+            # evaluate WITH learning enabled
             score = evaluate_policy_on_states(
                 policy, policy_states, rotation_rng, self.config.samples, style_bucket,
                 learn=True, learning_rate=0.15
             )
             results[agent_id] = score
-            # Save the learned weights
+            # save the learned weights
             updated_snapshots[agent_id] = policy.snapshot()
         
         return results, updated_snapshots
@@ -405,7 +454,13 @@ class EvaluatorWorker(Skprocess):
     def __run__(self):
         """
         Run evaluation with rotations.
-        Uses ThreadPoolExecutor to parallelize rotations within this process.
+        Uses .background() to parallelize rotations within this process.
+        
+        .background() runs the method in a thread pool and returns
+        a Future immediately. We collect all futures, then wait for results.
+        
+        This showcases suitkaise's .background() feature - no need for
+        manual ThreadPoolExecutor setup!
         """
         policies = self.share.policies if self.share else {}
         if not policies:
@@ -413,22 +468,24 @@ class EvaluatorWorker(Skprocess):
         
         num_rotations = min(6, self.config.num_models)
         
-        # Run rotations in parallel using threads
-        with ThreadPoolExecutor(max_workers=num_rotations) as executor:
-            futures = [
-                executor.submit(self._evaluate_rotation, rotation_id, policies)
-                for rotation_id in range(num_rotations)
-            ]
-            
-            all_rotation_results: List[Tuple[Dict[str, float], Dict[str, Dict[str, List[float]]]]] = []
-            for future in futures:
-                try:
-                    result = future.result(timeout=30)
-                    all_rotation_results.append(result)
-                except Exception:
-                    pass
+        # launch all rotations in parallel using .background()
+        # .background() returns a callable, which we then call with our args
+        # each call runs in a background thread and returns a Future immediately
+        futures = [
+            self._evaluate_rotation.background()(rotation_id, policies)  # type: ignore[attr-defined]
+            for rotation_id in range(num_rotations)
+        ]
         
-        # Average scores across rotations
+        # collect results from all futures
+        all_rotation_results: List[Tuple[Dict[str, float], Dict[str, Dict[str, List[float]]]]] = []
+        for future in futures:
+            try:
+                result = future.result(timeout=30)
+                all_rotation_results.append(result)
+            except Exception:
+                pass
+        
+        # average scores across rotations
         combined: Dict[str, List[float]] = {}
         for scores, _ in all_rotation_results:
             for agent_id, score in scores.items():
@@ -440,8 +497,8 @@ class EvaluatorWorker(Skprocess):
             agent_id: sum(scores) / len(scores) if scores else 0.0
             for agent_id, scores in combined.items()
         }
-        
-        # Collect the most recent learned policies (from last rotation)
+    
+        # collect the most recent learned policies (from last rotation)
         self._updated_policies: Dict[str, Dict[str, List[float]]] = {}
         if all_rotation_results:
             _, last_snapshots = all_rotation_results[-1]
@@ -454,7 +511,7 @@ class EvaluatorWorker(Skprocess):
             results[self.config.worker_id] = self._results
             self.share.eval_results = results
         
-        # Store learned policies
+        # store learned policies
         if self.share and hasattr(self.share, "learned_policies"):
             learned = self.share.learned_policies
             for agent_id, snapshot in self._updated_policies.items():
@@ -473,9 +530,7 @@ class EvaluatorWorker(Skprocess):
         return {"worker_id": self.config.worker_id, "error": True}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN EVALUATION ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
+# entry point
 
 def evaluate_all_policies_parallel(
     policies: Dict[str, Dict[str, List[float]]],
@@ -500,13 +555,13 @@ def evaluate_all_policies_parallel(
     """
     from suitkaise.processing import Pool
     
-    # Create shared state for results
+    # create shared state for results
     eval_share: Any = Share()
     eval_share.policies = policies
     eval_share.eval_results = {}
     eval_share.learned_policies = {}
     
-    # Create worker configs
+    # create worker configs
     worker_configs = [
         (
             eval_share,
@@ -522,11 +577,11 @@ def evaluate_all_policies_parallel(
         for i in range(num_workers)
     ]
     
-    # Run workers in parallel using Pool
+    # run workers in parallel using Pool
     pool: Any = Pool(num_workers)
     results = list(pool.star().unordered_imap(EvaluatorWorker, worker_configs))
     
-    # Aggregate results from all workers
+    # aggregate results from all workers
     combined_scores: Dict[str, List[float]] = {}
     learned_policies: Dict[str, Dict[str, List[float]]] = {}
     
@@ -541,7 +596,7 @@ def evaluate_all_policies_parallel(
                 for agent_id, snapshot in result["learned_policies"].items():
                     learned_policies[agent_id] = snapshot
     
-    # Also check shared state
+    # also check shared state
     if hasattr(eval_share, "eval_results"):
         for worker_id, worker_results in eval_share.eval_results.items():
             for agent_id, score in worker_results.items():
@@ -553,14 +608,15 @@ def evaluate_all_policies_parallel(
         for agent_id, snapshot in eval_share.learned_policies.items():
             learned_policies[agent_id] = snapshot
     
-    # Average scores
+    # average scores
     final_scores = {
         agent_id: sum(scores) / len(scores) if scores else 0.0
         for agent_id, scores in combined_scores.items()
     }
     
-    # Cleanup
+    # cleanup
     try:
+        # exit sharing so that extra processes can be cleaned up
         eval_share.exit()
     except Exception:
         pass
@@ -580,7 +636,7 @@ class EvalResult:
     """Result of evaluating policies with mastery tracking."""
     scores: Dict[str, float]
     learned_policies: Dict[str, Dict[str, List[float]]]
-    newly_mastered: Set[Tuple[int, int, bool]]  # Hands all agents got right
+    newly_mastered: Set[Tuple[int, int, bool]]  # hands all agents got right
     total_hands: int
     mastered_count: int
 
@@ -596,29 +652,42 @@ def evaluate_policies_simple(
     """
     Single-threaded evaluation with learning and mastery tracking.
     
+    This is the main training loop. For each agent:
+      1. Load their policy weights
+      2. Test on sampled hands (skipping already-mastered ones)
+      3. Update weights based on correct/incorrect actions
+      4. Track which hands ALL agents got right (newly mastered)
+    
+    Mastery optimization:
+      Once all agents correctly handle a hand in both variations,
+      that hand is "mastered" and skipped in future epochs.
+      This speeds up training as agents converge.
+    
     Args:
-        policies: Agent policies to evaluate
-        seed: Random seed for this epoch
-        mastered_hands: Set of hand keys to SKIP (already mastered)
+        policies: agent_id -> policy snapshot dict
+        seed: random seed for this epoch
+        mastered_hands: set of hand keys to skip (already mastered)
     
     Returns:
-        EvalResult with scores, learned policies, and newly mastered hands.
+        EvalResult with scores, updated policies, and newly mastered hands
     """
     rng = random.Random(seed)
     all_hands = generate_all_hands()
     mastered_hands = mastered_hands or set()
     
-    # Sample hands, excluding already-mastered ones
+    # sample hands, excluding already-mastered ones
+    # take every 8th hand ≈ 332 base hands for speed
     sampled_hands = []
-    for c1, c2 in all_hands[::8]:  # Every 8th hand ≈ 332 base hands
+    for c1, c2 in all_hands[::8]:
         key = _hand_key(c1, c2)
         if key not in mastered_hands:
             sampled_hands.append((c1, c2, key))
     
-    # Generate states with hand keys for tracking
+    # generate 2 variations per hand (different community cards, stacks, ...)
     states_with_keys: List[Tuple[EvalState, Tuple[int, int, bool]]] = []
     for c1, c2, hand_key in sampled_hands:
-        for _ in range(2):  # 2 variations per hand
+        for _ in range(2):
+            # random stage (weighted toward post-flop for more learning)
             stage = rng.choices([0, 1, 2, 3], weights=[1, 2, 2, 2])[0]
             community = generate_random_community(rng, [c1, c2], stage)
             
@@ -634,36 +703,40 @@ def evaluate_policies_simple(
             )
             states_with_keys.append((state, hand_key))
     
-    # Track which hands each agent got correct
+    # track which hands each agent got correct (for mastery detection)
     hand_correct_counts: Dict[Tuple[int, int, bool], int] = {}
     num_agents = len(policies)
     
     results: Dict[str, float] = {}
     learned_policies: Dict[str, Dict[str, List[float]]] = {}
     
+    # evaluate each agent
     for agent_id, snapshot in policies.items():
+        # load policy weights
         policy = PolicyTable(["fold", "call", "raise", "all_in"], rng)
         policy.load_snapshot(snapshot)
         
         total_score = 0.0
         for state, hand_key in states_with_keys:
+            # evaluate and learn from this state
             score, optimal, predicted = evaluate_single_state(
                 policy, state, rng, samples, 1,
                 learn=learn, learning_rate=0.15
             )
             total_score += score
             
-            # Track if this agent got this hand right
-            if score >= 1.0:  # Perfect match
+            # track perfect matches for mastery
+            if score >= 1.0:
                 hand_correct_counts[hand_key] = hand_correct_counts.get(hand_key, 0) + 1
         
+        # save results
         results[agent_id] = total_score / len(states_with_keys) if states_with_keys else 0.0
         learned_policies[agent_id] = policy.snapshot()
     
-    # Find hands that ALL agents got correct (newly mastered)
+    # find hands that ALL agents got correct in BOTH variations = newly mastered
     newly_mastered: Set[Tuple[int, int, bool]] = set()
     for hand_key, correct_count in hand_correct_counts.items():
-        # Each hand appears twice (2 variations), so need 2x num_agents correct
+        # each hand appears twice, need 2x num_agents perfect scores
         if correct_count >= num_agents * 2:
             newly_mastered.add(hand_key)
     

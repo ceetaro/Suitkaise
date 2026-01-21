@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .caller_paths import detect_caller_path
-from .exceptions import PathDetectionError
+from .exceptions import PathDetectionError, NotAFileError
 from .id_utils import (
     decode_path_id,
     encode_path_id,
@@ -299,6 +299,18 @@ class Skpath:
         return self._path.is_symlink()
     
     @property
+    def is_empty(self) -> bool:
+        """Whether the path is an empty directory (no files or subdirs).
+        
+        Raises:
+            NotADirectoryError: If path is not a directory
+        """
+        if not self._path.is_dir():
+            raise NotADirectoryError(f"is_empty requires a directory: {self._path}")
+        # use any() with iterdir() for early exit - faster than list()
+        return not any(self._path.iterdir())
+    
+    @property
     def stat(self) -> os.stat_result:
         """
         Return stat info for the path.
@@ -481,6 +493,30 @@ class Skpath:
             exist_ok: Don't raise if file exists
         """
         self._path.touch(mode=mode, exist_ok=exist_ok)
+    
+    def rmdir(self) -> None:
+        """Remove this directory. Directory must be empty.
+        
+        Raises:
+            OSError: If directory is not empty
+            NotADirectoryError: If path is not a directory
+        """
+        self._path.rmdir()
+    
+    def unlink(self, missing_ok: bool = False) -> None:
+        """Remove this file or symbolic link.
+        
+        Args:
+            missing_ok: Don't raise if file doesn't exist
+            
+        Raises:
+            NotAFileError: If path is a directory
+        """
+        # check upfront - unlink on a directory raises different errors on different OSes
+        # (IsADirectoryError on Linux, PermissionError on macOS)
+        if self._path.is_dir():
+            raise NotAFileError(f"Cannot unlink directory: {self._path}")
+        self._path.unlink(missing_ok=missing_ok)
     
     def copy_to(
         self,

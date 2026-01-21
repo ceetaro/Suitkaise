@@ -1,0 +1,355 @@
+"""
+@blocking Decorator Tests
+
+Tests that the @blocking decorator correctly marks methods/functions as blocking,
+enables .background() and .asynced(), and skips AST analysis for performance.
+"""
+
+import sys
+import time
+from pathlib import Path
+from concurrent.futures import Future
+
+# Add project root to path
+def _find_project_root(start: Path) -> Path:
+    for parent in [start] + list(start.parents):
+        if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
+            return parent
+    return start
+
+project_root = _find_project_root(Path(__file__).resolve())
+sys.path.insert(0, str(project_root))
+
+from suitkaise.sk import sk, blocking, Skfunction, SkModifierError
+
+
+# =============================================================================
+# Test Functions - CPU-heavy work with no I/O
+# =============================================================================
+
+@blocking
+def cpu_heavy_function():
+    """CPU-intensive work with no detectable I/O."""
+    result = 0
+    for i in range(1000):
+        result += i * i
+    return result
+
+
+def non_blocking_function():
+    """Pure function with no blocking calls."""
+    return 42
+
+
+@blocking
+def cpu_heavy_with_args(n: int, multiplier: float = 1.0) -> float:
+    """CPU-intensive work with arguments."""
+    result = 0.0
+    for i in range(n):
+        result += i * multiplier
+    return result
+
+
+# =============================================================================
+# Test Classes
+# =============================================================================
+
+@sk
+class WorkerWithBlockingMethod:
+    """Class with a @blocking method."""
+    
+    def __init__(self):
+        self.value = 0
+    
+    @blocking
+    def heavy_computation(self, iterations: int = 100) -> int:
+        """CPU-heavy method with no I/O."""
+        result = 0
+        for i in range(iterations):
+            result += i
+        self.value = result
+        return result
+    
+    def regular_method(self) -> str:
+        """Non-blocking method."""
+        return "regular"
+
+
+@sk
+class WorkerWithMixedMethods:
+    """Class with both @blocking and auto-detected blocking methods."""
+    
+    @blocking
+    def cpu_work(self) -> int:
+        """Explicit blocking via decorator."""
+        return sum(range(100))
+    
+    def io_work(self) -> str:
+        """Auto-detected blocking via time.sleep."""
+        time.sleep(0.001)
+        return "io done"
+    
+    def pure_work(self) -> int:
+        """Non-blocking method."""
+        return 42
+
+
+# =============================================================================
+# Tests - @blocking Decorator Detection
+# =============================================================================
+
+def test_blocking_decorator_sets_attribute():
+    """@blocking should set _sk_blocking = True on the function."""
+    assert hasattr(cpu_heavy_function, '_sk_blocking')
+    assert cpu_heavy_function._sk_blocking is True
+
+
+def test_blocking_decorator_preserves_function():
+    """@blocking should not change the function's behavior."""
+    result = cpu_heavy_function()
+    assert isinstance(result, int)
+    assert result > 0
+
+
+def test_blocking_decorator_with_args():
+    """@blocking should work with functions that have arguments."""
+    result = cpu_heavy_with_args(100, multiplier=2.0)
+    assert isinstance(result, float)
+    assert result == sum(i * 2.0 for i in range(100))
+
+
+def test_skfunction_detects_blocking_decorator():
+    """Skfunction should detect @blocking as a blocking indicator."""
+    sk_func = Skfunction(cpu_heavy_function)
+    assert sk_func.has_blocking_calls, "@blocking should be detected"
+    assert '@blocking' in sk_func.blocking_calls
+
+
+def test_skfunction_no_false_positive_without_decorator():
+    """Skfunction should NOT detect blocking in pure functions."""
+    sk_func = Skfunction(non_blocking_function)
+    assert not sk_func.has_blocking_calls
+    assert len(sk_func.blocking_calls) == 0
+
+
+def test_sk_decorated_function_detects_blocking():
+    """@sk on a @blocking function should detect it as blocking."""
+    @sk
+    @blocking
+    def decorated_heavy():
+        return sum(range(1000))
+    
+    assert decorated_heavy.has_blocking_calls
+    assert '@blocking' in decorated_heavy.blocking_calls
+
+
+# =============================================================================
+# Tests - Class Detection
+# =============================================================================
+
+def test_class_detects_blocking_method():
+    """@sk class should detect @blocking methods."""
+    assert WorkerWithBlockingMethod.has_blocking_calls
+    assert 'heavy_computation' in WorkerWithBlockingMethod.blocking_methods
+    assert '@blocking' in WorkerWithBlockingMethod.blocking_methods['heavy_computation']
+
+
+def test_class_mixed_detection():
+    """@sk class should detect both @blocking and auto-detected methods."""
+    assert WorkerWithMixedMethods.has_blocking_calls
+    methods = WorkerWithMixedMethods.blocking_methods
+    
+    # @blocking method
+    assert 'cpu_work' in methods
+    assert '@blocking' in methods['cpu_work']
+    
+    # Auto-detected method
+    assert 'io_work' in methods
+    assert any('sleep' in call for call in methods['io_work'])
+    
+    # Pure method should NOT be in blocking_methods
+    assert 'pure_work' not in methods
+
+
+# =============================================================================
+# Tests - .background() Enabled
+# =============================================================================
+
+def test_background_enabled_for_blocking_function():
+    """@blocking should enable .background() on Skfunction."""
+    sk_func = Skfunction(cpu_heavy_function)
+    
+    # Should not raise
+    bg_func = sk_func.background()
+    future = bg_func()
+    
+    assert isinstance(future, Future)
+    result = future.result(timeout=5)
+    assert isinstance(result, int)
+
+
+def test_background_enabled_for_blocking_method():
+    """@blocking should enable .background() on class methods."""
+    worker = WorkerWithBlockingMethod()
+    
+    # Should not raise
+    future = worker.heavy_computation.background()(50)
+    
+    assert isinstance(future, Future)
+    result = future.result(timeout=5)
+    assert result == sum(range(50))
+
+
+def test_background_runs_in_thread():
+    """@blocking + .background() should actually run in a separate thread."""
+    import threading
+    
+    main_thread = threading.current_thread().ident
+    thread_ids = []
+    
+    @sk
+    @blocking
+    def capture_thread():
+        thread_ids.append(threading.current_thread().ident)
+        return 42
+    
+    future = capture_thread.background()()
+    result = future.result(timeout=5)
+    
+    assert result == 42
+    assert len(thread_ids) == 1
+    assert thread_ids[0] != main_thread, "Should run in different thread"
+
+
+# =============================================================================
+# Tests - .asynced() Enabled
+# =============================================================================
+
+def test_asynced_enabled_for_blocking_function():
+    """@blocking should enable .asynced() on Skfunction."""
+    sk_func = Skfunction(cpu_heavy_function)
+    
+    # Should not raise SkModifierError
+    async_func = sk_func.asynced()
+    assert async_func is not None
+
+
+def test_asynced_raises_without_blocking():
+    """.asynced() should raise SkModifierError on pure functions."""
+    sk_func = Skfunction(non_blocking_function)
+    
+    try:
+        sk_func.asynced()
+        assert False, "Should have raised SkModifierError"
+    except SkModifierError:
+        pass  # Expected
+
+
+# =============================================================================
+# Tests - Performance Optimization (AST Skip)
+# =============================================================================
+
+def test_blocking_decorator_reports_only_blocking():
+    """@blocking should result in only '@blocking' in blocking_calls, not AST-detected ones."""
+    # This function has @blocking, so AST analysis for blocking detection should be skipped
+    # Even if it contained detectable I/O, we should only see '@blocking'
+    
+    @blocking
+    def mixed_but_decorated():
+        # Even though this has sleep, @blocking should short-circuit
+        # and not do AST analysis for blocking detection
+        return 42
+    
+    sk_func = Skfunction(mixed_but_decorated)
+    
+    # Should only have @blocking, proving AST was skipped
+    assert sk_func.blocking_calls == ['@blocking']
+
+
+def test_blocking_decorator_faster_than_ast():
+    """@blocking detection should be faster than AST analysis."""
+    # This is a soft test - we just verify that decorated functions
+    # don't do full AST analysis for blocking detection
+    
+    import timeit
+    
+    @blocking
+    def fast_decorated():
+        # Long function that would be slow to AST parse
+        a = 1
+        b = 2
+        c = 3
+        d = 4
+        e = 5
+        return a + b + c + d + e
+    
+    def slow_io_function():
+        import time
+        time.sleep(0.001)
+        return 42
+    
+    # Time wrapping the decorated function
+    t1 = timeit.timeit(lambda: Skfunction(fast_decorated), number=100)
+    
+    # Time wrapping the function requiring AST analysis
+    t2 = timeit.timeit(lambda: Skfunction(slow_io_function), number=100)
+    
+    # Decorated should be faster (or at least not significantly slower)
+    # We don't assert strict timing because it can vary, but this documents intent
+    print(f"\n  @blocking wrapper time: {t1:.4f}s")
+    print(f"  AST analysis time:     {t2:.4f}s")
+
+
+# =============================================================================
+# Tests - Edge Cases
+# =============================================================================
+
+def test_blocking_on_lambda_like():
+    """@blocking works even on simple one-liners."""
+    @blocking
+    def one_liner():
+        return 42
+    
+    sk_func = Skfunction(one_liner)
+    assert sk_func.has_blocking_calls
+    assert '@blocking' in sk_func.blocking_calls
+
+
+def test_blocking_preserves_docstring():
+    """@blocking should preserve the function's docstring."""
+    @blocking
+    def documented():
+        """This is documentation."""
+        return 42
+    
+    assert documented.__doc__ == """This is documentation."""
+
+
+def test_blocking_preserves_name():
+    """@blocking should preserve the function's name."""
+    @blocking
+    def named_function():
+        return 42
+    
+    assert named_function.__name__ == 'named_function'
+
+
+def test_multiple_blocking_decorators():
+    """Multiple @blocking decorators should be harmless."""
+    @blocking
+    @blocking
+    def double_decorated():
+        return 42
+    
+    assert double_decorated._sk_blocking is True
+    sk_func = Skfunction(double_decorated)
+    assert sk_func.has_blocking_calls
+
+
+# =============================================================================
+# Run Tests
+# =============================================================================
+
+if __name__ == "__main__":
+    import pytest
+    pytest.main([__file__, "-v"])

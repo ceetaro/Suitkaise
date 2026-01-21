@@ -37,6 +37,7 @@ from .api import (
     Skclass,
     Skfunction,
     sk,
+    blocking,
     SkModifierError,
     FunctionTimeoutError,
 )
@@ -45,6 +46,7 @@ __all__ = [
     'Skclass',
     'Skfunction',
     'sk',
+    'blocking',
     'SkModifierError',
     'FunctionTimeoutError',
 ]

@@ -32,6 +32,7 @@ try:
         
         # Exceptions
         PathDetectionError,
+        NotAFileError,
         
         # Root management
         CustomRoot,
@@ -571,6 +572,7 @@ __all__ = [
     
     # Exceptions
     "PathDetectionError",
+    "NotAFileError",
     
     # Root management
     "CustomRoot",

@@ -17,9 +17,6 @@ All further changes will be changes to 0.3.0 (or the most recent version once 0.
 
 As of version 0.3.0, the project is still unreleased.
 
-### Changed
-- Share now serializes into a live client that reuses the parent coordinator when passed to Pool workers, avoiding duplicate Manager startup and enabling safe cross-process usage.
-
 ## [0.3.0] - 2026-01-16
 
 ### Added
@@ -48,5 +45,15 @@ As of version 0.3.0, the project is still unreleased.
 - Rolling window support in `Sktimer` (`max_times`) and `@timethis(max_times=...)`.
 
 - Cerial IR helpers: `serialize_ir`, `ir_to_jsonable`, `ir_to_json`, `to_jsonable`, `to_json`.
+
+- `@blocking` decorator in `suitkaise.sk` to explicitly mark methods/functions as blocking. This enables `.background()` and `.asynced()` for CPU-heavy code that doesn't contain auto-detectable I/O calls (like `timing.sleep`).
+
+- `Skpath.is_empty` property that returns `True` if a directory has no contents. Raises `NotADirectoryError` if called on a file.
+
+- `Skpath.rmdir()` and `Skpath.unlink()` methods for removing directories and files.
+
+- `NotAFileError` exception (inherits `IsADirectoryError`) raised by `Skpath.unlink()` when path is a directory.
+
+- Share now serializes into a live client that reuses the parent coordinator when passed to Pool workers, avoiding duplicate Manager startup and enabling safe cross-process usage.
 
 

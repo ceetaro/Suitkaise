@@ -68,33 +68,44 @@ class PokerAgent:
         pot: int, 
         min_raise: int
     ) -> Dict[str, int | str]:
-        """Choose an action based on the policy."""
+        """
+        Choose an action based on current game state.
+        
+        Args:
+            state_key: tuple encoding the game state (stage, position, stacks, etc.)
+            stack: agent's remaining chips
+            to_call: amount needed to call current bet
+            pot: current pot size
+            min_raise: minimum legal raise amount
+        
+        Returns:
+            dict with 'action' and 'amount' keys
+        """
 
-        # quick sleep
-        timing.sleep(0.001)
-
-        # rate limit and breaking circ to manage resource usage
+        # check rate limiter - if tripped, fold immediately to prevent spam
         if self.rate_limit.short():
             self.breaker.short()
             return {"action": "fold", "amount": 0}
 
-        # choose action based on policy
+        # query the policy table for action based on state
         action = self.policy.choose_action(state_key)
 
+        # fold and call have no bet amount
         if action == "fold":
             return {"action": "fold", "amount": 0}
 
         if action == "call":
             return {"action": "call", "amount": 0}
 
+        # all-in uses entire stack
         if action == "all_in":
             return {"action": "all_in", "amount": stack}
 
-        # calc aggression based on style
+        # raise: calculate bet size based on style (aggression factor)
         aggression = 0.5 + self.style
-
-        # calc target raise amount
         target = int(min_raise + aggression * max(pot, min_raise))
+        
+        # clamp to valid range: at least min_raise, at most entire stack
         return {"action": "raise", "amount": max(min_raise, min(target, stack))}
 
 

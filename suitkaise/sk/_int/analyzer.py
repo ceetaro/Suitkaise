@@ -4,6 +4,7 @@ AST analysis for auto-generating _shared_meta and detecting blocking calls.
 This module analyzes class definitions to:
 1. Generate _shared_meta by tracking attribute reads/writes in methods
 2. Detect blocking calls (time.sleep, file I/O, requests, etc.)
+3. Check for explicit @blocking decorator (defined in api.py)
 """
 
 import ast
@@ -212,9 +213,32 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
     - writes: set of self.attr that are written
     - blocking_calls: list of blocking calls found
     
+    Checks for @blocking decorator first - if present, skips AST analysis
+    for blocking detection (performance optimization).
+    
     Returns:
         Tuple of (reads, writes, blocking_calls)
     """
+    # Check for explicit @blocking decorator FIRST
+    # If found, we can skip AST analysis for blocking detection
+    has_blocking_decorator = getattr(method, '_sk_blocking', False)
+    if has_blocking_decorator:
+        # Still need to analyze for attribute access (_shared_meta)
+        source = _get_method_source(method)
+        if source is None:
+            return set(), set(), ['@blocking']
+        
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            return set(), set(), ['@blocking']
+        
+        # Only analyze attributes, skip blocking call detection
+        attr_visitor = _AttributeVisitor()
+        attr_visitor.visit(tree)
+        return attr_visitor.reads, attr_visitor.writes, ['@blocking']
+    
+    # No @blocking decorator - do full AST analysis
     source = _get_method_source(method)
     if source is None:
         return set(), set(), []
@@ -228,7 +252,7 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
     attr_visitor = _AttributeVisitor()
     attr_visitor.visit(tree)
     
-    # Find blocking calls
+    # Find blocking calls via AST analysis
     blocking_visitor = _BlockingCallVisitor()
     blocking_visitor.visit(tree)
     

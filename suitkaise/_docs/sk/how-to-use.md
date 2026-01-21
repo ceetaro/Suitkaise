@@ -239,7 +239,40 @@ result = await sk_fetch.asynced().timeout(10.0).retry(3)("https://api.com")
 
 How does `sk` detect blocking calls?
 
-These are the detected blocking calls.
+### `@blocking` decorator
+
+For CPU-heavy code that doesn't contain detectable I/O calls, use the `@blocking` decorator to explicitly mark a method or function as blocking:
+
+```python
+from suitkaise.sk import sk, blocking
+
+@sk
+class DataProcessor:
+
+    @blocking  # explicitly marks this as blocking
+    def heavy_computation(self, data):
+        # CPU-intensive work with no I/O
+        result = 0
+        for item in data:
+            result += complex_math(item)
+        return result
+
+processor = DataProcessor()
+
+# Now .background() works without needing a fake timing.sleep()
+future = processor.heavy_computation.background()(large_dataset)
+# ... do other work ...
+result = future.result()
+```
+
+The `@blocking` decorator:
+- Enables `.background()` and `.asynced()` for the method
+- Shows up in `.blocking_methods` as `'@blocking'`
+- Works on both methods in `@sk` classes and standalone `@sk` functions
+
+### Auto-detection
+
+These blocking calls are automatically detected via AST analysis:
 
 - `time.sleep`, `timing.sleep`, ...
 - `requests.get`, `requests.post`, ...
@@ -253,6 +286,7 @@ These are the detected blocking calls.
 @sk
 class MyClass:
 
+    # auto detects blocking calls
     def blocking_method(self):
         timing.sleep(1)
 
@@ -263,12 +297,18 @@ class MyClass:
 
         return response.text, data
 
+    # explicitly marks as blocking
+    @blocking
     def non_blocking_method(self):
         return "Hello, world!"
 
 print(MyClass.has_blocking_calls) # True
 
-print(MyClass.blocking_methods) # {'blocking_method': ['time.sleep', 'requests.get', 'open']}
+print(MyClass.blocking_methods) 
+# {
+#     'blocking_method': ['time.sleep', 'requests.get', 'open'], 
+#     'non_blocking_method': ['@blocking']
+# }
 ```
 
 ## Errors

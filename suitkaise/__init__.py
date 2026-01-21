@@ -7,10 +7,11 @@ Suitkaise provides a collection of utilities for common development needs:
 - circuits: Circuit breaker pattern for controlled failure handling
 - cerial: Serialization for unpicklable objects
 - processing: Subprocess-based task execution with pools
+- sk: Class/function decorators for async, retry, timeout, background execution
 
 Usage:
     # Direct imports from suitkaise
-    from suitkaise import TimeThis, Sktimer, Skpath, Circuit
+    from suitkaise import TimeThis, Sktimer, Skpath, Circuit, sk, blocking
     
     # Module-level imports
     from suitkaise.timing import TimeThis
@@ -18,6 +19,7 @@ Usage:
     from suitkaise.circuits import Circuit
     from suitkaise.cerial import serialize, deserialize
     from suitkaise.processing import Skprocess, Pool
+    from suitkaise.sk import sk, blocking
 """
 
 # ============================================================================
@@ -129,6 +131,7 @@ from .processing import (
 # ============================================================================
 from .sk import (
     sk,
+    blocking,
     SkModifierError,
     FunctionTimeoutError,
 )
@@ -196,6 +199,7 @@ __all__ = [
     
     # Sk
     "sk",
+    "blocking",
     "SkModifierError",
     "FunctionTimeoutError",
 ]

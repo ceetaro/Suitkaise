@@ -1,5 +1,5 @@
 """
-Sk module API - Skclass, Skfunction, @sk decorator.
+Sk module API - Skclass, Skfunction, @sk, @blocking decorators.
 
 Provides automatic _shared_meta generation and .asynced() support for user classes.
 """
@@ -10,6 +10,46 @@ from concurrent.futures import Future
 
 from ._int.analyzer import analyze_class, get_blocking_methods, has_blocking_calls
 from ._int.analyzer import _analyze_method, _BlockingCallVisitor, _get_method_source
+
+
+# @blocking decorator
+
+F = TypeVar('F', bound=Callable[..., Any])
+
+
+def blocking(func: F) -> F:
+    """
+    Explicitly mark a method or function as blocking.
+    
+    Use this when a method is CPU-intensive or blocking but doesn't contain
+    detectable blocking calls (like time.sleep, file I/O, etc.).
+    
+    This enables .background() and .asynced() for the method without
+    needing to add a fake timing.sleep() call.
+    
+    Usage:
+        from suitkaise import sk, blocking
+        
+        @sk
+        class Worker:
+            @blocking
+            def heavy_computation(self):
+                # CPU-intensive work with no I/O
+                result = 0
+                for i in range(10_000_000):
+                    result += i
+                return result
+        
+        # Now .background() works:
+        future = worker.heavy_computation.background()()
+        result = future.result()
+    
+    Works on:
+        - Methods in @sk-decorated classes
+        - Standalone @sk-decorated functions
+    """
+    func._sk_blocking = True  # type: ignore[attr-defined]
+    return func
 from ._int.async_wrapper import create_async_class
 from ._int.function_wrapper import (
     create_async_wrapper,
@@ -296,7 +336,16 @@ class Skfunction(Generic[P, R]):
         return f"Skfunction({self._func.__name__}{mod_str})"
     
     def _detect_blocking_calls(self) -> List[str]:
-        """Detect blocking calls in the function."""
+        """Detect blocking calls in the function.
+        
+        Checks for @blocking decorator FIRST - if found, skips AST analysis
+        for performance optimization.
+        """
+        # Check for explicit @blocking decorator first
+        if getattr(self._func, '_sk_blocking', False):
+            return ['@blocking']
+        
+        # No @blocking - do AST analysis
         import ast
         import textwrap
         
@@ -713,20 +762,25 @@ def sk(cls_or_func):
         # It's a function - attach methods directly to the function
         func = cls_or_func
         
-        # Detect blocking calls
-        import ast
-        import textwrap
-        
-        blocking_calls = []
-        try:
-            source = inspect.getsource(func)
-            source = textwrap.dedent(source)
-            tree = ast.parse(source)
-            visitor = _BlockingCallVisitor()
-            visitor.visit(tree)
-            blocking_calls = visitor.blocking_calls
-        except (OSError, TypeError, SyntaxError):
-            pass
+        # Check for explicit @blocking decorator FIRST
+        # If found, skip AST analysis for blocking detection (performance)
+        blocking_calls: List[str] = []
+        if getattr(func, '_sk_blocking', False):
+            blocking_calls.append('@blocking')
+        else:
+            # No @blocking - detect blocking calls via AST analysis
+            import ast
+            import textwrap
+            
+            try:
+                source = inspect.getsource(func)
+                source = textwrap.dedent(source)
+                tree = ast.parse(source)
+                visitor = _BlockingCallVisitor()
+                visitor.visit(tree)
+                blocking_calls.extend(visitor.blocking_calls)
+            except (OSError, TypeError, SyntaxError):
+                pass
         
         # Attach attributes
         func.has_blocking_calls = len(blocking_calls) > 0

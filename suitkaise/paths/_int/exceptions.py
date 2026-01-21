@@ -16,3 +16,13 @@ class PathDetectionError(Exception):
     - Module path lookup fails
     """
     pass
+
+
+class NotAFileError(IsADirectoryError):
+    """
+    Raised when a file operation is attempted on a directory.
+    
+    Inherits from IsADirectoryError for compatibility with standard
+    exception handling, but provides a more intuitive name.
+    """
+    pass
