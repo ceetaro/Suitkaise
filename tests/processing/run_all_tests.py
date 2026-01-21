@@ -45,6 +45,7 @@ def run_all_tests():
     from tests.processing.test_share_primitives import run_all_tests as run_share_primitives_tests
     from tests.processing.test_share_proxy import run_all_tests as run_share_proxy_tests
     from tests.processing.test_pool_internal import run_all_tests as run_pool_internal_tests
+    from tests.processing.test_pool_share import run_all_tests as run_pool_share_tests
     from tests.processing.test_coordinator import run_all_tests as run_coordinator_tests
     
     results = []
@@ -84,6 +85,9 @@ def run_all_tests():
 
     print(f"\n{CYAN}Running Pool Internal tests...{RESET}")
     results.append(("Pool Internal", run_pool_internal_tests()))
+
+    print(f"\n{CYAN}Running Pool + Share tests...{RESET}")
+    results.append(("Pool + Share", run_pool_share_tests()))
 
     print(f"\n{CYAN}Running Coordinator tests...{RESET}")
     results.append(("Coordinator", run_coordinator_tests()))

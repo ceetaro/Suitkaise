@@ -33,7 +33,16 @@ class _Coordinator:
     Only one coordinator should exist per Share instance.
     """
     
-    def __init__(self, manager: Optional[SyncManager] = None):
+    def __init__(
+        self,
+        manager: Optional[SyncManager] = None,
+        *,
+        command_queue: Any | None = None,
+        counter_registry: Any | None = None,
+        source_store: Any | None = None,
+        source_lock: Any | None = None,
+        object_names: Any | None = None,
+    ):
         """
         Create a new coordinator.
         
@@ -42,19 +51,24 @@ class _Coordinator:
         """
         from multiprocessing import Manager
         
-        self._manager = manager or Manager()
+        self._manager = manager
         
         # Shared primitives - all use Manager for cross-process access
-        self._command_queue = self._manager.Queue()
-        
-        # Write tracking with atomic counters (prevents read starvation)
-        self._counter_registry = _AtomicCounterRegistry(self._manager)
-        
-        self._source_store = self._manager.dict()  # object_name -> serialized bytes
-        self._source_lock = self._manager.Lock()
-        
-        # Object name registry (which objects are registered)
-        self._object_names = self._manager.list()
+        if command_queue is None or counter_registry is None or source_store is None or source_lock is None or object_names is None:
+            self._manager = manager or Manager()
+            self._command_queue = self._manager.Queue()
+            # Write tracking with atomic counters (prevents read starvation)
+            self._counter_registry = _AtomicCounterRegistry(self._manager)
+            self._source_store = self._manager.dict()  # object_name -> serialized bytes
+            self._source_lock = self._manager.Lock()
+            # Object name registry (which objects are registered)
+            self._object_names = self._manager.list()
+        else:
+            self._command_queue = command_queue
+            self._counter_registry = counter_registry
+            self._source_store = source_store
+            self._source_lock = source_lock
+            self._object_names = object_names
         
         # Process management
         self._process: Optional[Process] = None
@@ -63,6 +77,31 @@ class _Coordinator:
         
         # Configuration
         self._poll_timeout = 0.1  # How long to wait for commands
+
+    def get_state(self) -> dict:
+        """Return proxy state for sharing this coordinator across processes."""
+        return {
+            "command_queue": self._command_queue,
+            "counter_registry": self._counter_registry,
+            "source_store": self._source_store,
+            "source_lock": self._source_lock,
+            "object_names": self._object_names,
+            "poll_timeout": self._poll_timeout,
+        }
+
+    @classmethod
+    def from_state(cls, state: dict) -> "_Coordinator":
+        """Create a coordinator instance bound to existing shared proxies."""
+        coord = cls(
+            manager=None,
+            command_queue=state["command_queue"],
+            counter_registry=state["counter_registry"],
+            source_store=state["source_store"],
+            source_lock=state["source_lock"],
+            object_names=state["object_names"],
+        )
+        coord._poll_timeout = state.get("poll_timeout", 0.1)
+        return coord
     
     def register_object(self, object_name: str, obj: Any, attrs: set[str] | None = None) -> None:
         """
@@ -216,8 +255,13 @@ class _Coordinator:
         if self._process is not None and self._process.is_alive():
             return  # Already running
         
-        self._stop_event = Event()
-        self._error_event = Event()
+        # Use manager-backed Events when available to avoid SemLock issues on spawn.
+        if self._manager is not None:
+            self._stop_event = self._manager.Event()
+            self._error_event = self._manager.Event()
+        else:
+            self._stop_event = Event()
+            self._error_event = Event()
         
         self._process = Process(
             target=_coordinator_main,
@@ -326,13 +370,29 @@ def _coordinator_main(
     # Local cache of deserialized objects for efficiency
     mirrors: Dict[str, Any] = {}
     
+    def _stop_requested() -> bool:
+        try:
+            return stop_event.is_set()
+        except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
+            # Manager connection is gone; treat as shutdown.
+            return True
+
+    def _safe_set_error() -> None:
+        try:
+            error_event.set()
+        except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
+            # Manager connection is gone; can't report error.
+            return
+
     try:
-        while not stop_event.is_set():
+        while not _stop_requested():
             # Try to get a command
             try:
                 command = command_queue.get(timeout=poll_timeout)
             except queue_module.Empty:
                 continue  # No command, check stop_event again
+            except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
+                break
             
             if command is None:
                 continue
@@ -345,8 +405,13 @@ def _coordinator_main(
                 continue
             
             # Deserialize args/kwargs
-            args = cerial.deserialize(serialized_args)
-            kwargs = cerial.deserialize(serialized_kwargs)
+            try:
+                args = cerial.deserialize(serialized_args)
+                kwargs = cerial.deserialize(serialized_kwargs)
+            except Exception:
+                _safe_set_error()
+                _update_counters_after_write(counter_registry, object_name, written_attrs)
+                continue
             
             # Get the mirror object (from cache or source of truth)
             mirror = mirrors.get(object_name)
@@ -380,7 +445,7 @@ def _coordinator_main(
     
     except Exception as e:
         # Fatal error in coordinator loop
-        error_event.set()
+        _safe_set_error()
         traceback.print_exc()
         raise
 

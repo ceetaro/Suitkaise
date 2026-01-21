@@ -1,0 +1,690 @@
+{
+  "__cerial_type__": "class_instance",
+  "__handler__": "ClassInstanceHandler",
+  "__object_id__": 4354971152,
+  "state": {
+    "__cerial_type__": "dict",
+    "__object_id__": 4383718784,
+    "items": [
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "module",
+          "poker_ml.state"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "qualname",
+          "RunState"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "strategy",
+          "dict"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "instance_dict",
+          {
+            "__cerial_type__": "dict",
+            "__object_id__": 4383367424,
+            "items": [
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "config",
+                  {
+                    "__cerial_type__": "simple_class_instance",
+                    "__object_id__": 4359496528,
+                    "attrs": {
+                      "big_blind": 2,
+                      "epochs": 6,
+                      "hands_per_table": 15,
+                      "learning_rate": 0.05,
+                      "players_per_table": 3,
+                      "seed": 42,
+                      "small_blind": 1,
+                      "starting_stack": 200,
+                      "strength_samples": 50,
+                      "tables": 2
+                    },
+                    "module": "poker_ml.state",
+                    "qualname": "RunConfig"
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "stats",
+                  {
+                    "__cerial_type__": "dict",
+                    "__object_id__": 4383500160,
+                    "items": [
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "hands",
+                          453
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "wins",
+                          151
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "total_reward",
+                          0.0
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "last_table_id",
+                          0
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "last_table_hands",
+                          15
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "last_winner",
+                          ""
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "last_epoch_seconds",
+                          0.755927124992013
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_id",
+                          "t0_p2"
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_score",
+                          0.5271072796934866
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_epoch",
+                          6
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "policies",
+                  {
+                    "__cerial_type__": "dict",
+                    "__object_id__": 4383494720,
+                    "items": [
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t0_p0",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4383504704,
+                            "items": [
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;3;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383707072,
+                                    "items": [
+                                      0.32940466425299486,
+                                      0.19351975236424607,
+                                      0.36170690031077724,
+                                      0.07735214525676204
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;1;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383714624,
+                                    "items": [
+                                      0.497325777989161,
+                                      -0.18666825510914414,
+                                      -0.006484165110368978,
+                                      0.2557821575337378
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;2;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383710208,
+                                    "items": [
+                                      -0.4906845431157536,
+                                      -0.05384074450690719,
+                                      0.06299364563894605,
+                                      -0.4000187510754115
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;5;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383718336,
+                                    "items": [
+                                      0.05441247766679369,
+                                      -0.38315990700985253,
+                                      0.1649294342127715,
+                                      -0.12085472287745824
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;1;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383706304,
+                                    "items": [
+                                      -0.33758987902269155,
+                                      -0.08867540527976328,
+                                      0.12044795501346872,
+                                      -0.08486646250094376
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;3;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383717312,
+                                    "items": [
+                                      -0.2742270910464427,
+                                      -0.35609964640678604,
+                                      0.11695742763796046,
+                                      0.4203976538340367
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;4;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383713792,
+                                    "items": [
+                                      0.38769183531231666,
+                                      0.002430146391742105,
+                                      0.4643826216037297,
+                                      -0.025139769606592477
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;3;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383717888,
+                                    "items": [
+                                      0.20180966684318125,
+                                      0.1440189798526679,
+                                      0.18699431570146519,
+                                      -0.007665864964523483
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;2;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383499200,
+                                    "items": [
+                                      -0.45136745286987545,
+                                      -0.4724664844287645,
+                                      0.15074612982718916,
+                                      -0.1385830726778624
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;1;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383501760,
+                                    "items": [
+                                      -0.2664789983707685,
+                                      0.3152731303897383,
+                                      0.06418111668657211,
+                                      -0.05718075412379786
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;5;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383500288,
+                                    "items": [
+                                      0.19384894163797217,
+                                      0.44491928017936416,
+                                      0.17995517634179037,
+                                      0.21874062456996712
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t0_p1",
+                          {
+                            "__cerial_ref__": 4383504704
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t0_p2",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4383501376,
+                            "items": [
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;3;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383498048,
+                                    "items": [
+                                      0.32940466425299486,
+                                      0.19351975236424607,
+                                      0.36170690031077724,
+                                      0.07735214525676204
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;1;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383497344,
+                                    "items": [
+                                      0.497325777989161,
+                                      -0.18666825510914414,
+                                      -0.006484165110368978,
+                                      0.2557821575337378
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;2;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383499968,
+                                    "items": [
+                                      -0.4906845431157536,
+                                      -0.05384074450690719,
+                                      0.06299364563894605,
+                                      -0.4000187510754115
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;5;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383501120,
+                                    "items": [
+                                      0.05441247766679369,
+                                      -0.38315990700985253,
+                                      0.1649294342127715,
+                                      -0.12085472287745824
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;1;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383498432,
+                                    "items": [
+                                      -0.33758987902269155,
+                                      -0.08867540527976328,
+                                      0.12044795501346872,
+                                      -0.08486646250094376
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;3;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383497408,
+                                    "items": [
+                                      -0.2742270910464427,
+                                      -0.35609964640678604,
+                                      0.11695742763796046,
+                                      0.4203976538340367
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;4;0",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383499584,
+                                    "items": [
+                                      0.38769183531231666,
+                                      0.002430146391742105,
+                                      0.4643826216037297,
+                                      -0.025139769606592477
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;3;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383503424,
+                                    "items": [
+                                      0.20180966684318125,
+                                      0.1440189798526679,
+                                      0.18699431570146519,
+                                      -0.007665864964523483
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;2;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383498944,
+                                    "items": [
+                                      -0.45136745286987545,
+                                      -0.4724664844287645,
+                                      0.15074612982718916,
+                                      -0.1385830726778624
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;1;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383502720,
+                                    "items": [
+                                      -0.2664789983707685,
+                                      0.3152731303897383,
+                                      0.06418111668657211,
+                                      -0.05718075412379786
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;5;1",
+                                  {
+                                    "__cerial_type__": "list",
+                                    "__object_id__": 4383502208,
+                                    "items": [
+                                      0.19384894163797217,
+                                      0.44491928017936416,
+                                      0.17995517634179037,
+                                      0.21874062456996712
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t1_p0",
+                          {
+                            "__cerial_ref__": 4383504704
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t1_p1",
+                          {
+                            "__cerial_ref__": 4383504704
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "t1_p2",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4383503552,
+                            "items": [
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;3;1",
+                                  {
+                                    "__cerial_ref__": 4383707072
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;1;1",
+                                  {
+                                    "__cerial_ref__": 4383714624
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;2;1",
+                                  {
+                                    "__cerial_ref__": 4383710208
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;0;3;0;5;1",
+                                  {
+                                    "__cerial_ref__": 4383718336
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;1;0",
+                                  {
+                                    "__cerial_ref__": 4383706304
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;3;0",
+                                  {
+                                    "__cerial_ref__": 4383717312
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;1;3;0;4;0",
+                                  {
+                                    "__cerial_ref__": 4383713792
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;3;1",
+                                  {
+                                    "__cerial_ref__": 4383717888
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;2;1",
+                                  {
+                                    "__cerial_ref__": 4383499200
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;1;1",
+                                  {
+                                    "__cerial_ref__": 4383501760
+                                  }
+                                ]
+                              },
+                              {
+                                "__cerial_json__": "tuple",
+                                "items": [
+                                  "0;2;3;0;5;1",
+                                  {
+                                    "__cerial_ref__": 4383500288
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "started_at",
+                  1768950734.708562
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "finished_at",
+                  1768950750.875206
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -278,6 +278,29 @@ async def async_wrapper(*args, **kwargs):
 
 ---
 
+## Rate Limit Wrapper
+### `create_rate_limit_wrapper()`
+Limits how often a function can be called by sleeping as needed.
+
+```python
+def create_rate_limit_wrapper(func, per_second):
+    def wrapper(*args, **kwargs):
+        limiter.acquire()  # sleeps if needed
+        return func(*args, **kwargs)
+    return wrapper
+```
+
+### Async Rate Limit
+Uses an async limiter and `asyncio.sleep()`:
+
+```python
+async def async_wrapper(*args, **kwargs):
+    await limiter.acquire_async()
+    return await asyncio.to_thread(func, *args, **kwargs)
+```
+
+---
+
 ## Background Wrapper
 
 ### `create_background_wrapper()`
@@ -338,8 +361,8 @@ class Skclass:
 ```
 
 `_attach_method_modifiers()` wraps instance methods with modifier descriptors:
-- sync methods get `.retry()`, `.timeout()`, `.background()`, `.asynced()`
-- async methods get `.retry()`, `.timeout()`, `.background()` (Task), `.asynced()`
+- sync methods get `.retry()`, `.timeout()`, `.rate_limit()`, `.background()`, `.asynced()`
+- async methods get `.retry()`, `.timeout()`, `.rate_limit()`, `.background()` (Task), `.asynced()`
 
 For methods or functions that already have a timeout parameter, the timeout modifier is not exposed.
 
@@ -465,6 +488,7 @@ def sk(cls_or_func):
         func.asynced = lambda: Skfunction(func).asynced()
         func.retry = lambda *a, **kw: Skfunction(func).retry(*a, **kw)
         func.timeout = lambda s: Skfunction(func).timeout(s)
+        func.rate_limit = lambda per_second: Skfunction(func).rate_limit(per_second)
         func.background = lambda: Skfunction(func).background()
         
         return func  # return original function

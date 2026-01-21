@@ -58,18 +58,27 @@ class Share:
         '_coordinator', '_proxies', '_started',
     })
     
-    def __init__(self, manager: Optional[SyncManager] = None):
+    def __init__(
+        self,
+        manager: Optional[SyncManager] = None,
+        *,
+        auto_start: bool = True,
+        client_mode: bool = False,
+        coordinator: Optional[_Coordinator] = None,
+    ):
         """
         Create a new Share container.
         
         Args:
             manager: Optional SyncManager to use. Creates one if not provided.
         """
-        object.__setattr__(self, '_coordinator', _Coordinator(manager))
+        object.__setattr__(self, '_coordinator', coordinator or _Coordinator(manager))
         object.__setattr__(self, '_proxies', {})  # name -> proxy
         object.__setattr__(self, '_started', False)
+        object.__setattr__(self, '_client_mode', client_mode)
         # Auto-start coordinator on creation
-        self.start()
+        if auto_start and not client_mode:
+            self.start()
     
     def __setattr__(self, name: str, value: Any) -> None:
         """
@@ -174,6 +183,8 @@ class Share:
         
         Must be called before workers access shared objects.
         """
+        if object.__getattribute__(self, '_client_mode'):
+            return
         if not self._started:
             self._coordinator.start()
             object.__setattr__(self, '_started', True)
@@ -188,6 +199,8 @@ class Share:
         Returns:
             True if stopped cleanly, False if timed out.
         """
+        if object.__getattribute__(self, '_client_mode'):
+            return True
         if self._started:
             result = self._coordinator.stop(timeout)
             object.__setattr__(self, '_started', False)
@@ -248,9 +261,16 @@ class Share:
                 serialized = None
             if serialized is not None:
                 objects[name] = serialized
+        from suitkaise import cerial
+        coordinator_state = None
+        if object.__getattribute__(self, '_started'):
+            # Serialize coordinator state separately to avoid proxy pickling issues.
+            coordinator_state = cerial.serialize(coordinator.get_state())
         return {
+            "mode": "live" if object.__getattribute__(self, '_started') else "snapshot",
             "objects": objects,
             "started": object.__getattribute__(self, '_started'),
+            "coordinator_state": coordinator_state,
         }
 
     @staticmethod
@@ -258,15 +278,27 @@ class Share:
         """
         Reconstruct Share from serialized snapshot.
         """
-        from suitkaise import cerial
-        
-        share = Share()
+        from suitkaise.cerial._int.deserializer import Decerializer
+        deserializer = Decerializer()
+        coordinator_state = state.get("coordinator_state")
+        if coordinator_state:
+            coordinator = _Coordinator.from_state(deserializer.deserialize(coordinator_state))
+            share = Share(
+                manager=None,
+                auto_start=False,
+                client_mode=True,
+                coordinator=coordinator,
+            )
+            object.__setattr__(share, '_started', True)
+        else:
+            share = Share()
+
         for name, serialized in state.get("objects", {}).items():
             try:
-                obj = cerial.deserialize(serialized)
+                obj = deserializer.deserialize(serialized)
             except Exception:
                 continue
             setattr(share, name, obj)
-        if state.get("started"):
+        if state.get("started") and not object.__getattribute__(share, '_client_mode'):
             share.start()
         return share

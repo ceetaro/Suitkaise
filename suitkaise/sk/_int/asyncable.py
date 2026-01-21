@@ -378,6 +378,20 @@ class _ModifiableBoundMethod:
             self._sync_method,
         )
     
+    def rate_limit(self, per_second: float) -> Callable:
+        """
+        Add rate limiting to the method call.
+        """
+        from .function_wrapper import create_rate_limit_wrapper
+        
+        instance = self._instance
+        sync_method = self._sync_method
+        
+        def bound_sync(*args, **kwargs):
+            return sync_method(instance, *args, **kwargs)
+        
+        return create_rate_limit_wrapper(bound_sync, per_second)
+    
     def asynced(self) -> Callable:
         """
         Get the async version of this method.
@@ -513,6 +527,20 @@ class _AsyncModifiableBoundMethod:
             return loop.create_task(async_method(instance, *args, **kwargs))
         
         return wrapper
+
+    def rate_limit(self, per_second: float) -> Callable:
+        """
+        Add rate limiting to the async method call.
+        """
+        from .function_wrapper import create_async_rate_limit_wrapper_v2
+        
+        async_method = self._async_method
+        instance = self._instance
+        
+        async def bound_async(*args, **kwargs):
+            return await async_method(instance, *args, **kwargs)
+        
+        return create_async_rate_limit_wrapper_v2(bound_async, per_second)
     
     def asynced(self) -> Callable:
         """

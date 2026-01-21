@@ -310,6 +310,23 @@ async def test_asyncskfunction_concurrent():
 
 
 # =============================================================================
+# rate_limit() Tests
+# =============================================================================
+
+async def test_asyncskfunction_rate_limit_spacing():
+    """rate_limit() should enforce minimum spacing between async calls."""
+    sk_func = Skfunction(blocking_return_42)
+    async_func = sk_func.asynced().rate_limit(20)  # 0.05s interval
+    
+    start = stdlib_time.perf_counter()
+    await async_func()
+    await async_func()
+    elapsed = stdlib_time.perf_counter() - start
+    
+    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+
+
+# =============================================================================
 # Error Handling Tests
 # =============================================================================
 
@@ -445,6 +462,7 @@ def run_all_tests():
     
     # Concurrent tests
     runner.run_test("AsyncSkfunction concurrent", test_asyncskfunction_concurrent)
+    runner.run_test("AsyncSkfunction rate limit spacing", test_asyncskfunction_rate_limit_spacing)
     
     # Error handling tests
     runner.run_test("AsyncSkfunction propagates error", test_asyncskfunction_propagates_error)

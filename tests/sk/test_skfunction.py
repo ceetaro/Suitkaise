@@ -388,6 +388,23 @@ def test_skfunction_background_concurrent():
 
 
 # =============================================================================
+# rate_limit() Tests
+# =============================================================================
+
+def test_skfunction_rate_limit_spacing():
+    """rate_limit() should enforce minimum spacing between calls."""
+    sk_slow = Skfunction(slow_work)
+    sk_limited = sk_slow.rate_limit(per_second=20)  # 0.05s interval
+    
+    start = stdlib_time.perf_counter()
+    sk_limited(0.0)
+    sk_limited(0.0)
+    elapsed = stdlib_time.perf_counter() - start
+    
+    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+
+
+# =============================================================================
 # Chaining Tests
 # =============================================================================
 
@@ -454,6 +471,9 @@ def run_all_tests():
     runner.run_test("Skfunction background returns Future", test_skfunction_background_returns_future)
     runner.run_test("Skfunction background works", test_skfunction_background_works)
     runner.run_test("Skfunction background concurrent", test_skfunction_background_concurrent)
+    
+    # rate_limit() tests
+    runner.run_test("Skfunction rate limit spacing", test_skfunction_rate_limit_spacing)
     
     # Chaining tests
     runner.run_test("Skfunction chain retry+timeout", test_skfunction_chain_retry_timeout)

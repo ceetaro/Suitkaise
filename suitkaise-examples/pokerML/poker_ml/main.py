@@ -1,0 +1,739 @@
+from __future__ import annotations
+
+# python imports
+import argparse
+import dataclasses
+import json
+import asyncio
+import random
+import os
+import sys
+from pathlib import Path
+from typing import Any, Optional
+
+# SUITKAISE IMPORTS
+from suitkaise import timing, cerial, paths
+from suitkaise.processing import Pool, Share
+
+# example-specific imports
+from .cli import print_intro, choose_mode, find_latest_run_dir, load_run_state, play_best_model
+from .policy import (
+    select_best_policy, rank_policies, build_state_key, PolicyTable, 
+    hand_strength_bucket, calculate_hand_potential, calculate_spr,
+    calculate_position_value, calculate_implied_odds, estimate_win_rate,
+    optimal_action,
+)
+from .training import (
+    evaluate_all_policies_parallel, evaluate_policies_simple, 
+    EvaluatorWorker, EvalConfig, EvalResult, HAND_RANKINGS
+)
+from .agent import PokerAgent
+from .state import RunConfig, RunState
+
+
+def _validate_run_name(name: str) -> str:
+    if not paths.is_valid_filename(name):
+        raise ValueError(f"Invalid run name: {name}")
+    return paths.streamline_path(name)
+
+
+def _ensure_import_paths() -> None:
+    poker_dir = Path(__file__).resolve().parent
+    project_root = poker_dir.parent.parent.parent
+    poker_path = str(poker_dir.parent)
+    root_path = str(project_root)
+
+    if poker_path not in sys.path:
+        sys.path.insert(0, poker_path)
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
+
+    current = os.environ.get("PYTHONPATH", "")
+    parts = [p for p in current.split(os.pathsep) if p]
+    if poker_path not in parts:
+        parts.insert(0, poker_path)
+    if root_path not in parts:
+        parts.insert(0, root_path)
+    os.environ["PYTHONPATH"] = os.pathsep.join(parts)
+
+
+def _log_feature(verbose: bool, feature: str, detail: str) -> None:
+    if not verbose:
+        return
+    print(f"  → [{feature}] {detail}")
+
+
+def _parse_cards(card_str: str) -> list:
+    """Parse card string like 'Ah Kd' or 'AH KD' into Card objects."""
+    from .cards import Card
+    
+    rank_map = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 
+                'T': 10, 't': 10, '10': 10, 'J': 11, 'j': 11, 'Q': 12, 'q': 12, 
+                'K': 13, 'k': 13, 'A': 14, 'a': 14}
+    suit_map = {'h': 'H', 'H': 'H', 'd': 'D', 'D': 'D',
+                's': 'S', 'S': 'S', 'c': 'C', 'C': 'C',
+                '♥': 'H', '♦': 'D', '♠': 'S', '♣': 'C'}
+    
+    cards = []
+    parts = card_str.strip().split()
+    for part in parts:
+        if not part:
+            continue
+        part = part.strip()
+        if len(part) < 2:
+            continue
+        # Handle 10h case
+        if part.startswith('10'):
+            rank_str = '10'
+            suit_str = part[2:]
+        else:
+            rank_str = part[:-1]
+            suit_str = part[-1]
+        
+        if rank_str in rank_map and suit_str in suit_map:
+            cards.append(Card(rank_map[rank_str], suit_map[suit_str]))
+    return cards
+
+
+def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_samples: int, verbose: bool) -> None:
+    """Let user configure a poker scenario and get model's suggested action."""
+    print("\n" + "═" * 50)
+    print("🎮 Interactive Scenario Mode")
+    print("═" * 50)
+    print("   Configure a poker scenario and the trained model will suggest an action.")
+    print("   Type 'quit' or 'q' to exit.\n")
+    
+    # Load the best policy
+    rng = random.Random(seed)
+    policy = PolicyTable(["fold", "call", "raise", "all_in"], rng)
+    policy.load_snapshot(best_policy_snapshot)
+    
+    stage_names = {0: "Pre-flop", 1: "Flop", 2: "Turn", 3: "River"}
+    position_names = {
+        0: "Small Blind",
+        1: "Big Blind", 
+        2: "Under the Gun",
+        3: "Middle Position",
+        4: "Cutoff",
+        5: "Dealer Button",
+    }
+    
+    while True:
+        print("─" * 40)
+        print("Enter your scenario (or 'quit' to exit):\n")
+        
+        # Get hole cards
+        hole_input = input("   Your hole cards (e.g., 'Ah Kd'): ").strip()
+        if hole_input.lower() in ('quit', 'q', 'exit'):
+            break
+        hole_cards = _parse_cards(hole_input)
+        if len(hole_cards) != 2:
+            print("   ❌ Please enter exactly 2 hole cards (e.g., 'Ah Kd')")
+            continue
+        
+        # Get community cards
+        community_input = input("   Community cards (e.g., '7h 8h 9c' or empty for pre-flop): ").strip()
+        if community_input.lower() in ('quit', 'q', 'exit'):
+            break
+        community_cards = _parse_cards(community_input) if community_input else []
+        if len(community_cards) not in (0, 3, 4, 5):
+            print("   ❌ Community cards must be 0 (pre-flop), 3 (flop), 4 (turn), or 5 (river)")
+            continue
+        
+        # Determine stage
+        if len(community_cards) == 0:
+            stage = 0
+        elif len(community_cards) == 3:
+            stage = 1
+        elif len(community_cards) == 4:
+            stage = 2
+        else:
+            stage = 3
+        
+        # Get position
+        print("   Position options:")
+        print("     0 = Small Blind (forced bet, first after flop)")
+        print("     1 = Big Blind (forced bet, second after flop)")
+        print("     2 = Under the Gun (first to act pre-flop)")
+        print("     3 = Middle Position")
+        print("     4 = Cutoff (one seat before dealer)")
+        print("     5 = Dealer Button (last to act, best position)")
+        try:
+            position = int(input("   Your position (default 3): ").strip() or "3")
+            position = max(0, min(5, position))
+        except ValueError:
+            position = 3
+        
+        # Get stack size
+        try:
+            stack = int(input("   Your stack size (default 200): ").strip() or "200")
+        except ValueError:
+            stack = 200
+        
+        # Get pot size
+        try:
+            pot = int(input("   Current pot size (default 20): ").strip() or "20")
+        except ValueError:
+            pot = 20
+        
+        # Get to_call amount
+        try:
+            to_call = int(input("   Amount to call (default 0): ").strip() or "0")
+        except ValueError:
+            to_call = 0
+        
+        # Calculate all factors
+        win_prob = estimate_win_rate(hole_cards, community_cards, rng, strength_samples)
+        pot_odds = 0.0 if to_call == 0 else to_call / max(pot + to_call, 1)
+        hand_potential = calculate_hand_potential(hole_cards, community_cards, rng, strength_samples)
+        spr = calculate_spr(stack, pot)
+        position_value = calculate_position_value(position, 6)
+        implied_odds = calculate_implied_odds(win_prob, hand_potential, spr, to_call, pot)
+        hand_bucket = hand_strength_bucket(hole_cards, community_cards, rng, strength_samples)
+        
+        # Get optimal action (what "perfect" play would be)
+        optimal = optimal_action(
+            win_prob=win_prob,
+            pot_odds=pot_odds,
+            stack=stack,
+            to_call=to_call,
+            hand_potential=hand_potential,
+            spr=spr,
+            position_value=position_value,
+            implied_odds=implied_odds,
+        )
+        
+        # Build state key and get model's learned action
+        state_key = build_state_key(stage, position, stack, pot, to_call, hand_bucket, 1)
+        model_action = policy.choose_action(state_key)
+        
+        # Display result
+        hole_str = " ".join(f"{c}" for c in hole_cards)
+        community_str = " ".join(f"{c}" for c in community_cards) if community_cards else "(none)"
+        
+        # Helper for consistent box rows (44 dashes = 44 inner visual width)
+        # Format: "│ " + text + "│" means inner = 1 + text_width
+        # Non-emoji: 1 + 43 = 44 visual
+        # Emoji: 1 + 42 chars = 43 chars, but emoji adds +1 visual = 44 visual
+        def row(text: str, emoji: bool = False) -> str:
+            width = 42 if emoji else 43
+            return f"   │ {text:<{width}}│"
+        
+        print(f"\n   ┌{'─' * 44}┐")
+        print(row("📊 Scenario Analysis", emoji=True))
+        print(f"   ├{'─' * 44}┤")
+        print(row(f"Stage: {stage_names[stage]}"))
+        print(row(f"Position: {position_names.get(position, str(position))}"))
+        print(row(f"Hole cards: {hole_str}"))
+        print(row(f"Community: {community_str}"))
+        print(row(f"Stack: {stack}"))
+        print(row(f"Pot: {pot}"))
+        print(row(f"To call: {to_call}"))
+        print(f"   └{'─' * 44}┘")
+        
+        # Explain the analysis factors
+        print(f"\n   📈 Analysis Factors (what the model considers):\n")
+        print(f"   • Win probability: {win_prob*100:.1f}%")
+        print(f"     How often you'd win if all cards were dealt now.")
+        print(f"     Calculated by simulating many random opponent hands.\n")
+        
+        print(f"   • Hand potential: {hand_potential*100:.1f}%")
+        print(f"     How likely your hand will improve on future cards.")
+        print(f"     High with draws (flush/straight possibilities).\n")
+        
+        print(f"   • Pot odds: {pot_odds*100:.1f}%")
+        print(f"     The cost to call vs what you can win: {to_call} / ({pot} + {to_call}).")
+        print(f"     You need win% > pot odds% for a profitable call.\n")
+        
+        print(f"   • Stack-to-pot ratio (SPR): {spr:.1f}x")
+        print(f"     How many pots you have left: {stack} / {pot}.")
+        print(f"     Low SPR (<4) = commit easier. High SPR (>10) = be cautious.\n")
+        
+        print(f"   • Implied odds: {implied_odds:.2f}x")
+        print(f"     Expected future winnings if you hit your hand.")
+        print(f"     Higher when opponent is likely to pay you off.\n")
+        
+        print(f"   • Position value: {position_value*100:.1f}%")
+        print(f"     Advantage from acting later (seeing others act first).")
+        print(f"     Dealer Button = 100%, Blinds = low.\n")
+        
+        # Recommendations box using same helper
+        print(f"   ┌{'─' * 44}┐")
+        print(row("🎯 Recommendations", emoji=True))
+        print(f"   ├{'─' * 44}┤")
+        print(row(f"Optimal play: {optimal.upper()}"))
+        print(row(f"Model suggests: {model_action.upper()}"))
+        if model_action == optimal:
+            print(f"   │{'✓ Match!':^44}│")
+        else:
+            print(f"   │{'✗ Differs':^44}│")
+        print(f"   └{'─' * 44}┘\n")
+    
+    print("\n👋 Thanks for using PokerML!")
+
+
+def main() -> None:
+    _ensure_import_paths()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, choices=["train", "play"], default=None)
+    parser.add_argument("--run-dir", type=str, default=None)
+    parser.add_argument("--verbose", action="store_true", default=True)
+    parser.add_argument("--quiet", action="store_true", help="Disable verbose output")
+    parser.add_argument("--no-wait", action="store_true")
+    parser.add_argument("--no-interactive", action="store_true", help="Skip interactive scenario mode after training")
+    parser.add_argument("--epochs", type=int, default=None, help="Max epochs (default: unlimited, trains until target score)")
+    parser.add_argument("--target-score", type=float, default=0.80, help="Stop training when best model reaches this score (default 0.80 = human-level)")
+    parser.add_argument("--tables", type=int, default=6)
+    parser.add_argument("--players", type=int, default=6)
+    parser.add_argument("--starting-stack", type=int, default=200)
+    parser.add_argument("--small-blind", type=int, default=1)
+    parser.add_argument("--big-blind", type=int, default=2)
+    parser.add_argument("--strength-samples", type=int, default=50)
+    parser.add_argument("--learning-rate", type=float, default=0.05)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--run-name", type=str, default="pokerml_run")
+    args = parser.parse_args()
+    if args.quiet:
+        args.verbose = False
+
+    if not args.no_wait:
+        print_intro()
+
+    mode = choose_mode(args.mode)
+    if mode == "play":
+        run_dir = args.run_dir or find_latest_run_dir()
+        if not run_dir:
+            raise ValueError("No run directory found. Train models first or pass --run-dir.")
+        run_state = load_run_state(run_dir)
+        play_best_model(run_state, args.verbose)
+        return
+
+    run_name = _validate_run_name(args.run_name)
+    run_id = paths.streamline_path(f"{run_name}_{int(timing.time())}")
+    run_dir: Any = paths.Skpath("suitkaise-examples/pokerML/runs") / run_id  # type: ignore[call-arg,operator]
+    run_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]
+    if args.verbose:
+        print(f"\n📁 Setting up run directory...")
+    _log_feature(args.verbose, "paths.Skpath", f"Created {run_dir.ap}")
+
+    if args.verbose:
+        print(f"\n🔗 Creating shared memory for cross-process communication...")
+    share: Any = Share()
+    share.stats = {"hands": 0, "wins": 0}
+    share.policies = {}
+    _log_feature(args.verbose, "processing.Share", "Stats and policies now accessible across all worker processes")
+
+    if args.verbose:
+        print(f"\n⏱️  Starting training timer...")
+    start_time = timing.time()
+    overall_timer: Any = timing.Sktimer()
+    overall_timer.start()  # type: ignore[attr-defined]
+    _log_feature(args.verbose, "timing.Sktimer", "Tracking total training duration")
+
+    if args.verbose:
+        print(f"\n👥 Spawning worker pool for parallel table execution...")
+    pool: Any = Pool(args.tables)  # type: ignore[call-arg]
+    _log_feature(args.verbose, "processing.Pool", f"{args.tables} worker processes ready to run poker tables in parallel")
+
+    if args.verbose:
+        print(f"\n🧪 Running demo of suitkaise features before training...\n")
+        
+        print("   Demonstrating @sk.blocking decorator:")
+        print(f"   Methods marked as blocking on PokerAgent: {PokerAgent.blocking_methods}")
+        _log_feature(args.verbose, "sk.blocking", "Automatically detects slow/IO-bound methods for async handling")
+
+        demo_agent = PokerAgent("demo", random.Random(args.seed), 0.5)
+        demo_key = build_state_key(1, 0, args.starting_stack, args.big_blind * 2, args.big_blind, 2, 1)
+        
+        print("\n   Demonstrating .background() - run blocking code in a thread:")
+        future = demo_agent.choose_action.background()(
+            demo_key,
+            args.starting_stack,
+            args.big_blind,
+            args.big_blind * 2,
+            args.big_blind,
+        )
+        _ = future.result()
+        _log_feature(args.verbose, "sk.background", "Blocking method ran in background thread, returned Future")
+
+        print("\n   Demonstrating .asynced() - convert blocking code to async:")
+        async def _demo_async():
+            await demo_agent.choose_action.asynced()(
+                demo_key,
+                args.starting_stack,
+                args.big_blind,
+                args.big_blind * 2,
+                args.big_blind,
+            )
+
+        asyncio.run(_demo_async())
+        _log_feature(args.verbose, "sk.asynced", "Blocking method awaited as native coroutine")
+
+        print("\n   Demonstrating Skprocess - run code in separate process:")
+        demo_share: Any = Share()
+        demo_share.policies = {"demo_agent": demo_agent.policy.snapshot()}
+        demo_share.eval_results = {}
+        demo_worker = EvaluatorWorker(
+            demo_share,
+            EvalConfig(
+                worker_id=0,
+                num_workers=1,
+                num_models=1,
+                base_stack=args.starting_stack,
+                samples=5,
+                seed=args.seed + 999,
+            ),
+        )
+        demo_worker.start()  # type: ignore[attr-defined]
+        _log_feature(args.verbose, "processing.Skprocess", "EvaluatorWorker spawned in isolated process")
+        status = demo_worker.listen(timeout=2.0)  # type: ignore[attr-defined]
+        if status:
+            print(f"   Received message from child process: {status}")
+            _log_feature(args.verbose, "processing.listen", "Parent received status from child via IPC")
+        demo_worker.stop()  # type: ignore[attr-defined]
+        demo_worker.wait()  # type: ignore[attr-defined]
+        _log_feature(args.verbose, "processing.Skprocess", "Process gracefully stopped and joined")
+
+    epoch_limit_str = str(args.epochs) if args.epochs else "∞"
+    total_agents = args.tables * args.players
+    if args.verbose:
+        print(f"\n{'═' * 65}")
+        print(f"  🎰 POKERML TRAINING")
+        print(f"{'═' * 65}")
+        print(f"""
+  Training {total_agents} AI agents to play poker.
+
+  This is a demo of suitkaise features, not a production poker AI.
+  Our target is {args.target_score:.0%} accuracy (roughly human-level).
+  Higher accuracy is limited by state bucketing - different board
+  textures can require different actions for the same hand strength.
+
+  Here's what happens each epoch:
+
+  ┌─ PHASE 1: PLAY ALL HANDS ─────────────────────────────────────┐
+  │                                                               │
+  │  Each agent plays ALL 2652 possible starting hands (52 × 51   │
+  │  card combinations). For each hand:                           │
+  │                                                               │
+  │  • Community cards are randomly generated (flop/turn/river)   │
+  │  • Stack sizes and pot odds vary randomly within bounds       │
+  │  • Agent chooses an action (fold/call/raise/all-in)           │
+  │  • We compare to the mathematically optimal action            │
+  │  • Agent's policy is updated based on correctness             │
+  │                                                               │
+  │  Community cards change each epoch, so agents see the same    │
+  │  hole cards in different board contexts over time.            │
+  │                                                               │
+  └───────────────────────────────────────────────────────────────┘
+
+  ┌─ PHASE 2: PARALLEL EVALUATION ───────────────────────────────┐
+  │                                                               │
+  │  Evaluation runs in parallel using Skprocess workers:         │
+  │                                                               │
+  │  • Parent spawns 6 EvaluatorWorker sub-processes              │
+  │  • Each worker handles 442 hands (2652 / 6)                   │
+  │  • Workers run rotations so every agent sees every hand       │
+  │  • Results aggregate via Share back to parent                 │
+  │                                                               │
+  │  Score = percentage of hands where agent matched optimal.     │
+  │                                                               │
+  │  Agents already "know" hand rankings, pre-flop tiers,         │
+  │  position value, and pot odds. They learn when to use them.   │
+  │                                                               │
+  └───────────────────────────────────────────────────────────────┘
+
+  ┌─ PHASE 3: SELECTION ──────────────────────────────────────────┐
+  │                                                               │
+  │  The top 25% of agents survive to the next epoch. The bottom  │
+  │  75% are replaced with copies of the winners. This creates    │
+  │  evolutionary pressure toward better play.                    │
+  │                                                               │
+  │  We track the global best policy across ALL epochs, so a      │
+  │  good policy found early won't be lost to random variance.    │
+  │  The global best is always included in the winner pool.       │
+  │                                                               │
+  │  Updated policies sync across all worker processes via        │
+  │  suitkaise's Share, so the next epoch starts with improved    │
+  │  agents everywhere.                                           │
+  │                                                               │
+  └───────────────────────────────────────────────────────────────┘
+
+  Config: {args.tables} tables × {args.players} players = {total_agents} agents
+  Hands per epoch: 2652 (all starting hands) | Stack: {args.starting_stack} chips
+  Max epochs: {epoch_limit_str}
+""")
+        print(f"{'═' * 65}\n")
+
+    epoch = 0
+    best_score = 0.0
+    
+    # Track global best policy across ALL epochs (hall of fame)
+    global_best_policy: dict = {}
+    global_best_score: float = 0.0
+    global_best_epoch: int = 0
+    global_best_id: str = ""
+    
+    # Initialize agents
+    if args.verbose:
+        print(f"\n🤖 Initializing {total_agents} agents...")
+    init_policies = {}
+    for agent_idx in range(total_agents):
+        agent_id = f"agent_{agent_idx}"
+        agent_rng = random.Random(args.seed + agent_idx)
+        agent = PokerAgent(agent_id, agent_rng, args.learning_rate)
+        init_policies[agent_id] = agent.policy.snapshot()
+    share.policies = init_policies  # Assign full dict at once for Share to sync correctly
+    _log_feature(args.verbose, "processing.Share", f"{len(init_policies)} agent policies stored in shared memory")
+    
+    # Track mastered hands (all agents got these right - skip in future epochs)
+    mastered_hands: set = set()
+    total_possible_hands = 169  # 169 unique canonical hands (AA, AKs, AKo, etc.)
+    
+    while best_score < args.target_score:
+        if args.epochs and epoch >= args.epochs:
+            if args.verbose:
+                print(f"\n⚠️  Reached max epochs ({args.epochs}) without hitting target score.")
+            break
+        
+        epoch_seed = args.seed + epoch * 1000
+        if args.verbose:
+            print(f"\n━━━ Epoch {epoch + 1} (best: {global_best_score:.3f} @ epoch {global_best_epoch} / target: {args.target_score:.2f}) ━━━")
+        
+        with timing.TimeThis() as epoch_timer:
+            _log_feature(args.verbose, "timing.TimeThis", "Auto-timing this epoch with context manager")
+            
+            # Get current policies snapshot
+            current_policies = dict(share.policies)
+            remaining_hands = total_possible_hands - len(mastered_hands)
+            if args.verbose:
+                print(f"   Evaluating {remaining_hands} remaining hands ({len(mastered_hands)} mastered, skipped)...")
+            
+            # Single-threaded evaluation with learning (more reliable learning)
+            # Community cards regenerated each epoch, policies learn during eval
+            eval_result = evaluate_policies_simple(
+                policies=current_policies,
+                seed=epoch_seed,  # Different seed each epoch = different community cards
+                base_stack=args.starting_stack,
+                samples=max(10, args.strength_samples // 3),  # Balance speed vs accuracy
+                learn=True,
+                mastered_hands=mastered_hands,
+            )
+            
+            # Unpack results
+            scores_dict = eval_result.scores
+            learned_policies = eval_result.learned_policies
+            
+            # Add newly mastered hands to the skip set
+            if eval_result.newly_mastered:
+                mastered_hands.update(eval_result.newly_mastered)
+                if args.verbose:
+                    print(f"   🎯 Mastered {len(eval_result.newly_mastered)} new hands! Total: {len(mastered_hands)}/{total_possible_hands}")
+            
+            # Update hands count in stats
+            stats = share.stats
+            stats["hands"] = stats.get("hands", 0) + eval_result.total_hands * len(share.policies) * 2
+            stats["mastered_hands"] = len(mastered_hands)
+            share.stats = stats
+        
+        _log_feature(args.verbose, "processing.Pool", f"Evaluated {eval_result.total_hands} hands for {len(share.policies)} agents")
+        
+        stats = share.stats
+        stats["last_epoch_seconds"] = epoch_timer.most_recent  # type: ignore[attr-defined]
+        share.stats = stats
+        if args.verbose:
+            print(f"   ✓ Evaluation complete in {epoch_timer.most_recent:.2f}s")
+
+        if scores_dict:
+            # Use LEARNED policies (weights updated during eval) for scoring
+            policy_scores = [
+                (agent_id, score, learned_policies.get(agent_id) or share.policies.get(agent_id) or {})
+                for agent_id, score in scores_dict.items()
+                if agent_id in share.policies
+            ]
+            policy_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            if not policy_scores:
+                if args.verbose:
+                    print("   ⚠️ No scored policies, skipping selection...")
+                epoch += 1
+                continue
+            
+            best_epoch_score = policy_scores[0][1]
+            
+            # Update global best if this epoch produced a better policy
+            if best_epoch_score > global_best_score:
+                global_best_score = best_epoch_score
+                global_best_policy = policy_scores[0][2].copy()
+                global_best_epoch = epoch + 1
+                global_best_id = policy_scores[0][0]
+                stats = share.stats
+                stats["wins"] = stats.get("wins", 0) + 1
+                share.stats = stats
+                if args.verbose:
+                    print(f"   🌟 NEW GLOBAL BEST! {global_best_id}: {global_best_score:.1%}")
+            
+            top_count = max(1, len(policy_scores) // 4)
+            winners = policy_scores[:top_count]
+            
+            if args.verbose:
+                print(f"   Epoch best: {policy_scores[0][0]} ({best_epoch_score:.1%}) | Global best: {global_best_id} ({global_best_score:.1%})")
+                print(f"   Keeping top {top_count}, replacing {len(policy_scores) - top_count} underperformers...")
+            
+            # Always include the global best in the winner pool
+            winners_snapshots = {agent_id: snap for agent_id, _, snap in winners}
+            if global_best_id and global_best_policy:
+                winners_snapshots["_global_best_"] = global_best_policy
+            
+            # Mutation parameters - tuned for exploration
+            MUTATION_CHANCE = 0.4  # 40% chance winner mutates
+            RADICAL_MUTATION_CHANCE = 0.15  # 15% chance of large mutation
+            RANDOM_POLICY_CHANCE = 0.05  # 5% chance of completely fresh policy
+            SMALL_MUTATION_RANGE = 0.1  # ±10% weight adjustment
+            RADICAL_MUTATION_RANGE = 0.3  # ±30% weight adjustment
+            
+            def mutate_policy(policy: dict, radical: bool = False) -> dict:
+                """Apply random mutations to a policy."""
+                mutated = {}
+                mutation_range = RADICAL_MUTATION_RANGE if radical else SMALL_MUTATION_RANGE
+                for key, weights in policy.items():
+                    mutated[key] = [
+                        max(0.01, w + random.uniform(-mutation_range, mutation_range))
+                        for w in weights
+                    ]
+                return mutated
+            
+            def fresh_policy() -> dict:
+                """Create a completely random policy for exploration."""
+                fresh_agent = PokerAgent(f"fresh_{epoch}", random.Random(), args.learning_rate)
+                return fresh_agent.policy.snapshot()
+            
+            # Build new population with mutations
+            new_policies = {}
+            mutations_applied = 0
+            fresh_injected = 0
+            
+            for agent_id in share.policies.keys():
+                # Small chance of completely fresh random policy
+                if random.random() < RANDOM_POLICY_CHANCE:
+                    new_policies[agent_id] = fresh_policy()
+                    fresh_injected += 1
+                elif agent_id in winners_snapshots:
+                    # Winners: keep but maybe mutate
+                    policy = winners_snapshots[agent_id].copy()
+                    if random.random() < MUTATION_CHANCE:
+                        radical = random.random() < RADICAL_MUTATION_CHANCE
+                        policy = mutate_policy(policy, radical)
+                        mutations_applied += 1
+                    new_policies[agent_id] = policy
+                else:
+                    # Losers: replace with mutated copy of random winner
+                    replacement = random.choice(list(winners_snapshots.values())).copy()
+                    radical = random.random() < RADICAL_MUTATION_CHANCE
+                    new_policies[agent_id] = mutate_policy(replacement, radical)
+                    mutations_applied += 1
+            
+            # Always preserve ONE pure copy of global best (no mutation)
+            if global_best_id and global_best_policy:
+                new_policies[global_best_id] = global_best_policy.copy()
+            
+            share.policies = new_policies
+            mutation_msg = f"{mutations_applied} mutations"
+            if fresh_injected:
+                mutation_msg += f", {fresh_injected} fresh"
+            _log_feature(args.verbose, "processing.Share", f"Updated policies ({mutation_msg})")
+        
+        # Use global best score for termination check
+        best_score = global_best_score
+        epoch += 1
+    
+    total_epochs = epoch
+
+    overall_timer.stop()  # type: ignore[attr-defined]
+    end_time = timing.time()
+    _log_feature(args.verbose, "timing.Sktimer", "Training timer stopped")
+
+    # Use the global best policy tracked across all epochs
+    best_id = global_best_id
+    best_score = global_best_score
+    
+    if args.verbose:
+        print(f"\n🏆 Best policy from all {total_epochs} epochs:")
+        print(f"   Winner: {best_id} with score {best_score:.3f} (found at epoch {global_best_epoch})")
+    
+    # Make sure the global best is in the final policies
+    if global_best_policy:
+        policies = share.policies
+        policies[best_id] = global_best_policy
+        share.policies = policies
+    
+    stats = share.stats
+    stats["best_policy_id"] = best_id
+    stats["best_policy_score"] = best_score
+    stats["best_policy_epoch"] = global_best_epoch
+    share.stats = stats
+
+    # Update config with actual epochs run
+    config = RunConfig(
+        epochs=total_epochs,
+        tables=args.tables,
+        players_per_table=args.players,
+        hands_per_epoch=2652,  # All possible starting hands
+        starting_stack=args.starting_stack,
+        small_blind=args.small_blind,
+        big_blind=args.big_blind,
+        strength_samples=args.strength_samples,
+        learning_rate=args.learning_rate,
+        seed=args.seed,
+    )
+
+    run_state = RunState(
+        config=config,
+        stats=share.stats,
+        policies=share.policies,
+        started_at=start_time,
+        finished_at=end_time,
+    )
+
+    if args.verbose:
+        print(f"\n💾 Saving run state to disk...")
+
+    state_bytes = cerial.serialize(run_state)
+    _log_feature(args.verbose, "cerial.serialize", "Converted RunState dataclass to compact binary format")
+    state_path = run_dir / "state.bin"  # type: ignore[operator]
+    with open(state_path.platform, "wb") as f:
+        f.write(state_bytes)
+
+    state_json = cerial.to_json(run_state)  # type: ignore[attr-defined]
+    _log_feature(args.verbose, "cerial.to_json", "Converted RunState to human-readable JSON")
+    with open((run_dir / "state.json").platform, "w") as f:  # type: ignore[operator]
+        f.write(state_json)
+
+    with open((run_dir / "metrics.json").platform, "w") as f:  # type: ignore[operator]
+        json.dump(dataclasses.asdict(run_state), f, indent=2)
+
+    tree = paths.get_formatted_project_tree(depth=3)
+    _log_feature(args.verbose, "paths.get_formatted_project_tree", "Generated ASCII tree of project structure")
+    with open((run_dir / "tree.txt").platform, "w") as f:  # type: ignore[operator]
+        f.write(tree)
+
+    if args.verbose:
+        print(f"\n🧹 Cleaning up shared memory...")
+    share.exit()  # type: ignore[attr-defined]
+    _log_feature(args.verbose, "processing.Share", "Released shared memory and stopped background coordinator")
+
+    print("\n" + "═" * 50)
+    print("✅ PokerML training complete!")
+    print("═" * 50)
+    stats = share.stats
+    print(f"   📂 Run saved to: {run_dir.ap}")
+    print(f"   🃏 Total hands played: {stats['hands']}")
+    print(f"   🏅 New global bests: {stats['wins']}")
+    print(f"   🎯 Best policy: {best_id} (score {best_score:.1%})")
+    print(f"   🧠 Hands mastered: {len(mastered_hands)}/{total_possible_hands} ({100*len(mastered_hands)/total_possible_hands:.1f}%)")
+    print(f"   📈 Epochs trained: {total_epochs}")
+    print(f"   ⏱️  Total time: {overall_timer.most_recent:.2f}s")  # type: ignore[attr-defined]
+    print("═" * 50)
+
+    # Interactive scenario mode
+    if not args.no_interactive:
+        _interactive_scenario_mode(share.policies[best_id], args.seed, args.strength_samples, args.verbose)

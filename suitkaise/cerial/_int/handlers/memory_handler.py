@@ -25,6 +25,30 @@ class MemorySerializationError(Exception):
     pass
 
 
+class MemoryViewHandler(Handler):
+    """
+    Serializes memoryview objects.
+    
+    Converts memoryview to bytes and reconstructs from bytes.
+    """
+    
+    type_name = "memoryview"
+    
+    def can_handle(self, obj: Any) -> bool:
+        return isinstance(obj, memoryview)
+    
+    def extract_state(self, obj: memoryview) -> Dict[str, Any]:
+        try:
+            data = obj.tobytes()
+        except Exception as e:
+            raise MemorySerializationError(f"Cannot serialize memoryview: {e}") from e
+        return {"data": data}
+    
+    def reconstruct(self, state: Dict[str, Any]) -> memoryview:
+        data = state.get("data", b"")
+        return memoryview(data)
+
+
 class MMapHandler(Handler):
     """
     Serializes mmap.mmap objects (9% importance).

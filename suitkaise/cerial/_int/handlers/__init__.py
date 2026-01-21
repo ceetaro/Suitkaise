@@ -74,6 +74,7 @@ from .memory_handler import (
     MMapHandler,
     SharedMemoryHandler,
     FileDescriptorHandler,
+    MemoryViewHandler,
 )
 
 # Threading handlers (8% + 7% + 2%)
@@ -211,6 +212,7 @@ __all__ = [
     'MMapHandler',
     'SharedMemoryHandler',
     'FileDescriptorHandler',
+    'MemoryViewHandler',
     
     # Threading
     'ThreadHandler',
@@ -373,6 +375,7 @@ ALL_HANDLERS = [
     
     # Shared memory
     SharedMemoryHandler(),
+    MemoryViewHandler(),
     
     # File descriptors
     FileDescriptorHandler(),

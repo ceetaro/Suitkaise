@@ -33,6 +33,20 @@ Arguments
 result = function.timeout(5.0)(args, kwargs)
 ```
 
+### `.rate_limit()`
+
+Limit how often a function/method can be called.
+
+Available for functions and methods of classes.
+
+Arguments
+- `per_second`: max calls per second (must be > 0)
+
+```python
+# allow up to 5 calls per second
+result = function.rate_limit(per_second=5)(args, kwargs)
+```
+
 ### `.background()`
 
 Run the function/method in a background thread.
@@ -161,7 +175,7 @@ except SkModifierError:
 result = await async_fetcher.fetch("https://api.example.com")
 ```
 
-Modifiers like `retry()`, `timeout()`, `background()`, and `asynced()` are available on every method of a class decorated by `@sk`, including async versions for other modifiers when `.asynced()` is called. They are also available on `sk`-wrapped standalone functions.
+Modifiers like `retry()`, `timeout()`, `rate_limit()`, `background()`, and `asynced()` are available on every method of a class decorated by `@sk`, including async versions for other modifiers when `.asynced()` is called. They are also available on `sk`-wrapped standalone functions.
 
 ### Async Usage With A Function
 
@@ -180,7 +194,7 @@ result = fetch_data("https://example.com")
 result = await fetch_data.asynced()("https://example.com")
 
 # combine modifiers
-future = fetch_data.retry(times=3).timeout(10.0).background()("https://example.com")
+future = fetch_data.retry(times=3).timeout(10.0).rate_limit(2).background()("https://example.com")
 try:
     result = future.result()
 except Exception as e:

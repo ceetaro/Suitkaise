@@ -17,6 +17,9 @@ All further changes will be changes to 0.3.0 (or the most recent version once 0.
 
 As of version 0.3.0, the project is still unreleased.
 
+### Changed
+- Share now serializes into a live client that reuses the parent coordinator when passed to Pool workers, avoiding duplicate Manager startup and enabling safe cross-process usage.
+
 ## [0.3.0] - 2026-01-16
 
 ### Added

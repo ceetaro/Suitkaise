@@ -261,6 +261,17 @@ class _AtomicCounterRegistry:
         self._local = {}
         self._local_object_keys = {}
         self._owned_names = set()
+
+    def __serialize__(self) -> dict:
+        """Custom cerial hook to avoid serializing Manager internals."""
+        return self.__getstate__()
+
+    @staticmethod
+    def __deserialize__(state: dict) -> "_AtomicCounterRegistry":
+        """Custom cerial hook to rebuild from minimal state."""
+        obj = _AtomicCounterRegistry.__new__(_AtomicCounterRegistry)
+        obj.__setstate__(state)
+        return obj
     
     def register_keys(self, object_name: str, attrs: set[str]) -> None:
         """Register counters for a set of attributes."""

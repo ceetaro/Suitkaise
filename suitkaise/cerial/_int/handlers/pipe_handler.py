@@ -148,6 +148,19 @@ class MultiprocessingManagerHandler(Handler):
         """
         obj_type_name = type(obj).__name__
         
+        # Prefer using the proxy's reduce protocol (stable across processes)
+        try:
+            reducer = obj.__reduce__()
+            if isinstance(reducer, tuple) and len(reducer) >= 2:
+                func, args = reducer[:2]
+                return {
+                    "type_name": obj_type_name,
+                    "rebuild": func,
+                    "args": args,
+                }
+        except Exception:
+            pass
+        
         # Avoid dereferencing proxies or manager internals.
         # These can contain unpicklable auth keys or locks.
         return {
@@ -162,8 +175,10 @@ class MultiprocessingManagerHandler(Handler):
         Create new manager and return proxy with same value.
         Note: This creates a NEW manager in the target process.
         """
-        # This is complex and varies by proxy type
-        # For now, just return the underlying value
-        # User can wrap in a new manager if needed
-        return state["value"]
+        if "rebuild" in state and "args" in state:
+            try:
+                return state["rebuild"](*state["args"])
+            except Exception:
+                return None
+        return state.get("value")
 

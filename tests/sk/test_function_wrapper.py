@@ -26,12 +26,15 @@ sys.path.insert(0, str(project_root))
 from suitkaise.sk._int.function_wrapper import (
     create_retry_wrapper,
     create_async_retry_wrapper,
+    create_rate_limit_wrapper,
+    create_async_rate_limit_wrapper,
     create_timeout_wrapper,
     create_async_timeout_wrapper,
     create_background_wrapper,
     create_async_wrapper,
     create_async_timeout_wrapper_v2,
     create_async_retry_wrapper_v2,
+    create_async_rate_limit_wrapper_v2,
     FunctionTimeoutError,
 )
 
@@ -259,6 +262,46 @@ def test_async_retry_wrapper_v2():
     assert asyncio.run(run()) == "ok"
 
 
+def test_rate_limit_wrapper():
+    """Rate limit wrapper should enforce minimum spacing."""
+    wrapped = create_rate_limit_wrapper(lambda: "ok", per_second=20)  # 0.05s
+    start = time.perf_counter()
+    wrapped()
+    wrapped()
+    elapsed = time.perf_counter() - start
+    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+
+
+def test_async_rate_limit_wrapper():
+    """Async rate limit wrapper should enforce minimum spacing."""
+    async def run():
+        wrapped = create_async_rate_limit_wrapper(lambda: "ok", per_second=20)
+        start = time.perf_counter()
+        await wrapped()
+        await wrapped()
+        return time.perf_counter() - start
+
+    elapsed = asyncio.run(run())
+    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+
+
+def test_async_rate_limit_wrapper_v2():
+    """Async rate limit v2 should work for async functions."""
+    async def slow_async():
+        await asyncio.sleep(0.0)
+        return "ok"
+
+    async def run():
+        wrapped = create_async_rate_limit_wrapper_v2(slow_async, per_second=20)
+        start = time.perf_counter()
+        await wrapped()
+        await wrapped()
+        return time.perf_counter() - start
+
+    elapsed = asyncio.run(run())
+    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -277,6 +320,9 @@ def run_all_tests():
     runner.run_test("Async wrapper", test_async_wrapper)
     runner.run_test("Async timeout v2", test_async_timeout_wrapper_v2)
     runner.run_test("Async retry v2", test_async_retry_wrapper_v2)
+    runner.run_test("Rate limit wrapper", test_rate_limit_wrapper)
+    runner.run_test("Async rate limit wrapper", test_async_rate_limit_wrapper)
+    runner.run_test("Async rate limit v2", test_async_rate_limit_wrapper_v2)
 
     return runner.print_results()
 

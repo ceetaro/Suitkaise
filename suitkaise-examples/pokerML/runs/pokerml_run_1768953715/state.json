@@ -1,0 +1,199 @@
+{
+  "__cerial_type__": "class_instance",
+  "__handler__": "ClassInstanceHandler",
+  "__object_id__": 4349868688,
+  "state": {
+    "__cerial_type__": "dict",
+    "__object_id__": 4379711936,
+    "items": [
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "module",
+          "poker_ml.state"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "qualname",
+          "RunState"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "strategy",
+          "dict"
+        ]
+      },
+      {
+        "__cerial_json__": "tuple",
+        "items": [
+          "instance_dict",
+          {
+            "__cerial_type__": "dict",
+            "__object_id__": 4379642560,
+            "items": [
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "config",
+                  {
+                    "__cerial_type__": "simple_class_instance",
+                    "__object_id__": 4364256912,
+                    "attrs": {
+                      "big_blind": 2,
+                      "epochs": 1,
+                      "hands_per_epoch": 2652,
+                      "learning_rate": 0.05,
+                      "players_per_table": 4,
+                      "seed": 42,
+                      "small_blind": 1,
+                      "starting_stack": 200,
+                      "strength_samples": 50,
+                      "tables": 1
+                    },
+                    "module": "poker_ml.state",
+                    "qualname": "RunConfig"
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "stats",
+                  {
+                    "__cerial_type__": "dict",
+                    "__object_id__": 4379617536,
+                    "items": [
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "hands",
+                          10608
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "wins",
+                          1
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "total_reward",
+                          0.0
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "last_epoch_seconds",
+                          1.5905330829846207
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_id",
+                          "agent_3"
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_score",
+                          0.38999999999999996
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "best_policy_epoch",
+                          1
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "policies",
+                  {
+                    "__cerial_type__": "dict",
+                    "__object_id__": 4379711104,
+                    "items": [
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "agent_0",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4349151104,
+                            "items": []
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "agent_1",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4379710400,
+                            "items": []
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "agent_2",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4384174592,
+                            "items": []
+                          }
+                        ]
+                      },
+                      {
+                        "__cerial_json__": "tuple",
+                        "items": [
+                          "agent_3",
+                          {
+                            "__cerial_type__": "dict",
+                            "__object_id__": 4384169088,
+                            "items": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "started_at",
+                  1768953716.0001228
+                ]
+              },
+              {
+                "__cerial_json__": "tuple",
+                "items": [
+                  "finished_at",
+                  1768953719.682178
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

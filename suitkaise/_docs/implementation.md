@@ -619,7 +619,7 @@ python tests/run_all_tests.py
 python tests/run_all_benchmarks.py
 ```
 
-## Update docs
+<!-- ## Update docs
 
 Here is the current progress on the docs:
 
@@ -652,7 +652,7 @@ circuits:
 sk:
 
 - [ done ] sk-how-to-use.md
-- [ done ] sk-how-it-works.md
+- [ done ] sk-how-it-works.md -->
 
 ## Final additions
 
@@ -679,11 +679,11 @@ update the docs downloader to work
 fix benchmark tests on windows
 
 
-add Skpath.copy_to() and Skpath.move_to() methods
+<!-- add Skpath.copy_to() and Skpath.move_to() methods
 
 add Skprocess.run() that does start + wait + result
 
-add rate_limit() modifier for sk
+add rate_limit() modifier for sk -->
 
 ```python
 @sk
@@ -694,6 +694,7 @@ def my_function():
 my_function.rate_limit(per_second=N)
 ```
 
+<!--
 add more blocking call patterns (boto3, redis, pymongo, etc)
 
 add timethis.asynced() for native async funcs
@@ -725,7 +726,9 @@ from suitkaise import cerial
 
 # serializes to python dict IR and then converts to JSON
 cerial.to_json(obj)
-```
+``` -->
+
+retest new implementation on window
 
 find a way to advertise cerial when people look up "cant pickle X"
 
@@ -736,6 +739,69 @@ refactor site to have a more interactive home page that shows off things more
 upload version to test pypi
 
 2 paragraph summary on how modules work a d finish quick start guide
+
+```text
+Think of the printing press, an invention that made production of paper media faster, more standardized, and less prone to human error. People didn't have to write books by hand anymore, saving them a large amount of time and effort.
+
+The result: the world was flooded with books, and the "Information Age" began.
+
+There are many things in Python that need their own printing press to make using them faster, more standardized, and less prone to human error.
+
+Parallel processing, Python-to-Python serialization, file path handling, and more.
+
+`suitkaise` gives you these printing presses.
+
+The name is inspired by "hacker laptops", where the user opens a briefcase and hacks some mainframe in 5 seconds.
+
+- `processing` - Unlocks the full potential of parallel programming in Python.
+
+60% of parallel processing is batch processing, where you process N number of items at once instead of just 1. `processing` gives you a `Pool` class that makes batch processing easy, with 3 standard pooling patterns.
+
+The other 40% is creating long-running, complex subprocesses that do more than just look up data or compute something. Creating these is generally a nightmare even for experienced developers. `processing` gives you a `Skprocess` class that makes creating these easy, with coded lifecycle methods to setup, run, cleanup, and more. These classes include timing, error handling, and run the process internally, so you don't have to worry about managing the process yourself.
+
+Finally, `processing` gives you a `Share` class.
+
+Every developer knows how to create a class instance and add objects to it.
+
+And that's all you have to do with `Share`. Instantiate it, add objects to it, and pass it to your subprocesses. It ensures that everything syncs up and remains in sync for you. Even complex classes can be added and used just like you would use it normally.
+
+How? `cerial`, the serialization engine that can handle a vast amount of things that `pickle`, `cloudpickle`, and `dill` cannot, including complex, user created class instances that would fail to serialize with the other options.
+
+- `cerial` - Serialize (almost) anything.
+
+`cerial` outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators, file handles, and more are all covered. Additionally, it has faster speed than `cloudpickle` and `dill` for many simple types, and is also faster in most cases for the more complex types as well.
+
+Why is this awesome? You don't have to worry about errors anymore. You now have access to a custom class, the objects you want to use in it but couldn't before, and the ability to just share data between processes without thinking, all powered by this engine. You don't even have to use the other modules to get an upgrade. This is just simply better.
+
+- `paths` - everything path related is so much more simple
+
+It includes `Skpath`, a path object that uses an auto-detected project root to normalize all of your paths for you. It is cross platform compatible. An `Skpath` made on Jeff's Mac will be the same as the same `Skpath` made on Sarah's Windows laptop.
+
+It also includes an `@autopath` decorator that can be used to automatically streamline all of your paths to a specific type.
+
+- `timing` - times your code with one line
+
+`timing` gives you a `Sktimer` class that is the core piece of this module. It powers `@timethis` and the `TimeThis` context manager.
+
+Both of these allow you to time your code with one line, and have full control of the resulting timer data with 2.
+
+- `circuits` - manage your execution flow more cleanly
+
+`circuits` gives you two patterns to manage your code. 
+
+  - `Circuit` - auto-resets after sleeping, great for rate limiting, resource management, and more
+  - `BreakingCircuit` - stays broken until manually reset, great for stopping execution after a certain number of failures with extra control
+
+- `sk` - modify your functions and methods without changing their code
+
+`sk` can be used as a decorator or a function, and adds some special modifiers to your functions and methods (if you decorate/convert the class). Using `sk` on a class will also make it run quicker in `Share`.
+
+  - `.retry()` - retry it when it fails
+  - `.timeout()` - return an error if it takes too long
+  - `.background()` - run it in the background and get the result later
+  - `.asynced()` - get an async version of it if it has calls that block your code from running
+  - .rate_limit() - limit the number of calls it makes per second
+```
 
 
 ### Real world example

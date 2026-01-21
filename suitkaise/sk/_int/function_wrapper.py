@@ -7,8 +7,9 @@ Provides retry, timeout, and background execution wrappers.
 import asyncio
 import functools
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, Future
-from typing import Callable, Any, TypeVar, ParamSpec, Optional, Type, Tuple
+from typing import Callable, Any, TypeVar, ParamSpec, Optional, Type, Tuple, Awaitable
 
 P = ParamSpec('P')
 R = TypeVar('R')
@@ -17,6 +18,35 @@ R = TypeVar('R')
 class FunctionTimeoutError(Exception):
     """Raised when a function exceeds its timeout."""
     pass
+
+
+class RateLimiter:
+    """
+    Simple per-second rate limiter shared across sync/async call paths.
+    """
+    def __init__(self, per_second: float):
+        if per_second <= 0:
+            raise ValueError("per_second must be > 0")
+        self._min_interval = 1.0 / per_second
+        self._lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
+        self._last_call = 0.0
+
+    def acquire(self) -> None:
+        with self._lock:
+            now = time.monotonic()
+            wait_time = (self._last_call + self._min_interval) - now
+            if wait_time > 0:
+                time.sleep(wait_time)
+            self._last_call = time.monotonic()
+
+    async def acquire_async(self) -> None:
+        async with self._async_lock:
+            now = time.monotonic()
+            wait_time = (self._last_call + self._min_interval) - now
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+            self._last_call = time.monotonic()
 
 
 def create_retry_wrapper(
@@ -65,7 +95,7 @@ def create_async_retry_wrapper(
     delay: float = 1.0,
     factor: float = 1.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
-) -> Callable[P, R]:
+) -> Callable[P, Awaitable[R]]:
     """
     Create an async wrapper that retries the function on failure.
     """
@@ -85,6 +115,42 @@ def create_async_retry_wrapper(
                     sleep_time *= factor
         
         raise last_exception  # type: ignore
+    
+    return wrapper
+
+
+def create_rate_limit_wrapper(
+    func: Callable[P, R],
+    per_second: float,
+    limiter: Optional["RateLimiter"] = None,
+) -> Callable[P, R]:
+    """
+    Create a wrapper that rate limits function calls.
+    """
+    limiter = limiter or RateLimiter(per_second)
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        limiter.acquire()
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def create_async_rate_limit_wrapper(
+    func: Callable[P, R],
+    per_second: float,
+    limiter: Optional["RateLimiter"] = None,
+) -> Callable[P, Awaitable[R]]:
+    """
+    Create an async wrapper that rate limits a sync function.
+    """
+    limiter = limiter or RateLimiter(per_second)
+
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        await limiter.acquire_async()
+        return await asyncio.to_thread(func, *args, **kwargs)
     
     return wrapper
 
@@ -124,7 +190,7 @@ def create_timeout_wrapper(
 def create_async_timeout_wrapper(
     func: Callable[P, R],
     seconds: float,
-) -> Callable[P, R]:
+) -> Callable[P, Awaitable[R]]:
     """
     Create an async wrapper that times out.
     """
@@ -173,7 +239,7 @@ def create_background_wrapper(
 
 def create_async_wrapper(
     func: Callable[P, R],
-) -> Callable[P, R]:
+) -> Callable[P, Awaitable[R]]:
     """
     Create an async wrapper using to_thread.
     
@@ -191,9 +257,9 @@ def create_async_wrapper(
 
 
 def create_async_timeout_wrapper_v2(
-    async_func: Callable[P, R],
+    async_func: Callable[P, Awaitable[R]],
     seconds: float,
-) -> Callable[P, R]:
+) -> Callable[P, Awaitable[R]]:
     """
     Create an async wrapper that times out (for already-async functions).
     """
@@ -214,12 +280,12 @@ def create_async_timeout_wrapper_v2(
 
 
 def create_async_retry_wrapper_v2(
-    async_func: Callable[P, R],
+    async_func: Callable[P, Awaitable[R]],
     times: int = 3,
     delay: float = 1.0,
     factor: float = 1.0,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
-) -> Callable[P, R]:
+) -> Callable[P, Awaitable[R]]:
     """
     Create an async retry wrapper (for already-async functions).
     """
@@ -238,5 +304,23 @@ def create_async_retry_wrapper_v2(
                     sleep_time *= factor
         
         raise last_exception  # type: ignore
+    
+    return wrapper
+
+
+def create_async_rate_limit_wrapper_v2(
+    async_func: Callable[P, Awaitable[R]],
+    per_second: float,
+    limiter: Optional["RateLimiter"] = None,
+) -> Callable[P, Awaitable[R]]:
+    """
+    Create an async rate limit wrapper for already-async functions.
+    """
+    limiter = limiter or RateLimiter(per_second)
+
+    @functools.wraps(async_func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        await limiter.acquire_async()
+        return await async_func(*args, **kwargs)
     
     return wrapper

@@ -1,0 +1,598 @@
+Suitkaise/
+├── .git/
+│   ├── cursor/
+│   │   └── crepe/
+│   ├── hooks/
+│   │   ├── applypatch-msg.sample
+│   │   ├── commit-msg.sample
+│   │   ├── fsmonitor-watchman.sample
+│   │   ├── post-update.sample
+│   │   ├── pre-applypatch.sample
+│   │   ├── pre-commit.sample
+│   │   ├── pre-merge-commit.sample
+│   │   ├── pre-push.sample
+│   │   ├── pre-rebase.sample
+│   │   ├── pre-receive.sample
+│   │   ├── prepare-commit-msg.sample
+│   │   ├── push-to-checkout.sample
+│   │   └── update.sample
+│   ├── info/
+│   │   └── exclude
+│   ├── logs/
+│   │   ├── refs/
+│   │   └── HEAD
+│   ├── objects/
+│   │   ├── 00/
+│   │   ├── 01/
+│   │   ├── 02/
+│   │   ├── 03/
+│   │   ├── 04/
+│   │   ├── 05/
+│   │   ├── 06/
+│   │   ├── 07/
+│   │   ├── 08/
+│   │   ├── 09/
+│   │   ├── 0a/
+│   │   ├── 0b/
+│   │   ├── 0c/
+│   │   ├── 0d/
+│   │   ├── 0e/
+│   │   ├── 0f/
+│   │   ├── 10/
+│   │   ├── 11/
+│   │   ├── 12/
+│   │   ├── 13/
+│   │   ├── 14/
+│   │   ├── 15/
+│   │   ├── 16/
+│   │   ├── 17/
+│   │   ├── 18/
+│   │   ├── 19/
+│   │   ├── 1a/
+│   │   ├── 1b/
+│   │   ├── 1c/
+│   │   ├── 1d/
+│   │   ├── 1e/
+│   │   ├── 1f/
+│   │   ├── 20/
+│   │   ├── 21/
+│   │   ├── 22/
+│   │   ├── 23/
+│   │   ├── 24/
+│   │   ├── 25/
+│   │   ├── 26/
+│   │   ├── 27/
+│   │   ├── 28/
+│   │   ├── 29/
+│   │   ├── 2a/
+│   │   ├── 2b/
+│   │   ├── 2c/
+│   │   ├── 2d/
+│   │   ├── 2e/
+│   │   ├── 2f/
+│   │   ├── 30/
+│   │   ├── 31/
+│   │   ├── 32/
+│   │   ├── 33/
+│   │   ├── 34/
+│   │   ├── 35/
+│   │   ├── 36/
+│   │   ├── 37/
+│   │   ├── 38/
+│   │   ├── 39/
+│   │   ├── 3a/
+│   │   ├── 3b/
+│   │   ├── 3c/
+│   │   ├── 3d/
+│   │   ├── 3e/
+│   │   ├── 3f/
+│   │   ├── 40/
+│   │   ├── 41/
+│   │   ├── 42/
+│   │   ├── 43/
+│   │   ├── 44/
+│   │   ├── 45/
+│   │   ├── 46/
+│   │   ├── 47/
+│   │   ├── 48/
+│   │   ├── 49/
+│   │   ├── 4a/
+│   │   ├── 4b/
+│   │   ├── 4c/
+│   │   ├── 4d/
+│   │   ├── 4e/
+│   │   ├── 4f/
+│   │   ├── 50/
+│   │   ├── 51/
+│   │   ├── 52/
+│   │   ├── 53/
+│   │   ├── 54/
+│   │   ├── 55/
+│   │   ├── 56/
+│   │   ├── 57/
+│   │   ├── 58/
+│   │   ├── 59/
+│   │   ├── 5a/
+│   │   ├── 5b/
+│   │   ├── 5c/
+│   │   ├── 5d/
+│   │   ├── 5e/
+│   │   ├── 5f/
+│   │   ├── 60/
+│   │   ├── 61/
+│   │   ├── 62/
+│   │   ├── 63/
+│   │   ├── 64/
+│   │   ├── 65/
+│   │   ├── 66/
+│   │   ├── 67/
+│   │   ├── 68/
+│   │   ├── 69/
+│   │   ├── 6a/
+│   │   ├── 6b/
+│   │   ├── 6c/
+│   │   ├── 6d/
+│   │   ├── 6e/
+│   │   ├── 6f/
+│   │   ├── 70/
+│   │   ├── 71/
+│   │   ├── 72/
+│   │   ├── 73/
+│   │   ├── 74/
+│   │   ├── 75/
+│   │   ├── 76/
+│   │   ├── 77/
+│   │   ├── 78/
+│   │   ├── 79/
+│   │   ├── 7a/
+│   │   ├── 7b/
+│   │   ├── 7c/
+│   │   ├── 7d/
+│   │   ├── 7e/
+│   │   ├── 7f/
+│   │   ├── 80/
+│   │   ├── 81/
+│   │   ├── 82/
+│   │   ├── 83/
+│   │   ├── 84/
+│   │   ├── 85/
+│   │   ├── 86/
+│   │   ├── 87/
+│   │   ├── 88/
+│   │   ├── 89/
+│   │   ├── 8a/
+│   │   ├── 8b/
+│   │   ├── 8c/
+│   │   ├── 8d/
+│   │   ├── 8e/
+│   │   ├── 8f/
+│   │   ├── 90/
+│   │   ├── 91/
+│   │   ├── 92/
+│   │   ├── 93/
+│   │   ├── 94/
+│   │   ├── 95/
+│   │   ├── 96/
+│   │   ├── 97/
+│   │   ├── 98/
+│   │   ├── 99/
+│   │   ├── 9a/
+│   │   ├── 9b/
+│   │   ├── 9c/
+│   │   ├── 9d/
+│   │   ├── 9e/
+│   │   ├── 9f/
+│   │   ├── a0/
+│   │   ├── a1/
+│   │   ├── a2/
+│   │   ├── a3/
+│   │   ├── a4/
+│   │   ├── a5/
+│   │   ├── a6/
+│   │   ├── a7/
+│   │   ├── a8/
+│   │   ├── a9/
+│   │   ├── aa/
+│   │   ├── ab/
+│   │   ├── ac/
+│   │   ├── ad/
+│   │   ├── ae/
+│   │   ├── af/
+│   │   ├── b0/
+│   │   ├── b1/
+│   │   ├── b2/
+│   │   ├── b3/
+│   │   ├── b4/
+│   │   ├── b5/
+│   │   ├── b6/
+│   │   ├── b7/
+│   │   ├── b8/
+│   │   ├── b9/
+│   │   ├── ba/
+│   │   ├── bb/
+│   │   ├── bc/
+│   │   ├── bd/
+│   │   ├── be/
+│   │   ├── bf/
+│   │   ├── c0/
+│   │   ├── c1/
+│   │   ├── c2/
+│   │   ├── c3/
+│   │   ├── c4/
+│   │   ├── c5/
+│   │   ├── c6/
+│   │   ├── c7/
+│   │   ├── c8/
+│   │   ├── c9/
+│   │   ├── ca/
+│   │   ├── cb/
+│   │   ├── cc/
+│   │   ├── cd/
+│   │   ├── ce/
+│   │   ├── cf/
+│   │   ├── d0/
+│   │   ├── d1/
+│   │   ├── d2/
+│   │   ├── d3/
+│   │   ├── d4/
+│   │   ├── d5/
+│   │   ├── d6/
+│   │   ├── d7/
+│   │   ├── d8/
+│   │   ├── d9/
+│   │   ├── da/
+│   │   ├── db/
+│   │   ├── dc/
+│   │   ├── dd/
+│   │   ├── de/
+│   │   ├── df/
+│   │   ├── e0/
+│   │   ├── e1/
+│   │   ├── e2/
+│   │   ├── e3/
+│   │   ├── e4/
+│   │   ├── e5/
+│   │   ├── e6/
+│   │   ├── e7/
+│   │   ├── e8/
+│   │   ├── e9/
+│   │   ├── ea/
+│   │   ├── eb/
+│   │   ├── ec/
+│   │   ├── ed/
+│   │   ├── ee/
+│   │   ├── ef/
+│   │   ├── f0/
+│   │   ├── f1/
+│   │   ├── f2/
+│   │   ├── f3/
+│   │   ├── f4/
+│   │   ├── f5/
+│   │   ├── f6/
+│   │   ├── f7/
+│   │   ├── f8/
+│   │   ├── f9/
+│   │   ├── fa/
+│   │   ├── fb/
+│   │   ├── fc/
+│   │   ├── fd/
+│   │   ├── fe/
+│   │   ├── ff/
+│   │   ├── info/
+│   │   └── pack/
+│   ├── refs/
+│   │   ├── heads/
+│   │   ├── remotes/
+│   │   └── tags/
+│   ├── COMMIT_EDITMSG
+│   ├── config
+│   ├── description
+│   ├── FETCH_HEAD
+│   ├── HEAD
+│   ├── index
+│   └── ORIG_HEAD
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── .vscode/
+│   └── settings.json
+├── site/
+│   ├── __code__/
+│   │   ├── pages/
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── styles.css
+│   ├── about/
+│   │   └── __about__.md
+│   ├── cerial/
+│   │   ├── cerial-bar.md
+│   │   ├── cerial-examples.md
+│   │   ├── cerial-how-it-works.md
+│   │   ├── cerial-how-to-use.md
+│   │   ├── cerial-learn.md
+│   │   ├── cerial-supported-types.md
+│   │   ├── cerial-tests.md
+│   │   ├── cerial-videos.md
+│   │   └── cerial-why.md
+│   ├── circuit/
+│   │   ├── circuits-bar.md
+│   │   ├── circuits-examples.md
+│   │   ├── circuits-how-it-works.md
+│   │   ├── circuits-how-to-use.md
+│   │   ├── circuits-learn.md
+│   │   ├── circuits-tests.md
+│   │   ├── circuits-videos.md
+│   │   └── circuits-why.md
+│   ├── donate/
+│   │   └── __donate__.md
+│   ├── error/
+│   │   └── __error__.md
+│   ├── home/
+│   │   ├── nav-bar/
+│   │   ├── page-content/
+│   │   └── __home__.md
+│   ├── loading/
+│   │   └── __loading__.md
+│   ├── password/
+│   │   └── __password__.md
+│   ├── paths/
+│   │   ├── paths-bar.md
+│   │   ├── paths-examples.md
+│   │   ├── paths-how-it-works.md
+│   │   ├── paths-learn.md
+│   │   ├── paths-skpath.md
+│   │   ├── paths-tests.md
+│   │   ├── paths-utilities.md
+│   │   ├── paths-videos.md
+│   │   └── paths-why.md
+│   ├── processing/
+│   │   ├── processing-bar.md
+│   │   ├── processing-examples.md
+│   │   ├── processing-how-it-works.md
+│   │   ├── processing-learn.md
+│   │   ├── processing-pool.md
+│   │   ├── processing-share.md
+│   │   ├── processing-skprocess.md
+│   │   ├── processing-tests.md
+│   │   ├── processing-videos.md
+│   │   └── processing-why.md
+│   ├── sk/
+│   │   ├── sk-bar.md
+│   │   ├── sk-examples.md
+│   │   ├── sk-how-it-works.md
+│   │   ├── sk-how-to-use.md
+│   │   ├── sk-learn.md
+│   │   ├── sk-tests.md
+│   │   ├── sk-videos.md
+│   │   └── sk-why.md
+│   ├── timing/
+│   │   ├── timing-bar.md
+│   │   ├── timing-examples.md
+│   │   ├── timing-how-it-works.md
+│   │   ├── timing-learn.md
+│   │   ├── timing-tests.md
+│   │   ├── timing-timers.md
+│   │   ├── timing-utilities.md
+│   │   ├── timing-videos.md
+│   │   └── timing-why.md
+│   ├── __init__.py
+│   └── instructions.md
+├── suitkaise/
+│   ├── _docs/
+│   │   ├── cerial/
+│   │   ├── circuits/
+│   │   ├── paths/
+│   │   ├── processing/
+│   │   ├── sk/
+│   │   ├── timing/
+│   │   ├── __init__.py
+│   │   └── implementation.md
+│   ├── cerial/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── circuits/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── paths/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── processing/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── sk/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── timing/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   ├── __init__.pyi
+│   │   └── api.py
+│   ├── __init__.py
+│   ├── __init__.pyi
+│   ├── cli.py
+│   └── py.typed
+├── suitkaise-examples/
+│   ├── language-scraper/
+│   │   └── concept.md
+│   └── pokerML/
+│       ├── poker_ml/
+│       ├── runs/
+│       ├── concept.md
+│       ├── README.md
+│       └── run_demo.py
+├── suitkaise024/
+│   ├── cerial/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   ├── circuit/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   ├── improvements/
+│   │   ├── cerial-improvements.md
+│   │   ├── circuit-improvements.md
+│   │   ├── general-improvements.md
+│   │   ├── new-goal.md
+│   │   ├── processing-imrpovements.md
+│   │   ├── skpath-improvements.md
+│   │   └── sktime-improvements.md
+│   ├── processing/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   ├── skpath/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   ├── sktime/
+│   │   ├── _int/
+│   │   ├── __init__.py
+│   │   └── api.py
+│   ├── test_cerial/
+│   │   ├── __init__.py
+│   │   ├── benchmark_comparison.py
+│   │   ├── stress_test.py
+│   │   ├── test_realistic_scenarios.py
+│   │   ├── test_round_trip.py
+│   │   ├── test_serialization.py
+│   │   ├── test_suitkaise_objs.py
+│   │   └── test_worst_object_roundtrip.py
+│   ├── test_processing/
+│   │   ├── __init__.py
+│   │   ├── tempCodeRunnerFile.py
+│   │   ├── test_communication.py
+│   │   ├── test_edge_cases.py
+│   │   ├── test_module_basic.py
+│   │   ├── test_multiple_processes.py
+│   │   ├── test_performance.py
+│   │   ├── test_pool.py
+│   │   └── test_with_rest_of_sk.py
+│   ├── test_skpath/
+│   │   ├── __init__.py
+│   │   ├── test_all_features.py
+│   │   └── test_performance.py
+│   ├── test_sktime/
+│   │   ├── test_api.py
+│   │   └── test_performance.py
+│   ├── __init__.py
+│   ├── docs.py
+│   ├── requirements.md
+│   └── setup.py
+├── tests/
+│   ├── cerial/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_complex.py
+│   │   ├── test_edge_cases.py
+│   │   ├── test_handlers.py
+│   │   ├── test_handlers_extended.py
+│   │   ├── test_ir_json.py
+│   │   ├── test_primitives.py
+│   │   └── test_worst_possible_object.py
+│   ├── circuits/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_async.py
+│   │   ├── test_backoff.py
+│   │   ├── test_breaking_circuit.py
+│   │   └── test_circuit.py
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   ├── run_all_tests.py
+│   │   └── test_cli.py
+│   ├── integration/
+│   │   ├── __init__.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_async_patterns.py
+│   │   ├── test_async_web_scraper.py
+│   │   ├── test_data_pipeline.py
+│   │   ├── test_parallel_processing.py
+│   │   ├── test_path_utilities.py
+│   │   └── test_pokerml_dealer.py
+│   ├── paths/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_autopath.py
+│   │   ├── test_id_encoding.py
+│   │   ├── test_project_utils.py
+│   │   ├── test_root_detection.py
+│   │   ├── test_skpath.py
+│   │   └── test_utilities.py
+│   ├── processing/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── debug_share.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_classes.py
+│   │   ├── test_config.py
+│   │   ├── test_coordinator.py
+│   │   ├── test_engine.py
+│   │   ├── test_errors.py
+│   │   ├── test_modifiers.py
+│   │   ├── test_pool.py
+│   │   ├── test_pool_internal.py
+│   │   ├── test_pool_share.py
+│   │   ├── test_process.py
+│   │   ├── test_process_classes.py
+│   │   ├── test_share.py
+│   │   ├── test_share_comprehensive.py
+│   │   ├── test_share_primitives.py
+│   │   ├── test_share_proxy.py
+│   │   ├── test_timeout.py
+│   │   └── test_timers.py
+│   ├── sk/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_async_chaining.py
+│   │   ├── test_async_skfunction.py
+│   │   ├── test_blocking_detection.py
+│   │   ├── test_decorator.py
+│   │   ├── test_function_wrapper.py
+│   │   ├── test_modifier_combinations.py
+│   │   ├── test_shared_meta.py
+│   │   ├── test_skclass.py
+│   │   └── test_skfunction.py
+│   ├── timing/
+│   │   ├── __init__.py
+│   │   ├── benchmarks.py
+│   │   ├── run_all_benchmarks.py
+│   │   ├── run_all_tests.py
+│   │   ├── test_decorators.py
+│   │   ├── test_functions.py
+│   │   ├── test_timer.py
+│   │   ├── test_timethis.py
+│   │   └── test_timethis_context.py
+│   ├── __init__.py
+│   ├── _failure_registry.py
+│   ├── conftest.py
+│   ├── run_all_benchmarks.py
+│   └── run_all_tests.py
+├── .gitignore
+├── __init__.py
+├── CHANGELOG.md
+├── LICENSE
+├── pyproject.toml
+├── pyrightconfig.json
+├── README.md
+├── requirements.md
+├── setup.cfg
+├── setup.py
+└── sitecustomize.py

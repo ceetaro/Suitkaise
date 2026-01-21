@@ -1,0 +1,26 @@
+{
+  "config": {
+    "epochs": 3,
+    "tables": 2,
+    "players_per_table": 4,
+    "hands_per_table": 500,
+    "starting_stack": 200,
+    "small_blind": 1,
+    "big_blind": 2,
+    "strength_samples": 50,
+    "learning_rate": 0.05,
+    "seed": 42
+  },
+  "stats": {
+    "hands": 0,
+    "wins": 0,
+    "total_reward": 0.0,
+    "last_epoch_seconds": 0.2969065840006806,
+    "best_policy_id": "",
+    "best_policy_score": 0.0,
+    "best_policy_epoch": 0
+  },
+  "policies": {},
+  "started_at": 1768953192.512945,
+  "finished_at": 1768953193.607816
+}

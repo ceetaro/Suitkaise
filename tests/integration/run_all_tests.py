@@ -43,6 +43,7 @@ def run_all_tests():
     from tests.integration.test_async_web_scraper import run_all_tests as run_scraper_tests
     from tests.integration.test_parallel_processing import run_all_tests as run_parallel_tests
     from tests.integration.test_path_utilities import run_all_tests as run_path_tests
+    from tests.integration.test_pokerml_dealer import run_all_tests as run_pokerml_tests
     
     results = []
     
@@ -80,6 +81,13 @@ def run_all_tests():
     print(f"{DIM}Simulates: A project analyzer using path detection and structure utilities{RESET}")
     print(f"{MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
     results.append(("Path Utilities", run_path_tests()))
+    
+    # Scenario 6: PokerML Dealer
+    print(f"\n{BOLD}{MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+    print(f"{BOLD}Scenario: PokerML Dealer{RESET}")
+    print(f"{DIM}Simulates: A full Dealer lifecycle using timing, Share, and poker logic{RESET}")
+    print(f"{MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{RESET}")
+    results.append(("PokerML Dealer", run_pokerml_tests()))
     
     # Summary
     print(f"\n{BOLD}{MAGENTA}{'='*80}{RESET}")

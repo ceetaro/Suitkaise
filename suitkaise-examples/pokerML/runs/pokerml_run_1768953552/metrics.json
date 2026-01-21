@@ -1,0 +1,35 @@
+{
+  "config": {
+    "epochs": 3,
+    "tables": 2,
+    "players_per_table": 4,
+    "hands_per_epoch": 2652,
+    "starting_stack": 200,
+    "small_blind": 1,
+    "big_blind": 2,
+    "strength_samples": 50,
+    "learning_rate": 0.05,
+    "seed": 42
+  },
+  "stats": {
+    "hands": 63648,
+    "wins": 1,
+    "total_reward": 0.0,
+    "last_epoch_seconds": 2.386713542015059,
+    "best_policy_id": "agent_7",
+    "best_policy_score": 0.4202020202020202,
+    "best_policy_epoch": 1
+  },
+  "policies": {
+    "agent_0": {},
+    "agent_1": {},
+    "agent_2": {},
+    "agent_3": {},
+    "agent_4": {},
+    "agent_5": {},
+    "agent_6": {},
+    "agent_7": {}
+  },
+  "started_at": 1768953552.280816,
+  "finished_at": 1768953561.849352
+}

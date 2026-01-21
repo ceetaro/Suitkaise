@@ -20,6 +20,7 @@ from ._int.function_wrapper import (
     create_background_wrapper,
     create_async_timeout_wrapper_v2,
     create_async_retry_wrapper_v2,
+    RateLimiter,
     FunctionTimeoutError,
 )
 from ._int.asyncable import _ModifiableMethod, _AsyncModifiableMethod, SkModifierError
@@ -234,16 +235,19 @@ class Skfunction(Generic[P, R]):
         # Extract config
         retry_config = self._config.get('retry')
         timeout_config = self._config.get('timeout')
+        rate_limit_config = self._config.get('rate_limit')
         
         # Build the execution
         func = self._func
         
         # If no modifiers, just call directly
-        if not retry_config and not timeout_config:
+        if not retry_config and not timeout_config and not rate_limit_config:
             return func(*args, **kwargs)
         
         # Define the core execution (with timeout if configured)
         def execute_once():
+            if rate_limit_config:
+                rate_limit_config['limiter'].acquire()
             if timeout_config:
                 seconds = timeout_config['seconds']
                 with ThreadPoolExecutor(max_workers=1) as executor:
@@ -286,6 +290,8 @@ class Skfunction(Generic[P, R]):
             modifiers.append('retry')
         if self._config.get('timeout'):
             modifiers.append('timeout')
+        if self._config.get('rate_limit'):
+            modifiers.append('rate_limit')
         mod_str = f", modifiers={modifiers}" if modifiers else ""
         return f"Skfunction({self._func.__name__}{mod_str})"
     
@@ -405,6 +411,24 @@ class Skfunction(Generic[P, R]):
         
         return wrapper
 
+    def rate_limit(self, per_second: float) -> "Skfunction[P, R]":
+        """
+        Add rate limiting to the function call.
+        
+        Args:
+            per_second: Maximum calls per second
+        
+        Returns:
+            Skfunction with rate limiting configured
+        """
+        limiter = self._config.get('rate_limit', {}).get('limiter')
+        if limiter is None:
+            limiter = RateLimiter(per_second)
+        return self._copy_with(rate_limit={
+            'per_second': per_second,
+            'limiter': limiter,
+        })
+
 
 class AsyncSkfunction(Generic[P, R]):
     """
@@ -469,9 +493,12 @@ class AsyncSkfunction(Generic[P, R]):
         # Extract config
         retry_config = self._config.get('retry')
         timeout_config = self._config.get('timeout')
+        rate_limit_config = self._config.get('rate_limit')
         
         # Define the core async execution (with timeout if configured)
         async def execute_once():
+            if rate_limit_config:
+                await rate_limit_config['limiter'].acquire_async()
             if timeout_config:
                 seconds = timeout_config['seconds']
                 try:
@@ -515,6 +542,8 @@ class AsyncSkfunction(Generic[P, R]):
             modifiers.append('retry')
         if self._config.get('timeout'):
             modifiers.append('timeout')
+        if self._config.get('rate_limit'):
+            modifiers.append('rate_limit')
         mod_str = f", modifiers={modifiers}" if modifiers else ""
         func_name = getattr(self._func, '__name__', 'async_function')
         return f"AsyncSkfunction({func_name}{mod_str})"
@@ -555,6 +584,24 @@ class AsyncSkfunction(Generic[P, R]):
             'delay': delay,
             'backoff_factor': backoff_factor,
             'exceptions': exceptions,
+        })
+
+    def rate_limit(self, per_second: float) -> "AsyncSkfunction[P, R]":
+        """
+        Add rate limiting to the async function call.
+        
+        Args:
+            per_second: Maximum calls per second
+        
+        Returns:
+            AsyncSkfunction with rate limiting configured
+        """
+        limiter = self._config.get('rate_limit', {}).get('limiter')
+        if limiter is None:
+            limiter = RateLimiter(per_second)
+        return self._copy_with(rate_limit={
+            'per_second': per_second,
+            'limiter': limiter,
         })
 
 
@@ -703,11 +750,16 @@ def sk(cls_or_func):
         def background():
             """Get version that runs in background thread."""
             return Skfunction(func).background()
+
+        def rate_limit(per_second: float):
+            """Get version with rate limiting."""
+            return Skfunction(func).rate_limit(per_second)
         
         func.asynced = asynced
         func.retry = retry
         func.timeout = timeout
         func.background = background
+        func.rate_limit = rate_limit
         
         # Return the original function
         return func
