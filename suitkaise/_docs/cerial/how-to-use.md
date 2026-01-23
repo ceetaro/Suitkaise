@@ -204,61 +204,56 @@ from suitkaise import cerial
 data = cerial.serialize(my_object)
 restored = cerial.deserialize(data)
 
-# reconnect all Reconnectors with credentials
+# reconnect all - just passwords (host/port/user stored during serialization)
 restored = cerial.reconnect_all(restored, **{
     "psycopg2.Connection": {
-        "*": {
-            "host": "localhost",
-            "user": "myuser",
-            "password": "secret",
-            "database": "mydb",
-        },
+        "*": "secret",
     },
     "redis.Redis": {
-        "*": {"password": "redis_pass"},
+        "*": "redis_pass",
     },
 })
 ```
 
-### kwargs structure
+### Password structure
 
 ```python
 {
     "TypeKey": {
-        "*": {...},           # defaults for all instances of this type
-        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+        "*": "password",           # default password for all instances
+        "attr_name": "password",   # specific password for attr named "attr_name"
     }
 }
 ```
 
 - **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`, `"redis.Redis"`)
-- **`"*"`** provides defaults for all instances of that type
-- **Specific attr names** override/merge with defaults
+- **`"*"`** provides default password for all instances of that type
+- **Specific attr names** override the default
+- Connection metadata (host, port, user, database) is stored during serialization
 
 ### Multiple connections of same type
 
 ```python
 restored = cerial.reconnect_all(restored, **{
     "psycopg2.Connection": {
-        "*": {  # default for all postgres connections
-            "host": "localhost",
-            "user": "myuser",
-            "password": "default_pass",
-        },
-        "analytics_db": {  # override for self.analytics_db
-            "password": "analytics_pass",
-        },
+        "*": "default_pass",
+        "analytics_db": "analytics_pass",  # override for self.analytics_db
     },
 })
 ```
 
-### No kwargs needed
+### No password needed
 
-For resources without credentials (sockets, threads, pipes, sqlite files, regex matches), just call with no kwargs:
+For resources without auth (sockets, threads, pipes, sqlite, duckdb, regex matches), just call with no args:
 
 ```python
 restored = cerial.reconnect_all(restored)
 ```
+
+### Note on special types
+
+- **Elasticsearch**: `password` is the api_key if no user was stored
+- **InfluxDB v2**: `password` represents the token
 
 ---
 

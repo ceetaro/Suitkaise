@@ -30,18 +30,21 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
         from suitkaise import cerial
         
         # Serialize any object to bytes
-        data = cerial.serialize(my_complex_object)
+        data = cerial.serialize(obj)
         ```
     ────────────────────────────────────────────────────────\n
 
     Serialize any Python object to bytes.
     
-    Handles objects that standard pickle cannot serialize, including:
-    - Objects with locks (threading.Lock, threading.RLock, etc.)
-    - Objects with loggers (logging.Logger instances)
-    - Objects with file handles
-    - Objects with circular references
-    - Custom classes with unpicklable attributes
+    Handles many Python objects that otherwise be unserializable.
+
+    Some objects cannot be truly serialized due to Python's design.
+    This is what we do:
+
+    1. try to keep the exact object intact
+    2. recreate an exact copy of the object
+    3. give a placeholder object that can be used to recreate an exact copy of the object
+    4. give info on the object's state pre-serialization
     
     Args:
         obj: Object to serialize
@@ -56,7 +59,7 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
     
     ────────────────────────────────────────────────────────
         ```python
-        # Serialize an object with locks and loggers
+        # Serialize an object with locks, loggers, and a database connection
         import threading
         import logging
         
@@ -64,11 +67,16 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
             def __init__(self):
                 self.lock = threading.Lock()
                 self.logger = logging.getLogger("service")
-                self.data = {"users": [], "config": {}}
+                self.conn = psycopg2.connect(
+                    host="localhost",
+                    database="mydatabase",
+                    user="myuser",
+                    password="mypassword",
+                )
         
         service = ComplexService()
         
-        # Cerial handles locks and loggers automatically
+        # cerial handles all of these objects automatically
         serialized = cerial.serialize(service)
         ```
     ────────────────────────────────────────────────────────
@@ -78,7 +86,7 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
         return serializer.serialize(obj)
     return _default_serializer.serialize(obj)
 
-
+# NOTE: CHECK DOCSTRING FOR ACCURACY
 def serialize_ir(obj, debug: bool = False, verbose: bool = False):
     """
     ────────────────────────────────────────────────────────
@@ -89,7 +97,8 @@ def serialize_ir(obj, debug: bool = False, verbose: bool = False):
         ```
     ────────────────────────────────────────────────────────\n
 
-    Build and return the intermediate representation (IR) without pickling.
+    Build and return the intermediate representation (IR) 
+    without converting fully to bytes.
     
     Args:
         obj: Object to convert to IR
@@ -98,6 +107,16 @@ def serialize_ir(obj, debug: bool = False, verbose: bool = False):
         
     Returns:
         IR: Nested dict/list structure of pickle-native types
+
+    ```python
+    {
+        "__cerial_type__": "lock",
+        "__handler__": "LockHandler",
+        "__object_id__": 140234567890,
+        "state": {
+            "locked": False
+        }
+    }
     """
     if debug or verbose:
         serializer = Cerializer(debug=debug, verbose=verbose)
@@ -112,17 +131,13 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
         from suitkaise import cerial
         
         # Deserialize bytes back to an object
-        my_object = cerial.deserialize(data)
+        obj = cerial.deserialize(data)
         ```
     ────────────────────────────────────────────────────────\n
 
     Deserialize bytes back to a Python object.
     
-    Reconstructs objects serialized with cerial.serialize(), including:
-    - Recreating locks (as new, unlocked locks)
-    - Recreating loggers (reconnected to logging system)
-    - Rebuilding circular references
-    - Restoring custom class instances
+    Reconstructs objects serialized with cerial.serialize().
     
     Args:
         data: Serialized bytes from cerial.serialize()
@@ -139,7 +154,6 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
         ```python
         # Round-trip example
         original = ComplexService()
-        original.data["users"].append("alice")
         
         # Serialize
         serialized = cerial.serialize(original)
@@ -148,11 +162,10 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
         restored = cerial.deserialize(serialized)
         
         # State is preserved
-        assert restored.data["users"] == ["alice"]
-        
-        # Locks are recreated (new, unlocked)
-        assert restored.lock.acquire(blocking=False)  # Can acquire
-        restored.lock.release()
+        with restored.lock: # will work
+
+        # once reconnected, conn will work
+        restored.conn.reconnect(password="mypassword")
         ```
     ────────────────────────────────────────────────────────
     """
@@ -172,16 +185,18 @@ def reconnect_all(obj, **kwargs):
     
     Args:
         obj: Object or container to traverse.
-        **kwargs: Reconnection parameters keyed by type. Unpack a dict:
+        **kwargs: Passwords keyed by type. Simplified dict[str, str] pattern:
             reconnect_all(obj, **{
                 "psycopg2.Connection": {
-                    "*": {"host": "...", "password": "..."},  # default
-                    "analytics_db": {"password": "other"},    # specific attr
+                    "*": "secret",           # default password
+                    "analytics_db": "other", # specific attr password
                 },
-                ...
+                "redis.Redis": {
+                    "*": "redis_pass",
+                },
             })
-            The "*" key provides defaults for all instances of that type.
-            Specific attr names override/merge with the defaults.
+            The "*" key provides default password for all instances of that type.
+            Specific attr names override the default.
     """
     visited: set[int] = set()
     
@@ -220,30 +235,26 @@ def reconnect_all(obj, **kwargs):
         
         return None
     
-    def _get_kwargs_for(reconnector: Reconnector, attr_name: str | None) -> dict:
-        """Look up kwargs for a reconnector based on type and attr name."""
+    def _get_password_for(reconnector: Reconnector, attr_name: str | None) -> str | None:
+        """Look up password for a reconnector based on type and attr name."""
         type_key = _get_reconnector_type_key(reconnector)
         if not type_key or type_key not in kwargs:
-            return {}
+            return None
         
-        type_kwargs = kwargs[type_key]
-        if not isinstance(type_kwargs, dict):
-            return {}
+        type_passwords = kwargs[type_key]
+        if not isinstance(type_passwords, dict):
+            return None
         
-        # Start with defaults from "*"
-        result = dict(type_kwargs.get("*", {}))
-        
-        # Merge specific attr kwargs on top
-        if attr_name and attr_name in type_kwargs:
-            result.update(type_kwargs[attr_name])
-        
-        return result
+        # Check for specific attr password first, then fall back to "*" default
+        if attr_name and attr_name in type_passwords:
+            return type_passwords[attr_name]
+        return type_passwords.get("*")
     
     def _recurse(item, attr_name: str | None = None):
         if isinstance(item, Reconnector):
             try:
-                reconnect_kwargs = _get_kwargs_for(item, attr_name)
-                return item.reconnect(**reconnect_kwargs)
+                password = _get_password_for(item, attr_name)
+                return item.reconnect(password=password) if password else item.reconnect()
             except Exception:
                 return item
         

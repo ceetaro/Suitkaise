@@ -758,21 +758,18 @@ class MyProcess(Skprocess):
 
 ### With credentials
 
-Pass kwargs to provide connection parameters:
+Pass passwords (connection metadata like host/port/user is stored during serialization):
 
 ```python
 from suitkaise.processing import Skprocess, auto_reconnect
 
 @auto_reconnect(**{
     "psycopg2.Connection": {
-        "*": {
-            "host": "localhost",
-            "password": "secret",
-        },
-        "analytics_db": {"password": "other_pass"},
+        "*": "secret",
+        "analytics_db": "other_pass",
     },
     "redis.Redis": {
-        "*": {"password": "redis_pass"},
+        "*": "redis_pass",
     },
 })
 class MyProcess(Skprocess):
@@ -787,20 +784,26 @@ class MyProcess(Skprocess):
         ...
 ```
 
-### kwargs structure
+### Password structure
 
 ```python
 {
     "TypeKey": {
-        "*": {...},           # defaults for all instances of this type
-        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+        "*": "password",           # default password for all instances
+        "attr_name": "password",   # specific password for attr named "attr_name"
     }
 }
 ```
 
 - **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`)
-- **`"*"`** provides defaults for all instances of that type
-- **Specific attr names** override/merge with defaults
+- **`"*"`** provides default password for all instances of that type
+- **Specific attr names** override the default
+- Connection metadata (host, port, user, database) is stored during serialization
+
+### Note on special types
+
+- **Elasticsearch**: `password` is the api_key if no user was stored
+- **InfluxDB v2**: `password` represents the token
 
 ### Manual reconnect in `__prerun__`
 
@@ -818,7 +821,7 @@ class MyProcess(Skprocess):
     def __prerun__(self):
         reconnect_all(self, **{
             "psycopg2.Connection": {
-                "*": {"password": os.environ["DB_PASSWORD"]},
+                "*": os.environ["DB_PASSWORD"],
             },
         })
     

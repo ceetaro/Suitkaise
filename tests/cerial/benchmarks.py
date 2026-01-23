@@ -81,7 +81,25 @@ from suitkaise.processing import (
 from suitkaise.sk import Skclass, Skfunction, SkModifierError, FunctionTimeoutError
 from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
 from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
-from suitkaise.cerial._int.handlers.network_handler import DbReconnector, SocketReconnector
+from suitkaise.cerial._int.handlers.network_handler import (
+    SocketReconnector,
+    PostgresReconnector,
+    MySQLReconnector,
+    SQLiteReconnector,
+    MongoReconnector,
+    RedisReconnector,
+    SQLAlchemyReconnector,
+    CassandraReconnector,
+    ElasticsearchReconnector,
+    Neo4jReconnector,
+    InfluxDBReconnector,
+    ODBCReconnector,
+    ClickHouseReconnector,
+    MSSQLReconnector,
+    OracleReconnector,
+    SnowflakeReconnector,
+    DuckDBReconnector,
+)
 from suitkaise.cerial._int.handlers.subprocess_handler import SubprocessReconnector
 from suitkaise.cerial._int.handlers.threading_handler import ThreadReconnector
 from suitkaise.cerial._int.handlers.regex_handler import MatchReconnector, MatchObjectHandler
@@ -246,6 +264,144 @@ class CompatibilityRunner:
         
         print(f"\n{self.BOLD}{'-'*110}{self.RESET}\n")
 
+
+# =============================================================================
+# Reconnector Showcase
+# =============================================================================
+
+class ReconnectorShowcaseResult:
+    def __init__(self, name: str, status: str, detail: str = "", error: str = ""):
+        self.name = name
+        self.status = status
+        self.detail = detail
+        self.error = error
+
+
+class ReconnectorShowcaseRunner:
+    def __init__(self, suite_name: str):
+        self.suite_name = suite_name
+        self.results: list[ReconnectorShowcaseResult] = []
+        self.GREEN = '\033[92m'
+        self.RED = '\033[91m'
+        self.YELLOW = '\033[93m'
+        self.CYAN = '\033[96m'
+        self.BOLD = '\033[1m'
+        self.RESET = '\033[0m'
+    
+    def add(self, name: str, func):
+        try:
+            detail = func()
+            self.results.append(ReconnectorShowcaseResult(name, "ok", detail=detail))
+        except Exception as e:
+            self.results.append(ReconnectorShowcaseResult(name, "fail", error=f"{type(e).__name__}: {e}"))
+    
+    def skip(self, name: str, reason: str):
+        self.results.append(ReconnectorShowcaseResult(name, "skip", detail=reason))
+    
+    def print_results(self):
+        print(f"\n{self.BOLD}{self.CYAN}{'='*80}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{self.suite_name:^80}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{'='*80}{self.RESET}\n")
+        
+        for result in self.results:
+            if result.status == "ok":
+                status = f"{self.GREEN}✓ OK{self.RESET}"
+                detail = f" - {result.detail}" if result.detail else ""
+                print(f"  {status}  {result.name}{detail}")
+            elif result.status == "skip":
+                status = f"{self.YELLOW}• SKIP{self.RESET}"
+                detail = f" - {result.detail}" if result.detail else ""
+                print(f"  {status}  {result.name}{detail}")
+            else:
+                status = f"{self.RED}✗ FAIL{self.RESET}"
+                detail = f" - {result.error}" if result.error else ""
+                print(f"  {status}  {result.name}{detail}")
+        
+        print(f"\n{self.BOLD}{'-'*80}{self.RESET}\n")
+
+
+def _roundtrip_reconnector(obj):
+    data = serialize(obj)
+    restored = deserialize(data)
+    reconnected = reconnect_all(restored)
+    return restored, reconnected
+
+
+def _extract_reconnected_value(reconnected):
+    if isinstance(reconnected, dict) and "value" in reconnected:
+        return reconnected["value"]
+    return reconnected
+
+
+@contextmanager
+def _reconnector_payload(name, factory):
+    obj = factory()
+    try:
+        yield obj
+    finally:
+        # cleanup for common types
+        if name == "socket.socket" and isinstance(obj, socket.socket):
+            obj.close()
+        if name == "sqlite3.Connection" and isinstance(obj, sqlite3.Connection):
+            obj.close()
+        if name == "subprocess.Popen" and isinstance(obj, subprocess.Popen):
+            try:
+                obj.terminate()
+                obj.wait(timeout=5)
+            except Exception:
+                pass
+
+
+def benchmark_reconnector_showcase():
+    runner = ReconnectorShowcaseRunner("Reconnector Showcase (serialize → reconnect)")
+    
+    def add_roundtrip(name, factory, expected_type):
+        def _run():
+            with _reconnector_payload(name, factory) as obj:
+                restored, reconnected = _roundtrip_reconnector(obj)
+                value = _extract_reconnected_value(reconnected)
+                return f"{type(restored).__name__} → {type(value).__name__}"
+        runner.add(name, _run)
+    
+    # Objects that serialize into reconnectors
+    add_roundtrip("socket.socket", lambda: socket.socket(), socket.socket)
+    add_roundtrip("multiprocessing.Pipe", lambda: multiprocessing.Pipe()[0], object)
+    add_roundtrip(
+        "subprocess.Popen",
+        lambda: subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.PIPE, stderr=subprocess.PIPE),
+        subprocess.Popen,
+    )
+    add_roundtrip("threading.Thread", lambda: threading.Thread(target=lambda: None), threading.Thread)
+    add_roundtrip("re.Match", lambda: re.search(r"a(b)c", "zabc"), re.Match)
+    add_roundtrip("sqlite3.Connection", lambda: sqlite3.connect(":memory:"), sqlite3.Connection)
+    
+    # Reconnector classes (network/db types)
+    reconnector_classes = [
+        ("PostgresReconnector", PostgresReconnector(details={"host": "localhost", "database": "db"})),
+        ("MySQLReconnector", MySQLReconnector(details={"host": "localhost", "database": "db"})),
+        ("SQLiteReconnector", SQLiteReconnector(details={"path": ":memory:"})),
+        ("MongoReconnector", MongoReconnector(details={"host": "localhost"})),
+        ("RedisReconnector", RedisReconnector(details={"host": "localhost"})),
+        ("SQLAlchemyReconnector", SQLAlchemyReconnector(details={"url": "sqlite:///:memory:"})),
+        ("CassandraReconnector", CassandraReconnector(details={"hosts": ["localhost"]})),
+        ("ElasticsearchReconnector", ElasticsearchReconnector(details={"hosts": ["localhost"]})),
+        ("Neo4jReconnector", Neo4jReconnector(details={"uri": "bolt://localhost:7687"})),
+        ("InfluxDBReconnector", InfluxDBReconnector(details={"url": "http://localhost:8086"})),
+        ("ODBCReconnector", ODBCReconnector(details={"dsn": "example"})),
+        ("ClickHouseReconnector", ClickHouseReconnector(details={"host": "localhost"})),
+        ("MSSQLReconnector", MSSQLReconnector(details={"host": "localhost"})),
+        ("OracleReconnector", OracleReconnector(details={"dsn": "localhost"})),
+        ("SnowflakeReconnector", SnowflakeReconnector(details={"account": "acct"})),
+        ("DuckDBReconnector", DuckDBReconnector(details={"path": ":memory:"})),
+    ]
+    
+    for name, reconnector in reconnector_classes:
+        def _make_run(rec=reconnector):
+            restored, reconnected = _roundtrip_reconnector(rec)
+            return f"{type(restored).__name__} → {type(reconnected).__name__}"
+        runner.add(name, _make_run)
+    
+    return runner
 
 # =============================================================================
 # Test Data
@@ -576,7 +732,7 @@ def _reconnect_all_payload():
             "local_addr": None,
             "remote_addr": None,
         }),
-        "db": DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"}),
+        "db": SQLiteReconnector(details={"path": ":memory:"}),
         "proc": SubprocessReconnector(state={
             "args": [sys.executable, "-c", "pass"],
             "returncode": 0,
@@ -595,7 +751,7 @@ def _reconnect_all_payload():
             "is_alive": False,
         }),
         "nested": {
-            "list": [PipeReconnector(), DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})]
+            "list": [PipeReconnector(), SQLiteReconnector(details={"path": ":memory:"})]
         }
     }
 
@@ -900,7 +1056,7 @@ def _get_supported_objects():
         ("OS pipes", _pipe_fds),
         ("File descriptors", _file_descriptor),
         ("PipeReconnector", lambda: PipeReconnector()),
-        ("DbReconnector", lambda: DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})),
+        ("SQLiteReconnector", lambda: SQLiteReconnector(details={"path": ":memory:"})),
         ("typing.NamedTuple", lambda: _NamedTuple(1)),
         ("typing.TypedDict", lambda: _TypedDict(x=1)),
         ("Class object", lambda: _BenchCustomClass),
@@ -1016,6 +1172,7 @@ def run_all_benchmarks():
         benchmark_large_data(),
         benchmark_roundtrip(),
         benchmark_worst_possible_object(),
+        benchmark_reconnector_showcase(),
         benchmark_supported_types_throughput(),
         benchmark_supported_types_compatibility(),
     ]

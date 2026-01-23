@@ -7,6 +7,7 @@ enables .background() and .asynced(), and skips AST analysis for performance.
 
 import sys
 import time
+import asyncio
 from pathlib import Path
 from concurrent.futures import Future
 
@@ -21,6 +22,82 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.sk import sk, blocking, Skfunction, SkModifierError
+
+
+# =============================================================================
+# Test Infrastructure
+# =============================================================================
+
+class TestResult:
+    def __init__(self, name: str, passed: bool, message: str = "", error: str = ""):
+        self.name = name
+        self.passed = passed
+        self.message = message
+        self.error = error
+
+
+class TestRunner:
+    def __init__(self, suite_name: str):
+        self.suite_name = suite_name
+        self.results = []
+        self.GREEN = '\033[92m'
+        self.RED = '\033[91m'
+        self.YELLOW = '\033[93m'
+        self.CYAN = '\033[96m'
+        self.BOLD = '\033[1m'
+        self.RESET = '\033[0m'
+    
+    def run_test(self, name: str, test_func):
+        try:
+            result = test_func()
+            if asyncio.iscoroutine(result):
+                asyncio.run(result)
+            self.results.append(TestResult(name, True))
+        except AssertionError as e:
+            self.results.append(TestResult(name, False, error=str(e)))
+        except Exception as e:
+            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
+    
+    def print_results(self):
+        print(f"\n{self.BOLD}{self.CYAN}{'='*70}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{self.suite_name:^70}{self.RESET}")
+        print(f"{self.BOLD}{self.CYAN}{'='*70}{self.RESET}\n")
+        
+        passed = sum(1 for r in self.results if r.passed)
+        failed = len(self.results) - passed
+        
+        for result in self.results:
+            if result.passed:
+                status = f"{self.GREEN}✓ PASS{self.RESET}"
+            else:
+                status = f"{self.RED}✗ FAIL{self.RESET}"
+            print(f"  {status}  {result.name}")
+            if result.error:
+                print(f"         {self.RED}└─ {result.error}{self.RESET}")
+        
+        print(f"\n{self.BOLD}{'-'*70}{self.RESET}")
+        if failed == 0:
+            print(f"  {self.GREEN}{self.BOLD}All {passed} tests passed!{self.RESET}")
+        else:
+            print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
+        print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
+
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
+        return failed == 0
 
 
 # =============================================================================
@@ -350,6 +427,32 @@ def test_multiple_blocking_decorators():
 # Run Tests
 # =============================================================================
 
+def run_all_tests():
+    runner = TestRunner("@blocking Decorator Tests")
+    
+    runner.run_test("blocking decorator sets attribute", test_blocking_decorator_sets_attribute)
+    runner.run_test("blocking decorator preserves function", test_blocking_decorator_preserves_function)
+    runner.run_test("blocking decorator with args", test_blocking_decorator_with_args)
+    runner.run_test("Skfunction detects blocking decorator", test_skfunction_detects_blocking_decorator)
+    runner.run_test("Skfunction no false positive", test_skfunction_no_false_positive_without_decorator)
+    runner.run_test("sk decorated function detects blocking", test_sk_decorated_function_detects_blocking)
+    runner.run_test("class detects blocking method", test_class_detects_blocking_method)
+    runner.run_test("class mixed detection", test_class_mixed_detection)
+    runner.run_test("background enabled for blocking function", test_background_enabled_for_blocking_function)
+    runner.run_test("background enabled for blocking method", test_background_enabled_for_blocking_method)
+    runner.run_test("background runs in thread", test_background_runs_in_thread)
+    runner.run_test("asynced enabled for blocking function", test_asynced_enabled_for_blocking_function)
+    runner.run_test("asynced raises without blocking", test_asynced_raises_without_blocking)
+    runner.run_test("blocking decorator reports only blocking", test_blocking_decorator_reports_only_blocking)
+    runner.run_test("blocking decorator faster than AST", test_blocking_decorator_faster_than_ast)
+    runner.run_test("blocking on lambda-like", test_blocking_on_lambda_like)
+    runner.run_test("blocking preserves docstring", test_blocking_preserves_docstring)
+    runner.run_test("blocking preserves name", test_blocking_preserves_name)
+    runner.run_test("multiple blocking decorators", test_multiple_blocking_decorators)
+    
+    return runner.print_results()
+
+
 if __name__ == "__main__":
-    import pytest
-    pytest.main([__file__, "-v"])
+    success = run_all_tests()
+    sys.exit(0 if success else 1)

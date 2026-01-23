@@ -22,22 +22,19 @@ class ThreadReconnector(Reconnector):
     """
     Recreate a thread from serialized thread metadata.
     
-    Use reconnect() to build a new Thread. The thread is NOT started
-    automatically unless auto_start=True is provided.
+    Use reconnect() to build a new Thread with the same configuration.
+    The thread is NOT started - call thread.start() yourself.
     """
     state: Dict[str, Any]
     
-    def reconnect(self, auto_start: bool = False, **kwargs: Any) -> threading.Thread:
-        thread = threading.Thread(
+    def reconnect(self) -> threading.Thread:
+        return threading.Thread(
             name=self.state["name"],
             target=self.state["target"],
             args=self.state["args"],
             kwargs=self.state["kwargs"],
             daemon=self.state["daemon"],
         )
-        if auto_start:
-            thread.start()
-        return thread
 
 
 

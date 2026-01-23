@@ -74,6 +74,29 @@ class ScenarioRunner:
         else:
             print(f"  {YELLOW}Passed: {passed}{RESET}  |  {RED}Failed: {failed}{RESET}")
         print(f"  {BOLD}{'─'*70}{RESET}")
+
+        if failed != 0:
+            print(f"{BOLD}{RED}Failed tests (recap):{RESET}")
+            for name, passed_flag, error in self.results:
+                if not passed_flag:
+                    print(f"  {RED}✗ {name}{RESET}")
+                    if error:
+                        print(f"     {RED}└─ {error}{RESET}")
+            print()
+
+        try:
+            from tests._failure_registry import record_failures
+            # Convert results to objects with .passed, .name, .error attributes
+            class FailedResult:
+                def __init__(self, name, error):
+                    self.name = name
+                    self.passed = False
+                    self.error = error
+            failed_results = [FailedResult(name, error) for name, p, error in self.results if not p]
+            record_failures(self.scenario_name, failed_results)
+        except Exception:
+            pass
+
         return failed == 0
 
 

@@ -133,7 +133,7 @@ class MatchReconnector(Reconnector):
     """
     state: Dict[str, Any]
     
-    def reconnect(self, **kwargs: Any) -> Optional[re.Match]:
+    def reconnect(self) -> Optional[re.Match]:
         pattern = self.state["pattern"]
         flags = self.state["flags"]
         string = self.state["string"]

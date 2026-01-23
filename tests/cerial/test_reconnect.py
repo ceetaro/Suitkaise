@@ -77,6 +77,21 @@ class TestRunner:
             print(f"  {self.YELLOW}Passed: {passed}{self.RESET}  |  {self.RED}Failed: {failed}{self.RESET}")
         print(f"{self.BOLD}{'-'*70}{self.RESET}\n")
 
+        if failed != 0:
+            print(f"{self.BOLD}{self.RED}Failed tests (recap):{self.RESET}")
+            for result in self.results:
+                if not result.passed:
+                    print(f"  {self.RED}✗ {result.name}{self.RESET}")
+                    if result.error:
+                        print(f"     {self.RED}└─ {result.error}{self.RESET}")
+            print()
+
+        try:
+            from tests._failure_registry import record_failures
+            record_failures(self.suite_name, [r for r in self.results if not r.passed])
+        except Exception:
+            pass
+
         return failed == 0
 
 
@@ -85,19 +100,16 @@ class TestRunner:
 # =============================================================================
 
 class MockDbReconnector(Reconnector):
-    """Mock DbReconnector that captures overrides."""
+    """Mock DbReconnector that captures password."""
     def __init__(self, module: str, class_name: str, details: dict = None):
         self.module = module
         self.class_name = class_name
         self.details = details or {}
-        self.last_overrides = None
+        self.last_password = None
     
-    def reconnect(self, **overrides):
-        self.last_overrides = overrides
-        # Merge details with overrides
-        merged = dict(self.details)
-        merged.update(overrides)
-        return f"connected:{self.module}.{self.class_name}:{merged}"
+    def reconnect(self, password: str = None):
+        self.last_password = password
+        return f"connected:{self.module}.{self.class_name}:{password}"
 
 
 class SimpleReconnector(Reconnector):
@@ -105,7 +117,7 @@ class SimpleReconnector(Reconnector):
     def __init__(self, value):
         self.value = value
     
-    def reconnect(self, **kwargs):
+    def reconnect(self, password: str = None):
         return f"reconnected-{self.value}"
 
 
@@ -151,25 +163,25 @@ def test_reconnect_all_in_object_dict():
 # Tests: reconnect_all with overrides
 # =============================================================================
 
-def test_reconnect_all_overrides_type_key():
-    """reconnect_all should look up overrides by type key."""
+def test_reconnect_all_password_type_key():
+    """reconnect_all should look up password by type key."""
     rec = MockDbReconnector("psycopg2.extensions", "connection")
     obj = {"db": rec}
     
-    overrides = {
+    passwords = {
         "psycopg2.Connection": {
-            "*": {"password": "secret123"}
+            "*": "secret123"
         }
     }
     
-    reconnect_all(obj, **overrides)
+    reconnect_all(obj, **passwords)
     
-    assert rec.last_overrides == {"password": "secret123"}, \
-        f"Expected {{'password': 'secret123'}}, got {rec.last_overrides}"
+    assert rec.last_password == "secret123", \
+        f"Expected 'secret123', got {rec.last_password}"
 
 
-def test_reconnect_all_overrides_attr_specific():
-    """reconnect_all should use attr-specific overrides over defaults."""
+def test_reconnect_all_password_attr_specific():
+    """reconnect_all should use attr-specific password over default."""
     rec1 = MockDbReconnector("psycopg2.extensions", "connection")
     rec2 = MockDbReconnector("psycopg2.extensions", "connection")
     
@@ -180,45 +192,22 @@ def test_reconnect_all_overrides_attr_specific():
     
     obj = Container()
     
-    overrides = {
+    passwords = {
         "psycopg2.Connection": {
-            "*": {"password": "default_pass"},
-            "analytics_db": {"password": "analytics_pass"},
+            "*": "default_pass",
+            "analytics_db": "analytics_pass",
         }
     }
     
-    reconnect_all(obj, **overrides)
+    reconnect_all(obj, **passwords)
     
-    assert rec1.last_overrides == {"password": "default_pass"}, \
-        f"main_db should get default, got {rec1.last_overrides}"
-    assert rec2.last_overrides == {"password": "analytics_pass"}, \
-        f"analytics_db should get specific, got {rec2.last_overrides}"
+    assert rec1.last_password == "default_pass", \
+        f"main_db should get default, got {rec1.last_password}"
+    assert rec2.last_password == "analytics_pass", \
+        f"analytics_db should get specific, got {rec2.last_password}"
 
 
-def test_reconnect_all_overrides_merge():
-    """Attr-specific overrides should merge with defaults."""
-    rec = MockDbReconnector("psycopg2.extensions", "connection")
-    
-    class Container:
-        def __init__(self):
-            self.db = rec
-    
-    obj = Container()
-    
-    overrides = {
-        "psycopg2.Connection": {
-            "*": {"host": "localhost", "password": "default"},
-            "db": {"password": "specific"},  # Override password, keep host
-        }
-    }
-    
-    reconnect_all(obj, **overrides)
-    
-    assert rec.last_overrides == {"host": "localhost", "password": "specific"}, \
-        f"Should merge, got {rec.last_overrides}"
-
-
-def test_reconnect_all_overrides_multiple_types():
+def test_reconnect_all_password_multiple_types():
     """reconnect_all should handle multiple DB types."""
     pg_rec = MockDbReconnector("psycopg2.extensions", "connection")
     redis_rec = MockDbReconnector("redis", "Redis")
@@ -230,35 +219,35 @@ def test_reconnect_all_overrides_multiple_types():
     
     obj = Container()
     
-    overrides = {
+    passwords = {
         "psycopg2.Connection": {
-            "*": {"password": "pg_pass"}
+            "*": "pg_pass"
         },
         "redis.Redis": {
-            "*": {"password": "redis_pass"}
+            "*": "redis_pass"
         }
     }
     
-    reconnect_all(obj, **overrides)
+    reconnect_all(obj, **passwords)
     
-    assert pg_rec.last_overrides == {"password": "pg_pass"}
-    assert redis_rec.last_overrides == {"password": "redis_pass"}
+    assert pg_rec.last_password == "pg_pass"
+    assert redis_rec.last_password == "redis_pass"
 
 
-def test_reconnect_all_overrides_no_match():
-    """reconnect_all should pass empty kwargs if no override matches."""
+def test_reconnect_all_password_no_match():
+    """reconnect_all should pass None if no password matches."""
     rec = MockDbReconnector("unknown.module", "UnknownClass")
     obj = {"conn": rec}
     
-    overrides = {
+    passwords = {
         "psycopg2.Connection": {
-            "*": {"password": "secret"}
+            "*": "secret"
         }
     }
     
-    reconnect_all(obj, **overrides)
+    reconnect_all(obj, **passwords)
     
-    assert rec.last_overrides == {}, f"Should get empty overrides, got {rec.last_overrides}"
+    assert rec.last_password is None, f"Should get None, got {rec.last_password}"
 
 
 def test_reconnect_all_type_key_normalization():
@@ -276,17 +265,17 @@ def test_reconnect_all_type_key_normalization():
         rec = MockDbReconnector(module, class_name)
         obj = {"conn": rec}
         
-        overrides = {
+        passwords = {
             expected_key: {
-                "*": {"test": "value"}
+                "*": "test_password"
             }
         }
         
-        reconnect_all(obj, **overrides)
+        reconnect_all(obj, **passwords)
         
-        # Should match and get the override
-        assert rec.last_overrides == {"test": "value"}, \
-            f"Key {expected_key} should match {module}.{class_name}, got {rec.last_overrides}"
+        # Should match and get the password
+        assert rec.last_password == "test_password", \
+            f"Key {expected_key} should match {module}.{class_name}, got {rec.last_password}"
 
 
 # =============================================================================
@@ -298,7 +287,7 @@ def test_auto_reconnect_decorator_sets_flags():
     from suitkaise.processing import Skprocess, auto_reconnect
     
     @auto_reconnect(**{
-        "psycopg2.Connection": {"*": {"password": "test"}}
+        "psycopg2.Connection": {"*": "test_password"}
     })
     class TestProcess(Skprocess):
         def __run__(self):
@@ -308,7 +297,7 @@ def test_auto_reconnect_decorator_sets_flags():
     assert TestProcess._auto_reconnect_enabled is True
     assert hasattr(TestProcess, '_auto_reconnect_kwargs')
     assert TestProcess._auto_reconnect_kwargs == {
-        "psycopg2.Connection": {"*": {"password": "test"}}
+        "psycopg2.Connection": {"*": "test_password"}
     }
 
 
@@ -341,22 +330,22 @@ def test_real_db_reconnector_type_key():
     obj = Container()
     
     # Mock the reconnect to capture what's passed
-    captured_kwargs = {}
-    def mock_reconnect(**kwargs):
-        captured_kwargs.update(kwargs)
+    captured_password = [None]
+    def mock_reconnect(password=None):
+        captured_password[0] = password
         return "mocked"
     rec.reconnect = mock_reconnect
     
-    overrides = {
+    passwords = {
         "psycopg2.Connection": {
-            "*": {"user": "testuser", "password": "testpass"}
+            "*": "testpass"
         }
     }
     
-    reconnect_all(obj, **overrides)
+    reconnect_all(obj, **passwords)
     
-    assert captured_kwargs == {"user": "testuser", "password": "testpass"}, \
-        f"Expected user/password overrides, got {captured_kwargs}"
+    assert captured_password[0] == "testpass", \
+        f"Expected 'testpass', got {captured_password[0]}"
 
 
 # =============================================================================
@@ -367,17 +356,16 @@ def run_all_tests():
     runner = TestRunner("Reconnect Tests")
     
     # Basic functionality
-    runner.run_test("reconnect_all no overrides", test_reconnect_all_no_overrides)
+    runner.run_test("reconnect_all no passwords", test_reconnect_all_no_overrides)
     runner.run_test("reconnect_all in dict", test_reconnect_all_in_dict)
     runner.run_test("reconnect_all in list", test_reconnect_all_in_list)
     runner.run_test("reconnect_all in object dict", test_reconnect_all_in_object_dict)
     
-    # Overrides
-    runner.run_test("overrides type key lookup", test_reconnect_all_overrides_type_key)
-    runner.run_test("overrides attr-specific", test_reconnect_all_overrides_attr_specific)
-    runner.run_test("overrides merge", test_reconnect_all_overrides_merge)
-    runner.run_test("overrides multiple types", test_reconnect_all_overrides_multiple_types)
-    runner.run_test("overrides no match", test_reconnect_all_overrides_no_match)
+    # Passwords
+    runner.run_test("password type key lookup", test_reconnect_all_password_type_key)
+    runner.run_test("password attr-specific", test_reconnect_all_password_attr_specific)
+    runner.run_test("password multiple types", test_reconnect_all_password_multiple_types)
+    runner.run_test("password no match", test_reconnect_all_password_no_match)
     runner.run_test("type key normalization", test_reconnect_all_type_key_normalization)
     
     # auto_reconnect decorator
@@ -385,7 +373,7 @@ def run_all_tests():
     runner.run_test("auto_reconnect empty", test_auto_reconnect_empty)
     
     # Real DbReconnector
-    runner.run_test("real DbReconnector type key", test_real_db_reconnector_type_key)
+    runner.run_test("real PostgresReconnector type key", test_real_db_reconnector_type_key)
     
     return runner.print_results()
 

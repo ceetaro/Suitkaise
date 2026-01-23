@@ -58,6 +58,7 @@ from suitkaise.cerial._int.handlers.network_handler import (
     NetworkSerializationError,
     DbReconnector,
     SocketReconnector,
+    SQLiteReconnector,
 )
 from suitkaise.cerial._int.handlers.memory_handler import (
     MMapHandler,
@@ -1724,7 +1725,7 @@ def test_reconnect_all_reconnectors():
         "local_addr": None,
         "remote_addr": None,
     })
-    db_rec = DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})
+    db_rec = SQLiteReconnector(details={"path": ":memory:"})
     subproc_rec = SubprocessReconnector(state={
         "args": [sys.executable, "-c", "print('x')"],
         "returncode": 0,

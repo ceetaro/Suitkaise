@@ -32,7 +32,7 @@ class PipeReconnector(Reconnector):
     writable: bool = True
     _pipe_pair: Optional[Tuple[Any, Any]] = field(default=None, init=False, repr=False)
     
-    def reconnect(self, **kwargs: Any) -> Any:
+    def reconnect(self) -> Any:
         """
         Return a connection end matching the original directionality.
         """

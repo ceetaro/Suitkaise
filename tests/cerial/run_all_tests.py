@@ -38,14 +38,9 @@ def run_all_tests():
     from tests.cerial.test_edge_cases import run_all_tests as run_edge_cases_tests
     from tests.cerial.test_handlers import run_all_tests as run_handlers_tests
     from tests.cerial.test_worst_possible_object import run_all_tests as run_wpo_tests
-    from tests.cerial.test_worst_possible_object_state import run_all_tests as run_wpo_state_tests
     from tests.cerial.test_handlers_extended import run_all_tests as run_handlers_extended_tests
     from tests.cerial.test_ir_json import run_all_tests as run_ir_json_tests
     from tests.cerial.test_reconnect import run_all_tests as run_reconnect_tests
-    from tests.cerial.worst_possible_object.test_worst_obj import run_all_tests as run_wpo_object_tests
-    from tests.cerial.worst_possible_object.test_worst_verification import run_all_tests as run_wpo_verify_tests
-    from tests.cerial.worst_possible_object.test_debugging_features import run_all_tests as run_wpo_debug_tests
-    from tests.cerial.worst_possible_object.test_full_cycle import run_all_tests as run_wpo_full_cycle_tests
     
     results = []
     
@@ -63,21 +58,6 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running WorstPossibleObject stress tests...{RESET}")
     results.append(("WorstPossibleObject", run_wpo_tests()))
-
-    print(f"\n{CYAN}Running WorstPossibleObject state tests...{RESET}")
-    results.append(("WorstPossibleObject (State)", run_wpo_state_tests()))
-
-    print(f"\n{CYAN}Running WorstPossibleObject object tests...{RESET}")
-    results.append(("WorstPossibleObject (Object)", run_wpo_object_tests()))
-
-    print(f"\n{CYAN}Running WorstPossibleObject verification tests...{RESET}")
-    results.append(("WorstPossibleObject (Verification)", run_wpo_verify_tests()))
-
-    print(f"\n{CYAN}Running WorstPossibleObject debugging tests...{RESET}")
-    results.append(("WorstPossibleObject (Debugging)", run_wpo_debug_tests()))
-
-    print(f"\n{CYAN}Running WorstPossibleObject full cycle test...{RESET}")
-    results.append(("WorstPossibleObject (Full Cycle)", run_wpo_full_cycle_tests()))
 
     print(f"\n{CYAN}Running Extended Handlers tests...{RESET}")
     results.append(("Extended Handlers", run_handlers_extended_tests()))

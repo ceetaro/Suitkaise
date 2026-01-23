@@ -19,13 +19,13 @@ from typing import Any, TypeVar, Union, get_args, get_origin
 from .caller_paths import get_caller_path_raw
 from .skpath import Skpath
 
-# Thread-safe lock
+# thread-safe lock
 _autopath_lock = threading.RLock()
 
 # Type variable for decorated function
 F = TypeVar("F", bound=Callable[..., Any])
 
-# Types that are considered "path-like"
+# types that are considered "path-like"
 PATH_TYPES: frozenset[type] = frozenset({str, Path, Skpath})
 
 
@@ -33,10 +33,10 @@ def _is_skpath_type(t: Any) -> bool:
     """Check if a type is Skpath (handles forward references)."""
     if t is Skpath:
         return True
-    # Handle forward reference strings
+    # handle forward reference strings
     if isinstance(t, str) and t == "Skpath":
         return True
-    # Handle typing.ForwardRef
+    # handle typing.ForwardRef
     if hasattr(t, "__forward_arg__") and t.__forward_arg__ == "Skpath":
         return True
     return False
@@ -72,7 +72,7 @@ def _get_base_type_from_annotation(annotation: Any) -> type | None:
         - str if annotation is str
         - None if annotation is not a path type
     """
-    # Direct type match
+    # direct type match
     if _is_skpath_type(annotation):
         return Skpath
     if _is_path_type(annotation):
@@ -80,8 +80,8 @@ def _get_base_type_from_annotation(annotation: Any) -> type | None:
     if _is_str_type(annotation):
         return str
     
-    # Handle Union types (e.g., AnyPath = str | Path | Skpath)
-    # Supports both typing.Union and Python 3.10+ X | Y syntax
+    # handle Union types (e.g., AnyPath = str | Path | Skpath)
+    # supports both typing.Union and Python 3.10+ X | Y syntax
     origin = get_origin(annotation)
     if _is_union_type(origin):
         args = get_args(annotation)
@@ -105,7 +105,7 @@ def _get_iterable_element_type(annotation: Any) -> tuple[type | None, type | Non
     """
     origin = get_origin(annotation)
     
-    # Check for common iterables (get_origin returns lowercase in 3.9+)
+    # check for common iterables (get_origin returns lowercase in 3.9+)
     if origin is list:
         container = list
     elif origin is tuple:
@@ -115,19 +115,19 @@ def _get_iterable_element_type(annotation: Any) -> tuple[type | None, type | Non
     elif origin is frozenset:
         container = frozenset
     elif origin is Iterable:
-        container = list  # Convert to list for general Iterable
+        container = list  # convert to list for general Iterable
     else:
         return None, None
     
-    # Get the element type
+    # get the element type
     args = get_args(annotation)
     if not args:
         return None, None
     
-    # For tuple, handle tuple[X, ...] and tuple[X, Y, Z]
+    # for tuple, handle tuple[X, ...] and tuple[X, Y, Z]
     element_type = args[0]
     
-    # Get the base path type from element
+    # get the base path type from element
     base_type = _get_base_type_from_annotation(element_type)
     if base_type is not None:
         return container, base_type
@@ -165,7 +165,7 @@ def _convert_value(
     original_type = type(value).__name__
     original_value = str(value) if isinstance(value, (str, Path)) else None
     
-    # All paths flow through Skpath for normalization: input → Skpath → target type
+    # all paths flow through Skpath for normalization: input → Skpath → target type
     if target_type is Skpath:
         if isinstance(value, Skpath):
             result = value
@@ -173,7 +173,7 @@ def _convert_value(
             try:
                 result = Skpath(value)
             except Exception:
-                return value  # Can't convert, return as-is
+                return value  # can't convert, return as is
         else:
             return value
             
@@ -182,7 +182,7 @@ def _convert_value(
             result = Path(value.ap)
         elif isinstance(value, (str, Path)):
             try:
-                # Normalize through Skpath, then convert to Path
+                # normalize through Skpath, then convert to Path
                 result = Path(Skpath(value).ap)
             except Exception:
                 result = Path(value) if isinstance(value, str) else value
@@ -194,10 +194,10 @@ def _convert_value(
             result = value.ap
         elif isinstance(value, (str, Path)):
             try:
-                # Normalize through Skpath, then extract string
+                # normalize through Skpath, then extract string
                 result = Skpath(value).ap
             except Exception:
-                result = str(value)  # Fall back to simple str conversion
+                result = str(value)  # fall back to simple str conversion
         else:
             return value
     else:
@@ -235,7 +235,7 @@ def _convert_iterable(
     except (TypeError, ValueError):
         return value
 
-
+# DOCSTRING NEEDS UPDATE
 def autopath(
     use_caller: bool = False,
     debug: bool = False,
@@ -293,7 +293,7 @@ def autopath(
             # This is much faster when names/ids contain thousands of items
             return file_path
     """
-    # Normalize 'only' to a set for O(1) lookup
+    # normalize 'only' to a set for O(1) lookup
     if only is None:
         allowed_params: set[str] | None = None  # None means all params
     elif isinstance(only, str):
@@ -305,20 +305,20 @@ def autopath(
         sig = inspect.signature(func)
         type_hints = {}
         
-        # Get type hints, handling forward references
+        # get type hints, handling forward references
         try:
             type_hints = func.__annotations__.copy()
         except AttributeError:
             pass
         
-        # Analyze parameters
+        # analyze parameters
         param_info: dict[str, dict[str, Any]] = {}
         
         for param_name, param in sig.parameters.items():
             if param_name in ("self", "cls"):
                 continue
             
-            # Skip if path_params specified and this param isn't in the list
+            # skip if path_params specified and this param isn't in the list
             if allowed_params is not None and param_name not in allowed_params:
                 continue
             
@@ -326,7 +326,7 @@ def autopath(
             if annotation is inspect.Parameter.empty:
                 continue
             
-            # Check for direct path type
+            # check for direct path type
             base_type = _get_base_type_from_annotation(annotation)
             if base_type is not None:
                 param_info[param_name] = {
@@ -336,7 +336,7 @@ def autopath(
                 }
                 continue
             
-            # Check for iterable of path types
+            # check for iterable of path types
             container_type, element_type = _get_iterable_element_type(annotation)
             if container_type is not None:
                 param_info[param_name] = {
@@ -348,19 +348,20 @@ def autopath(
         
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # Get the caller's path if use_caller is enabled
+
+            # get the caller's path if use_caller is enabled
             caller_path: Path | None = None
             if use_caller:
                 caller_path = get_caller_path_raw(skip_frames=1)
             
-            # Convert args to kwargs for easier processing
+            # convert args to kwargs for easier processing
             bound = sig.bind_partial(*args, **kwargs)
             
-            # Process each parameter
+            # process each parameter
             for param_name, info in param_info.items():
                 value = bound.arguments.get(param_name)
                 
-                # Handle use_caller for missing values
+                # handle use_caller for missing values
                 if value is None and use_caller and caller_path is not None:
                     if info["type"] == "single":
                         target = info["target_type"]
@@ -370,11 +371,11 @@ def autopath(
                             if debug:
                                 print(f"@autopath: Using caller path for {param_name}")
                 
-                # Skip if still None
+                # skip if still None
                 if value is None:
                     continue
                 
-                # Convert based on type
+                # convert based on type
                 if info["type"] == "single":
                     converted = _convert_value(
                         value,

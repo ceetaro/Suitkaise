@@ -435,28 +435,26 @@ During deserialization:
 
 ### Database Reconnector Details
 
-Each database reconnector has a `reconnect()` method with **standard args** for that database type — the same args you'd use to connect normally.
+Each database reconnector has a `reconnect(password=None)` method:
+
+- **No-auth types** (SQLite, DuckDB): `reconnect()` with no args
+- **Auth types**: `reconnect(password=None)` — only password is needed
 
 For example, `PostgresReconnector.reconnect()`:
 
 ```python
-def reconnect(
-    self,
-    host: str | None = None,
-    port: int | None = None,
-    user: str | None = None,
-    password: str | None = None,
-    database: str | None = None,
-    dsn: str | None = None,
-    **kwargs
-) -> Any:
+def reconnect(self, password: str | None = None) -> Any:
 ```
 
-On `reconnect(**kwargs)`:
-1. Merges stored `details` with provided kwargs (kwargs take precedence)
+On `reconnect(password)`:
+1. Uses stored `details` for connection metadata (host, port, user, database)
 2. Imports the database module (psycopg2, pymysql, etc.)
-3. Calls the native connection function with merged params
+3. Calls the native connection function with stored params + password
 4. Returns the new live connection
+
+**Special cases**:
+- **Elasticsearch**: `password` is the api_key if no user was stored
+- **InfluxDB v2**: `password` represents the token
 
 ### reconnect_all() Implementation
 
@@ -464,8 +462,8 @@ On `reconnect(**kwargs)`:
 
 1. If item is a `Reconnector`:
    - Look up type key in kwargs (e.g., `"psycopg2.Connection"`)
-   - Merge `"*"` defaults with attr-specific overrides
-   - Call `item.reconnect(**merged_kwargs)`
+   - Check for attr-specific password, fall back to `"*"` default
+   - Call `item.reconnect(password)` or `item.reconnect()` if no password
    - Replace item with the result
 
 2. If item is a container (list, dict, set, tuple):
@@ -475,9 +473,9 @@ On `reconnect(**kwargs)`:
    - Recurse into each attribute
    - Track the attribute name for attr-specific lookups
 
-The type key is normalized from the Reconnector's `module` and `class_name`:
-- `module="psycopg2.extensions"`, `class_name="connection"` → `"psycopg2.Connection"`
-- `module="redis.client"`, `class_name="Redis"` → `"redis.Redis"`
+The type key is mapped from the Reconnector class:
+- `PostgresReconnector` → `"psycopg2.Connection"`
+- `RedisReconnector` → `"redis.Redis"`
 
 
 

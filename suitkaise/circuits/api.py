@@ -134,9 +134,9 @@ class Circuit:
         with self._lock:
             return self._current_sleep_time
 
-    # -------------------------------------------------------------------------
-    # Async internal methods
-    # -------------------------------------------------------------------------
+
+
+    # async internal methods
     
     async def _async_trip_circuit(self, custom_sleep: float | None = None) -> bool:
         """Async version of _trip_circuit using asyncio.sleep."""
@@ -175,10 +175,10 @@ class Circuit:
         """Async version of trip()."""
         return await self._async_trip_circuit(custom_sleep)
     
-    # -------------------------------------------------------------------------
-    # Sync methods with .asynced() support
-    # -------------------------------------------------------------------------
-    
+
+
+    # sync methods with .asynced() support
+
     def _sync_short(self, custom_sleep: float | None = None) -> bool:
         """Sync implementation of short()."""
         should_trip = False
@@ -258,9 +258,9 @@ class Circuit:
         with self._lock:
             sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
             self._total_trips += 1
-            self._times_shorted = 0  # Auto-reset counter
+            self._times_shorted = 0  # auto-reset counter
             
-            # Apply exponential backoff for next trip
+            # apply exponential backoff for next trip
             if self.backoff_factor != 1.0:
                 self._current_sleep_time = min(
                     self._current_sleep_time * self.backoff_factor,
@@ -431,10 +431,11 @@ class BreakingCircuit:
         with self._lock:
             return self._current_sleep_time
 
-    # -------------------------------------------------------------------------
-    # Async internal methods
-    # -------------------------------------------------------------------------
+
+
+    # async internal methods
     
+
     async def _async_break_circuit(self, sleep_duration: float) -> None:
         """Async version of _break_circuit using asyncio.sleep."""
         with self._lock:
@@ -468,10 +469,10 @@ class BreakingCircuit:
             custom_sleep if custom_sleep is not None else self._current_sleep_time
         )
     
-    # -------------------------------------------------------------------------
-    # Sync methods with .asynced() support
-    # -------------------------------------------------------------------------
-    
+
+
+    # sync methods with .asynced() support
+
     def _sync_short(self, custom_sleep: float | None = None) -> None:
         """Sync implementation of short()."""
         should_trip = False
@@ -552,7 +553,7 @@ class BreakingCircuit:
             self._broken = False
             self._times_shorted = 0
             
-            # Apply exponential backoff on reset
+            # apply exponential backoff on reset
             if self.backoff_factor != 1.0:
                 self._current_sleep_time = min(
                     self._current_sleep_time * self.backoff_factor,

@@ -389,7 +389,7 @@ def test_async_always_returns_coroutine():
 # Run Tests
 # =============================================================================
 
-def test_all():
+def run_all_tests():
     """Run all modifier combination tests."""
     runner = TestRunner("Skfunction Modifier Combinations")
     
@@ -422,5 +422,5 @@ def test_all():
 
 
 if __name__ == "__main__":
-    success = test_all()
+    success = run_all_tests()
     sys.exit(0 if success else 1)

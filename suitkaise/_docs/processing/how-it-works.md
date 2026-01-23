@@ -902,29 +902,31 @@ bytes ────────────────────────�
                                              self.db = live connection
 ```
 
-### kwargs Lookup
+### Password Lookup
 
-`reconnect_all()` uses type keys to find kwargs:
+`reconnect_all()` uses type keys to find passwords:
 
 1. Get type key from Reconnector (e.g., `"psycopg2.Connection"`)
 2. Look up in kwargs dict
-3. Start with `"*"` defaults
-4. Merge attr-specific overrides on top
-5. Pass merged dict to `reconnect(**merged)`
+3. Check for attr-specific password first
+4. Fall back to `"*"` default
+5. Pass password to `reconnect(password)`
 
 ```python
 # If kwargs is:
 {
     "psycopg2.Connection": {
-        "*": {"host": "localhost", "password": "default"},
-        "analytics_db": {"password": "special"},
+        "*": "default_pass",
+        "analytics_db": "special_pass",
     }
 }
 
 # Then:
-# self.db (any name) gets: {"host": "localhost", "password": "default"}
-# self.analytics_db gets: {"host": "localhost", "password": "special"}
+# self.db (any name) gets: reconnect("default_pass")
+# self.analytics_db gets: reconnect("special_pass")
 ```
+
+Connection metadata (host, port, user, database) is stored during serialization - only passwords need to be provided.
 
 ### Without Decorator
 
@@ -935,7 +937,7 @@ def __prerun__(self):
     from suitkaise.cerial import reconnect_all
     reconnect_all(self, **{
         "psycopg2.Connection": {
-            "*": {"password": os.environ["DB_PASSWORD"]},
+            "*": os.environ["DB_PASSWORD"],
         },
     })
 ```

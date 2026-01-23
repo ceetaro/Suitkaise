@@ -851,16 +851,16 @@ Original Object ──serialize──> Reconnector Placeholder ──reconnect()
 
 ## Using Reconnector.reconnect()
 
-Each Reconnector has a `reconnect(**kwargs)` method that creates a new live resource.
+Each Reconnector has a `reconnect()` method that creates a new live resource.
 
 ### Resources that don't need auth
 
-These reconnect automatically with no kwargs:
+These reconnect with no args (`reconnect()`):
 
 ```python
 from suitkaise import cerial
 
-# Serialize object with sockets, pipes, threads, sqlite, etc.
+# Serialize object with sockets, pipes, threads, sqlite, duckdb, etc.
 data = cerial.serialize(my_object)
 restored = cerial.deserialize(data)
 
@@ -874,20 +874,19 @@ restored = cerial.reconnect_all(restored)
 
 ### Resources that need auth/credentials
 
-Pass connection parameters as kwargs:
+Only password needs to be passed - connection metadata (host, port, user, database) is stored during serialization:
 
 ```python
-# Deserialize - db connection becomes DbReconnector
+# Deserialize - db connection becomes PostgresReconnector
 restored = cerial.deserialize(data)
 
-# restored.db is a DbReconnector, needs credentials to reconnect
-restored.db = restored.db.reconnect(
-    host="localhost",
-    user="myuser",
-    password="secret",
-    database="mydb"
-)
+# restored.db has stored host, port, user, database
+# Only password needs to be provided
+restored.db = restored.db.reconnect("secret")
 ```
+
+For Elasticsearch, `password` can be the api_key if no user was stored.
+For InfluxDB v2, `password` represents the token.
 
 ---
 
@@ -901,55 +900,50 @@ from suitkaise import cerial
 data = cerial.serialize(my_object)
 restored = cerial.deserialize(data)
 
-# Reconnect all Reconnectors with credentials
+# Reconnect all - just passwords, connection metadata is stored
 restored = cerial.reconnect_all(restored, **{
     "psycopg2.Connection": {
-        "*": {"host": "localhost", "password": "secret"},
+        "*": "secret",
     },
     "redis.Redis": {
-        "*": {"password": "redis_pass"},
+        "*": "redis_pass",
     },
 })
 ```
 
-### kwargs structure
+### Password structure
 
 ```python
 {
     "TypeKey": {
-        "*": {...},           # defaults for all instances of this type
-        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+        "*": "password",           # default password for all instances
+        "attr_name": "password",   # specific password for attr named "attr_name"
     }
 }
 ```
 
 - **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`)
-- **`"*"`** provides defaults for all instances of that type
-- **Specific attr names** override/merge with defaults
+- **`"*"`** provides default password for all instances of that type
+- **Specific attr names** override the default
+- Connection metadata (host, port, user, database) is stored during serialization
 
 ### Multiple connections of same type
 
 ```python
 restored = cerial.reconnect_all(restored, **{
     "psycopg2.Connection": {
-        "*": {  # default for all postgres connections
-            "host": "localhost",
-            "user": "myuser",
-            "password": "default_pass",
-        },
-        "analytics_db": {  # override for self.analytics_db
-            "password": "analytics_pass",
-        },
+        "*": "default_pass",
+        "analytics_db": "analytics_pass",  # override for self.analytics_db
     },
 })
 ```
 
-### No kwargs needed
+### No password needed
 
-For resources without auth, just call with no kwargs:
+For resources without auth, just call with no args:
 
 ```python
-# Sockets, threads, pipes, sqlite files, regex matches, etc.
+# Sockets, threads, pipes, sqlite, duckdb, regex matches, etc.
 restored = cerial.reconnect_all(restored)
 ```
 
@@ -957,21 +951,13 @@ restored = cerial.reconnect_all(restored)
 
 ## Supported database kwargs
 
-Each database type uses its native connection parameters:
+Only secret details need to be passed - connection metadata (host, port, user, database) is stored during serialization:
 
 ### PostgreSQL (psycopg2)
 
 ```python
 "psycopg2.Connection": {
-    "*": {
-        "host": "localhost",
-        "port": 5432,
-        "user": "myuser",
-        "password": "secret",
-        "database": "mydb",
-        # or use dsn...
-        "dsn": "postgresql://user:password@host:port/dbname"
-    }
+    "*": {"password": "secret"}  # host/port/user/database stored
 }
 ```
 
@@ -979,13 +965,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "pymysql.Connection": {
-    "*": {
-        "host": "localhost",
-        "port": 3306,
-        "user": "myuser",
-        "password": "secret",
-        "database": "mydb",
-    }
+    "*": {"password": "secret"}  # host/port/user/database stored
 }
 ```
 
@@ -993,14 +973,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "pymongo.Mongoclient": {
-    "*": {
-        "host": "localhost",
-        "port": 27017,
-        "username": "myuser",
-        "password": "secret",
-        # or use uri...
-        "uri": "mongodb://user:password@host:port/dbname"
-    }
+    "*": {"password": "secret"}  # host/port/username/authSource stored
 }
 ```
 
@@ -1008,14 +981,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "redis.Redis": {
-    "*": {
-        "host": "localhost",
-        "port": 6379,
-        "password": "secret",
-        "db": 0,
-        # or use url...
-        "url": "redis://user:password@host:port/db"
-    }
+    "*": {"password": "secret"}  # host/port/db stored
 }
 ```
 
@@ -1023,12 +989,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "cassandra.Cluster": {
-    "*": {
-        "contact_points": ["127.0.0.1"],
-        "port": 9042,
-        "username": "myuser",
-        "password": "secret",
-    }
+    "*": {"password": "secret"}  # contact_points/port/username stored
 }
 ```
 
@@ -1036,12 +997,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "elasticsearch.Elasticsearch": {
-    "*": {
-        "hosts": ["localhost:9200"],
-        "http_auth": ("user", "password"),
-        # or use api_key...
-        "api_key": "key",
-    }
+    "*": {"password": "secret"}  # hosts/user stored
 }
 ```
 
@@ -1049,16 +1005,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "sqlalchemy.Engine": {
-    "*": {
-        "url": "postgresql://user:password@host:port/dbname",
-        # or build from params...
-        "driver": "postgresql",
-        "host": "localhost",
-        "port": 5432,
-        "user": "myuser",
-        "password": "secret",
-        "database": "mydb",
-    }
+    "*": {"password": "secret"}  # url or driver/host/port/user/database stored
 }
 ```
 
@@ -1066,16 +1013,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "pyodbc.Connection": {
-    "*": {
-        "dsn": "DSN=mydsn;UID=user;PWD=password",
-        # or build from params...
-        "driver": "ODBC Driver 17 for SQL Server",
-        "server": "localhost",
-        "port": 1433,
-        "database": "mydb",
-        "user": "myuser",
-        "password": "secret",
-    }
+    "*": {"password": "secret"}  # dsn or driver/server/port/database/user stored
 }
 ```
 
@@ -1083,15 +1021,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "neo4j.Driver": {
-    "*": {
-        "uri": "bolt://localhost:7687",
-        "user": "neo4j",
-        "password": "secret",
-        # or build uri from params...
-        "scheme": "bolt",
-        "host": "localhost",
-        "port": 7687,
-    }
+    "*": {"password": "secret"}  # uri or host/port/scheme/user stored
 }
 ```
 
@@ -1099,14 +1029,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "influxdb_client.Influxdbclient": {
-    "*": {
-        "url": "http://localhost:8086",
-        "token": "my-token",
-        "org": "my-org",
-        # or build url from params...
-        "host": "localhost",
-        "port": 8086,
-    }
+    "*": {"token": "my-token"}  # url or host/port/org stored
 }
 ```
 
@@ -1114,14 +1037,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "snowflake.Connection": {
-    "*": {
-        "user": "myuser",
-        "password": "secret",
-        "account": "myaccount",
-        "warehouse": "mywarehouse",
-        "database": "mydb",
-        "schema": "myschema",
-    }
+    "*": {"password": "secret"}  # user/account/warehouse/database/schema stored
 }
 ```
 
@@ -1129,15 +1045,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "oracledb.Connection": {
-    "*": {
-        "dsn": "localhost:1521/myservice",
-        "user": "myuser",
-        "password": "secret",
-        # or build dsn from params...
-        "host": "localhost",
-        "port": 1521,
-        "service_name": "myservice",
-    }
+    "*": {"password": "secret"}  # dsn or host/port/service_name/user stored
 }
 ```
 
@@ -1145,13 +1053,7 @@ Each database type uses its native connection parameters:
 
 ```python
 "clickhouse_driver.Client": {
-    "*": {
-        "host": "localhost",
-        "port": 9000,
-        "user": "default",
-        "password": "secret",
-        "database": "default",
-    }
+    "*": {"password": "secret"}  # host/port/user/database stored
 }
 ```
 
@@ -1159,25 +1061,22 @@ Each database type uses its native connection parameters:
 
 ```python
 "pymssql.Connection": {
-    "*": {
-        "host": "localhost",
-        "port": 1433,
-        "user": "sa",
-        "password": "secret",
-        "database": "mydb",
-    }
+    "*": {"password": "secret"}  # host/port/user/database stored
 }
 ```
 
 ### SQLite
 
 ```python
-"sqlite3.Connection": {
-    "*": {
-        "path": "/path/to/database.db",
-        # or use :memory: for in-memory db
-    }
-}
+# No kwargs needed - path is stored, no auth required
+"sqlite3.Connection": {}
+```
+
+### DuckDB
+
+```python
+# No kwargs needed - path is stored, no auth required
+"duckdb.Connection": {}
 ```
 
 ---
@@ -1208,14 +1107,11 @@ from suitkaise.processing import Skprocess, auto_reconnect
 
 @auto_reconnect(**{
     "psycopg2.Connection": {
-        "*": {
-            "host": "localhost",
-            "password": "secret",
-        },
-        "analytics_db": {"password": "other_pass"},
+        "*": "secret",
+        "analytics_db": "other_pass",
     },
     "redis.Redis": {
-        "*": {"password": "redis_pass"},
+        "*": "redis_pass",
     },
 })
 class MyProcess(Skprocess):
@@ -1246,7 +1142,7 @@ class MyProcess(Skprocess):
     def __prerun__(self):
         reconnect_all(self, **{
             "psycopg2.Connection": {
-                "*": {"password": os.environ["DB_PASSWORD"]},
+                "*": os.environ["DB_PASSWORD"],
             },
         })
     

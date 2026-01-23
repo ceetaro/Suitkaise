@@ -13,6 +13,9 @@ class Reconnector:
     
     Subclasses should implement reconnect() to create or reattach the resource.
     
+    - No-auth types: reconnect() with no args
+    - Auth types: reconnect(password) with password arg
+    
     Example:
         >>> from suitkaise.cerial import deserialize
         >>> from suitkaise.cerial._int.handlers import Reconnector
@@ -23,5 +26,5 @@ class Reconnector:
         ...     # use item as normal
     """
 
-    def reconnect(self, **kwargs: Any) -> Any:
+    def reconnect(self, *args, **kwargs) -> Any:
         raise NotImplementedError("reconnect() must be implemented by subclasses.")
