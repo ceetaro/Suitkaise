@@ -7,8 +7,10 @@ Pipes are inter-process communication channels.
 import os
 import multiprocessing
 import multiprocessing.connection
-from typing import Any, Dict
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Tuple
 from .base_class import Handler
+from .reconnector import Reconnector
 
 
 class PipeSerializationError(Exception):
@@ -16,15 +18,62 @@ class PipeSerializationError(Exception):
     pass
 
 
+@dataclass
+class PipeReconnector(Reconnector):
+    """
+    Recreates multiprocessing pipes on demand.
+    
+    Since connection handles don't survive across processes, we return a
+    PipeReconnector that can generate a fresh pipe and provide both ends.
+    """
+    duplex: bool = True
+    preferred_end: str = "either"
+    readable: bool = True
+    writable: bool = True
+    _pipe_pair: Optional[Tuple[Any, Any]] = field(default=None, init=False, repr=False)
+    
+    def reconnect(self, **kwargs: Any) -> Any:
+        """
+        Return a connection end matching the original directionality.
+        """
+        conn, _ = self._ensure_pipe()
+        return conn
+    
+    def peer(self) -> Any:
+        """
+        Return the peer connection end.
+        """
+        _, peer_conn = self._ensure_pipe()
+        return peer_conn
+    
+    def pair(self) -> Tuple[Any, Any]:
+        """
+        Return both ends of the newly created pipe.
+        """
+        return self._ensure_pipe()
+
+    
+    def _ensure_pipe(self) -> Tuple[Any, Any]:
+        if self._pipe_pair is None:
+            conn1, conn2 = multiprocessing.Pipe(duplex=self.duplex)
+            if self.preferred_end == "read":
+                self._pipe_pair = (conn1, conn2)
+            elif self.preferred_end == "write":
+                self._pipe_pair = (conn2, conn1)
+            else:
+                self._pipe_pair = (conn1, conn2)
+        return self._pipe_pair
+
+
 class OSPipeHandler(Handler):
     """
-    Serializes os.pipe file descriptor pairs (6% importance).
+    Serializes os.pipe file descriptor pairs.
     
     os.pipe() returns a tuple of (read_fd, write_fd).
     These are raw file descriptors that don't transfer across processes.
     
     Important: Pipes are inherently process-local. We can't meaningfully
-    serialize them for cross-process use.
+    serialize them for cross-process use. Reconstruction is best-effort.
     """
     
     type_name = "os_pipe"
@@ -36,24 +85,84 @@ class OSPipeHandler(Handler):
         This is tricky since pipes are just tuples of ints.
         We don't want to handle random tuples, so we return False.
         """
-        # We don't auto-detect pipes since they're just (int, int) tuples
+        # we don't auto-detect pipes since they're just (int, int) tuples
         return False
     
     def extract_state(self, obj: tuple) -> Dict[str, Any]:
-        """Extract pipe file descriptors."""
+        """Extract pipe file descriptors and basic metadata."""
+        if not isinstance(obj, tuple) or len(obj) != 2:
+            raise PipeSerializationError("os.pipe state must be a (read_fd, write_fd) tuple.")
+        read_fd, write_fd = obj
+        if not isinstance(read_fd, int) or not isinstance(write_fd, int):
+            raise PipeSerializationError("os.pipe fds must be integers.")
+        try:
+            os.fstat(read_fd)
+            os.fstat(write_fd)
+        except OSError as exc:
+            raise PipeSerializationError("Invalid pipe file descriptor.") from exc
+        
+        read_inheritable = os.get_inheritable(read_fd)
+        write_inheritable = os.get_inheritable(write_fd)
+        read_blocking = os.get_blocking(read_fd) if hasattr(os, "get_blocking") else None
+        write_blocking = os.get_blocking(write_fd) if hasattr(os, "get_blocking") else None
         return {
-            "read_fd": obj[0],
-            "write_fd": obj[1],
+            "read_fd": read_fd,
+            "write_fd": write_fd,
+            "read_inheritable": read_inheritable,
+            "write_inheritable": write_inheritable,
+            "read_blocking": read_blocking,
+            "write_blocking": write_blocking,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> tuple:
         """
         Reconstruct pipe.
         
-        File descriptors don't transfer, so we create a new pipe.
+        Best-effort:
+        - If the original fds are still valid in-process, dup them.
+        - Otherwise, create a new pipe.
         """
-        # Create new pipe with different file descriptors
-        return os.pipe()
+        read_fd = state.get("read_fd")
+        write_fd = state.get("write_fd")
+        
+        def _dup_fd(fd: Any) -> int | None:
+            if not isinstance(fd, int):
+                return None
+            try:
+                return os.dup(fd)
+            except OSError:
+                return None
+        
+        new_read = _dup_fd(read_fd)
+        new_write = _dup_fd(write_fd)
+        if new_read is None or new_write is None:
+            # clean up any partial dup and create a fresh pipe
+            if new_read is not None:
+                try:
+                    os.close(new_read)
+                except OSError:
+                    pass
+            if new_write is not None:
+                try:
+                    os.close(new_write)
+                except OSError:
+                    pass
+            new_read, new_write = os.pipe()
+        
+        # restore inheritable/blocking flags when possible
+        if "read_inheritable" in state:
+            os.set_inheritable(new_read, bool(state["read_inheritable"]))
+        if "write_inheritable" in state:
+            os.set_inheritable(new_write, bool(state["write_inheritable"]))
+        if hasattr(os, "set_blocking"):
+            read_blocking = state.get("read_blocking")
+            if read_blocking is not None:
+                os.set_blocking(new_read, bool(read_blocking))
+            write_blocking = state.get("write_blocking")
+            if write_blocking is not None:
+                os.set_blocking(new_write, bool(write_blocking))
+        
+        return new_read, new_write
 
 
 class MultiprocessingPipeHandler(Handler):
@@ -82,39 +191,54 @@ class MultiprocessingPipeHandler(Handler):
         - readable: Whether connection is readable
         - writable: Whether connection is writable
         - closed: Whether connection is closed
+        - duplex: Whether the pipe is duplex
+        - preferred_end: Which end to return on reconnect
         
         Note: The actual pipe connection doesn't transfer.
-        We'll create a new pipe on reconstruction.
+        We'll create a new pipe on reconstruction and return a reconnection helper.
         """
+        readable = obj.readable
+        writable = obj.writable
+        duplex = bool(readable and writable)
+        if readable and not writable:
+            preferred_end = "read"
+        elif writable and not readable:
+            preferred_end = "write"
+        else:
+            preferred_end = "either"
         return {
-            "readable": obj.readable,
-            "writable": obj.writable,
+            "readable": readable,
+            "writable": writable,
             "closed": obj.closed,
+            "duplex": duplex,
+            "preferred_end": preferred_end,
         }
     
-    def reconstruct(self, state: Dict[str, Any]) -> Any:
+    def reconstruct(self, state: Dict[str, Any]) -> PipeReconnector:
         """
         Reconstruct pipe connection.
         
-        Creates new pipe and returns one end.
-        Note: The other end is lost, which makes this not very useful.
-        Pipes are inherently paired, so serializing one end doesn't
-        make much sense.
+        Returns a PipeReconnector that can create a fresh pipe and
+        provide both ends. This lets users pass one end to another
+        process via a Share or Queue when needed.
         """
-        # Create new pipe
-        conn1, conn2 = multiprocessing.Pipe(duplex=True)
-        
-        # Return one end (but the other end is lost)
-        # This is a fundamental limitation of serializing pipes
-        return conn1
+        return PipeReconnector(
+            duplex=bool(state.get("duplex", True)),
+            preferred_end=str(state.get("preferred_end", "either")),
+            readable=bool(state.get("readable", True)),
+            writable=bool(state.get("writable", True)),
+        )
 
 
 class MultiprocessingManagerHandler(Handler):
     """
-    Serializes multiprocessing.Manager and proxy objects (4% importance).
+    Serializes multiprocessing.Manager and proxy objects.
     
     Managers provide shared objects that can be used across processes.
     They create proxy objects that communicate with a server process.
+    
+    We keep this hands-off and do not attempt to reconnect to the original
+    Manager server. Share is the recommended cross-process mechanism.
     """
     
     type_name = "mp_manager"
@@ -128,7 +252,7 @@ class MultiprocessingManagerHandler(Handler):
         obj_type_name = type(obj).__name__
         obj_module = getattr(type(obj), '__module__', '')
         
-        # Check for manager or proxy objects
+        # check for manager or proxy objects
         is_manager = 'Manager' in obj_type_name or 'Proxy' in obj_type_name
         is_mp = 'multiprocessing' in obj_module
         
@@ -142,13 +266,20 @@ class MultiprocessingManagerHandler(Handler):
         - type_name: Type of proxy (ListProxy, DictProxy, etc.)
         - value: The current value (if accessible)
         
-        Note: Managers communicate with a server process via sockets.
+        NOTE: Managers communicate with a server process via sockets.
         This doesn't transfer across processes. We extract the value
         and create a new manager/proxy.
+        
+        Detailed behavior:
+        - Prefer the proxy's __reduce__ protocol for a safe rebuild.
+        - If reduce fails, avoid touching manager internals and fall back
+          to the proxy's current value (if accessible).
+        - We do NOT reconnect to the original Manager server or preserve
+          auth keys/addresses. This keeps behavior hands-off and secure.
         """
         obj_type_name = type(obj).__name__
         
-        # Prefer using the proxy's reduce protocol (stable across processes)
+        # prefer using the proxy's reduce protocol (stable across processes)
         try:
             reducer = obj.__reduce__()
             if isinstance(reducer, tuple) and len(reducer) >= 2:
@@ -161,8 +292,8 @@ class MultiprocessingManagerHandler(Handler):
         except Exception:
             pass
         
-        # Avoid dereferencing proxies or manager internals.
-        # These can contain unpicklable auth keys or locks.
+        # avoid dereferencing proxies or manager internals.
+        # these can contain unpicklable auth keys or locks.
         return {
             "type_name": obj_type_name,
             "value": None,
@@ -173,7 +304,8 @@ class MultiprocessingManagerHandler(Handler):
         Reconstruct manager/proxy.
         
         Create new manager and return proxy with same value.
-        Note: This creates a NEW manager in the target process.
+        NOTE: This creates a NEW manager in the target process.
+        If rebuild is unavailable, returns the stored value.
         """
         if "rebuild" in state and "args" in state:
             try:

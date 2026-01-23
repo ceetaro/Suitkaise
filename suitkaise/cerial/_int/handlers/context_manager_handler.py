@@ -3,17 +3,25 @@ Handler for context manager objects.
 
 Context managers implement the __enter__ and __exit__ protocol.
 We serialize the underlying object and recreate the context manager.
+
+AI helped me with technical details, but:
+- all of the basic structure is mine.
+- comments and code has all been reviewed (and revised if needed) by me.
+
+Do I know how this works? Yes.
+DO I know every internal attribute and method? No. That's where AI came in,
+so I didn't have to crawl Stack Overflow myself.
+
+Cheers
 """
 
 import types
 from typing import Any, Dict
 from .base_class import Handler
 
-
 class ContextManagerSerializationError(Exception):
     """Raised when context manager serialization fails."""
     pass
-
 
 class ContextManagerHandler(Handler):
     """
@@ -30,7 +38,7 @@ class ContextManagerHandler(Handler):
     - For custom context managers, serialize the object itself
     - The __enter__ and __exit__ methods are part of the class definition
     
-    Note: This handler focuses on custom context managers that aren't 
+    NOTE: This handler focuses on custom context managers that aren't 
     covered by more specific handlers (files, locks, etc.).
     """
     
@@ -41,44 +49,45 @@ class ContextManagerHandler(Handler):
         Check if object is a context manager.
         
         We check for __enter__ and __exit__ methods.
+
         However, we skip objects that have more specific handlers:
         - File handles (have specific handler)
         - Locks (have specific handler)
         - Database connections (have specific handler)
         """
-        # Must have __enter__ and __exit__
+        # must have __enter__ and __exit__
         has_enter = hasattr(type(obj), '__enter__')
         has_exit = hasattr(type(obj), '__exit__')
         
         if not (has_enter and has_exit):
             return False
         
-        # Skip types that have more specific handlers
-        # These are already covered by other handlers
+        # skip types that have more specific handlers
+        # these are already covered by other handlers
         obj_type_name = type(obj).__name__
         obj_module = getattr(type(obj), '__module__', '')
         
-        # Skip file-like objects (FileHandleHandler)
+        # skip file-like objects (FileHandleHandler)
         if hasattr(obj, 'read') or hasattr(obj, 'write'):
             return False
         
-        # Skip locks and threading objects (LockHandler, etc.)
+        # skip locks and threading objects (LockHandler, etc.)
         if 'threading' in obj_module or 'multiprocessing' in obj_module:
             return False
         
-        # Skip database connections (handled by DatabaseConnectionHandler)
+        # skip db conns (handled by DatabaseConnectionHandler)
         if 'connection' in obj_type_name.lower() or 'cursor' in obj_type_name.lower():
             return False
         
-        # Skip generators (GeneratorHandler)
+        # skip generators (GeneratorHandler)
         if isinstance(obj, types.GeneratorType):
             return False
         
-        # Skip custom __serialize__/__deserialize__ objects (ClassInstanceHandler)
+        # skip custom __serialize__/__deserialize__ objects (ClassInstanceHandler)
         if hasattr(obj, '__serialize__') and hasattr(type(obj), '__deserialize__'):
             return False
         
-        # This is a custom context manager - handle it
+        # this is a custom context manager - handle it
         return True
     
     def extract_state(self, obj: Any) -> Dict[str, Any]:
@@ -96,15 +105,15 @@ class ContextManagerHandler(Handler):
         """
         obj_class = type(obj)
         
-        # Get instance state
+        # get instance state
         instance_dict = {}
         if hasattr(obj, '__dict__'):
             instance_dict = dict(obj.__dict__)
         
-        # Try to determine if context is active
-        # This is difficult to determine generically, so we just note it
+        # try to determine if context is active
+        # this is difficult to determine generically, so we just note it
         is_active = False
-        # We can't reliably determine if __enter__ was called without 
+        # we can't reliably determine if __enter__ was called without 
         # side effects, so we assume it's not active
         
         return {
@@ -122,7 +131,7 @@ class ContextManagerHandler(Handler):
         We recreate the object using __new__ and populate its __dict__.
         We do NOT call __enter__ - the user must do that if needed.
         """
-        # Import module
+        # import module
         import importlib
         
         try:
@@ -132,7 +141,7 @@ class ContextManagerHandler(Handler):
                 f"Cannot import module '{state['module']}' for context manager {state['class_name']}"
             ) from e
         
-        # Get class
+        # get class
         parts = state["qualname"].split('.')
         cls = module
         for part in parts:
@@ -143,16 +152,16 @@ class ContextManagerHandler(Handler):
                     f"Cannot find class '{state['qualname']}' in module '{state['module']}'"
                 ) from e
         
-        # Create instance without calling __init__
+        # create instance without calling __init__
         obj = cls.__new__(cls)
         
-        # Populate __dict__
+        # populate __dict__
         if state["instance_dict"]:
             obj.__dict__.update(state["instance_dict"])
         
-        # Note: We do NOT call __enter__
-        # The context manager is reconstructed but not entered
-        # User must call __enter__ if they want to use it as a context manager
+        # NOTE: We do NOT call __enter__
+        # the context manager is reconstructed but not entered
+        # user must call __enter__ if they want to use it as a context manager
         
         return obj
 
@@ -187,13 +196,13 @@ class ContextlibGeneratorHandler(Handler):
         
         These wrap a generator function.
         """
-        # Get the underlying generator function
+        # get the underlying generator function
         func = getattr(obj, 'func', None)
         args = getattr(obj, 'args', ())
         kwds = getattr(obj, 'kwds', {})
         
         return {
-            "func": func,  # Will be recursively serialized by FunctionHandler
+            "func": func,  # will be recursively serialized by FunctionHandler
             "args": args,
             "kwds": kwds,
         }
@@ -206,15 +215,15 @@ class ContextlibGeneratorHandler(Handler):
         """
         import contextlib
         
-        # The func should be deserialized back to the original generator function
-        # Call it with the same args/kwds to create a new context manager
+        # the func should be deserialized back to the original generator function
+        # call it with the same args/kwds to create a new context manager
         func = state["func"]
         
-        # If func is already a context manager decorator, call it
-        # Otherwise, wrap it
+        # if func is already a context manager decorator, call it
+        # otherwise, wrap it
         if hasattr(func, '__enter__') and hasattr(func, '__exit__'):
             return func
         
-        # Call the generator function to create the context manager
+        # call the generator function to create the context manager
         return func(*state["args"], **state["kwds"])
 

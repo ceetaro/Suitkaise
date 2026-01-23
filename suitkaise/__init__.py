@@ -100,6 +100,7 @@ from .cerial import (
     # Main functions
     serialize,
     deserialize,
+    reconnect_all,
     
     # Exceptions
     SerializationError,
@@ -114,6 +115,9 @@ from .processing import (
     Skprocess,
     Pool,
     Share,
+    
+    # Decorators
+    auto_reconnect,
     
     # Errors
     ProcessError,
@@ -188,6 +192,7 @@ __all__ = [
     "Skprocess",
     "Pool",
     "Share",
+    "auto_reconnect",
     "ProcessError",
     "PreRunError",
     "RunError",

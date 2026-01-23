@@ -730,3 +730,99 @@ class ColorImage(Skprocess):
 
 colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))
 ```
+
+---
+
+## `auto_reconnect`
+
+When a `Skprocess` is serialized to run in a subprocess, resources like database connections become `Reconnector` placeholders.
+
+The `@auto_reconnect` decorator automatically calls `reconnect_all()` after deserialization, restoring these resources.
+
+### Basic usage (no credentials needed)
+
+For sockets, threads, pipes, sqlite files, etc.:
+
+```python
+from suitkaise.processing import Skprocess, auto_reconnect
+
+@auto_reconnect()
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.socket = socket.socket(...)  # becomes SocketReconnector
+    
+    def __run__(self):
+        # self.socket is a live socket again
+        self.socket.send(b"hello")
+```
+
+### With credentials
+
+Pass kwargs to provide connection parameters:
+
+```python
+from suitkaise.processing import Skprocess, auto_reconnect
+
+@auto_reconnect(**{
+    "psycopg2.Connection": {
+        "*": {
+            "host": "localhost",
+            "password": "secret",
+        },
+        "analytics_db": {"password": "other_pass"},
+    },
+    "redis.Redis": {
+        "*": {"password": "redis_pass"},
+    },
+})
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.db = psycopg2.connect(...)
+        self.analytics_db = psycopg2.connect(...)
+        self.cache = redis.Redis(...)
+    
+    def __run__(self):
+        # db, analytics_db, cache are all live connections
+        cursor = self.db.cursor()
+        ...
+```
+
+### kwargs structure
+
+```python
+{
+    "TypeKey": {
+        "*": {...},           # defaults for all instances of this type
+        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+    }
+}
+```
+
+- **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`)
+- **`"*"`** provides defaults for all instances of that type
+- **Specific attr names** override/merge with defaults
+
+### Manual reconnect in `__prerun__`
+
+If you need dynamic credentials (e.g., from environment variables), use `reconnect_all()` directly:
+
+```python
+from suitkaise.processing import Skprocess
+from suitkaise.cerial import reconnect_all
+import os
+
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.db = psycopg2.connect(...)
+    
+    def __prerun__(self):
+        reconnect_all(self, **{
+            "psycopg2.Connection": {
+                "*": {"password": os.environ["DB_PASSWORD"]},
+            },
+        })
+    
+    def __run__(self):
+        cursor = self.db.cursor()
+        ...
+```

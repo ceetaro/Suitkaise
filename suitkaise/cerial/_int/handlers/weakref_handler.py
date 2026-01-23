@@ -25,7 +25,7 @@ class WeakrefHandler(Handler):
     - If object is gone, store None
     - On reconstruction, create strong reference (not weak)
     
-    Important: Weak references become strong references after deserialization.
+    NOTE: Weak references become strong references after deserialization.
     This is necessary because weak references don't make sense across processes -
     we can't preserve the original object identity and garbage collection state.
     """
@@ -44,10 +44,10 @@ class WeakrefHandler(Handler):
         - referenced_object: The object being referenced (if still alive)
         - is_dead: Whether the reference is dead (object was garbage collected)
         
-        Note: We serialize the actual object, not the weak reference itself.
+        NOTE: We serialize the actual object, not the weak reference itself.
         This means the reference becomes strong after deserialization.
         """
-        # Try to dereference the weak reference
+        # try to dereference the weak reference
         try:
             referenced_object = obj()
             is_dead = referenced_object is None
@@ -56,7 +56,7 @@ class WeakrefHandler(Handler):
             is_dead = True
         
         return {
-            "referenced_object": referenced_object,  # Will be recursively serialized
+            "referenced_object": referenced_object,  # will be recursively serialized
             "is_dead": is_dead,
         }
     
@@ -73,11 +73,11 @@ class WeakrefHandler(Handler):
         that this is a NEW object, not the original.
         """
         if state["is_dead"]:
-            # Reference was dead, create a dead reference
-            # We can't create a truly dead weakref, so return a lambda that returns None
+            # reference was dead, create a dead reference
+            # we can't create a truly dead weakref, so return a lambda that returns None
             return lambda: None
         
-        # Create new weak reference to deserialized object
+        # create new weak reference to deserialized object
         if state["referenced_object"] is not None:
             return weakref.ref(state["referenced_object"])
         else:
@@ -104,7 +104,7 @@ class WeakValueDictionaryHandler(Handler):
         
         We snapshot the current key-value pairs (values that still exist).
         """
-        # Get all current key-value pairs where value still exists
+        # get all current key-value pairs where value still exists
         items = {}
         for key in list(obj.keys()):
             try:
@@ -112,11 +112,11 @@ class WeakValueDictionaryHandler(Handler):
                 if value is not None:
                     items[key] = value
             except KeyError:
-                # Value was garbage collected between keys() and now
+                # value was garbage collected between keys() and now
                 pass
         
         return {
-            "items": items,  # Will be recursively serialized
+            "items": items,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> weakref.WeakValueDictionary:
@@ -129,7 +129,7 @@ class WeakValueDictionaryHandler(Handler):
         """
         wvd = weakref.WeakValueDictionary()
         
-        # Add items back
+        # add items back
         for key, value in state["items"].items():
             wvd[key] = value
         
@@ -158,18 +158,18 @@ class WeakKeyDictionaryHandler(Handler):
         Note: This is tricky because weak keys might not be hashable after
         serialization.
         """
-        # Get all current key-value pairs where key still exists
+        # get all current key-value pairs where key still exists
         items = []
         for key in list(obj.keys()):
             try:
                 value = obj[key]
                 items.append((key, value))
             except KeyError:
-                # Key was garbage collected between keys() and now
+                # key was garbage collected between keys() and now
                 pass
         
         return {
-            "items": items,  # Will be recursively serialized
+            "items": items,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> weakref.WeakKeyDictionary:
@@ -180,13 +180,13 @@ class WeakKeyDictionaryHandler(Handler):
         """
         wkd = weakref.WeakKeyDictionary()
         
-        # Add items back
+        # add items back
         for key, value in state["items"]:
             try:
                 wkd[key] = value
             except TypeError:
-                # Key might not be weakly referenceable (e.g., int, str)
-                # Skip these items
+                # key might not be weakly referenceable (e.g., int, str)
+                # skip these items
                 pass
         
         return wkd

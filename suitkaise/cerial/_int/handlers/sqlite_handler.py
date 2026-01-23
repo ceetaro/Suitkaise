@@ -51,9 +51,9 @@ class SQLiteConnectionHandler(Handler):
         Note: Serializing data is expensive for large databases!
         This is primarily for small in-memory databases used in testing.
         """
-        # Get database path
-        # Note: In Python 3.7+, we can use connection.execute("PRAGMA database_list")
-        # For older versions, we try to access internal attributes
+        # get database path
+        # NOTE: In Python 3.7+, we can use connection.execute("PRAGMA database_list")
+        # for older versions, we try to access internal attributes
         try:
             cursor = obj.execute("PRAGMA database_list")
             db_info = cursor.fetchone()
@@ -62,17 +62,17 @@ class SQLiteConnectionHandler(Handler):
             # PRAGMA not supported or returns unexpected format - assume in-memory
             database_path = ':memory:'
         except Exception as e:
-            # Unexpected error querying database info - log and assume in-memory
+            # unexpected error querying database info - log and assume in-memory
             import warnings
             warnings.warn(f"Failed to get SQLite database path: {e}")
             database_path = ':memory:'
         
         is_memory = database_path == ':memory:' or database_path == ''
         
-        # Get connection settings
+        # get connection settings
         isolation_level = obj.isolation_level
         
-        # For in-memory databases, we need to dump schema and data
+        # for in-memory databases, we need to dump schema and data
         if is_memory:
             schema, data = self._dump_database(obj)
         else:
@@ -97,14 +97,14 @@ class SQLiteConnectionHandler(Handler):
         """
         cursor = conn.cursor()
         
-        # Get all table names (excluding sqlite internal tables)
+        # get all table names (excluding sqlite internal tables)
         cursor.execute("""
             SELECT name FROM sqlite_master 
             WHERE type='table' AND name NOT LIKE 'sqlite_%'
         """)
         tables = [row[0] for row in cursor.fetchall()]
         
-        # Get schema (CREATE statements)
+        # get schema (CREATE statements)
         schema = []
         cursor.execute("""
             SELECT sql FROM sqlite_master 
@@ -114,16 +114,16 @@ class SQLiteConnectionHandler(Handler):
             if row[0]:  # sql might be None for some tables
                 schema.append(row[0])
         
-        # Get all data
+        # get all data
         data = []
         for table in tables:
-            # Validate table name is a safe identifier
+            # validate table name is a safe identifier
             if not table.replace('_', '').isalnum():
                 raise SQLiteSerializationError(
                     f"Invalid table name '{table}' - contains unsafe characters"
                 )
-            # Use parameterized query would be ideal, but table names can't be parameterized
-            # Since table names come from sqlite_master (trusted source), this is safe
+            # use parameterized query would be ideal, but table names can't be parameterized
+            # since table names come from sqlite_master (trusted source), this is safe
             cursor.execute(f"SELECT * FROM {table}")
             rows = cursor.fetchall()
             data.append((table, rows))
@@ -139,39 +139,39 @@ class SQLiteConnectionHandler(Handler):
         2. If in-memory, restore schema and data
         3. Set connection properties
         """
-        # Connect to database
+        # connect to database
         conn = sqlite3.connect(state["database"])
         
-        # Set isolation level
+        # set isolation level
         conn.isolation_level = state["isolation_level"]
         
-        # For in-memory databases, restore schema and data
+        # for in-memory databases, restore schema and data
         if state["is_memory"] and (state["schema"] or state["data"]):
             cursor = conn.cursor()
             
-            # Execute CREATE statements
+            # execute CREATE statements
             for create_stmt in state["schema"]:
                 try:
                     cursor.execute(create_stmt)
                 except sqlite3.Error as e:
-                    # Table might already exist, continue
+                    # table might already exist, continue
                     pass
             
-            # Insert data
+            # insert data
             for table_name, rows in state["data"]:
                 if rows:
-                    # Validate table name
+                    # validate table name
                     if not table_name.replace('_', '').isalnum():
                         continue  # Skip invalid table names
                     
-                    # Build INSERT statement
+                    # build INSERT statement
                     placeholders = ','.join('?' * len(rows[0]))
                     insert_stmt = f"INSERT INTO {table_name} VALUES ({placeholders})"
                     
                     try:
                         cursor.executemany(insert_stmt, rows)
                     except sqlite3.Error:
-                        # Log error but continue
+                        # log error but continue
                         pass
             
             conn.commit()
@@ -202,11 +202,11 @@ class SQLiteCursorHandler(Handler):
         - lastrowid: Last modified row ID
         - arraysize: Array size for fetchmany()
         
-        Note: We DON'T serialize the current result set, as that's typically
+        NOTE: We DON'T serialize the current result set, as that's typically
         not needed and could be large. User should re-query in target process.
         """
         return {
-            "connection": obj.connection,  # Will be recursively serialized
+            "connection": obj.connection,  # will be recursively serialized
             "lastrowid": obj.lastrowid,
             "arraysize": obj.arraysize,
         }
@@ -216,12 +216,12 @@ class SQLiteCursorHandler(Handler):
         Reconstruct cursor.
         
         Creates new cursor from the deserialized connection.
-        Note: The result set is NOT restored - user must re-execute query.
+        NOTE: The result set is NOT restored - user must re-execute query.
         """
-        # Connection has already been deserialized
+        # connection has already been deserialized
         conn = state["connection"]
         
-        # Create new cursor
+        # create new cursor
         cursor = conn.cursor()
         cursor.arraysize = state["arraysize"]
         

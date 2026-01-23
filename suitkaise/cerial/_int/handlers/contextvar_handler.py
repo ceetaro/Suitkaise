@@ -43,25 +43,26 @@ class ContextVarHandler(Handler):
             "name": obj.name,
         }
         
-        # Try to get default value
+        # try to get default value
+
         # ContextVar doesn't expose this directly, so we need to check
         # by trying to get the value in a fresh context
         try:
-            # Get current value first
+            # get current value first
             current_value = obj.get()
             state["has_current"] = True
             state["current_value"] = current_value
         except LookupError:
-            # No value set in current context
+            # no value set in current context
             state["has_current"] = False
         
-        # Check if there's a default by inspecting the ContextVar
-        # This is tricky - we can use a sentinel to detect if default exists
+        # check if there's a default by inspecting the ContextVar
+        # this is tricky - we can use a sentinel to detect if default exists
         sentinel = object()
         default_or_sentinel = obj.get(sentinel)
         
         if default_or_sentinel is not sentinel:
-            # Has a default
+            # has a default
             state["has_default"] = True
             state["default_value"] = default_or_sentinel
         else:
@@ -76,13 +77,13 @@ class ContextVarHandler(Handler):
         Creates a new ContextVar with the same name and default.
         If there was a current value, sets it in the current context.
         """
-        # Create ContextVar with or without default
+        # create ContextVar with or without default
         if state["has_default"]:
             var = contextvars.ContextVar(state["name"], default=state["default_value"])
         else:
             var = contextvars.ContextVar(state["name"])
         
-        # Set current value if there was one
+        # set current value if there was one
         if state["has_current"]:
             var.set(state["current_value"])
         
@@ -99,6 +100,9 @@ class TokenHandler(Handler):
     
     We serialize the token's metadata (var name, value) but reconstruction creates
     a "dead" token that can't be used for reset operations.
+
+    If you want to serialize and reconstruct tokens, have to put the ContextVar through
+    and get token over there, but this will be a new (but funcionally equivalent) ContextVar.
     """
     
     type_name = "contextvar_token"
@@ -117,9 +121,11 @@ class TokenHandler(Handler):
         
         Tokens have private attributes that aren't meant to be accessed,
         so we only capture what we can safely access.
+
+        Once again, this is the best that Python lets us do.
         """
         # Token objects don't expose much publicly
-        # We can try to access private attributes but this is fragile
+        # we can try to access private attributes but this is fragile
         try:
             var = obj.var
             var_name = var.name if hasattr(var, 'name') else None
@@ -128,7 +134,7 @@ class TokenHandler(Handler):
         
         try:
             old_value = obj.old_value
-            # Check if it's the MISSING sentinel (can't be pickled)
+            # check if it's the MISSING sentinel (can't be pickled)
             if old_value is contextvars.Token.MISSING:
                 has_old_value = False
                 old_value_serializable = None
@@ -148,14 +154,14 @@ class TokenHandler(Handler):
     
     def reconstruct(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Cannot reconstruct tokens.
+        Cannot truly reconstruct tokens.
         
         Tokens are inherently tied to specific execution contexts and ContextVar
         instances. They can't be reconstructed in a meaningful way.
         
         We return a dict with metadata about the original token instead.
         """
-        # Return metadata dict instead of trying to create a fake token
+        # return metadata dict instead of trying to create a fake token
         return {
             "__cerial_dead_token__": True,
             "var_name": state.get("var_name"),

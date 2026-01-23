@@ -376,5 +376,108 @@ The serializer is designed for single-threaded use within a single serialize/des
 
 If you need to serialize from multiple threads, create separate calls — don't share state between them.
 
+---
+
+## Reconnectors
+
+Some resources cannot be serialized directly — they represent live connections to external systems (database servers, network sockets) or OS-level handles (file descriptors, threads).
+
+Instead of failing, `cerial` replaces these with **Reconnector** placeholder objects.
+
+### How Reconnectors Work
+
+```
+Original Resource ──serialize──> Reconnector ──reconnect()──> New Live Resource
+```
+
+During serialization:
+1. Handler detects an unpicklable resource (e.g., `psycopg2.connection`)
+2. Handler extracts metadata needed to recreate it (host, port, database, etc.)
+3. Handler returns a `Reconnector` object containing this metadata
+
+During deserialization:
+1. The Reconnector is reconstructed (it's just a data class)
+2. User calls `reconnect(**kwargs)` to create a new live resource
+3. Any credentials needed are passed as kwargs
+
+### Reconnector Types
+
+**Database Reconnectors** (inherit from `_DbReconnector`):
+
+| Reconnector | Database | Type Key |
+|-------------|----------|----------|
+| `PostgresReconnector` | PostgreSQL | `psycopg2.Connection` |
+| `MySQLReconnector` | MySQL/MariaDB | `pymysql.Connection` |
+| `SQLiteReconnector` | SQLite | `sqlite3.Connection` |
+| `MongoReconnector` | MongoDB | `pymongo.MongoClient` |
+| `RedisReconnector` | Redis | `redis.Redis` |
+| `SQLAlchemyReconnector` | SQLAlchemy | `sqlalchemy.Engine` |
+| `CassandraReconnector` | Cassandra | `cassandra.Cluster` |
+| `ElasticsearchReconnector` | Elasticsearch | `elasticsearch.Elasticsearch` |
+| `Neo4jReconnector` | Neo4j | `neo4j.Driver` |
+| `InfluxDBReconnector` | InfluxDB | `influxdb_client.InfluxDBClient` |
+| `ODBCReconnector` | ODBC | `pyodbc.Connection` |
+| `ClickHouseReconnector` | ClickHouse | `clickhouse_driver.Client` |
+| `MSSQLReconnector` | MSSQL | `pymssql.Connection` |
+| `OracleReconnector` | Oracle | `oracledb.Connection` |
+| `SnowflakeReconnector` | Snowflake | `snowflake.Connection` |
+| `DuckDBReconnector` | DuckDB | `duckdb.Connection` |
+
+**Other Reconnectors**:
+
+| Reconnector | Original Type | Stored Metadata |
+|-------------|--------------|-----------------|
+| `SocketReconnector` | `socket.socket` | family, type, proto, addresses |
+| `PipeReconnector` | Pipe file objects | mode, direction |
+| `ThreadReconnector` | `threading.Thread` | name, daemon, target, args |
+| `SubprocessReconnector` | `subprocess.Popen` | args, returncode, output |
+| `MatchReconnector` | `re.Match` | pattern, string, pos, groups |
+
+### Database Reconnector Details
+
+Each database reconnector has a `reconnect()` method with **standard args** for that database type — the same args you'd use to connect normally.
+
+For example, `PostgresReconnector.reconnect()`:
+
+```python
+def reconnect(
+    self,
+    host: str | None = None,
+    port: int | None = None,
+    user: str | None = None,
+    password: str | None = None,
+    database: str | None = None,
+    dsn: str | None = None,
+    **kwargs
+) -> Any:
+```
+
+On `reconnect(**kwargs)`:
+1. Merges stored `details` with provided kwargs (kwargs take precedence)
+2. Imports the database module (psycopg2, pymysql, etc.)
+3. Calls the native connection function with merged params
+4. Returns the new live connection
+
+### reconnect_all() Implementation
+
+`reconnect_all(obj, **kwargs)` recursively walks an object:
+
+1. If item is a `Reconnector`:
+   - Look up type key in kwargs (e.g., `"psycopg2.Connection"`)
+   - Merge `"*"` defaults with attr-specific overrides
+   - Call `item.reconnect(**merged_kwargs)`
+   - Replace item with the result
+
+2. If item is a container (list, dict, set, tuple):
+   - Recurse into each element
+
+3. If item is an object with `__dict__` or `__slots__`:
+   - Recurse into each attribute
+   - Track the attribute name for attr-specific lookups
+
+The type key is normalized from the Reconnector's `module` and `class_name`:
+- `module="psycopg2.extensions"`, `class_name="connection"` → `"psycopg2.Connection"`
+- `module="redis.client"`, `class_name="Redis"` → `"redis.Redis"`
+
 
 

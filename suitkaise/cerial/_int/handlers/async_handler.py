@@ -3,6 +3,16 @@ Handler for async/await objects.
 
 Includes coroutines, async generators, asyncio Tasks, Futures, etc.
 These are challenging because they represent suspended execution state.
+
+AI helped me with technical details, but:
+- all of the basic structure is mine.
+- comments and code has all been reviewed (and revised if needed) by me.
+
+Do I know how this works? Yes.
+DO I know every internal attribute and method? No. That's where AI came in,
+so I didn't have to crawl Stack Overflow myself.
+
+Cheers
 """
 
 import sys
@@ -10,7 +20,7 @@ import types
 from typing import Any, Dict
 from .base_class import Handler
 
-# Try to import asyncio (standard in Python 3.4+)
+# try to import asyncio (3.4+)
 try:
     import asyncio
     HAS_ASYNCIO = True
@@ -56,12 +66,12 @@ class CoroutineHandler(Handler):
         Note: We can't capture the exact execution state, so the
         reconstructed coroutine will start from the beginning.
         """
-        # Get coroutine metadata
+        # get coroutine metadata
         cr_code = obj.cr_code if hasattr(obj, 'cr_code') else None
         cr_name = obj.__name__ if hasattr(obj, '__name__') else 'coroutine'
         cr_qualname = obj.__qualname__ if hasattr(obj, '__qualname__') else cr_name
         
-        # Try to get frame locals
+        # try to get frame locals
         frame_locals = None
         if hasattr(obj, 'cr_frame') and obj.cr_frame:
             try:
@@ -70,7 +80,7 @@ class CoroutineHandler(Handler):
                 pass
         
         return {
-            "cr_code": cr_code,  # Will be recursively serialized
+            "cr_code": cr_code,  # will be recursively serialized
             "cr_name": cr_name,
             "cr_qualname": cr_qualname,
             "frame_locals": frame_locals,
@@ -205,8 +215,8 @@ class TaskHandler(Handler):
             "task_name": task_name,
             "is_done": is_done,
             "is_cancelled": is_cancelled,
-            "result": result,  # Will be recursively serialized
-            "exception": exception,  # Will be recursively serialized
+            "result": result,  # will be recursively serialized
+            "exception": exception,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -266,7 +276,8 @@ class FutureHandler(Handler):
         """Check if object is an asyncio.Future."""
         if not HAS_ASYNCIO:
             return False
-        # Check for Future but not Task (Task is a subclass of Future)
+
+        # check for Future but not Task (Task is a subclass of Future)
         return isinstance(obj, asyncio.Future) and not isinstance(obj, asyncio.Task)
     
     def extract_state(self, obj: Any) -> Dict[str, Any]:

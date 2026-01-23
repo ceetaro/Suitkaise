@@ -6,10 +6,13 @@ These are challenging because network connections don't transfer across processe
 """
 
 import socket
+import importlib
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 from .base_class import Handler
+from .reconnector import Reconnector
 
-# Try to import requests, but it's optional
+# try to import requests, but it's optional
 try:
     import requests
     HAS_REQUESTS = True
@@ -21,6 +24,915 @@ except ImportError:
 class NetworkSerializationError(Exception):
     """Raised when network object serialization fails."""
     pass
+
+
+@dataclass
+class _DbReconnector(Reconnector):
+    """
+    Base class for database reconnectors.
+    
+    Stores connection metadata extracted during serialization.
+    Subclasses implement reconnect() with standard args for each database type.
+    """
+    details: Dict[str, Any] = field(default_factory=dict)
+    
+    def _get(self, *keys: str) -> Any:
+        """Get first non-None value from details for any of the given keys."""
+        for key in keys:
+            if key in self.details and self.details[key] is not None:
+                return self.details[key]
+        return None
+    
+    def _import(self, name: str):
+        """Import a module, raising NetworkSerializationError if missing."""
+        try:
+            return importlib.import_module(name)
+        except ImportError as exc:
+            raise NetworkSerializationError(
+                f"Cannot reconnect: missing dependency '{name}'."
+            ) from exc
+
+
+@dataclass
+class PostgresReconnector(_DbReconnector):
+    """Reconnector for PostgreSQL (psycopg2/psycopg3)."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        database = self.details.get("database", "")
+        addr = f"{host}:{port}" if port else host
+        return f"PostgresReconnector({addr}, db={database})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        dsn: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to PostgreSQL.
+        
+        Args:
+            host: Database host
+            port: Database port
+            user: Username
+            password: Password
+            database: Database name
+            dsn: Connection string (alternative to individual params)
+            **kwargs: Additional connection parameters
+        """
+        # Merge with stored details (explicit args override)
+        params: Dict[str, Any] = {}
+        for key in ("host", "port", "user", "password", "database"):
+            stored = self._get(key)
+            if stored is not None:
+                params[key] = stored
+        if host is not None:
+            params["host"] = host
+        if port is not None:
+            params["port"] = port
+        if user is not None:
+            params["user"] = user
+        if password is not None:
+            params["password"] = password
+        if database is not None:
+            params["database"] = database
+        params.update(kwargs)
+        
+        conn_dsn = dsn or self._get("dsn", "url")
+        
+        try:
+            psycopg2 = self._import("psycopg2")
+            return psycopg2.connect(conn_dsn, **params) if conn_dsn else psycopg2.connect(**params)
+        except NetworkSerializationError:
+            psycopg = self._import("psycopg")
+            return psycopg.connect(conn_dsn, **params) if conn_dsn else psycopg.connect(**params)
+
+
+@dataclass
+class MySQLReconnector(_DbReconnector):
+    """Reconnector for MySQL/MariaDB (pymysql, mysql-connector, mariadb)."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        database = self.details.get("database", "")
+        addr = f"{host}:{port}" if port else host
+        return f"MySQLReconnector({addr}, db={database})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to MySQL/MariaDB.
+        
+        Args:
+            host: Database host
+            port: Database port
+            user: Username
+            password: Password
+            database: Database name
+            **kwargs: Additional connection parameters
+        """
+        params: Dict[str, Any] = {}
+        for key in ("host", "port", "user", "password", "database"):
+            stored = self._get(key)
+            if stored is not None:
+                params[key] = stored
+        if host is not None:
+            params["host"] = host
+        if port is not None:
+            params["port"] = port
+        if user is not None:
+            params["user"] = user
+        if password is not None:
+            params["password"] = password
+        if database is not None:
+            params["database"] = database
+        params.update(kwargs)
+        
+        try:
+            pymysql = self._import("pymysql")
+            return pymysql.connect(**params)
+        except NetworkSerializationError:
+            pass
+        try:
+            mysql_connector = self._import("mysql.connector")
+            return mysql_connector.connect(**params)
+        except NetworkSerializationError:
+            mariadb = self._import("mariadb")
+            return mariadb.connect(**params)
+
+
+@dataclass
+class SQLiteReconnector(_DbReconnector):
+    """Reconnector for SQLite."""
+    
+    def __repr__(self) -> str:
+        path = self.details.get("path", self.details.get("database", ":memory:"))
+        return f"SQLiteReconnector({path})"
+    
+    def reconnect(self, path: str | None = None, **kwargs) -> Any:
+        """
+        Reconnect to SQLite.
+        
+        Args:
+            path: Path to database file (or ":memory:")
+            **kwargs: Additional connection parameters
+        """
+        sqlite3 = self._import("sqlite3")
+        db_path = path or self._get("path", "database") or ":memory:"
+        return sqlite3.connect(db_path, **kwargs)
+
+
+@dataclass
+class MongoReconnector(_DbReconnector):
+    """Reconnector for MongoDB (pymongo)."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        addr = f"{host}:{port}" if port else host
+        return f"MongoReconnector({addr})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        authSource: str | None = None,
+        uri: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to MongoDB.
+        
+        Args:
+            host: Database host
+            port: Database port
+            username: Username
+            password: Password
+            authSource: Authentication database
+            uri: Connection URI (alternative to individual params)
+            **kwargs: Additional connection parameters
+        """
+        pymongo = self._import("pymongo")
+        
+        conn_uri = uri or self._get("uri", "url")
+        if conn_uri:
+            return pymongo.MongoClient(conn_uri, **kwargs)
+        
+        params: Dict[str, Any] = {}
+        if (h := host or self._get("host")) is not None:
+            params["host"] = h
+        if (p := port or self._get("port")) is not None:
+            params["port"] = p
+        if (u := username or self._get("username", "user")) is not None:
+            params["username"] = u
+        if (pw := password or self._get("password")) is not None:
+            params["password"] = pw
+        if (auth := authSource or self._get("authSource", "auth_source")) is not None:
+            params["authSource"] = auth
+        params.update(kwargs)
+        
+        return pymongo.MongoClient(**params) if params else pymongo.MongoClient()
+
+
+@dataclass
+class RedisReconnector(_DbReconnector):
+    """Reconnector for Redis."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        db = self.details.get("db", 0)
+        addr = f"{host}:{port}" if port else host
+        return f"RedisReconnector({addr}, db={db})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        password: str | None = None,
+        db: int | None = None,
+        url: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Redis.
+        
+        Args:
+            host: Redis host
+            port: Redis port
+            password: Password
+            db: Database number
+            url: Connection URL (alternative to individual params)
+            **kwargs: Additional connection parameters
+        """
+        redis_mod = self._import("redis")
+        
+        conn_url = url or self._get("url", "uri")
+        if conn_url:
+            return redis_mod.from_url(conn_url, **kwargs)
+        
+        params = dict(self.details.get("connection_kwargs", {}))
+        if (h := host or self._get("host")) is not None:
+            params["host"] = h
+        if (p := port or self._get("port")) is not None:
+            params["port"] = p
+        if (pw := password or self._get("password")) is not None:
+            params["password"] = pw
+        if (d := db if db is not None else self._get("db")) is not None:
+            params["db"] = d
+        params.update(kwargs)
+        
+        return redis_mod.Redis(**params)
+
+
+@dataclass
+class SQLAlchemyReconnector(_DbReconnector):
+    """Reconnector for SQLAlchemy."""
+    
+    def __repr__(self) -> str:
+        url = self.details.get("url", "")
+        if url:
+            # Mask password in repr
+            return f"SQLAlchemyReconnector({url[:30]}...)" if len(url) > 30 else f"SQLAlchemyReconnector({url})"
+        driver = self.details.get("driver", "")
+        host = self.details.get("host", "")
+        return f"SQLAlchemyReconnector({driver}://{host})"
+    
+    def reconnect(
+        self,
+        url: str | None = None,
+        driver: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to SQLAlchemy engine.
+        
+        Args:
+            url: Full connection URL
+            driver: Driver name (e.g., "postgresql", "mysql+pymysql")
+            host: Database host
+            port: Database port
+            user: Username
+            password: Password
+            database: Database name
+            **kwargs: Additional engine parameters
+        """
+        sqlalchemy = self._import("sqlalchemy")
+        
+        conn_url = url or self._get("url", "uri", "dsn")
+        if conn_url:
+            engine = sqlalchemy.create_engine(conn_url, **kwargs)
+            return engine.connect()
+        
+        # Build URL from params
+        from sqlalchemy.engine import URL
+        url_obj = URL.create(
+            drivername=driver or self._get("driver", "drivername") or "postgresql",
+            username=user or self._get("user", "username"),
+            password=password or self._get("password"),
+            host=host or self._get("host"),
+            port=port or self._get("port"),
+            database=database or self._get("database", "db"),
+        )
+        engine = sqlalchemy.create_engine(url_obj, **kwargs)
+        return engine.connect()
+
+
+@dataclass
+class CassandraReconnector(_DbReconnector):
+    """Reconnector for Cassandra."""
+    
+    def __repr__(self) -> str:
+        hosts = self.details.get("contact_points", [])
+        keyspace = self.details.get("keyspace", "")
+        return f"CassandraReconnector({hosts}, keyspace={keyspace})"
+    
+    def reconnect(
+        self,
+        contact_points: list | None = None,
+        port: int | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        keyspace: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Cassandra.
+        
+        Args:
+            contact_points: List of hosts
+            port: Cassandra port
+            username: Username
+            password: Password
+            keyspace: Keyspace to connect to
+            **kwargs: Additional cluster parameters
+        """
+        cassandra_cluster = self._import("cassandra.cluster")
+        
+        cluster_kwargs: Dict[str, Any] = {}
+        hosts = contact_points or self._get("contact_points", "hosts", "nodes")
+        if hosts:
+            cluster_kwargs["contact_points"] = hosts
+        if (p := port or self._get("port")) is not None:
+            cluster_kwargs["port"] = p
+        
+        # Auth
+        user = username or self._get("username", "user")
+        pw = password or self._get("password")
+        if user is not None and pw is not None:
+            try:
+                from cassandra.auth import PlainTextAuthProvider
+                cluster_kwargs["auth_provider"] = PlainTextAuthProvider(username=user, password=pw)
+            except ImportError:
+                pass
+        
+        cluster_kwargs.update(kwargs)
+        cluster = cassandra_cluster.Cluster(**cluster_kwargs) if cluster_kwargs else cassandra_cluster.Cluster()
+        ks = keyspace or self.details.get("keyspace")
+        return cluster.connect(ks) if ks else cluster.connect()
+
+
+@dataclass
+class ElasticsearchReconnector(_DbReconnector):
+    """Reconnector for Elasticsearch."""
+    
+    def __repr__(self) -> str:
+        hosts = self.details.get("hosts", [])
+        return f"ElasticsearchReconnector({hosts})"
+    
+    def reconnect(
+        self,
+        hosts: list | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        api_key: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Elasticsearch.
+        
+        Args:
+            hosts: List of hosts
+            user: Username (for http_auth)
+            password: Password (for http_auth)
+            api_key: API key (alternative to user/password)
+            **kwargs: Additional client parameters
+        """
+        elasticsearch = self._import("elasticsearch")
+        
+        es_kwargs: Dict[str, Any] = {}
+        h = hosts or self._get("hosts") or []
+        if not h:
+            url = self._get("url", "uri")
+            if url:
+                h = [url]
+        if h:
+            es_kwargs["hosts"] = h
+        
+        # Auth
+        http_auth = self.details.get("http_auth")
+        if http_auth is not None:
+            es_kwargs["http_auth"] = http_auth
+        elif (u := user or self._get("user", "username")) and (p := password or self._get("password")):
+            es_kwargs["http_auth"] = (u, p)
+        
+        if (key := api_key or self._get("api_key")) is not None:
+            es_kwargs["api_key"] = key
+        
+        es_kwargs.update(kwargs)
+        return elasticsearch.Elasticsearch(**es_kwargs)
+
+
+@dataclass
+class Neo4jReconnector(_DbReconnector):
+    """Reconnector for Neo4j."""
+    
+    def __repr__(self) -> str:
+        uri = self.details.get("uri", "")
+        if not uri:
+            host = self.details.get("host", "localhost")
+            port = self.details.get("port", 7687)
+            uri = f"bolt://{host}:{port}"
+        return f"Neo4jReconnector({uri})"
+    
+    def reconnect(
+        self,
+        uri: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        scheme: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Neo4j.
+        
+        Args:
+            uri: Connection URI
+            user: Username
+            password: Password
+            host: Host (if uri not provided)
+            port: Port (if uri not provided)
+            scheme: Scheme like "bolt" (if uri not provided)
+            **kwargs: Additional driver parameters
+        """
+        neo4j = self._import("neo4j")
+        
+        conn_uri = uri or self._get("uri", "url")
+        if not conn_uri:
+            h = host or self._get("host") or "localhost"
+            p = port or self._get("port") or 7687
+            s = scheme or self._get("scheme") or "bolt"
+            conn_uri = f"{s}://{h}:{p}"
+        
+        neo4j_kwargs: Dict[str, Any] = {}
+        u = user or self._get("user", "username")
+        pw = password or self._get("password")
+        if u is not None and pw is not None:
+            neo4j_kwargs["auth"] = (u, pw)
+        
+        if (enc := self.details.get("encrypted")) is not None:
+            neo4j_kwargs["encrypted"] = enc
+        
+        neo4j_kwargs.update(kwargs)
+        return neo4j.GraphDatabase.driver(conn_uri, **neo4j_kwargs)
+
+
+@dataclass
+class InfluxDBReconnector(_DbReconnector):
+    """Reconnector for InfluxDB (v1 and v2)."""
+    
+    def __repr__(self) -> str:
+        url = self.details.get("url", "")
+        if not url:
+            host = self.details.get("host", "localhost")
+            port = self.details.get("port", 8086)
+            url = f"http://{host}:{port}"
+        return f"InfluxDBReconnector({url})"
+    
+    def reconnect(
+        self,
+        url: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        token: str | None = None,
+        org: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to InfluxDB.
+        
+        Args:
+            url: InfluxDB URL
+            host: Host (if url not provided)
+            port: Port (if url not provided)
+            token: Auth token (v2)
+            org: Organization (v2)
+            **kwargs: Additional client parameters
+        """
+        # Try v1 first
+        try:
+            influxdb = self._import("influxdb")
+            params: Dict[str, Any] = {}
+            for key in ("host", "port", "user", "password", "database"):
+                if (v := self._get(key)) is not None:
+                    params[key] = v
+            if host is not None:
+                params["host"] = host
+            if port is not None:
+                params["port"] = port
+            params.update(kwargs)
+            return influxdb.InfluxDBClient(**params)
+        except NetworkSerializationError:
+            pass
+        
+        # v2
+        influxdb_client = self._import("influxdb_client")
+        conn_url = url or self._get("url", "uri")
+        if not conn_url:
+            h = host or self._get("host") or "localhost"
+            p = port or self._get("port") or 8086
+            conn_url = f"http://{h}:{p}"
+        
+        influx_kwargs: Dict[str, Any] = {"url": conn_url}
+        if (t := token or self._get("token")) is not None:
+            influx_kwargs["token"] = t
+        if (o := org or self._get("org")) is not None:
+            influx_kwargs["org"] = o
+        if (timeout := self.details.get("timeout")) is not None:
+            influx_kwargs["timeout"] = timeout
+        if (verify := self.details.get("verify_ssl")) is not None:
+            influx_kwargs["verify_ssl"] = verify
+        
+        influx_kwargs.update(kwargs)
+        return influxdb_client.InfluxDBClient(**influx_kwargs)
+
+
+@dataclass
+class ODBCReconnector(_DbReconnector):
+    """Reconnector for ODBC (pyodbc)."""
+    
+    def __repr__(self) -> str:
+        driver = self.details.get("driver", "")
+        server = self.details.get("server", self.details.get("host", ""))
+        return f"ODBCReconnector({driver}, {server})"
+    
+    def reconnect(
+        self,
+        dsn: str | None = None,
+        driver: str | None = None,
+        server: str | None = None,
+        port: int | None = None,
+        database: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect via ODBC.
+        
+        Args:
+            dsn: Full DSN connection string
+            driver: ODBC driver name
+            server: Server address
+            port: Server port
+            database: Database name
+            user: Username
+            password: Password
+            **kwargs: Additional connection parameters
+        """
+        pyodbc = self._import("pyodbc")
+        
+        conn_dsn = dsn or self._get("dsn")
+        if conn_dsn:
+            return pyodbc.connect(conn_dsn, **kwargs)
+        
+        # Build connection string
+        parts = []
+        if (d := driver or self._get("driver")) is not None:
+            parts.append(f"DRIVER={{{d}}}")
+        if (s := server or self._get("server", "host")) is not None:
+            parts.append(f"SERVER={s}")
+        if (p := port or self._get("port")) is not None:
+            parts.append(f"PORT={p}")
+        if (db := database or self._get("database", "db")) is not None:
+            parts.append(f"DATABASE={db}")
+        if (u := user or self._get("user", "username", "uid")) is not None:
+            parts.append(f"UID={u}")
+        if (pw := password or self._get("password", "pwd")) is not None:
+            parts.append(f"PWD={pw}")
+        
+        if parts:
+            return pyodbc.connect(";".join(parts), **kwargs)
+        raise NetworkSerializationError("ODBC reconnect requires dsn or driver/server params")
+
+
+@dataclass 
+class ClickHouseReconnector(_DbReconnector):
+    """Reconnector for ClickHouse."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        addr = f"{host}:{port}" if port else host
+        return f"ClickHouseReconnector({addr})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to ClickHouse.
+        
+        Args:
+            host: ClickHouse host
+            port: ClickHouse port
+            user: Username
+            password: Password
+            database: Database name
+            **kwargs: Additional client parameters
+        """
+        clickhouse = self._import("clickhouse_driver")
+        
+        params: Dict[str, Any] = {}
+        for key in ("host", "port", "user", "password", "database"):
+            if (v := self._get(key)) is not None:
+                params[key] = v
+        if host is not None:
+            params["host"] = host
+        if port is not None:
+            params["port"] = port
+        if user is not None:
+            params["user"] = user
+        if password is not None:
+            params["password"] = password
+        if database is not None:
+            params["database"] = database
+        params.update(kwargs)
+        
+        return clickhouse.Client(**params)
+
+
+@dataclass
+class MSSQLReconnector(_DbReconnector):
+    """Reconnector for MSSQL (pymssql)."""
+    
+    def __repr__(self) -> str:
+        host = self.details.get("host", "")
+        port = self.details.get("port", "")
+        database = self.details.get("database", "")
+        addr = f"{host}:{port}" if port else host
+        return f"MSSQLReconnector({addr}, db={database})"
+    
+    def reconnect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to MSSQL.
+        
+        Args:
+            host: Server host
+            port: Server port
+            user: Username
+            password: Password
+            database: Database name
+            **kwargs: Additional connection parameters
+        """
+        pymssql = self._import("pymssql")
+        
+        params: Dict[str, Any] = {}
+        for key in ("host", "port", "user", "password", "database"):
+            if (v := self._get(key)) is not None:
+                params[key] = v
+        if host is not None:
+            params["host"] = host
+        if port is not None:
+            params["port"] = port
+        if user is not None:
+            params["user"] = user
+        if password is not None:
+            params["password"] = password
+        if database is not None:
+            params["database"] = database
+        params.update(kwargs)
+        
+        return pymssql.connect(**params)
+
+
+@dataclass
+class OracleReconnector(_DbReconnector):
+    """Reconnector for Oracle (oracledb/cx_Oracle)."""
+    
+    def __repr__(self) -> str:
+        dsn = self.details.get("dsn", "")
+        if not dsn:
+            host = self.details.get("host", "")
+            port = self.details.get("port", "")
+            service = self.details.get("service_name", "")
+            dsn = f"{host}:{port}/{service}" if host else ""
+        return f"OracleReconnector({dsn})"
+    
+    def reconnect(
+        self,
+        dsn: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        service_name: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Oracle.
+        
+        Args:
+            dsn: TNS name or Easy Connect string
+            host: Host (if dsn not provided)
+            port: Port (if dsn not provided)
+            service_name: Service name (if dsn not provided)
+            user: Username
+            password: Password
+            **kwargs: Additional connection parameters
+        """
+        try:
+            oracledb = self._import("oracledb")
+        except NetworkSerializationError:
+            oracledb = self._import("cx_Oracle")
+        
+        conn_dsn = dsn or self._get("dsn")
+        if not conn_dsn:
+            h = host or self._get("host")
+            p = port or self._get("port")
+            s = service_name or self._get("service_name", "database")
+            if h and p and s:
+                conn_dsn = f"{h}:{p}/{s}"
+        
+        params: Dict[str, Any] = {}
+        if (u := user or self._get("user")) is not None:
+            params["user"] = u
+        if (pw := password or self._get("password")) is not None:
+            params["password"] = pw
+        params.update(kwargs)
+        
+        if conn_dsn:
+            return oracledb.connect(dsn=conn_dsn, **params)
+        return oracledb.connect(**params)
+
+
+@dataclass
+class SnowflakeReconnector(_DbReconnector):
+    """Reconnector for Snowflake."""
+    
+    def __repr__(self) -> str:
+        account = self.details.get("account", "")
+        database = self.details.get("database", "")
+        return f"SnowflakeReconnector({account}, db={database})"
+    
+    def reconnect(
+        self,
+        user: str | None = None,
+        password: str | None = None,
+        account: str | None = None,
+        warehouse: str | None = None,
+        database: str | None = None,
+        schema: str | None = None,
+        **kwargs
+    ) -> Any:
+        """
+        Reconnect to Snowflake.
+        
+        Args:
+            user: Username
+            password: Password
+            account: Snowflake account
+            warehouse: Warehouse name
+            database: Database name
+            schema: Schema name
+            **kwargs: Additional connection parameters
+        """
+        snowflake = self._import("snowflake.connector")
+        
+        params: Dict[str, Any] = {}
+        for key in ("user", "password", "account", "warehouse", "database", "schema", "role"):
+            if (v := self._get(key)) is not None:
+                params[key] = v
+        if user is not None:
+            params["user"] = user
+        if password is not None:
+            params["password"] = password
+        if account is not None:
+            params["account"] = account
+        if warehouse is not None:
+            params["warehouse"] = warehouse
+        if database is not None:
+            params["database"] = database
+        if schema is not None:
+            params["schema"] = schema
+        params.update(kwargs)
+        
+        return snowflake.connect(**params)
+
+
+@dataclass
+class DuckDBReconnector(_DbReconnector):
+    """Reconnector for DuckDB."""
+    
+    def __repr__(self) -> str:
+        path = self.details.get("path", self.details.get("database", ":memory:"))
+        return f"DuckDBReconnector({path})"
+    
+    def reconnect(self, path: str | None = None, **kwargs) -> Any:
+        """
+        Reconnect to DuckDB.
+        
+        Args:
+            path: Path to database file (or ":memory:")
+            **kwargs: Additional connection parameters
+        """
+        duckdb = self._import("duckdb")
+        db_path = path or self._get("path", "database") or ":memory:"
+        return duckdb.connect(db_path, **kwargs)
+
+
+# Legacy alias for backwards compatibility
+DbReconnector = _DbReconnector
+
+
+def _create_db_reconnector(module: str, class_name: str, details: Dict[str, Any]) -> _DbReconnector:
+    """
+    Factory function to create the appropriate reconnector type based on module/class.
+    """
+    module_lower = module.lower()
+    class_lower = class_name.lower()
+    
+    if "psycopg" in module_lower or "postgres" in module_lower:
+        return PostgresReconnector(details=details)
+    if "mysql" in module_lower or "pymysql" in module_lower or "mariadb" in module_lower:
+        return MySQLReconnector(details=details)
+    if "sqlite" in module_lower:
+        return SQLiteReconnector(details=details)
+    if "pymongo" in module_lower or "mongo" in class_lower:
+        return MongoReconnector(details=details)
+    if "redis" in module_lower:
+        return RedisReconnector(details=details)
+    if "sqlalchemy" in module_lower or "engine" in class_lower:
+        return SQLAlchemyReconnector(details=details)
+    if "cassandra" in module_lower:
+        return CassandraReconnector(details=details)
+    if "elasticsearch" in module_lower:
+        return ElasticsearchReconnector(details=details)
+    if "neo4j" in module_lower:
+        return Neo4jReconnector(details=details)
+    if "influxdb" in module_lower:
+        return InfluxDBReconnector(details=details)
+    if "pyodbc" in module_lower or "odbc" in module_lower:
+        return ODBCReconnector(details=details)
+    if "clickhouse" in module_lower:
+        return ClickHouseReconnector(details=details)
+    if "mssql" in module_lower or "pymssql" in module_lower:
+        return MSSQLReconnector(details=details)
+    if "oracle" in module_lower or "oracledb" in module_lower or "cx_oracle" in module_lower:
+        return OracleReconnector(details=details)
+    if "snowflake" in module_lower:
+        return SnowflakeReconnector(details=details)
+    if "duckdb" in module_lower:
+        return DuckDBReconnector(details=details)
+    
+    # Fallback to base class
+    return _DbReconnector(details=details)
 
 
 class HTTPSessionHandler(Handler):
@@ -59,35 +971,35 @@ class HTTPSessionHandler(Handler):
         - cert: Client certificate path
         - max_redirects: Maximum number of redirects
         
-        Note: We serialize configuration, not active connections.
+        NOTE: We serialize configuration, not active connections.
         Connection pools are recreated fresh in the target process.
         """
-        # Extract cookies
+        # extract cookies
         cookies = {}
         if hasattr(obj, 'cookies'):
             try:
                 cookies = dict(obj.cookies)
             except (TypeError, AttributeError):
-                # Cookies not convertible to dict - use empty
+                # cookies not convertible to dict - use empty
                 cookies = {}
             except Exception as e:
-                # Unexpected error extracting cookies - log and use empty
+                # unexpected error extracting cookies - log and use empty
                 import warnings
                 warnings.warn(f"Failed to extract HTTP session cookies: {e}")
                 cookies = {}
         
-        # Extract headers
+        # extract headers
         headers = dict(obj.headers) if hasattr(obj, 'headers') else {}
         
-        # Extract auth (might be tuple or auth object)
+        # extract auth (might be tuple or auth object)
         auth = obj.auth if hasattr(obj, 'auth') else None
         
-        # Extract other settings
+        # extract other settings
         proxies = dict(obj.proxies) if hasattr(obj, 'proxies') else {}
         verify = obj.verify if hasattr(obj, 'verify') else True
         cert = obj.cert if hasattr(obj, 'cert') else None
         
-        # Get redirect settings
+        # get redirect settings
         max_redirects = 30  # default
         if hasattr(obj, 'max_redirects'):
             max_redirects = obj.max_redirects
@@ -114,17 +1026,17 @@ class HTTPSessionHandler(Handler):
                 "Install it with: pip install requests"
             )
         
-        # Create new session
+        # create new session
         session = requests.Session()
         
-        # Apply configuration
+        # apply configuration
         session.headers.update(state["headers"])
         
-        # Set cookies
+        # set cookies
         for name, value in state["cookies"].items():
             session.cookies.set(name, value)
         
-        # Set other properties
+        # set other properties
         session.auth = state["auth"]
         session.proxies = state["proxies"]
         session.verify = state["verify"]
@@ -161,49 +1073,86 @@ class SocketHandler(Handler):
         - proto: Protocol number
         - timeout: Socket timeout
         - blocking: Whether socket is blocking
+        - local_addr: Address from getsockname() when available
+        - remote_addr: Address from getpeername() when connected
         
         We DON'T capture:
-        - The actual connection
-        - Remote address
         - Buffer contents
         
-        User must reconnect after deserialization.
+        We attempt a best-effort reconnect when possible.
         """
+        local_addr = None
+        remote_addr = None
+        try:
+            local_addr = obj.getsockname()
+        except OSError:
+            local_addr = None
+        try:
+            remote_addr = obj.getpeername()
+        except OSError:
+            remote_addr = None
         return {
             "family": obj.family.value if hasattr(obj.family, 'value') else obj.family,
             "type": obj.type.value if hasattr(obj.type, 'value') else obj.type,
             "proto": obj.proto,
             "timeout": obj.gettimeout(),
             "blocking": obj.getblocking(),
+            "local_addr": local_addr,
+            "remote_addr": remote_addr,
         }
     
-    def reconstruct(self, state: Dict[str, Any]) -> socket.socket:
+    def reconstruct(self, state: Dict[str, Any]) -> Any:
         """
         Reconstruct socket.
         
-        Creates new unconnected socket with same properties.
-        User must call connect() or bind() as appropriate.
+        Returns a SocketReconnector and attempts to reconnect immediately.
         """
-        # Create new socket
+        reconnector = SocketReconnector(state=state)
+        try:
+            sock = reconnector.reconnect()
+            return sock if sock is not None else reconnector
+        except Exception:
+            return reconnector
+
+
+@dataclass
+class SocketReconnector(Reconnector):
+    """
+    Recreate a socket using stored configuration and addresses.
+    
+    .reconnect() creates a new socket, applies timeout/blocking, and
+    attempts best-effort bind/connect using saved local/remote addresses.
+    """
+    state: Dict[str, Any]
+    
+    def reconnect(self, **kwargs: Any) -> socket.socket:
+        state = self.state
         sock = socket.socket(
             family=state["family"],
             type=state["type"],
             proto=state["proto"]
         )
         
-        # Set timeout AFTER creating socket
-        # Note: setblocking(True) clears timeout to None, so we use settimeout()
-        # which properly sets both timeout and blocking mode together:
-        # - settimeout(None) = blocking with no timeout
-        # - settimeout(0) = non-blocking
-        # - settimeout(positive) = blocking with timeout
+        # set timeout AFTER creating socket
         timeout = state["timeout"]
         if timeout is not None:
             sock.settimeout(timeout)
         elif not state["blocking"]:
-            # Non-blocking with no timeout means timeout=0
             sock.settimeout(0)
-        # else: blocking with no timeout is the default
+        
+        local_addr = state.get("local_addr")
+        if local_addr:
+            try:
+                sock.bind(local_addr)
+            except OSError:
+                pass
+        
+        remote_addr = state.get("remote_addr")
+        if remote_addr:
+            try:
+                sock.connect(remote_addr)
+            except OSError:
+                pass
         
         return sock
 
@@ -217,6 +1166,8 @@ class DatabaseConnectionHandler(Handler):
     
     Strategy: Extract connection parameters for documentation purposes.
     Note: Actual reconnection requires passwords which we don't serialize for security.
+    
+    We intentionally do NOT store secrets (passwords, access tokens).
     """
     
     type_name = "db_connection"
@@ -230,9 +1181,33 @@ class DatabaseConnectionHandler(Handler):
         obj_type_name = type(obj).__name__.lower()
         obj_module = getattr(type(obj), '__module__', '').lower()
         
-        # Check for known database connection types
-        db_keywords = ['connection', 'client', 'redis', 'mongo']
-        db_modules = ['psycopg2', 'pymysql', 'pymongo', 'redis', 'mysql']
+        # check for known database connection types
+        db_keywords = [
+            'connection',
+            'client',
+            'engine',
+            'session',
+            'cursor',
+            'pool',
+            'redis',
+            'mongo',
+        ]
+        db_modules = [
+            'psycopg',
+            'psycopg2',
+            'pymysql',
+            'mysql',
+            'mariadb',
+            'sqlite',
+            'sqlalchemy',
+            'pymongo',
+            'redis',
+            'pyodbc',
+            'duckdb',
+            'oracledb',
+            'cx_oracle',
+            'snowflake',
+        ]
         
         has_db_keyword = any(kw in obj_type_name for kw in db_keywords)
         has_db_module = any(mod in obj_module for mod in db_modules)
@@ -246,37 +1221,135 @@ class DatabaseConnectionHandler(Handler):
         This is challenging because each database library has different
         attributes for connection parameters. We try common patterns.
         """
-        state = {
+        state: Dict[str, Any] = {
             "module": type(obj).__module__,
             "class_name": type(obj).__name__,
         }
         
-        # Try to extract connection parameters (varies by library)
-        # PostgreSQL (psycopg2)
+        def _set_if_value(key: str, value: Any) -> None:
+            if value is not None:
+                state[key] = value
+        
+        def _set_if_mapping(key: str, value: Any) -> None:
+            if isinstance(value, dict) and value:
+                state[key] = value
+        
+        def _scrub_secret(value: Any) -> Any:
+            if isinstance(value, dict):
+                cleaned = dict(value)
+                if 'password' in cleaned:
+                    cleaned['password'] = None
+                if 'passwd' in cleaned:
+                    cleaned['passwd'] = None
+                if 'token' in cleaned:
+                    cleaned['token'] = None
+                return cleaned
+            return value
+
+        def _sqlite_path_from_connection(connection: Any) -> Optional[str]:
+            try:
+                cursor = connection.execute("PRAGMA database_list")
+                row = cursor.fetchone()
+                if row and len(row) >= 3:
+                    return row[2] or None
+            except Exception:
+                return None
+            return None
+        
+        # generic attributes (many connectors expose these)
+        for attr_name, key in (
+            ('host', 'host'),
+            ('hostname', 'host'),
+            ('server', 'host'),
+            ('port', 'port'),
+            ('user', 'user'),
+            ('username', 'user'),
+            ('database', 'database'),
+            ('db', 'database'),
+            ('dbname', 'database'),
+        ):
+            if hasattr(obj, attr_name):
+                _set_if_value(key, getattr(obj, attr_name))
+        
+        # PostgreSQL (psycopg2/psycopg3)
         if hasattr(obj, 'info'):
             try:
-                state["host"] = obj.info.host
-                state["port"] = obj.info.port
-                state["dbname"] = obj.info.dbname
-                state["user"] = obj.info.user
+                _set_if_value("host", obj.info.host)
+                _set_if_value("port", obj.info.port)
+                _set_if_value("database", obj.info.dbname)
+                _set_if_value("user", obj.info.user)
             except (AttributeError, Exception):
                 pass
+        if hasattr(obj, 'get_dsn_parameters'):
+            try:
+                params = _scrub_secret(obj.get_dsn_parameters())
+                _set_if_mapping("dsn_parameters", params)
+            except Exception:
+                pass
+        if hasattr(obj, 'dsn'):
+            _set_if_value("dsn", _scrub_secret(getattr(obj, 'dsn')))
         
-        # MySQL (pymysql/mysql-connector)
-        if hasattr(obj, 'host'):
-            state["host"] = obj.host
-        if hasattr(obj, 'port'):
-            state["port"] = obj.port
-        if hasattr(obj, 'user'):
-            state["user"] = obj.user
-        if hasattr(obj, 'db') or hasattr(obj, 'database'):
-            state["database"] = getattr(obj, 'db', getattr(obj, 'database', None))
+        # MySQL (pymysql/mysql-connector/mariadb)
+        for attr_name, key in (
+            ('_host', 'host'),
+            ('_port', 'port'),
+            ('_user', 'user'),
+            ('_database', 'database'),
+        ):
+            if hasattr(obj, attr_name):
+                _set_if_value(key, getattr(obj, attr_name))
+        
+        # SQLite
+        for attr_name in ('database', 'db', 'path', 'filename', 'file'):
+            if hasattr(obj, attr_name):
+                _set_if_value("path", getattr(obj, attr_name))
+                break
+        if "sqlite" in state["module"]:
+            path = _sqlite_path_from_connection(obj)
+            if path:
+                _set_if_value("path", path)
+        
+        # SQLAlchemy Engine/Connection
+        sqlalchemy_url = None
+        if hasattr(obj, 'engine') and hasattr(obj.engine, 'url'):
+            sqlalchemy_url = obj.engine.url
+        elif hasattr(obj, 'url'):
+            sqlalchemy_url = obj.url
+        if sqlalchemy_url is not None:
+            try:
+                _set_if_value("drivername", getattr(sqlalchemy_url, 'drivername', None))
+                _set_if_value("host", getattr(sqlalchemy_url, 'host', None))
+                _set_if_value("port", getattr(sqlalchemy_url, 'port', None))
+                _set_if_value("database", getattr(sqlalchemy_url, 'database', None))
+                _set_if_value("user", getattr(sqlalchemy_url, 'username', None))
+                if hasattr(sqlalchemy_url, 'query'):
+                    _set_if_mapping("query", dict(sqlalchemy_url.query))
+                if hasattr(sqlalchemy_url, 'render_as_string'):
+                    _set_if_value("url", sqlalchemy_url.render_as_string(hide_password=True))
+                else:
+                    _set_if_value("url", str(sqlalchemy_url))
+            except Exception:
+                pass
         
         # Redis
         if hasattr(obj, 'connection_pool'):
             pool = obj.connection_pool
             if hasattr(pool, 'connection_kwargs'):
-                state["connection_kwargs"] = pool.connection_kwargs
+                _set_if_mapping("connection_kwargs", _scrub_secret(pool.connection_kwargs))
+        
+        # PyMongo
+        if hasattr(obj, 'address'):
+            try:
+                _set_if_value("address", obj.address)
+            except Exception:
+                pass
+        if hasattr(obj, 'nodes'):
+            try:
+                nodes = list(obj.nodes)
+                if nodes:
+                    state["nodes"] = nodes
+            except Exception:
+                pass
         
         return state
     
@@ -284,8 +1357,9 @@ class DatabaseConnectionHandler(Handler):
         """
         Reconstruct database connection.
         
-        This is not implemented for security reasons - database passwords
-        should not be serialized. Users should:
+        This returns a DbConnectionInfo object instead of a live connection,
+        because passwords/tokens are not serialized for security reasons.
+        Users should:
         1. Use custom __serialize__/__deserialize__ methods on their database wrapper class
         2. Store connection config separately and reconnect manually
         3. Use connection pools that handle reconnection automatically
@@ -293,10 +1367,15 @@ class DatabaseConnectionHandler(Handler):
         For internal multiprocessing use, consider passing connection parameters
         separately and having each process create its own connection.
         """
-        raise NetworkSerializationError(
-            f"Cannot automatically reconstruct {state['class_name']} connection. "
-            f"Database passwords are not serialized for security reasons. "
-            f"For multiprocessing, each process should create its own database connection. "
-            f"You can implement custom __serialize__/__deserialize__ methods if needed."
-        )
+        details = dict(state)
+        module = str(details.pop("module", "unknown"))
+        class_name = str(details.pop("class_name", "unknown"))
+        reconnector = _create_db_reconnector(module, class_name, details)
+        try:
+            return reconnector.reconnect()
+        except NetworkSerializationError:
+            return reconnector
+        except Exception:
+            return reconnector
+
 

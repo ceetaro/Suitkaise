@@ -40,7 +40,7 @@ from .queue_handler import (
 )
 
 # Regex handler (40% importance)
-from .regex_handler import RegexPatternHandler, MatchObjectHandler
+from .regex_handler import RegexPatternHandler, MatchObjectHandler, MatchReconnector
 
 # SQLite handlers (30% + cursors 15%)
 from .sqlite_handler import (
@@ -59,7 +59,10 @@ from .network_handler import (
     HTTPSessionHandler,
     SocketHandler,
     DatabaseConnectionHandler,
+    DbReconnector,
+    SocketReconnector,
 )
+from .reconnector import Reconnector
 
 # Iterator handlers (10%)
 from .iterator_handler import (
@@ -83,6 +86,7 @@ from .threading_handler import (
     ThreadPoolExecutorHandler,
     ProcessPoolExecutorHandler,
     ThreadLocalHandler,
+    ThreadReconnector,
 )
 
 # Pipe handlers (6% + 4%)
@@ -90,12 +94,14 @@ from .pipe_handler import (
     OSPipeHandler,
     MultiprocessingPipeHandler,
     MultiprocessingManagerHandler,
+    PipeReconnector,
 )
 
 # Advanced handlers (2% each)
 from .advanced_py_handler import (
     CodeObjectHandler,
     FrameObjectHandler,
+    FrameInfo,
     PropertyHandler,
     DescriptorHandler,
 )
@@ -136,6 +142,7 @@ from .context_manager_handler import (
 from .subprocess_handler import (
     PopenHandler,
     CompletedProcessHandler,
+    SubprocessReconnector,
 )
 
 # Async handlers
@@ -192,6 +199,7 @@ __all__ = [
     
     # Regex
     'RegexPatternHandler',
+    'MatchReconnector',
     
     # SQLite
     'SQLiteConnectionHandler',
@@ -201,6 +209,9 @@ __all__ = [
     'HTTPSessionHandler',
     'SocketHandler',
     'DatabaseConnectionHandler',
+    'DbReconnector',
+    'SocketReconnector',
+    'Reconnector',
     
     # Iterators
     'IteratorHandler',
@@ -219,15 +230,18 @@ __all__ = [
     'ThreadPoolExecutorHandler',
     'ProcessPoolExecutorHandler',
     'ThreadLocalHandler',
+    'ThreadReconnector',
     
     # Pipes
     'OSPipeHandler',
     'MultiprocessingPipeHandler',
     'MultiprocessingManagerHandler',
+    'PipeReconnector',
     
     # Advanced
     'CodeObjectHandler',
     'FrameObjectHandler',
+    'FrameInfo',
     'PropertyHandler',
     'DescriptorHandler',
     'ContextVarHandler',
@@ -259,6 +273,7 @@ __all__ = [
     # Subprocess
     'PopenHandler',
     'CompletedProcessHandler',
+    'SubprocessReconnector',
     
     # Async
     'CoroutineHandler',
@@ -314,9 +329,6 @@ ALL_HANDLERS = [
     
     # HTTP Sessions
     HTTPSessionHandler(),
-    
-    # Database connections
-    DatabaseConnectionHandler(),
     
     # Events
     EventHandler(),
@@ -413,6 +425,9 @@ ALL_HANDLERS = [
     
     # Modules
     ModuleHandler(),
+    
+    # Database connections (generic, after specific handlers)
+    DatabaseConnectionHandler(),
     
     # Class objects (classes themselves)
     ClassObjectHandler(),

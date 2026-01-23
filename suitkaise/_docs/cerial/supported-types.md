@@ -239,7 +239,7 @@ Cerial handles the container; contents are recursively serialized.
 ## Advanced Python Internals
 
 - `types.CodeType`
-- `types.FrameType`
+- `types.FrameType` (see [Partial Support](#partial-support))
 - `property`
 - Custom descriptors
 - File descriptors
@@ -288,6 +288,51 @@ obj.next = obj  # self-referential object
 
 # both serialize correctly
 ```
+
+---
+
+## Partial Support
+
+Types that can be serialized but have reconstruction limitations.
+
+### `types.FrameType`
+
+Frame objects can be **serialized** but cannot be **reconstructed as actual frames**.
+
+**Why:** Python doesn't expose a `FrameType` constructor. Frames are created internally by the interpreter during function execution and are tied to the call stack, thread state, and bytecode execution.
+
+**What happens:** On reconstruction, cerial returns a `FrameInfo` dataclass instead of a frame object.
+
+```python
+from suitkaise.cerial import serialize, deserialize
+from suitkaise.cerial._int.handlers import FrameInfo
+import inspect
+
+# Serialize a frame
+frame = inspect.currentframe()
+data = serialize(frame)
+
+# Deserialize returns FrameInfo, not a frame
+result = deserialize(data)
+assert isinstance(result, FrameInfo)
+
+# FrameInfo contains all useful frame data
+print(result.filename)       # Source file
+print(result.function_name)  # Function name
+print(result.lineno)         # Line number
+print(result.locals)         # Local variables (serializable ones)
+print(result.code)           # Code object (fully reconstructed)
+print(result.parent)         # Parent frame info (call stack)
+```
+
+**Use cases that work:**
+- Debugging and error reporting
+- Logging stack traces
+- Saving execution context for analysis
+
+**Use cases that don't work:**
+- Resuming execution from a serialized frame
+- Using the result with `traceback` module functions that expect real frames
 
 ---
 

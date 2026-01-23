@@ -38,19 +38,19 @@ class IteratorHandler(Handler):
         We check for common iterator types: enumerate, zip, filter, map, etc.
         We avoid handling generator objects here (they have their own handler).
         """
-        # Check if it has iterator protocol
+        # check if it has iterator protocol
         if not hasattr(obj, '__iter__') or not hasattr(obj, '__next__'):
             return False
         
-        # Check type name
+        # check type name
         obj_type_name = type(obj).__name__
         
-        # Handle known iterator types
+        # handle known iterator types
         known_iterators = ['enumerate', 'zip', 'filter', 'map', 'reversed', 
                           'range_iterator', 'list_iterator', 'tuple_iterator',
                           'dict_keyiterator', 'dict_valueiterator', 'dict_itemiterator']
         
-        # Don't handle generator objects (they have separate handler)
+        # don't handle generator objects (they have separate handler)
         if isinstance(obj, types.GeneratorType):
             return False
         
@@ -69,31 +69,31 @@ class IteratorHandler(Handler):
         """
         obj_type_name = type(obj).__name__
         
-        # Exhaust iterator to get remaining values
+        # exhaust iterator to get remaining values
         remaining_values = []
         try:
-            # Limit to prevent infinite iterators from causing issues
+            # limit to prevent infinite iterators from causing issues
             max_items = 100000
             for i, item in enumerate(obj):
                 if i >= max_items:
-                    # Iterator too long, can't serialize
+                    # iterator too long, can't serialize
                     raise ValueError(f"Iterator has more than {max_items} items, cannot serialize")
                 remaining_values.append(item)
         except Exception as e:
-            # Some iterators might fail to serialize
+            # some iterators might fail to serialize
             pass
         
-        # Try to extract iterator parameters (varies by type)
+        # try to extract iterator parameters (varies by type)
         params = {}
         
-        # For enumerate, try to get start value
+        # for enumerate, try to get start value
         if obj_type_name == 'enumerate':
-            # Can't extract start value after creation, default to 0
+            # can't extract start value after creation, default to 0
             params['start'] = len(remaining_values)
         
         return {
             "type_name": obj_type_name,
-            "remaining_values": remaining_values,  # Will be recursively serialized
+            "remaining_values": remaining_values,  # will be recursively serialized
             "params": params,
         }
     
@@ -105,8 +105,8 @@ class IteratorHandler(Handler):
         Note: We can't perfectly recreate the original iterator,
         but we can create one with the same remaining values.
         """
-        # Simply create an iterator over the remaining values
-        # This is the best we can do - the original iterator type
+        # simply create an iterator over the remaining values
+        # this is the best we can do - the original iterator type
         # might not be reconstructible with the same parameters
         return iter(state["remaining_values"])
 
@@ -163,10 +163,10 @@ class EnumerateHandler(Handler):
         We exhaust the enumerate and capture:
         - Remaining (index, value) pairs
         """
-        remaining = list(obj)  # Exhausts the enumerate
+        remaining = list(obj)  # exhausts the enumerate
         
         return {
-            "remaining": remaining,  # List of (index, value) tuples
+            "remaining": remaining,  # list of (index, value) tuples
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -197,10 +197,10 @@ class ZipHandler(Handler):
         
         We exhaust the zip and capture remaining tuples.
         """
-        remaining = list(obj)  # Exhausts the zip
+        remaining = list(obj)  # exhausts the zip
         
         return {
-            "remaining": remaining,  # List of tuples
+            "remaining": remaining,  # list of tuples
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:

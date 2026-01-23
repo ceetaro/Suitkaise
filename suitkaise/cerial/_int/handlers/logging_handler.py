@@ -49,8 +49,8 @@ class LoggerHandler(Handler):
         return {
             "name": obj.name,
             "level": obj.level,
-            "handlers": list(obj.handlers),  # Will be recursively serialized
-            "filters": list(obj.filters),    # Will be recursively serialized
+            "handlers": list(obj.handlers),  # will be recursively serialized
+            "filters": list(obj.filters),    # will be recursively serialized
             "propagate": obj.propagate,
             "disabled": obj.disabled,
         }
@@ -65,22 +65,22 @@ class LoggerHandler(Handler):
         3. Set level and other properties
         4. Add handlers back (already deserialized by central serializer)
         """
-        # Get logger instance (singleton per name)
+        # get logger instance (singleton per name)
         logger = logging.getLogger(state["name"])
         
-        # Clear existing handlers to start fresh
+        # clear existing handlers to start fresh
         logger.handlers = []
         
-        # Restore configuration
+        # restore configuration
         logger.setLevel(state["level"])
         logger.propagate = state["propagate"]
         logger.disabled = state["disabled"]
         
-        # Add handlers (already reconstructed objects)
+        # add handlers (already reconstructed objects)
         for handler in state["handlers"]:
             logger.addHandler(handler)
         
-        # Add filters (already reconstructed objects)
+        # add filters (already reconstructed objects)
         for filter_obj in state["filters"]:
             logger.addFilter(filter_obj)
         
@@ -113,7 +113,7 @@ class StreamHandlerHandler(Handler):
         """
         return {
             "level": obj.level,
-            "formatter": obj.formatter,  # Will be recursively serialized
+            "formatter": obj.formatter,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> logging.StreamHandler:
@@ -123,7 +123,7 @@ class StreamHandlerHandler(Handler):
         Note: We use default stream (sys.stderr) since we can't serialize
         the stream itself. Most use cases just use the default anyway.
         """
-        handler = logging.StreamHandler()  # Uses sys.stderr by default
+        handler = logging.StreamHandler()  # uses sys.stderr by default
         handler.setLevel(state["level"])
         
         if state["formatter"]:
@@ -205,7 +205,7 @@ class FormatterHandler(Handler):
         - datefmt: Date format string
         - _style: Format style ('%', '{', or '$')
         """
-        # Determine style from _style object type
+        # determine style from _style object type
         style = '%'  # default
         if hasattr(obj, '_style'):
             style_class_name = obj._style.__class__.__name__

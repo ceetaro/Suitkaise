@@ -17,6 +17,31 @@ All further changes will be changes to 0.3.0 (or the most recent version once 0.
 
 As of version 0.3.0, the project is still unreleased.
 
+### Added
+- Expanded blocking call detection for common sync libraries (boto3, redis, pymongo, Kafka, Elasticsearch, etc.) with broader IO-aware heuristics.
+- Best-effort socket auto-reconnect that attempts bind/connect using saved local/remote addresses.
+- Base `Reconnector` class with consistent `.reconnect()` API for reconnection helpers.
+- Database-specific reconnector classes (`PostgresReconnector`, `MySQLReconnector`, `MongoReconnector`, `RedisReconnector`, etc.) with standard connection args.
+- SocketReconnector helper to recreate sockets with best-effort bind/connect.
+- PipeReconnector helper to recreate multiprocessing pipes and expose both ends.
+- SubprocessReconnector helper to restart Popen commands or inspect snapshots.
+- ThreadReconnector helper to rebuild threads from serialized metadata.
+- MatchReconnector helper to recreate regex Match objects when possible.
+- `cerial.reconnect_all(obj, **kwargs)` to recursively reconnect structures with optional credentials.
+- Robust database connection metadata extraction for common libraries (Postgres/MySQL/SQLite/Redis/Mongo/SQLAlchemy/ODBC and more).
+- `@auto_reconnect(**kwargs)` decorator for Skprocess to automatically reconnect resources after deserialization.
+- kwargs structure for `reconnect_all()` and `@auto_reconnect`: type-keyed dict with `"*"` defaults and attr-specific overrides.
+- Full auth/credential support in DbReconnector for MongoDB, Cassandra, Elasticsearch, OpenSearch, SQLAlchemy, ODBC, Neo4j, and InfluxDB v2.
+- Documentation for Reconnectors in `cerial` how-to-use and how-it-works.
+- Documentation for `@auto_reconnect` in `processing` how-to-use and how-it-works.
+
+### Changed
+- FrameType deserialization now returns `FrameInfo` metadata instead of raising (frames cannot be reconstructed).
+- File descriptor reconstruction is now best-effort when a path is available; still fails safely otherwise.
+- Database connection deserialization now auto-connects when enough non-secret info is present, otherwise returns a `DbReconnector`.
+- `reconnect_all()` now accepts `**kwargs` instead of `overrides` parameter for cleaner API.
+- All DbReconnector implementations now use consistent dict-based parameter passing for authentication.
+
 ## [0.3.0] - 2026-01-16
 
 ### Added

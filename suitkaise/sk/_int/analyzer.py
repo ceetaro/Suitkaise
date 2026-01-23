@@ -14,6 +14,7 @@ from typing import Dict, List, Set, Tuple, Any, Type
 
 
 # Known blocking calls that should be wrapped with to_thread()
+# NOTE: store lowercase entries and compare against lowercased call names.
 BLOCKING_CALLS: Set[str] = {
     # time module
     'time.sleep',
@@ -43,7 +44,7 @@ BLOCKING_CALLS: Set[str] = {
     'subprocess.call',
     'subprocess.check_call',
     'subprocess.check_output',
-    'subprocess.Popen',
+    'subprocess.popen',
     
     # requests library
     'requests.get',
@@ -55,13 +56,85 @@ BLOCKING_CALLS: Set[str] = {
     'requests.options',
     'requests.request',
     
+    # httpx
+    'httpx.get',
+    'httpx.post',
+    'httpx.put',
+    'httpx.delete',
+    'httpx.patch',
+    'httpx.head',
+    'httpx.options',
+    'httpx.request',
+    'httpx.stream',
+    
     # urllib
     'urllib.request.urlopen',
     'urlopen',
     
+    # urllib3
+    'urllib3.poolmanager.request',
+    'urllib3.connectionpool.request',
+    'urllib3.request',
+    
     # socket
     'socket.socket',
     'socket.create_connection',
+    
+    # pathlib file helpers
+    'pathlib.path.open',
+    'pathlib.path.read_text',
+    'pathlib.path.read_bytes',
+    'pathlib.path.write_text',
+    'pathlib.path.write_bytes',
+    
+    # shutil file ops
+    'shutil.copy',
+    'shutil.copy2',
+    'shutil.copyfile',
+    'shutil.copytree',
+    'shutil.move',
+    'shutil.rmtree',
+    
+    # database connectors (sync)
+    'sqlite3.connect',
+    'psycopg2.connect',
+    'psycopg.connect',
+    'pymysql.connect',
+    'mysql.connector.connect',
+    'mysqldb.connect',
+    'pyodbc.connect',
+    'duckdb.connect',
+    'pymssql.connect',
+    'oracledb.connect',
+    'cx_oracle.connect',
+    'snowflake.connector.connect',
+    
+    # redis helpers (sync)
+    'redis.from_url',
+    'redis.redis.from_url',
+    'redis.strictredis.from_url',
+    'redis.sentinel.sentinel',
+    
+    # pymongo client
+    'pymongo.mongoclient',
+    'pymongo.mongo_client.mongoclient',
+    
+    # boto3 client/resource factories
+    'boto3.client',
+    'boto3.resource',
+    'boto3.session.session.client',
+    'boto3.session.session.resource',
+    
+    # kafka-python / confluent-kafka / pika
+    'kafka.kafka_producer',
+    'kafka.kafkaconsumer',
+    'confluent_kafka.producer',
+    'confluent_kafka.consumer',
+    'pika.blockingconnection',
+    
+    # elasticsearch/opensearch clients
+    'elasticsearch.elasticsearch',
+    'opensearchpy.opensearch',
     
     # Database (common patterns)
     'cursor.execute',
@@ -101,7 +174,96 @@ BLOCKING_METHOD_PATTERNS: Set[str] = {
     'executemany',
     'commit',
     'rollback',
-    'acquire',  # Lock acquisition
+    'acquire',  # lock acquisition
+    
+    # pathlib helpers (instance methods)
+    'open',
+    'read_text',
+    'read_bytes',
+    'write_text',
+    'write_bytes',
+    
+    # boto3/s3 (common object ops)
+    'get_object',
+    'put_object',
+    'head_object',
+    'list_objects',
+    'list_objects_v2',
+    'delete_object',
+    'copy_object',
+    'upload_file',
+    'upload_fileobj',
+    'download_file',
+    'download_fileobj',
+    'list_buckets',
+    'create_bucket',
+    'delete_bucket',
+    
+    # boto3/dynamodb
+    'get_item',
+    'put_item',
+    'update_item',
+    'delete_item',
+    'batch_get_item',
+    'batch_write_item',
+    'query',
+    'scan',
+    
+    # boto3/sqs + sns
+    'send_message',
+    'receive_message',
+    'delete_message',
+    'publish',
+    'subscribe',
+    
+    # pymongo
+    'find',
+    'find_one',
+    'insert_one',
+    'insert_many',
+    'update_one',
+    'update_many',
+    'replace_one',
+    'delete_one',
+    'delete_many',
+    'aggregate',
+    'count_documents',
+    'distinct',
+    'bulk_write',
+    
+    # redis (blocking variants + streams)
+    'blpop',
+    'brpop',
+    'brpoplpush',
+    'bzpopmin',
+    'bzpopmax',
+    'xread',
+    'xreadgroup',
+    'get_message',
+    
+    # elasticsearch/opensearch
+    'search',
+    'index',
+    'bulk',
+    'msearch',
+    'delete_by_query',
+    'update_by_query',
+    
+    # kafka / rabbitmq
+    'produce',
+    'send',
+    'poll',
+    'flush',
+    'basic_publish',
+    'basic_consume',
+    'basic_get',
+    
+    # cassandra / neo4j / clickhouse / influxdb
+    'execute',
+    'run',
+    'query',
+    'write_points',
+    'write_api',
     
     # suitkaise patterns
     'map',      # Pool.map
@@ -109,6 +271,82 @@ BLOCKING_METHOD_PATTERNS: Set[str] = {
     'starmap',  # Pool.starmap
     'short',    # Circuit.short (may sleep)
     'trip',     # Circuit.trip (may sleep)
+}
+
+# Broad heuristics: only apply when the call name suggests I/O context.
+BROAD_BLOCKING_METHOD_PATTERNS: Set[str] = {
+    'get',
+    'set',
+    'find',
+    'insert',
+    'update',
+    'delete',
+    'query',
+    'scan',
+    'request',
+    'send',
+    'recv',
+    'read',
+    'write',
+    'execute',
+    'commit',
+    'rollback',
+}
+
+IO_CONTEXT_PARTS: Set[str] = {
+    # databases
+    'db',
+    'database',
+    'cursor',
+    'conn',
+    'connection',
+    'engine',
+    'session',
+    'pool',
+    'psycopg',
+    'postgres',
+    'mysql',
+    'sqlite',
+    'mongo',
+    'pymongo',
+    'redis',
+    'sqlalchemy',
+    'odbc',
+    'duckdb',
+    # cloud clients
+    'boto3',
+    'botocore',
+    's3',
+    'sqs',
+    'sns',
+    'dynamodb',
+    'kinesis',
+    'lambda',
+    # messaging/search
+    'kafka',
+    'rabbitmq',
+    'amqp',
+    'pika',
+    'elasticsearch',
+    'opensearch',
+    'search',
+    # data stores
+    'cassandra',
+    'neo4j',
+    'influx',
+    'influxdb',
+    'clickhouse',
+    # networking
+    'http',
+    'https',
+    'request',
+    'requests',
+    'httpx',
+    'urllib',
+    'socket',
+    'sock',
+    'client',
+    'channel',
 }
 
 
@@ -163,14 +401,25 @@ class _BlockingCallVisitor(ast.NodeVisitor):
         call_name = self._get_call_name(node)
         
         if call_name:
+            call_name_lower = call_name.lower()
+            parts = call_name_lower.split('.')
+            tail = parts[-1]
+            
             # Check if it's a known blocking call
-            if call_name in BLOCKING_CALLS:
+            if call_name_lower in BLOCKING_CALLS:
                 self.blocking_calls.append(call_name)
             else:
-                # Check for pattern matches (e.g., anything.sleep, anything.read)
-                parts = call_name.split('.')
-                if parts[-1] in BLOCKING_METHOD_PATTERNS:
+                # Check for specific blocking method names
+                if tail in BLOCKING_METHOD_PATTERNS:
                     self.blocking_calls.append(call_name)
+                # Broad heuristics: only when context suggests I/O
+                elif tail in BROAD_BLOCKING_METHOD_PATTERNS:
+                    has_io_context = any(
+                        any(context in part for context in IO_CONTEXT_PARTS)
+                        for part in parts
+                    )
+                    if has_io_context:
+                        self.blocking_calls.append(call_name)
         
         # Continue visiting children
         self.generic_visit(node)

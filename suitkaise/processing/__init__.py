@@ -39,6 +39,9 @@ from .api import (
     Skprocess,
     Pool,
     
+    # Decorators
+    auto_reconnect,
+    
     # Timers
     ProcessTimers,
     
@@ -63,6 +66,7 @@ __all__ = [
     'Process',
     'Pool',
     'Share',
+    'auto_reconnect',
     'ProcessTimers',
     'ProcessError',
     'PreRunError',

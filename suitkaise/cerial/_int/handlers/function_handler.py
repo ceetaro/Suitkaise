@@ -43,7 +43,7 @@ class FunctionHandler(Handler):
         """Check if object is a function (but not a lambda)."""
         if not isinstance(obj, types.FunctionType):
             return False
-        # Exclude lambdas - they have their own handler
+        # exclude lambdas - they have their own handler
         return obj.__name__ != '<lambda>'
     
     def _can_use_reference(self, func: types.FunctionType) -> bool:
@@ -60,35 +60,35 @@ class FunctionHandler(Handler):
         Returns:
             bool: True if reference serialization is safe
         """
-        # Must have module and qualname
+        # must have module and qualname
         module_name = getattr(func, '__module__', None)
         qualname = getattr(func, '__qualname__', None)
         if not module_name or not qualname:
             return False
         
-        # Can't import from __main__
+        # can't import from __main__
         if module_name == '__main__':
             return False
         
-        # Nested functions have '<locals>' in qualname
+        # nested functions have '<locals>' in qualname
         if '<locals>' in qualname:
             return False
         
-        # Closures have captured variables
+        # closures have captured variables
         if func.__closure__ is not None:
             return False
         
-        # Verify we can actually look it up and get the same function
+        # verify we can actually look it up and get the same function
         try:
             import importlib
             module = importlib.import_module(module_name)
             
-            # Navigate qualname (handles class methods like MyClass.method)
+            # navigate qualname (handles class methods like MyClass.method)
             obj = module
             for part in qualname.split('.'):
                 obj = getattr(obj, part)
             
-            # Must be the exact same function object
+            # must be the exact same function object
             if obj is not func:
                 return False
             
@@ -110,7 +110,7 @@ class FunctionHandler(Handler):
         - code, globals, name, defaults, etc.
         - serialization_type: "full"
         """
-        # Try reference-based serialization first (fast path)
+        # try reference-based serialization first (fast path)
         if self._can_use_reference(obj):
             return {
                 "serialization_type": "reference",
@@ -118,7 +118,7 @@ class FunctionHandler(Handler):
                 "qualname": obj.__qualname__,
             }
         
-        # Fall back to full serialization (slow path)
+        # fall back to full serialization (slow path)
         return self._extract_full_state(obj)
     
     def _extract_full_state(self, obj: types.FunctionType) -> Dict[str, Any]:
@@ -127,31 +127,31 @@ class FunctionHandler(Handler):
         
         Used when reference-based serialization isn't possible.
         """
-        # Get code object
+        # get code object
         code = obj.__code__
         
-        # Get only the globals that this function references
-        # This is important - we don't want to serialize the entire global namespace
+        # get only the globals that this function references
+        # this is important - we don't want to serialize the entire global namespace
         referenced_globals = {}
         for name in code.co_names:
             if name in obj.__globals__:
-                # Skip __builtins__ - it's a huge module (157+ items) that always 
+                # skip __builtins__ - it's a huge module (157+ items) that always 
                 # exists on the other end. We'll restore it during reconstruction.
                 if name == '__builtins__':
                     continue
                 try:
                     referenced_globals[name] = obj.__globals__[name]
                 except (KeyError, TypeError):
-                    # Some globals might not exist or be serializable, skip them
+                    # some globals might not exist or be serializable, skip them
                     pass
         
-        # NOTE: We intentionally do NOT include __builtins__ here.
+        # NOTE: we intentionally do NOT include __builtins__ here.
         # __builtins__ is a module with 157+ items that exists on every Python process.
-        # Serializing it would add ~1.5KB overhead to every function.
-        # During reconstruction, we'll inject the target process's __builtins__.
+        # serializing it would add ~1.5KB overhead to every function.
+        # during reconstruction, we'll inject the target process's __builtins__.
         
-        # Get closure cell contents
-        # Closures capture variables from enclosing scopes
+        # get closure cell contents
+        # closures capture variables from enclosing scopes
         closure_values = None
         if obj.__closure__:
             closure_values = []
@@ -159,18 +159,18 @@ class FunctionHandler(Handler):
                 try:
                     closure_values.append(cell.cell_contents)
                 except ValueError:
-                    # Cell is empty (variable not yet assigned in closure)
+                    # cell is empty (variable not yet assigned in closure)
                     closure_values.append(None)
         
         return {
             "serialization_type": "full",
-            "code": code,  # Will be recursively serialized by CodeObjectHandler
-            "globals": referenced_globals,  # Dict will be recursively serialized
+            "code": code,  # will be recursively serialized by CodeObjectHandler
+            "globals": referenced_globals,  # dict will be recursively serialized
             "name": obj.__name__,
-            "defaults": obj.__defaults__,  # Tuple of default values
-            "kwdefaults": obj.__kwdefaults__,  # Dict of keyword defaults
-            "closure": closure_values,  # List of captured variables
-            "annotations": obj.__annotations__,  # Type annotations
+            "defaults": obj.__defaults__,  # tuple of default values
+            "kwdefaults": obj.__kwdefaults__,  # dict of keyword defaults
+            "closure": closure_values,  # list of captured variables
+            "annotations": obj.__annotations__,  # type annotations
             "doc": obj.__doc__,
             "module": obj.__module__,
         }
@@ -207,7 +207,7 @@ class FunctionHandler(Handler):
                 f"Ensure the module exists in the target process."
             ) from e
         
-        # Navigate qualname (handles class methods like MyClass.method)
+        # navigate qualname (handles class methods like MyClass.method)
         obj = module
         for part in qualname.split('.'):
             try:
@@ -231,26 +231,26 @@ class FunctionHandler(Handler):
         
         Slow path - rebuild from code object, globals, closures, etc.
         """
-        # Get code and globals (already deserialized)
+        # get code and globals (already deserialized)
         code = state["code"]
         globals_dict = state["globals"]
         
-        # Inject __builtins__ from the target process
-        # We don't serialize __builtins__ (it's huge) - we use the local one
+        # inject __builtins__ from the target process
+        # we don't serialize __builtins__ (it's huge) - we use the local one
         import builtins
         globals_dict['__builtins__'] = builtins
         
-        # Recreate closure cells if needed
+        # recreate closure cells if needed
         closure = None
         if state.get("closure") is not None:
-            # Create cell objects from closure values
+            # create cell objects from closure values
             closure = tuple(
                 types.CellType(value) if hasattr(types, 'CellType') 
                 else self._make_cell(value)
                 for value in state["closure"]
             )
         
-        # Create function
+        # create function
         func = types.FunctionType(
             code,
             globals_dict,
@@ -259,7 +259,7 @@ class FunctionHandler(Handler):
             closure=closure
         )
         
-        # Restore other attributes
+        # restore other attributes
         if state.get("kwdefaults"):
             func.__kwdefaults__ = state["kwdefaults"]
         if state.get("annotations"):
@@ -276,7 +276,7 @@ class FunctionHandler(Handler):
         Cells are used for closure variables. Python doesn't expose
         a direct way to create them, so we use this trick.
         """
-        # Create a closure that captures the value
+        # create a closure that captures the value
         def _closure():
             return value
         return _closure.__closure__[0]

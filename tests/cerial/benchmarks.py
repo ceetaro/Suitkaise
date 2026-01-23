@@ -56,6 +56,7 @@ sys.path.insert(0, str(project_root))
 from suitkaise.cerial import (
     serialize,
     deserialize,
+    reconnect_all,
     SerializationError,
     DeserializationError,
 )
@@ -78,7 +79,12 @@ from suitkaise.processing import (
     ResultTimeoutError,
 )
 from suitkaise.sk import Skclass, Skfunction, SkModifierError, FunctionTimeoutError
-from suitkaise.cerial._int.worst_possible_object import WorstPossibleObject
+from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
+from suitkaise.cerial._int.handlers.network_handler import DbReconnector, SocketReconnector
+from suitkaise.cerial._int.handlers.subprocess_handler import SubprocessReconnector
+from suitkaise.cerial._int.handlers.threading_handler import ThreadReconnector
+from suitkaise.cerial._int.handlers.regex_handler import MatchReconnector, MatchObjectHandler
 
 
 class _BenchEnum(Enum):
@@ -400,6 +406,7 @@ def benchmark_roundtrip():
     simple = SimpleClass(100, 200)
     runner.bench("cerial: roundtrip SimpleClass", 1_000, lambda: cerial_roundtrip(simple))
     runner.bench("pickle: roundtrip SimpleClass", 5_000, lambda: pickle_roundtrip(simple))
+    runner.bench("cerial: reconnect_all", 500, lambda: reconnect_all(_reconnect_all_payload()))
     
     return runner
 
@@ -518,7 +525,7 @@ def _socket_handle():
 
 @contextmanager
 def _subprocess_popen():
-    proc = subprocess.Popen([sys.executable, "-c", "print('x')"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         yield proc
     finally:
@@ -553,6 +560,44 @@ def _pipe():
     finally:
         conn1.close()
         conn2.close()
+
+
+def _reconnect_all_payload():
+    match = re.search(r"a(b)c", "zabc")
+    match_state = MatchObjectHandler().extract_state(match)
+    return {
+        "pipe": PipeReconnector(),
+        "socket": SocketReconnector(state={
+            "family": socket.AF_INET,
+            "type": socket.SOCK_STREAM,
+            "proto": 0,
+            "timeout": None,
+            "blocking": True,
+            "local_addr": None,
+            "remote_addr": None,
+        }),
+        "db": DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"}),
+        "proc": SubprocessReconnector(state={
+            "args": [sys.executable, "-c", "pass"],
+            "returncode": 0,
+            "pid": 123,
+            "poll_result": 0,
+            "stdout_data": None,
+            "stderr_data": None,
+        }),
+        "match": MatchReconnector(state=match_state),
+        "thread": ThreadReconnector(state={
+            "name": "worker",
+            "daemon": True,
+            "target": lambda: None,
+            "args": (),
+            "kwargs": {},
+            "is_alive": False,
+        }),
+        "nested": {
+            "list": [PipeReconnector(), DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})]
+        }
+    }
 
 
 @contextmanager
@@ -854,6 +899,8 @@ def _get_supported_objects():
         ("ModuleType", lambda: types.ModuleType("mod")),
         ("OS pipes", _pipe_fds),
         ("File descriptors", _file_descriptor),
+        ("PipeReconnector", lambda: PipeReconnector()),
+        ("DbReconnector", lambda: DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})),
         ("typing.NamedTuple", lambda: _NamedTuple(1)),
         ("typing.TypedDict", lambda: _TypedDict(x=1)),
         ("Class object", lambda: _BenchCustomClass),

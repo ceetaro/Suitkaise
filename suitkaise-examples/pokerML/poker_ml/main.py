@@ -17,7 +17,7 @@ from suitkaise import timing, cerial, paths
 from suitkaise.processing import Pool, Share
 
 # pokerml imports
-from .cli import print_intro, choose_mode, find_latest_run_dir, load_run_state, play_best_model
+from .cli import print_intro, choose_mode, find_latest_run_dir, find_best_run_dir, load_run_state, play_best_model, interactive_scenario_mode
 from .policy import (
     select_best_policy, rank_policies, build_state_key, PolicyTable, 
     hand_strength_bucket, calculate_hand_potential, calculate_spr,
@@ -171,19 +171,51 @@ def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_s
         else:
             stage = 3
         
-        # get position
-        print("   Position options:")
-        print("     0 = Small Blind (forced bet, first after flop)")
-        print("     1 = Big Blind (forced bet, second after flop)")
-        print("     2 = Under the Gun (first to act pre-flop)")
-        print("     3 = Middle Position")
-        print("     4 = Cutoff (one seat before dealer)")
-        print("     5 = Dealer Button (last to act, best position)")
-        try:
-            position = int(input("   Your position (default 3): ").strip() or "3")
-            position = max(0, min(5, position))
-        except ValueError:
+        # ask if playing blinds or ante
+        game_type = input("   Forced bets (blinds or ante) [blinds]: ").strip().lower() or "blinds"
+        using_blinds = game_type.startswith("b")
+        
+        # get position (only for blinds)
+        if using_blinds:
+            print("   Position options:")
+            print("     0 = Small Blind (forced bet, first after flop)")
+            print("     1 = Big Blind (forced bet, second after flop)")
+            print("     2 = Under the Gun (first to act pre-flop)")
+            print("     3 = Middle Position")
+            print("     4 = Cutoff (one seat before dealer)")
+            print("     5 = Dealer Button (last to act, best position)")
+            try:
+                position = int(input("   Your position (default 3): ").strip() or "3")
+                position = max(0, min(5, position))
+            except ValueError:
+                position = 3
+        else:
             position = 3
+        
+        # get forced bet amounts to set reasonable defaults
+        if using_blinds:
+            try:
+                small_blind = int(input("   Small blind (default 1): ").strip() or "1")
+            except ValueError:
+                small_blind = 1
+            try:
+                big_blind = int(input("   Big blind (default 2): ").strip() or "2")
+            except ValueError:
+                big_blind = 2
+            default_pot = max(0, small_blind + big_blind)
+            default_to_call = max(0, big_blind)
+        else:
+            try:
+                ante = int(input("   Ante amount (default 1): ").strip() or "1")
+            except ValueError:
+                ante = 1
+            try:
+                players = int(input("   Number of players (default 6): ").strip() or "6")
+                players = max(2, players)
+            except ValueError:
+                players = 6
+            default_pot = max(0, ante * players)
+            default_to_call = 0
         
         # get stack size
         try:
@@ -193,15 +225,15 @@ def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_s
         
         # get pot size
         try:
-            pot = int(input("   Current pot size (default 20): ").strip() or "20")
+            pot = int(input(f"   Current pot size (default {default_pot}): ").strip() or str(default_pot))
         except ValueError:
-            pot = 20
+            pot = default_pot
         
         # get to_call amount
         try:
-            to_call = int(input("   Amount to call (default 0): ").strip() or "0")
+            to_call = int(input(f"   Amount to call (default {default_to_call}): ").strip() or str(default_to_call))
         except ValueError:
-            to_call = 0
+            to_call = default_to_call
         
         # calculate all factors
         win_prob = estimate_win_rate(hole_cards, community_cards, rng, strength_samples)
@@ -315,6 +347,8 @@ def main() -> None:
     parser.add_argument("--tables", type=int, default=6)
     parser.add_argument("--players", type=int, default=6)
     parser.add_argument("--starting-stack", type=int, default=200)
+    parser.add_argument("--bet-mode", type=str, choices=["blinds", "ante"], default="blinds")
+    parser.add_argument("--ante", type=int, default=0, help="Forced ante per player (0 = no ante)")
     parser.add_argument("--small-blind", type=int, default=1)
     parser.add_argument("--big-blind", type=int, default=2)
     parser.add_argument("--strength-samples", type=int, default=50)
@@ -324,6 +358,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.quiet:
         args.verbose = False
+    
+    bet_mode = "ante" if args.bet_mode == "ante" else "blinds"
+    if bet_mode == "ante" and args.ante <= 0:
+        args.ante = max(1, args.small_blind)
 
     # show intro and choose mode
     if not args.no_wait:
@@ -333,9 +371,11 @@ def main() -> None:
     
     # if play mode, load existing run and play
     if mode == "play":
-        run_dir = args.run_dir or find_latest_run_dir()
+        run_dir = args.run_dir or find_best_run_dir()
         if not run_dir:
             raise ValueError("No run directory found. Train models first or pass --run-dir.")
+        if args.verbose:
+            print(f"Using run: {run_dir}")
         run_state = load_run_state(run_dir)
         play_best_model(run_state, args.verbose)
         return
@@ -379,15 +419,18 @@ def main() -> None:
         _log_feature(args.verbose, "sk.blocking", "Automatically detects slow/IO-bound methods for async handling")
 
         demo_agent = PokerAgent("demo", random.Random(args.seed), 0.5)
-        demo_key = build_state_key(1, 0, args.starting_stack, args.big_blind * 2, args.big_blind, 2, 1)
+        demo_pot = args.ante * args.players if bet_mode == "ante" else args.big_blind * 2
+        demo_to_call = 0 if bet_mode == "ante" else args.big_blind
+        demo_min_raise = max(1, args.ante) if bet_mode == "ante" else args.big_blind
+        demo_key = build_state_key(1, 0, args.starting_stack, demo_pot, demo_to_call, 2, 1)
         
         print("\n   Demonstrating .background() - run blocking code in a thread:")
         future = demo_agent.choose_action.background()(
             demo_key,
             args.starting_stack,
-            args.big_blind,
-            args.big_blind * 2,
-            args.big_blind,
+            demo_to_call,
+            demo_pot,
+            demo_min_raise,
         )
         _ = future.result()
         _log_feature(args.verbose, "sk.background", "Blocking method ran in background thread, returned Future")
@@ -397,9 +440,9 @@ def main() -> None:
             await demo_agent.choose_action.asynced()(
                 demo_key,
                 args.starting_stack,
-                args.big_blind,
-                args.big_blind * 2,
-                args.big_blind,
+                demo_to_call,
+                demo_pot,
+                demo_min_raise,
             )
 
         asyncio.run(_demo_async())
@@ -553,11 +596,19 @@ def main() -> None:
             
             # run evaluation - community cards regenerated each epoch
             # policies learn during eval (online learning)
+            precision_mode = best_score >= max(0.0, args.target_score - 0.05)
+            eval_samples = max(10, args.strength_samples // 3)
+            variations_per_hand = 2
+            if precision_mode:
+                # boost signal when we're close to target to avoid noisy plateau
+                eval_samples = max(eval_samples, args.strength_samples)
+                variations_per_hand = 3
             eval_result = evaluate_policies_simple(
                 policies=current_policies,
                 seed=epoch_seed,
                 base_stack=args.starting_stack,
-                samples=max(10, args.strength_samples // 3),
+                samples=eval_samples,
+                variations_per_hand=variations_per_hand,
                 learn=True,
                 mastered_hands=mastered_hands,
             )
@@ -735,6 +786,8 @@ def main() -> None:
         strength_samples=args.strength_samples,
         learning_rate=args.learning_rate,
         seed=args.seed,
+        bet_mode=bet_mode,
+        ante=args.ante,
     )
 
     run_state = RunState(
@@ -795,4 +848,4 @@ def main() -> None:
 
     # launch interactive scenario mode
     if not args.no_interactive:
-        _interactive_scenario_mode(share.policies[best_id], args.seed, args.strength_samples, args.verbose)
+        interactive_scenario_mode(share.policies[best_id], args.seed, args.strength_samples, args.verbose)

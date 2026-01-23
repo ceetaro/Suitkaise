@@ -23,6 +23,8 @@ class RunConfig:
     strength_samples: int       # random trials per hand strength estimate (more = slower but more accurate)
     learning_rate: float        # policy update learning rate
     seed: int                   # random seed for reproducibility
+    bet_mode: str = "blinds"    # forced-bet mode: blinds or ante
+    ante: int = 0               # forced ante bet (0 = no ante)
 
 
 @dataclass

@@ -2,6 +2,13 @@
 Handler for memory-related objects.
 
 Includes memory-mapped files, shared memory, and raw file descriptors.
+ 
+Limitations:
+- Raw file descriptors are reconstructed on a best-effort basis by reopening
+  the original path when possible. This cannot guarantee the same underlying
+  file or state across processes.
+
+This is a Python limitation, so I did my best to work around it.
 """
 
 import mmap
@@ -11,7 +18,7 @@ import multiprocessing
 from typing import Any, Dict, Optional
 from .base_class import Handler
 
-# Try to import shared_memory (Python 3.8+)
+# try to import shared_memory (Python 3.8+)
 try:
     from multiprocessing import shared_memory
     HAS_SHARED_MEMORY = True
@@ -51,12 +58,12 @@ class MemoryViewHandler(Handler):
 
 class MMapHandler(Handler):
     """
-    Serializes mmap.mmap objects (9% importance).
+    Serializes mmap.mmap objects.
     
     Memory-mapped files map file contents into memory.
     We serialize the file backing the mmap and the current position.
     
-    Important: The actual memory mapping doesn't transfer across processes.
+    NOTE: The actual memory mapping doesn't transfer across processes.
     We recreate a new mapping to the same file.
     """
     
@@ -83,18 +90,18 @@ class MMapHandler(Handler):
         We also try to get the file path for file-backed mmaps.
         This enables reliable multiple round-trips across processes.
         """
-        # Get current position
+        # get current position
         try:
             position = obj.tell()
         except (OSError, ValueError):
             position = 0
         
-        # Get length
+        # get length
         try:
             length = obj.size()
         except (OSError, ValueError):
-            # If size() fails, the mmap is invalid/closed
-            # Try to read all content to determine size
+            # if size() fails, the mmap is invalid/closed
+            # try to read all content to determine size
             try:
                 current = obj.tell()
                 obj.seek(0)
@@ -102,25 +109,25 @@ class MMapHandler(Handler):
                 length = len(content)
                 obj.seek(current)
             except:
-                # Completely invalid mmap
+                # completely invalid mmap
                 raise MemorySerializationError(
                     "Cannot serialize mmap: object is closed or in invalid state"
                 )
         
-        # Try to get file descriptor
+        # try to get file descriptor
         fileno = -1
         try:
             if hasattr(obj, 'fileno'):
                 fileno = obj.fileno()
         except (OSError, ValueError):
-            # Bad file descriptor or invalid mmap
+            # bad file descriptor or invalid mmap
             fileno = -1
         
-        # Try to get file path from file descriptor (for file-backed mmaps)
+        # try to get file path from file descriptor (for file-backed mmaps)
         file_path: Optional[str] = None
         if fileno != -1:
             if sys.platform.startswith('linux'):
-                # Linux: use /proc/self/fd/
+                # linux: use /proc/self/fd/
                 try:
                     file_path = os.readlink(f'/proc/self/fd/{fileno}')
                 except (OSError, FileNotFoundError):
@@ -136,12 +143,12 @@ class MMapHandler(Handler):
                     pass
         
         # ALWAYS save content for reliable cross-process transfer
-        # Even for file-backed mmaps, the file might not exist in target process
+        # even for file-backed mmaps, the file might not exist in target process
         obj.seek(0)
         content = obj.read()
         obj.seek(position)
         
-        # Determine if this is anonymous (no file backing found)
+        # determine if this is anonymous (no file backing found)
         is_anonymous = fileno == -1 or file_path is None
         
         return {
@@ -166,21 +173,21 @@ class MMapHandler(Handler):
         The content is always preserved, making this work for inter-process
         communication even when the backing file doesn't exist in target process.
         """
-        # Try file-backed mmap first (if we have a path and file exists)
+        # try file-backed mmap first (if we have a path and file exists)
         file_path = state.get("file_path")
         if file_path and os.path.exists(file_path):
             try:
-                # Open the file and create a file-backed mmap
+                # open the file and create a file-backed mmap
                 with open(file_path, 'r+b') as f:
                     mm = mmap.mmap(f.fileno(), state["length"])
                     mm.seek(state["position"])
                     return mm
             except (OSError, ValueError, IOError):
-                # File-backed mmap failed, fall back to anonymous
+                # file-backed mmap failed, fall back to anonymous
                 pass
         
-        # Fall back to anonymous mmap with content
-        # This works reliably across processes
+        # fall back to anonymous mmap with content
+        # this works reliably across processes
         length = state["length"]
         mm = mmap.mmap(-1, length)
         
@@ -217,11 +224,11 @@ class SharedMemoryHandler(Handler):
         - content: The actual memory content
         - create: Whether this process created the block
         """
-        # Get name and size
+        # get name and size
         name = obj.name
         size = obj.size
         
-        # Read content
+        # read content
         content = bytes(obj.buf[:])
         
         return {
@@ -245,16 +252,16 @@ class SharedMemoryHandler(Handler):
         content = state["content"]
         expected_size = len(content)
 
-        # Try to attach to existing shared memory block
+        # try to attach to existing shared memory block
         try:
             shm = shared_memory.SharedMemory(
                 name=state["name"],
                 create=False,
                 size=state["size"]
             )
-            # Some platforms may attach with a different size; if so, write what fits
+            # some platforms may attach with a different size; if so, write what fits
         except FileNotFoundError:
-            # Shared memory block doesn't exist, create new one
+            # shared memory block doesn't exist, create new one
             try:
                 shm = shared_memory.SharedMemory(
                     name=state["name"],
@@ -262,14 +269,14 @@ class SharedMemoryHandler(Handler):
                     size=expected_size
                 )
             except FileExistsError:
-                # Another process created it; attach instead
+                # another process created it; attach instead
                 shm = shared_memory.SharedMemory(
                     name=state["name"],
                     create=False,
                     size=state["size"]
                 )
         
-        # Write content (truncate if existing shared memory is smaller)
+        # write content (truncate if existing shared memory is smaller)
         if shm.size >= expected_size:
             shm.buf[:expected_size] = content
         else:
@@ -285,6 +292,12 @@ class FileDescriptorHandler(Handler):
     File descriptors are OS-level handles to open files.
     They don't transfer across processes, but we can try to
     serialize the file path and reopen.
+    
+    Limitation:
+        Reconstruction is best-effort only. We reopen the path and attempt
+        to restore access flags and file position, but the underlying file
+        may be different, permissions may change, and some flags cannot be
+        restored across processes.
     """
     
     type_name = "file_descriptor"
@@ -298,8 +311,8 @@ class FileDescriptorHandler(Handler):
         we return False here. User should serialize the file
         handle instead.
         """
-        # We don't auto-detect file descriptors since they're just ints
-        # Users should explicitly handle file objects instead
+        # we don't auto-detect file descriptors since they're just ints
+        # users should explicitly handle file objects instead
         return False
     
     def extract_state(self, obj: int) -> Dict[str, Any]:
@@ -309,10 +322,12 @@ class FileDescriptorHandler(Handler):
         Try to get file path from file descriptor (platform-specific).
         """
         path: Optional[str] = None
+        flags: Optional[int] = None
+        position: Optional[int] = None
         
-        # Try platform-specific methods to get path from fd
+        # try platform-specific methods to get path from fd
         if sys.platform.startswith('linux'):
-            # Linux: use /proc/self/fd/
+            # linux: use /proc/self/fd/
             try:
                 path = os.readlink(f'/proc/self/fd/{obj}')
             except (OSError, FileNotFoundError):
@@ -328,11 +343,24 @@ class FileDescriptorHandler(Handler):
                 pass
         
         # Windows and other platforms: no reliable way to get path from fd
+        # Try to capture flags and position where possible (POSIX).
+        if sys.platform != 'win32':
+            try:
+                import fcntl
+                flags = fcntl.fcntl(obj, fcntl.F_GETFL)
+            except (ImportError, OSError, AttributeError):
+                flags = None
+            try:
+                position = os.lseek(obj, 0, os.SEEK_CUR)
+            except OSError:
+                position = None
         
         return {
             "fd": obj,
             "path": path,
             "platform": sys.platform,
+            "flags": flags,
+            "position": position,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> int:
@@ -341,10 +369,37 @@ class FileDescriptorHandler(Handler):
         
         This is very limited - file descriptors don't transfer across processes.
         """
-        raise MemorySerializationError(
-            f"Raw file descriptors cannot be serialized across processes. "
-            f"Use file handle objects instead (open file objects). "
-            f"Original fd={state['fd']}, path={state.get('path', 'unknown')}, "
-            f"platform={state.get('platform', 'unknown')}"
-        )
+        path = state.get("path")
+        if not path:
+            raise MemorySerializationError(
+                f"Raw file descriptors cannot be reconstructed without a path. "
+                f"Use file handle objects instead (open file objects). "
+                f"Original fd={state.get('fd')}, platform={state.get('platform', 'unknown')}"
+            )
+        
+        flags = state.get("flags")
+        if flags is None:
+            # best-effort fallback when flags are unknown
+            open_flags = os.O_RDONLY
+        else:
+            # sanitize flags to avoid recreating the file
+            open_flags = flags & os.O_ACCMODE
+            open_flags |= flags & getattr(os, "O_APPEND", 0)
+            open_flags |= flags & getattr(os, "O_NONBLOCK", 0)
+            open_flags |= flags & getattr(os, "O_SYNC", 0)
+        
+        try:
+            fd = os.open(path, open_flags)
+        except OSError:
+            # fallback if access mode was too restrictive
+            fd = os.open(path, os.O_RDWR)
+        
+        position = state.get("position")
+        if position is not None:
+            try:
+                os.lseek(fd, position, os.SEEK_SET)
+            except OSError:
+                pass
+        
+        return fd
 

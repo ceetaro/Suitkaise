@@ -3,6 +3,16 @@ Handler for class instances and class objects.
 
 This is the most complex handler - it handles all user-defined class instances
 using the extraction strategy hierarchy we designed.
+
+AI helped me with technical details, but:
+- all of the basic structure is mine.
+- comments and code has all been reviewed (and revised if needed) by me.
+
+Do I know how this works? Yes.
+DO I know every internal attribute and method? No. That's where AI came in,
+so I didn't have to crawl Stack Overflow myself.
+
+Cheers
 """
 
 import types
@@ -16,8 +26,7 @@ class ClassInstanceHandler(Handler):
     """
     Serializes instances of user-defined classes.
     
-    This is the "catch-all" handler for class instances. It uses the
-    extraction strategy hierarchy:
+    This is the catch-all for class instances. It uses this strategy:
     
     1. Try __serialize__ / __deserialize__ methods (highest priority)
     2. Try to_dict() / from_dict() methods (common library pattern)
@@ -42,22 +51,24 @@ class ClassInstanceHandler(Handler):
         
         We check for this LAST in the handler chain, after all
         specialized handlers have had a chance.
+
+        We DONT want to handle a special object with this more general handler.
         """
-        # Skip built-in types (handled by base pickle)
+        # skip built-in types (handled by base pickle)
         if isinstance(obj, (int, float, str, bytes, bool, type(None),
                            list, tuple, dict, set, frozenset)):
             return False
         
-        # Skip types from built-in modules
+        # skip types from built-in modules
         obj_module = getattr(type(obj), '__module__', '')
         if obj_module in ('builtins', '__builtin__', 'typing'):
             return False
         
-        # Must have a class
+        # must have a class
         if not hasattr(obj, '__class__'):
             return False
         
-        # Must have __dict__, __slots__, OR custom serialization methods
+        # must have __dict__, __slots__, OR custom serialization methods
         has_dict = hasattr(obj, '__dict__')
         has_slots = hasattr(type(obj), '__slots__')
         has_serialize = hasattr(obj, '__serialize__')
@@ -80,50 +91,50 @@ class ClassInstanceHandler(Handler):
         """
         obj_class = obj.__class__
         
-        # Determine extraction strategy
+        # determine extraction strategy
         strategy = self._determine_strategy(obj)
         
-        # Base state with class identity
+        # base state with class identity
         state = {
             "module": obj_class.__module__,
             "qualname": obj_class.__qualname__,
             "strategy": strategy,
         }
         
-        # Check if this is a locally-defined class (inside a function/method)
+        # check if this is a locally-defined class (inside a function/method)
         if "<locals>" in obj_class.__qualname__:
-            # Locally-defined class - must serialize the class definition
+            # locally-defined class - must serialize the class definition
             state["class_definition"] = self._serialize_class_definition(obj_class)
         
-        # Extract nested class definitions if this is a nested class
+        # extract nested class definitions if this is a nested class
         nested_classes = self._extract_nested_classes(obj_class)
         if nested_classes:
             state["nested_classes"] = nested_classes
 
-        # If the class lives in __main__, include its definition for reconstruction
+        # if the class lives in __main__, include its definition for reconstruction
         if obj_class.__module__ == "__main__":
             state["class_definition"] = self._serialize_class_definition(
                 obj_class,
                 allow_callables=True,
             )
         
-        # Extract state based on strategy
+        # extract state based on strategy
         if strategy == "custom_serialize":
-            # User provided __serialize__ method (module-level class)
+            # user provided __serialize__ method (module-level class)
             state["custom_state"] = obj.__serialize__()
             
         elif strategy == "custom_serialize_local":
-            # User provided __serialize__/__deserialize__ for locally-defined class
-            # Save both the state AND the __deserialize__ function
+            # user provided __serialize__/__deserialize__ for locally-defined class
+            # save both the state AND the __deserialize__ function
             state["custom_state"] = obj.__serialize__()
             state["deserialize_function"] = obj_class.__deserialize__
             
         elif strategy == "to_dict":
-            # Library pattern: to_dict() / from_dict()
+            # library pattern: to_dict() / from_dict()
             state["dict_state"] = obj.to_dict()
             
         elif strategy == "dict":
-            # Generic: use __dict__
+            # generic: use __dict__ and walk
             state["instance_dict"] = dict(obj.__dict__)
         
         elif strategy == "slots":
@@ -131,7 +142,7 @@ class ClassInstanceHandler(Handler):
             state["slots_dict"] = self._extract_slots(obj)
         
         elif strategy == "dict_and_slots":
-            # Class has both __dict__ and __slots__
+            # class has both __dict__ and __slots__
             state["instance_dict"] = dict(obj.__dict__)
             state["slots_dict"] = self._extract_slots(obj)
         
@@ -148,29 +159,33 @@ class ClassInstanceHandler(Handler):
         """
         obj_class = obj.__class__
         
-        # Check for __serialize__ / __deserialize__
+        # check for __serialize__ / __deserialize__
         if hasattr(obj, '__serialize__'):
             if hasattr(obj_class, '__deserialize__'):
-                # Check if locally-defined
+                # check if locally-defined
                 if "<locals>" in obj_class.__qualname__:
-                    # For locally-defined classes, only use custom_serialize_local
-                    # if __deserialize__ is a staticmethod (not a classmethod)
-                    # Check the descriptor in __dict__
+
+                    # for locally-defined classes, only use custom_serialize_local
+                    #   if __deserialize__ is a staticmethod (not a classmethod)
+                    # check the descriptor in __dict__
                     if '__deserialize__' in obj_class.__dict__:
                         deserialize_desc = obj_class.__dict__['__deserialize__']
                         if isinstance(deserialize_desc, staticmethod):
                             return "custom_serialize_local"
+
                     # else: classmethod or regular method - fall through to dict strategy
+
                 else:
-                    # Module-level class - use normal custom_serialize
+                    # module-level class - use normal custom_serialize
                     return "custom_serialize"
         
-        # Check for to_dict / from_dict
-        # Same limitation for locally-defined classes
+        # check for to_dict / from_dict
+        # same limitation for locally-defined classes
         if hasattr(obj, 'to_dict'):
             if hasattr(obj_class, 'from_dict'):
                 if "<locals>" not in obj_class.__qualname__:
                     return "to_dict"
+
                 # else: fall through to dict strategy
         
         # Check for __slots__
@@ -179,13 +194,13 @@ class ClassInstanceHandler(Handler):
         has_dict = hasattr(obj, '__dict__')
         
         if has_slots and has_dict:
-            # Class has both (can happen with inheritance)
+            # class has both (can happen when you inherit)
             return "dict_and_slots"
         elif has_slots:
-            # Only __slots__
+            # only __slots__
             return "slots"
         elif has_dict:
-            # Only __dict__
+            # only __dict__
             return "dict"
         
         raise ValueError(f"Cannot determine extraction strategy for {type(obj)}")
@@ -200,7 +215,7 @@ class ClassInstanceHandler(Handler):
         slots_dict = {}
         obj_class = type(obj)
         
-        # Collect all slots from class and parent classes
+        # collect all slots from class and parent classes
         all_slots = set()
         for cls in obj_class.__mro__:
             if hasattr(cls, '__slots__'):
@@ -213,9 +228,9 @@ class ClassInstanceHandler(Handler):
                 else:
                     all_slots.update(slots)
         
-        # Extract value for each slot
+        # extract value for each slot
         for slot_name in all_slots:
-            # Skip __dict__ and __weakref__ special slots
+            # skip __dict__ and __weakref__ special slots
             if slot_name in ('__dict__', '__weakref__'):
                 continue
             
@@ -223,7 +238,7 @@ class ClassInstanceHandler(Handler):
                 value = getattr(obj, slot_name)
                 slots_dict[slot_name] = value
             except AttributeError:
-                # Slot not set (no value)
+                # slot not set (no value)
                 pass
         
         return slots_dict
@@ -256,15 +271,15 @@ class ClassInstanceHandler(Handler):
         """
         nested = {}
         
-        # Check if this class is nested (has '.' in qualname)
+        # check if this class is nested (has '.' in qualname)
         if '.' not in cls.__qualname__:
             return nested
         
-        # Get all nested classes
+        # get all nested classes
         for name, member in inspect.getmembers(cls, inspect.isclass):
-            # Check if this class is defined inside our class
+            # check if this class is defined inside our class
             if member.__qualname__.startswith(cls.__qualname__ + '.'):
-                # Serialize the nested class definition
+                # serialize the nested class definition
                 nested[member.__qualname__] = self._serialize_class_definition(member)
         
         return nested
@@ -275,7 +290,7 @@ class ClassInstanceHandler(Handler):
         
         This captures the class structure so we can recreate it with type().
         """
-        # Get base classes
+        # get base classes
         bases = [
             {
                 "module": base.__module__,
@@ -285,7 +300,7 @@ class ClassInstanceHandler(Handler):
             if base is not object  # Exclude object base
         ]
         
-        # Get class attributes (including methods)
+        # get class attributes (including methods)
         class_dict = {}
         for name, value in cls.__dict__.items():
             # Skip special attributes
@@ -294,8 +309,8 @@ class ClassInstanceHandler(Handler):
                     class_dict[name] = value
                 continue
             
-            # Include methods, class variables, etc.
-            # These will be recursively serialized by central serializer
+            # include methods, class variables, etc.
+            # these will be recursively serialized by central serializer
             class_dict[name] = value
         
         return {
@@ -316,15 +331,15 @@ class ClassInstanceHandler(Handler):
         2. Get or create the class
         3. Create instance based on strategy
         """
-        # Reconstruct nested classes first
+        # reconstruct nested classes first
         if "nested_classes" in state:
             for qualname, class_def in state["nested_classes"].items():
                 self._reconstruct_class_definition(class_def)
         
-        # Get the class
-        # Check if this is a locally-defined class (has <locals> in qualname)
+        # get the class
+        # check if this is a locally-defined class (has <locals> in qualname)
         if "<locals>" in state["qualname"]:
-            # Locally-defined class - must reconstruct from definition
+            # locally-defined class - must reconstruct from definition
             if "class_definition" in state:
                 cls = self._reconstruct_class_definition(state["class_definition"])
             else:
@@ -336,33 +351,33 @@ class ClassInstanceHandler(Handler):
             # __main__ class - reconstruct from definition for cross-process safety
             cls = self._reconstruct_class_definition(state["class_definition"])
         else:
-            # Regular or nested class - try to import
+            # regular or nested class - try to import
             cls = self._get_class(state["module"], state["qualname"])
         
-        # Reconstruct based on strategy
+        # reconstruct based on strategy
         strategy = state["strategy"]
         
         if strategy == "custom_serialize":
-            # Use class's __deserialize__ method (module-level class)
+            # use class's __deserialize__ method (module-level class)
             return cls.__deserialize__(state["custom_state"])
             
         elif strategy == "custom_serialize_local":
-            # Locally-defined class with custom __serialize__/__deserialize__
-            # The __deserialize__ function was serialized and should be reconstructed
+            # locally-defined class with custom __serialize__/__deserialize__
+            # the __deserialize__ function was serialized and should be reconstructed
             deserialize_func = state["deserialize_function"]
             
-            # Call the function with cls and state
-            # Note: User should define __deserialize__ as @staticmethod that takes (cls, state)
+            # call the function with cls and state
+            # NOTE: User should define __deserialize__ as @staticmethod that takes (cls, state)
             return deserialize_func(cls, state["custom_state"])
             
         elif strategy == "to_dict":
-            # Use class's from_dict method
+            # use class's from_dict method
             return cls.from_dict(state["dict_state"])
             
         elif strategy == "dict":
-            # Generic reconstruction using __new__
+            # generic reconstruction using __new__
             obj = cls.__new__(cls)  # type: ignore
-            # Populate __dict__ (already deserialized by central deserializer)
+            # populate __dict__ (already deserialized by central deserializer)
             if isinstance(state["instance_dict"], dict):
                 obj.__dict__.update(state["instance_dict"])
             return obj
@@ -370,23 +385,26 @@ class ClassInstanceHandler(Handler):
         elif strategy == "slots":
             # __slots__ reconstruction
             obj = cls.__new__(cls)  # type: ignore
-            # Set each slot value
+            # set each slot value
             if isinstance(state["slots_dict"], dict):
                 for slot_name, value in state["slots_dict"].items():
                     try:
                         setattr(obj, slot_name, value)
                     except AttributeError:
-                        # Slot might be read-only or not exist, skip
+                        # slot might be read-only or not exist, skip
+                        # it is what it is in this case
                         pass
             return obj
         
         elif strategy == "dict_and_slots":
-            # Both __dict__ and __slots__
+            # both __dict__ and __slots__
             obj = cls.__new__(cls)  # type: ignore
-            # Populate __dict__
+
+            # populate __dict__
             if isinstance(state.get("instance_dict"), dict):
                 obj.__dict__.update(state["instance_dict"])
-            # Set slot values
+
+            # set slot values
             if isinstance(state.get("slots_dict"), dict):
                 for slot_name, value in state["slots_dict"].items():
                     try:
@@ -407,7 +425,7 @@ class ClassInstanceHandler(Handler):
         - Nested classes (e.g., "Outer.Inner")
         - Classes in __main__
         """
-        # Import module
+        # import module
         try:
             module = importlib.import_module(module_name)
         except ImportError:
@@ -416,8 +434,8 @@ class ClassInstanceHandler(Handler):
                 f"Ensure the module exists in the target process."
             )
         
-        # Navigate to class using qualname
-        # qualname might be "Outer.Inner.DeepNested"
+        # navigate to class using qualname
+        # qualname might be "Outer.Inner.DeepNested", we need to handle this
         parts = qualname.split('.')
         obj: Any = module
         
@@ -448,8 +466,11 @@ class ClassInstanceHandler(Handler):
         
         For fully functional reconstruction of locally-defined classes with
         methods, users should move the class to module level or use pickle directly.
+
+        This is a known limitation of Python, and good practice is to avoid
+        locally-defined classes with methods when parallelizing or sending CL.
         """
-        # Get base classes
+        # get base classes
         bases = []
         for base_info in class_def["bases"]:
             base_module = importlib.import_module(base_info["module"])
@@ -459,39 +480,41 @@ class ClassInstanceHandler(Handler):
         if not bases:
             bases = [object]
         
-        # Note: class_def["dict"] is in IR format (serialized by central serializer)
+        # NOTE: class_def["dict"] is in IR format (serialized by central serializer)
         # For basic attributes this works fine, but methods will be broken
         # This is a known limitation for locally-defined classes
-        # 
+
         # To properly reconstruct, we'd need access to the deserializer here,
         # but that creates circular dependencies. Instead, we create a minimal
         # class definition that can at least be used for isinstance checks.
+
+        # Hey, this is the best that Python lets us do.
         
         allow_callables = class_def.get("allow_callables", False)
         class_dict = {}
         for key, value in class_def["dict"].items():
-            # Skip anything that's a cerial-serialized object (has __cerial_type__)
+            # skip anything that's a cerial-serialized object (has __cerial_type__)
             if isinstance(value, dict) and "__cerial_type__" in value:
                 continue
 
             if not allow_callables:
-                # Skip methods, functions, and descriptors for local classes
+                # skip methods, functions, and descriptors for local classes
                 if callable(value) or isinstance(value, (classmethod, staticmethod, property)):
                     continue
-                # Skip private/special attributes
+                # skip private/special attributes
                 if key.startswith('_'):
                     continue
 
             class_dict[key] = value
         
-        # Create class using type()
+        # create class using type()
         cls = type(
             class_def["name"],
             tuple(bases),
             class_dict
         )
         
-        # Set __module__ and __qualname__
+        # set __module__ and __qualname__
         cls.__module__ = class_def["module"]
         cls.__qualname__ = class_def["qualname"]
         
@@ -529,30 +552,30 @@ class ClassObjectHandler(Handler):
         For module-level classes, just store module + name.
         For dynamic classes, serialize full definition.
         """
-        # Check if class is at module level
+        # check if class is at module level
         try:
             module = importlib.import_module(obj.__module__)
-            # Try to get class from module
+            # try to get class from module
             module_class = getattr(module, obj.__name__, None)
             is_module_level = module_class is obj
         except (ImportError, AttributeError):
-            # Module doesn't exist or class not in module - it's dynamic
+            # module doesn't exist or class not in module - it's dynamic
             is_module_level = False
         except Exception as e:
-            # Unexpected error - log and treat as dynamic
+            # unexpected error - log and treat as dynamic
             import warnings
             warnings.warn(f"Error checking if class is module-level: {e}")
             is_module_level = False
         
         if is_module_level:
-            # Simple reference
+            # simple reference
             return {
                 "type": "reference",
                 "module": obj.__module__,
                 "name": obj.__name__,
             }
         else:
-            # Dynamic class - serialize full definition
+            # dynamic class - serialize full definition
             instance_handler = ClassInstanceHandler()
             return {
                 "type": "definition",
@@ -562,11 +585,11 @@ class ClassObjectHandler(Handler):
     def reconstruct(self, state: Dict[str, Any]) -> type:
         """Reconstruct class object."""
         if state["type"] == "reference":
-            # Import and return class
+            # import and return class
             module = importlib.import_module(state["module"])
             return getattr(module, state["name"])
         else:
-            # Reconstruct dynamic class
+            # reconstruct dynamic class
             instance_handler = ClassInstanceHandler()
             return instance_handler._reconstruct_class_definition(state["definition"])
 

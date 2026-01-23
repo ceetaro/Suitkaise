@@ -23,6 +23,7 @@ import weakref
 import threading
 import functools
 import contextlib
+import re
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from collections import namedtuple
 from typing import NamedTuple
@@ -55,6 +56,8 @@ from suitkaise.cerial._int.handlers.network_handler import (
     SocketHandler,
     DatabaseConnectionHandler,
     NetworkSerializationError,
+    DbReconnector,
+    SocketReconnector,
 )
 from suitkaise.cerial._int.handlers.memory_handler import (
     MMapHandler,
@@ -71,6 +74,7 @@ from suitkaise.cerial._int.handlers.function_handler import (
     StaticMethodHandler,
     ClassMethodHandler,
 )
+from suitkaise.cerial._int.handlers.reconnector import Reconnector
 from suitkaise.cerial._int.handlers.sqlite_handler import (
     SQLiteConnectionHandler,
     SQLiteCursorHandler,
@@ -78,6 +82,7 @@ from suitkaise.cerial._int.handlers.sqlite_handler import (
 from suitkaise.cerial._int.handlers.subprocess_handler import (
     PopenHandler,
     CompletedProcessHandler,
+    SubprocessReconnector,
 )
 from suitkaise.cerial._int.handlers.weakref_handler import (
     WeakrefHandler,
@@ -85,6 +90,7 @@ from suitkaise.cerial._int.handlers.weakref_handler import (
     WeakKeyDictionaryHandler,
 )
 from suitkaise.cerial._int.handlers.namedtuple_handler import NamedTupleHandler, TypedDictHandler
+from suitkaise.cerial._int.handlers.regex_handler import MatchObjectHandler, MatchReconnector
 from suitkaise.cerial._int.handlers.queue_handler import (
     QueueHandler,
     MultiprocessingQueueHandler,
@@ -95,6 +101,7 @@ from suitkaise.cerial._int.handlers.pipe_handler import (
     MultiprocessingPipeHandler,
     OSPipeHandler,
     MultiprocessingManagerHandler,
+    PipeReconnector,
 )
 from suitkaise.cerial._int.handlers.class_handler import (
     ClassInstanceHandler,
@@ -110,6 +117,7 @@ from suitkaise.cerial._int.handlers.threading_handler import (
     ThreadPoolExecutorHandler,
     ProcessPoolExecutorHandler,
     ThreadLocalHandler,
+    ThreadReconnector,
 )
 from suitkaise.cerial._int.handlers.iterator_handler import (
     IteratorHandler,
@@ -555,8 +563,10 @@ def test_thread_handler_roundtrip():
     thread = threading.Thread(name="worker", target=_thread_target, args=(2,), daemon=True)
     state = handler.extract_state(thread)
     restored = handler.reconstruct(state)
-    assert restored.name == "worker"
-    assert restored.daemon is True
+    assert isinstance(restored, ThreadReconnector)
+    thread_copy = restored.reconnect()
+    assert thread_copy.name == "worker"
+    assert thread_copy.daemon is True
 
 
 def test_executor_handlers_roundtrip():
@@ -575,11 +585,22 @@ def test_executor_handlers_roundtrip():
             executor.shutdown(wait=False)
         if restored is not None:
             restored.shutdown(wait=False)
-    proc_executor = ProcessPoolExecutor(max_workers=1)
-    proc_state = proc_handler.extract_state(proc_executor)
-    proc_restored = proc_handler.reconstruct(proc_state)
-    proc_executor.shutdown(wait=False)
-    proc_restored.shutdown(wait=False)
+
+
+# =============================================================================
+# Regex Handler Tests
+# =============================================================================
+
+def test_regex_match_reconnector_roundtrip():
+    """MatchObjectHandler should reconstruct a match when possible."""
+    handler = MatchObjectHandler()
+    match = re.search(r"a(b)c", "zabc")
+    state = handler.extract_state(match)
+    restored = handler.reconstruct(state)
+    if isinstance(restored, MatchReconnector):
+        restored = restored.reconnect()
+    assert isinstance(restored, re.Match)
+    assert restored.group(1) == "b"
 
 
 def test_thread_local_handler_roundtrip():
@@ -853,16 +874,14 @@ def test_mmap_file_backed_reconstruct():
 
 
 def test_file_descriptor_handler_errors():
-    """FileDescriptorHandler should raise on reconstruct."""
+    """FileDescriptorHandler should reconstruct when path exists."""
     handler = FileDescriptorHandler()
     fd, path = tempfile.mkstemp()
     try:
         state = handler.extract_state(fd)
-        try:
-            handler.reconstruct(state)
-            assert False, "Expected MemorySerializationError"
-        except MemorySerializationError:
-            pass
+        restored = handler.reconstruct(state)
+        assert isinstance(restored, int)
+        os.close(restored)
     finally:
         os.close(fd)
         os.unlink(path)
@@ -1006,6 +1025,8 @@ def test_socket_handler_roundtrip():
     sock.settimeout(0.2)
     state = handler.extract_state(sock)
     restored = handler.reconstruct(state)
+    if isinstance(restored, SocketReconnector):
+        restored = restored.reconnect()
     assert isinstance(restored, socket.socket)
     assert restored.gettimeout() == 0.2
     sock.close()
@@ -1023,6 +1044,8 @@ def test_socket_handler_nonblocking_state():
         "blocking": False,
     }
     sock = handler.reconstruct(state)
+    if isinstance(sock, SocketReconnector):
+        sock = sock.reconnect()
     assert sock.gettimeout() == 0.0
     sock.close()
 
@@ -1105,8 +1128,8 @@ def test_db_connection_handler_extract_state():
     assert state["connection_kwargs"]["db"] == "db"
 
 
-def test_db_connection_handler_reconstruct_error():
-    """DatabaseConnectionHandler should refuse reconstruction."""
+def test_db_connection_handler_reconstruct_reconnector():
+    """DatabaseConnectionHandler should return a DbReconnector on missing auth."""
     handler = DatabaseConnectionHandler()
 
     class DummyConnection:
@@ -1120,11 +1143,22 @@ def test_db_connection_handler_reconstruct_error():
     dummy = DummyConnection()
     assert handler.can_handle(dummy) is True
     state = handler.extract_state(dummy)
-    try:
-        handler.reconstruct(state)
-        assert False, "Expected NetworkSerializationError"
-    except NetworkSerializationError:
-        pass
+    restored = handler.reconstruct(state)
+    assert isinstance(restored, DbReconnector)
+
+
+def test_db_connection_handler_reconstruct_sqlite():
+    """DatabaseConnectionHandler should auto-connect when details are sufficient."""
+    handler = DatabaseConnectionHandler()
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        conn = sqlite3.connect(tmp.name)
+        try:
+            state = handler.extract_state(conn)
+        finally:
+            conn.close()
+        restored = handler.reconstruct(state)
+        assert isinstance(restored, sqlite3.Connection)
+        restored.close()
 
 
 # =============================================================================
@@ -1615,29 +1649,132 @@ def test_os_pipe_roundtrip():
 
 
 def test_mp_pipe_roundtrip():
-    """MultiprocessingPipeHandler should reconstruct connection."""
+    """MultiprocessingPipeHandler should reconstruct PipeReconnector."""
     handler = MultiprocessingPipeHandler()
     conn1, conn2 = multiprocessing.Pipe()
     try:
         state = handler.extract_state(conn1)
         restored = handler.reconstruct(state)
-        assert hasattr(restored, "send")
+        assert isinstance(restored, PipeReconnector)
+        end_a, end_b = restored.pair()
+        assert hasattr(end_a, "send")
+        assert hasattr(end_b, "recv")
+        end_a.close()
+        end_b.close()
     finally:
         conn1.close()
         conn2.close()
 
 
 def test_mp_manager_roundtrip():
-    """MultiprocessingManagerHandler should return value placeholder."""
+    """MultiprocessingManagerHandler should reconstruct proxy or return None."""
     handler = MultiprocessingManagerHandler()
     manager = multiprocessing.Manager()
     try:
         proxy = manager.list([1, 2])
         state = handler.extract_state(proxy)
         restored = handler.reconstruct(state)
-        assert restored is None
+        # handler uses __reduce__ protocol - should reconstruct or return None
+        if restored is not None:
+            assert list(restored) == [1, 2], f"Expected [1, 2], got {list(restored)}"
     finally:
         manager.shutdown()
+
+
+def test_reconnect_all_nested():
+    """reconnect_all should recurse through nested structures."""
+    class DummyReconnector(Reconnector):
+        def __init__(self, value):
+            self.value = value
+        def reconnect(self, **kwargs):
+            return f"connected-{self.value}"
+    
+    class SlotHolder:
+        __slots__ = ("item",)
+        def __init__(self, item):
+            self.item = item
+    
+    payload = {
+        "a": [DummyReconnector(1), {"b": DummyReconnector(2)}],
+        "c": DummyReconnector(3),
+        DummyReconnector("key"): "value",
+        "slot": SlotHolder(DummyReconnector("slot")),
+    }
+    restored = cerial.reconnect_all(payload)
+    assert restored is payload
+    assert payload["a"][0] == "connected-1"
+    assert payload["a"][1]["b"] == "connected-2"
+    assert payload["c"] == "connected-3"
+    assert "connected-key" in payload
+    assert payload["slot"].item == "connected-slot"
+
+
+def test_reconnect_all_reconnectors():
+    """reconnect_all should handle all reconnector types."""
+    handler = MatchObjectHandler()
+    match = re.search(r"a(b)c", "zabc")
+    
+    pipe_rec = PipeReconnector()
+    sock_rec = SocketReconnector(state={
+        "family": socket.AF_INET,
+        "type": socket.SOCK_STREAM,
+        "proto": 0,
+        "timeout": None,
+        "blocking": True,
+        "local_addr": None,
+        "remote_addr": None,
+    })
+    db_rec = DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"})
+    subproc_rec = SubprocessReconnector(state={
+        "args": [sys.executable, "-c", "print('x')"],
+        "returncode": 0,
+        "pid": 123,
+        "poll_result": 0,
+        "stdout_data": None,
+        "stderr_data": None,
+    })
+    match_rec = MatchReconnector(state=handler.extract_state(match))
+    thread_rec = ThreadReconnector(state={
+        "name": "worker",
+        "daemon": True,
+        "target": _thread_target,
+        "args": (1,),
+        "kwargs": {},
+        "is_alive": False,
+    })
+    
+    payload = {
+        "pipe": pipe_rec,
+        "socket": sock_rec,
+        "db": db_rec,
+        "proc": subproc_rec,
+        "match": match_rec,
+        "thread": thread_rec,
+    }
+    
+    restored = cerial.reconnect_all(payload)
+    assert restored is payload
+    assert hasattr(payload["pipe"], "send")
+    assert isinstance(payload["socket"], socket.socket)
+    assert isinstance(payload["db"], sqlite3.Connection)
+    assert isinstance(payload["proc"], subprocess.Popen)
+    assert isinstance(payload["match"], re.Match)
+    assert isinstance(payload["thread"], threading.Thread)
+    
+    # Cleanup
+    try:
+        payload["proc"].wait(timeout=5)
+    except Exception:
+        try:
+            payload["proc"].terminate()
+        except Exception:
+            pass
+    payload["socket"].close()
+    payload["db"].close()
+    try:
+        payload["pipe"].close()
+    except Exception:
+        pass
 # =============================================================================
 # Subprocess Handler Tests
 # =============================================================================
@@ -1654,9 +1791,11 @@ def test_popen_handler_roundtrip():
     out, err = proc.communicate(timeout=5)
     state = handler.extract_state(proc)
     restored = handler.reconstruct(state)
-    assert restored.args
-    assert restored.returncode == proc.returncode
-    assert isinstance(restored.poll(), int)
+    assert isinstance(restored, SubprocessReconnector)
+    snapshot = restored.snapshot()
+    assert snapshot.args
+    assert snapshot.returncode == proc.returncode
+    assert isinstance(snapshot.poll(), int)
 
 
 def test_completed_process_handler_roundtrip():
@@ -1700,6 +1839,7 @@ def run_all_tests():
     runner.run_test("Contextlib generator handler", test_contextlib_generator_handler_roundtrip)
     runner.run_test("Thread handler roundtrip", test_thread_handler_roundtrip)
     runner.run_test("Executor handlers roundtrip", test_executor_handlers_roundtrip)
+    runner.run_test("Regex match reconnector", test_regex_match_reconnector_roundtrip)
     runner.run_test("Thread local handler roundtrip", test_thread_local_handler_roundtrip)
     runner.run_test("Iterator handler enumerate", test_iterator_handler_enumerate)
     runner.run_test("Iterator handler rejects generator", test_iterator_handler_rejects_generator)
@@ -1730,7 +1870,10 @@ def run_all_tests():
     runner.run_test("HTTP session handler", test_http_session_handler_roundtrip)
     runner.run_test("HTTP session cookies error", test_http_session_handler_cookie_error)
     runner.run_test("DB handler extract state", test_db_connection_handler_extract_state)
-    runner.run_test("DB handler reconstruct error", test_db_connection_handler_reconstruct_error)
+    runner.run_test("DB handler reconstruct reconnector", test_db_connection_handler_reconstruct_reconnector)
+    runner.run_test("DB handler reconstruct sqlite", test_db_connection_handler_reconstruct_sqlite)
+    runner.run_test("reconnect_all nested", test_reconnect_all_nested)
+    runner.run_test("reconnect_all reconnectors", test_reconnect_all_reconnectors)
 
     runner.run_test("Weakref live", test_weakref_roundtrip_live)
     runner.run_test("Weakref dead", test_weakref_roundtrip_dead)

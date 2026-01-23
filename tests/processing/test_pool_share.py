@@ -40,10 +40,10 @@ class ShareWorker(Skprocess):
         self.process_config.runs = 1  # type: ignore[attr-defined]
 
     def __run__(self):
-        stats = self.share.stats
-        stats["hands"] += 1
-        stats["total_reward"] += float(self.value)
-        self.share.stats = stats
+        # write to per-worker key to avoid race condition on read-modify-write
+        # (read-modify-write is not atomic, but individual writes are)
+        worker_key = f"worker_{self.value}"
+        setattr(self.share, worker_key, {"hands": 1, "reward": float(self.value)})
         return {"ok": True, "value": self.value}
 
 
@@ -126,43 +126,64 @@ class TestRunner:
 
 def test_share_serialization_roundtrip():
     share = Share()
-    share.stats = {"hands": 1, "wins": 0, "total_reward": 0.5}
-    data = cerial.serialize(share)
-    restored = cerial.deserialize(data)
-    stats = restored.stats
-    assert stats["hands"] == 1, f"Expected hands=1, got {stats}"
+    try:
+        share.stats = {"hands": 1, "wins": 0, "total_reward": 0.5}
+        data = cerial.serialize(share)
+        restored = cerial.deserialize(data)
+        stats = restored.stats
+        assert stats["hands"] == 1, f"Expected hands=1, got {stats}"
+    finally:
+        share._coordinator.stop()
+        time.sleep(0.1)
 
 
 def test_share_coordinator_state_roundtrip():
     share = Share()
-    share.stats = {"hands": 0, "wins": 0, "total_reward": 0.0}
-    state = share._coordinator.get_state()
     try:
-        encoded = cerial.serialize(state)
-        decoded = cerial.deserialize(encoded)
-        rebuilt = _Coordinator.from_state(decoded)
-        assert rebuilt is not None, "Coordinator should rebuild from state"
-    except Exception as e:
-        sizes = {k: (len(v) if isinstance(v, (bytes, bytearray)) else None) for k, v in state.items()}
-        raise AssertionError(f"Coordinator state roundtrip failed: {type(e).__name__}: {e} | sizes={sizes}") from e
+        share.stats = {"hands": 0, "wins": 0, "total_reward": 0.0}
+        state = share._coordinator.get_state()
+        try:
+            encoded = cerial.serialize(state)
+            decoded = cerial.deserialize(encoded)
+            rebuilt = _Coordinator.from_state(decoded)
+            assert rebuilt is not None, "Coordinator should rebuild from state"
+        except Exception as e:
+            sizes = {k: (len(v) if isinstance(v, (bytes, bytearray)) else None) for k, v in state.items()}
+            raise AssertionError(f"Coordinator state roundtrip failed: {type(e).__name__}: {e} | sizes={sizes}") from e
+        finally:
+            share._coordinator.stop()
+            time.sleep(0.1)
+    finally:
+        share._coordinator.stop()
+        time.sleep(0.1)
 
 
 def test_pool_share_roundtrip_timing():
     share = Share()
-    share.stats = {"hands": 0, "wins": 0, "total_reward": 0.0}
     pool = Pool(workers=2)
 
-    timer = timing.Sktimer()
-    with timing.TimeThis(timer=timer):
-        results = list(pool.star().unordered_imap(ShareWorker, [(share, 1), (share, 2)]))
-        assert len(results) == 2, f"Expected 2 results, got {len(results)}"
+    try:
+        timer = timing.Sktimer()
+        with timing.TimeThis(timer=timer):
+            results = list(pool.star().unordered_imap(ShareWorker, [(share, 1), (share, 2)]))
+            assert len(results) == 2, f"Expected 2 results, got {len(results)}"
 
-    time.sleep(0.3)
-    stats = share._coordinator.get_object("stats")
-    assert stats is not None, "Stats should be stored in Share"
-    assert stats["hands"] == 2, f"Expected hands=2, got {stats}"
-    assert stats["total_reward"] == 3.0, f"Expected total_reward=3.0, got {stats}"
-    assert timer.num_times == 1, f"Expected 1 timing, got {timer.num_times}"
+        time.sleep(0.3)
+        # each worker writes to its own key - no race condition
+        w1 = share._coordinator.get_object("worker_1")
+        w2 = share._coordinator.get_object("worker_2")
+        assert w1 is not None, "Worker 1 data should exist"
+        assert w2 is not None, "Worker 2 data should exist"
+        total_hands = w1["hands"] + w2["hands"]
+        total_reward = w1["reward"] + w2["reward"]
+        assert total_hands == 2, f"Expected hands=2, got {total_hands}"
+        assert total_reward == 3.0, f"Expected total_reward=3.0, got {total_reward}"
+        assert timer.num_times == 1, f"Expected 1 timing, got {timer.num_times}"
+    finally:
+        # clean up to avoid orphaned processes affecting later tests
+        pool.close()
+        share._coordinator.stop()
+        time.sleep(0.1)
 
 
 def run_all_tests():

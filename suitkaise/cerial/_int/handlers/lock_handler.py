@@ -6,7 +6,15 @@ We serialize their type and locked state, then recreate them in the target proce
 
 IMPORTANT LIMITATION: Lock thread ownership does NOT transfer across processes.
 When a lock is reconstructed, it's acquired by the reconstructing thread, not the
-original owning thread. This is a fundamental limitation of serializing thread-local state.
+original owning thread. This is a fundamental Python limitation of serializing thread-local state.
+
+Serializing threads and locks is still important, 
+so I did my best to create a functionally equivalent workaround.
+
+- locks won't fail to serialize
+- locks can be used in the target process.
+
+Cheers
 """
 
 import threading
@@ -60,20 +68,20 @@ class LockHandler(Handler):
         Note: Lock has locked() method, RLock doesn't.
         For RLock, we try acquire(blocking=False) to check state.
         """
-        # Determine lock type by comparing to known lock types
+        # determine lock type by comparing to known lock types
         is_rlock = type(obj) == threading.RLock().__class__
         
         if is_rlock:
             lock_type_name = "RLock"
             # RLock doesn't have locked() method
-            # Try non-blocking acquire to check if it's locked
+            # try non-blocking acquire to check if it's locked
             acquired = obj.acquire(blocking=False)
             if acquired:
-                # We acquired it, so it wasn't locked. Release it.
+                # we acquired it, so it wasn't locked. Release it.
                 obj.release()
                 locked = False
             else:
-                # Couldn't acquire, so it's locked
+                # couldn't acquire, so it's locked
                 locked = True
         else:
             lock_type_name = "Lock"
@@ -92,18 +100,17 @@ class LockHandler(Handler):
         1. Create new lock of the appropriate type
         2. If it was locked, acquire it
         
-        Note: The lock will be owned by whoever calls this method in the
-        target process. This is the best we can do - lock ownership doesn't
-        transfer across processes.
+        NOTE: The lock will be owned by whoever calls this method in the
+        target process. This is the best we can do.
         """
-        # Create new lock of appropriate type
+        # create new lock of appropriate type
         if state["lock_type"] == "RLock":
             lock = threading.RLock()
         else:
             lock = threading.Lock()
         
-        # If lock was acquired, acquire it in new process
-        # This is a best-effort reconstruction - the owner will be different
+        # if lock was acquired, acquire it in new process
+        # this is the best we can do - lock ownership doesn't transfer to the target process
         if state["locked"]:
             lock.acquire()
         
@@ -138,14 +145,14 @@ class SemaphoreHandler(Handler):
         """
         is_bounded = isinstance(obj, threading.BoundedSemaphore)
         
-        # Try to get current value (internal attribute name varies)
+        # try to get current value (internal attribute name varies)
         try:
             current_value = obj._value
         except AttributeError:
-            # Fallback: assume it's at initial value
+            # fallback: assume it's at initial value
             current_value = 1
         
-        # Try to get initial value for BoundedSemaphore
+        # try to get initial value for BoundedSemaphore
         if is_bounded:
             try:
                 initial_value = obj._initial_value
@@ -174,14 +181,14 @@ class SemaphoreHandler(Handler):
         initial = state["initial_value"]
         current = state["current_value"]
         
-        # Create semaphore of appropriate type
+        # create semaphore of appropriate type
         if state["semaphore_type"] == "BoundedSemaphore":
             sem = threading.BoundedSemaphore(initial)
         else:
             sem = threading.Semaphore(initial)
         
-        # Adjust to current value by acquiring
-        # If current < initial, we need to acquire (initial - current) times
+        # adjust to current value by acquiring
+        # if current < initial, we need to acquire (initial - current) times
         while initial > current:
             sem.acquire()
             initial -= 1
@@ -257,7 +264,7 @@ class ConditionHandler(Handler):
         The lock will be recursively serialized by the central serializer.
         """
         return {
-            "lock": obj._lock,  # Will be recursively serialized
+            "lock": obj._lock,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> threading.Condition:

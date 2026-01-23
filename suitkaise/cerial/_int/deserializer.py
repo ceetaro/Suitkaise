@@ -91,7 +91,7 @@ class _ReconstructionPlaceholder:
     def __init__(self, obj_id: int, type_name: str):
         self.obj_id = obj_id
         self.type_name = type_name
-        self.real_object = None  # Will be set after reconstruction
+        self.real_object = None  # will be set after reconstruction
     
     def __repr__(self):
         return f"<Placeholder for {self.type_name} id={self.obj_id}>"
@@ -127,28 +127,28 @@ class Decerializer:
         self.debug = debug
         self.verbose = verbose
         
-        # Object registry: maps object_id -> reconstructed object
-        # Used for circular reference handling
+        # object registry: maps object_id -> reconstructed object
+        # used for circular reference handling
         self._object_registry: Dict[int, Any] = {}
         
-        # Reconstruction path: tracks current position in object tree
-        # Used for error reporting
+        # reconstruction path: tracks current position in object tree
+        # used for error reporting
         self._reconstruction_path: List[str] = []
         
-        # Reconstruction depth: tracks how deep we are in recursion
+        # reconstruction depth: tracks how deep we are in recursion
         self._reconstruction_depth: int = 0
         
-        # Track collections currently being reconstructed (by python id) to detect cycles
+        # track collections currently being reconstructed (by python id) to detect cycles
         self._reconstructing: set = set()
         
-        # Cache reconstructed IR objects to handle pickle's object deduplication
-        # If pickle deduplicated an object (same IR dict/list appears multiple times),
-        # we should return the same reconstructed object each time
+        # cache reconstructed IR objects to handle pickle's object deduplication
+        # if pickle deduplicated an object (same IR dict/list appears multiple times),
+        #   we should return the same reconstructed object each time
         self._reconstructed_cache: Dict[int, Any] = {}
         
         # Debug tracking
-        self._all_registered_ids: set = set()  # All IDs registered in pass 1
-        self._all_encountered_refs: set = set()  # All __cerial_ref__ values encountered
+        self._all_registered_ids: set = set()  # all IDs registered in pass 1
+        self._all_encountered_refs: set = set()  # all __cerial_ref__ values encountered
     
     def deserialize(self, data: bytes) -> Any:
         """
@@ -168,11 +168,11 @@ class Decerializer:
             DeserializationError: If reconstruction fails
         """
         try:
-            # STEP 1: Unpickle bytes to get intermediate representation
+            # inpickle bytes to get intermediate representation
             self._log("Unpickling bytes to intermediate representation...")
             ir = pickle.loads(data)
             
-            # STEP 2: Clear state for fresh reconstruction
+            # clear state for fresh reconstruction
             self._object_registry.clear()
             self._reconstruction_path.clear()
             self._reconstruction_depth = 0
@@ -181,16 +181,16 @@ class Decerializer:
             self._all_registered_ids = set()
             self._all_encountered_refs = set()
             
-            # STEP 3: PASS 1 - Register placeholders for all objects with __object_id__
+            # PASS 1 - register placeholders for all objects with __object_id__
             self._log("Pass 1: Registering placeholders for all objects...")
             self._register_all_placeholders(ir)
             self._log(f"  Registered {len(self._object_registry)} placeholders")
             
-            # STEP 4: PASS 2 - Reconstruct the object tree
+            # PASS 2 - reconstruct the object tree
             self._log("Pass 2: Reconstructing objects...")
             result = self._reconstruct_recursive(ir)
             
-            # STEP 5: Return the final reconstructed object
+            # return the final reconstructed object
             self._log(f"Deserialization complete! Reconstructed {type(result).__name__}")
             return result
             
@@ -216,16 +216,16 @@ class Decerializer:
         Returns:
             Fully reconstructed Python object
         """
-        # STEP 1: Track recursion depth
+        # track recursion depth
         self._reconstruction_depth += 1
         try:
-            # STEP 1a: Check cache for already-reconstructed IR objects
-            # This handles pickle's object deduplication (same dict/list appearing multiple times)
+            # check cache for already-reconstructed IR objects
+            # this handles pickle's object deduplication (same dict/list appearing multiple times)
             ir_id = id(ir_data)
             if ir_id in self._reconstructed_cache:
                 return self._reconstructed_cache[ir_id]
             
-            # STEP 2: Check for circular reference marker
+            # check for circular reference marker
             if self._is_circular_reference(ir_data):
                 if self.debug:
                     obj_id = ir_data["__cerial_ref__"]
@@ -233,34 +233,34 @@ class Decerializer:
                     self._log(f"  Current registry has: {list(self._object_registry.keys())}")
                 return self._resolve_circular_reference(ir_data)
             
-            # STEP 3: Check if data is primitive (already final, no work needed)
+            # check if data is primitive (already final, no work needed)
             if self._is_primitive(ir_data):
                 return ir_data
             
-            # STEP 3a: Check if data is a special collections type that pickle handled correctly
-            # These are dict/list subclasses that would otherwise be caught by _is_basic_collection
-            # but should be returned as-is since pickle preserved their type
+            # check if data is a special collections type that pickle handled correctly
+            # these are dict/list subclasses that would otherwise be caught by _is_basic_collection
+            #   but should be returned as-is since pickle preserved their type
             if self._is_special_collection_type(ir_data):
                 return ir_data
             
-            # STEP 4: Check if data has cerial metadata (needs handler reconstruction)
-            # IMPORTANT: Check this BEFORE basic collections, because cerial objects
-            # are dicts with special markers
+            # check if data has cerial metadata (needs handler reconstruction)
+            # NOTE: Check this BEFORE basic collections, because cerial objects
+            #   are dicts with special markers
             if self._has_cerial_metadata(ir_data):
                 return self._reconstruct_from_handler(ir_data)
             
-            # STEP 5: Check if data is a basic collection (needs recursive processing)
+            # check if data is a basic collection (needs recursive processing)
             if self._is_basic_collection(ir_data):
                 data_id = id(ir_data)
                 
-                # Check if we're already reconstructing this exact IR object
+                # check if we're already reconstructing this exact IR object
                 if data_id in self._reconstructing:
-                    # This happens when pickle deduplicated an object and it appears
-                    # in multiple places in the IR. We're currently reconstructing it,
-                    # so we need to register a placeholder and return it.
-                    # The placeholder will be replaced with the final result once complete.
+                    # this happens when pickle deduplicated an object and it appears
+                    #   in multiple places in the IR. We're currently reconstructing it,
+                    #   so we need to register a placeholder and return it.
+                    # the placeholder will be replaced with the final result once complete.
                     
-                    # For mutable collections (dict, list, set), create empty placeholder
+                    # for mutable collections (dict, list, set), create empty placeholder
                     if isinstance(ir_data, dict):
                         placeholder = {}
                     elif isinstance(ir_data, list):
@@ -268,24 +268,24 @@ class Decerializer:
                     elif isinstance(ir_data, set):
                         placeholder = set()
                     else:
-                        # For immutable collections (tuple, frozenset), we can't use placeholders
-                        # This is a true circular reference that can't be handled
+                        # for immutable collections (tuple, frozenset), we can't use placeholders
+                        # this is a true circular reference that can't be handled
                         raise DeserializationError(
                             f"Cannot reconstruct immutable collection {type(ir_data).__name__} "
                             f"that references itself. Immutable circular refs are not supported."
                         )
                     
-                    # Cache the placeholder
+                    # cache the placeholder
                     self._reconstructed_cache[data_id] = placeholder
                     return placeholder
                 
-                # Mark as currently reconstructing
+                # mark as currently reconstructing
                 self._reconstructing.add(data_id)
                 try:
-                    # Reconstruct the collection
+                    # reconstruct the collection
                     result = self._reconstruct_collection(ir_data)
                     
-                    # If we created a placeholder earlier, update it instead of caching a new object
+                    # if we created a placeholder earlier, update it instead of caching a new object
                     if data_id in self._reconstructed_cache:
                         placeholder = self._reconstructed_cache[data_id]
                         if isinstance(placeholder, dict) and isinstance(result, dict):
@@ -298,18 +298,18 @@ class Decerializer:
                             placeholder.update(result)
                             return placeholder
                     
-                    # Cache the result for future references
+                    # cache the result for future references
                     self._reconstructed_cache[data_id] = result
                     return result
                 finally:
                     self._reconstructing.discard(data_id)
             
-            # STEP 6: If none of above, return as-is
-            # This handles edge cases like type objects, modules, etc that pickle handles
+            # if none of above, return as-is
+            # this handles edge cases like type objects, modules, etc that pickle handles
             return ir_data
             
         finally:
-            # Always decrement depth on exit
+            # always decrement depth on exit
             self._reconstruction_depth -= 1
     
     def _register_all_placeholders(self, data: Any, visited: Optional[set] = None) -> None:
@@ -326,31 +326,31 @@ class Decerializer:
         if visited is None:
             visited = set()
         
-        # Avoid infinite loops from Python's own object cycles
+        # avoid infinite loops from Python's own object cycles
         data_id = id(data)
         if data_id in visited:
             return
         visited.add(data_id)
         
-        # Check if this is a cerial object with __object_id__
+        # check if this is a cerial object with __object_id__
         if isinstance(data, dict):
             if "__object_id__" in data:
                 obj_id = data["__object_id__"]
                 type_name = data.get("__cerial_type__", "unknown")
                 
-                # Only register if not already registered
+                # only register if not already registered
                 if obj_id not in self._object_registry:
                     placeholder = _ReconstructionPlaceholder(obj_id, type_name)
                     self._object_registry[obj_id] = placeholder
                     self._all_registered_ids.add(obj_id)
                     self._log(f"  Registered placeholder for {type_name} (id={obj_id})")
             
-            # Recursively scan all dict values
+            # recursively scan all dict values
             for value in data.values():
                 self._register_all_placeholders(value, visited)
         
         elif isinstance(data, (list, tuple)):
-            # Recursively scan all list/tuple items
+            # recursively scan all list/tuple items
             for item in data:
                 self._register_all_placeholders(item, visited)
     
@@ -360,14 +360,15 @@ class Decerializer:
         
         Format: {"__cerial_ref__": object_id}
         """
-        # Must be a dict with exactly one key: "__cerial_ref__"
+        # must be a dict with exactly one key: "__cerial_ref__"
         if isinstance(data, dict):
             if "__cerial_ref__" in data:
                 if len(data) == 1:
                     return True
                 else:
-                    # This is a bug - dict has __cerial_ref__ but also other keys
-                    # This shouldn't happen!
+                    # if you reach this else statement...
+                    # this is a bug - dict has __cerial_ref__ but also other keys
+                    # this shouldn't happen!
                     import sys
                     print(f"WARNING: Found dict with __cerial_ref__ AND other keys: {list(data.keys())}", file=sys.stderr)
         return False
@@ -382,11 +383,11 @@ class Decerializer:
         obj_id = data["__cerial_ref__"]
         self._all_encountered_refs.add(obj_id)
         
-        # Look up the object in our registry
+        # look up the object in our registry
         if obj_id in self._object_registry:
             obj = self._object_registry[obj_id]
             
-            # If it's still a placeholder, that's okay - we'll replace it later
+            # if it's still a placeholder, that's okay - we'll replace it later
             if isinstance(obj, _ReconstructionPlaceholder):
                 self._log(f"Resolved circular reference to placeholder {obj_id}")
             else:
@@ -394,7 +395,7 @@ class Decerializer:
             
             return obj
         
-        # This should never happen with two-pass reconstruction!
+        # this should never happen with two-pass reconstruction!
         raise DeserializationError(
             f"Circular reference to object {obj_id} not found in registry. "
             f"This suggests a bug in the two-pass reconstruction."
@@ -412,7 +413,7 @@ class Decerializer:
         try:
             import collections
             
-            # Check if it's a collections module type
+            # check if it's a collections module type
             if isinstance(data, (
                 collections.Counter,
                 collections.defaultdict,
@@ -432,7 +433,7 @@ class Decerializer:
         
         Primitives: int, float, str, bool, None, bytes, complex, Ellipsis
         """
-        # These types are already final - they came through pickle unchanged
+        # these types are already final - they came through pickle unchanged
         return isinstance(data, (
             type(None),
             bool,
@@ -453,8 +454,8 @@ class Decerializer:
         Basic collections: list, tuple, set, frozenset, dict
         These need recursive reconstruction but don't use handlers.
         """
-        # Note: We check isinstance for each type individually
-        # Can't check dict with __cerial_type__ here - that's handled separately
+        # NOTE: We check isinstance for each type individually
+        # can't check dict with __cerial_type__ here - that's handled separately
         return isinstance(data, (list, tuple, set, frozenset, dict))
     
     def _reconstruct_collection(self, data: Any) -> Any:
@@ -469,23 +470,23 @@ class Decerializer:
         These are simple collections from the original serialized data that
         pickle handled, not cerial-wrapped ones.
         """
-        # List: reconstruct each element
+        # list: reconstruct each element
         if isinstance(data, list):
             return [self._reconstruct_recursive(item) for item in data]
         
-        # Tuple: reconstruct each element, convert to tuple
+        # tuple: reconstruct each element, convert to tuple
         if isinstance(data, tuple):
             return tuple(self._reconstruct_recursive(item) for item in data)
         
-        # Set: reconstruct each element, convert to set
+        # set: reconstruct each element, convert to set
         if isinstance(data, set):
             return {self._reconstruct_recursive(item) for item in data}
         
-        # Frozenset: reconstruct each element, convert to frozenset
+        # frozenset: reconstruct each element, convert to frozenset
         if isinstance(data, frozenset):
             return frozenset(self._reconstruct_recursive(item) for item in data)
         
-        # Dict: reconstruct both keys and values
+        # dict: reconstruct both keys and values
         if isinstance(data, dict):
             # Plain dict: reconstruct keys and values
             return {
@@ -493,7 +494,7 @@ class Decerializer:
                 for k, v in data.items()
             }
         
-        # Shouldn't reach here
+        # shouldn't reach here
         return data
     
     def _has_cerial_metadata(self, data: Any) -> bool:
@@ -504,11 +505,11 @@ class Decerializer:
         1. Handler objects: {"__cerial_type__", "__handler__", "state", "__object_id__"?}
         2. Wrapped collections: {"__cerial_type__": "dict/tuple/set/frozenset", "items": [...]}
         """
-        # Must be a dict with cerial markers
+        # must be a dict with cerial markers
         if not isinstance(data, dict):
             return False
         
-        # Check for __cerial_type__ marker
+        # check for __cerial_type__ marker
         return "__cerial_type__" in data
     
     def _reconstruct_from_handler(self, data: Dict[str, Any]) -> Any:
@@ -524,32 +525,32 @@ class Decerializer:
         """
         type_name = data["__cerial_type__"]
         
-        # Check if this is a wrapped pickle-native object (just needs unwrapping)
+        # check if this is a wrapped pickle-native object (just needs unwrapping)
         if type_name == "pickle_native":
             return self._reconstruct_pickle_native(data)
         
-        # Check if this is a pickle-native function (module-level function by reference)
+        # check if this is a pickle-native function (module-level function by reference)
         if type_name == "pickle_native_func":
             return self._reconstruct_pickle_native_func(data)
         
-        # Check if this is a simple instance (fast path - no handler needed)
+        # check if this is a simple instance (fast path - no handler needed)
         if type_name == "simple_class_instance":
             return self._reconstruct_simple_instance(data)
         
-        # Check if this is a wrapped collection (no handler, just items)
+        # check if this is a wrapped collection (no handler, just items)
         if "__handler__" not in data and "items" in data:
             return self._reconstruct_wrapped_collection(data)
         
-        # Otherwise, it's a handler object
+        # otherwise, it's a handler object
         handler_name = data.get("__handler__")
         obj_id = data.get("__object_id__")
         state = data.get("state")
         
-        # Update path for error reporting
+        # update path for error reporting
         self._reconstruction_path.append(type_name)
         
         try:
-            # STEP 1: Find the appropriate handler
+            # find the appropriate handler
             handler = self._find_handler(type_name, handler_name)
             if handler is None:
                 raise DeserializationError(
@@ -560,8 +561,8 @@ class Decerializer:
                 indent = "  " * min(self._reconstruction_depth - 1, 5)
                 self._log(f"{indent}[{self._reconstruction_depth}] Reconstructing {type_name} with {handler_name}")
             
-            # STEP 2: Get placeholder if it exists (from pass 1)
-            # If no obj_id, we won't have/need a placeholder
+            # get placeholder if it exists (from pass 1)
+            # if no obj_id, we won't have/need a placeholder
             placeholder = None
             if obj_id is not None:
                 placeholder = self._object_registry.get(obj_id)
@@ -572,12 +573,12 @@ class Decerializer:
                     self._log(f"Object {obj_id} already reconstructed, returning cached")
                     return placeholder
             
-            # STEP 3: Recursively reconstruct all values in state
-            # This ensures the handler receives fully-reconstructed state
-            # If state has circular refs back to this object, they'll resolve to the placeholder
+            # recursively reconstruct all values in state
+            # this ensures the handler receives fully-reconstructed state
+            # if state has circular refs back to this object, they'll resolve to the placeholder
             reconstructed_state = self._reconstruct_state_dict(state)
             
-            # STEP 4: Call handler.reconstruct(state)
+            # call handler.reconstruct(state)
             try:
                 obj = handler.reconstruct(reconstructed_state)
             except Exception as e:
@@ -585,23 +586,23 @@ class Decerializer:
                     self._format_error(e, data, handler)
                 ) from e
             
-            # STEP 5: Replace placeholder with real object in registry
+            # replace placeholder with real object in registry
             if obj_id is not None:
                 self._object_registry[obj_id] = obj
                 placeholder.real_object = obj  # Update placeholder for any existing references
                 self._log(f"Replaced placeholder with real object {obj_id} ({type_name})")
             
-            # STEP 6: Post-process to replace placeholders in the reconstructed object
-            # If the state contained circular refs, the handler received placeholders
-            # We need to replace those with the real object
+            # post-process to replace placeholders in the reconstructed object
+            # if the state contained circular refs, the handler received placeholders
+            # we need to replace those with the real object
             if placeholder is not None:
                 self._replace_placeholders_in_object(obj, placeholder, obj)
             
-            # STEP 7: Return reconstructed object
+            # return reconstructed object
             return obj
             
         finally:
-            # Always clean up path
+            # always clean up path
             self._reconstruction_path.pop()
     
     def _reconstruct_pickle_native(self, data: Dict[str, Any]) -> Any:
@@ -616,7 +617,7 @@ class Decerializer:
         obj_id = data.get("__object_id__")
         value = data["value"]
         
-        # Register the object if it has an ID (for circular refs)
+        # register the object if it has an ID (for circular refs)
         if obj_id is not None:
             self._object_registry[obj_id] = value
             self._all_registered_ids.add(obj_id)
@@ -636,7 +637,7 @@ class Decerializer:
         obj_id = data.get("__object_id__")
         value = data["value"]
         
-        # Register the function if it has an ID (for circular refs)
+        # register the function if it has an ID (for circular refs)
         if obj_id is not None:
             self._object_registry[obj_id] = value
             self._all_registered_ids.add(obj_id)
@@ -666,7 +667,7 @@ class Decerializer:
         qualname = data["qualname"]
         attrs = data["attrs"]
         
-        # Import the class
+        # import the class
         try:
             module = importlib.import_module(module_name)
         except ImportError as e:
@@ -675,7 +676,7 @@ class Decerializer:
                 f"Ensure the module exists in the target process."
             ) from e
         
-        # Navigate to class using qualname (handles nested classes like Outer.Inner)
+        # navigate to class using qualname (handles nested classes like Outer.Inner)
         parts = qualname.split('.')
         cls = module
         for part in parts:
@@ -687,15 +688,15 @@ class Decerializer:
                     f"Ensure the class definition exists in the target process."
                 ) from e
         
-        # Create instance using __new__ (skip __init__)
+        # create instance using __new__ (skip __init__)
         obj = cls.__new__(cls)
         
-        # Register in object registry for circular reference resolution
+        # register in object registry for circular reference resolution
         if obj_id is not None:
             self._object_registry[obj_id] = obj
             self._all_registered_ids.add(obj_id)
         
-        # Populate __dict__ directly (attrs are all primitives, no reconstruction needed)
+        # populate __dict__ directly (attrs are all primitives, no reconstruction needed)
         obj.__dict__.update(attrs)
         
         self._log(f"Reconstructed simple instance: {qualname}")
@@ -721,13 +722,13 @@ class Decerializer:
         obj_id = data.get("__object_id__")
         
         if type_name == "dict":
-            # Create empty dict placeholder if circular-capable
+            # create empty dict placeholder if circular-capable
             if obj_id is not None:
-                # Register empty placeholder first
+                # register empty placeholder first
                 placeholder = {}
                 self._object_registry[obj_id] = placeholder
                 
-                # Now reconstruct contents (may reference placeholder)
+                # now reconstruct contents (may reference placeholder)
                 for k, v in items:
                     reconstructed_key = self._reconstruct_recursive(k)
                     reconstructed_value = self._reconstruct_recursive(v)
@@ -735,65 +736,65 @@ class Decerializer:
                 
                 return placeholder
             else:
-                # No circular refs, simple reconstruction
+                # no circular refs, simple reconstruction
                 return {
                     self._reconstruct_recursive(k): self._reconstruct_recursive(v)
                     for k, v in items
                 }
         
         elif type_name == "list":
-            # Lists need special handling - can't pre-create with contents
+            # lists need special handling - can't pre-create with contents
             if obj_id is not None:
-                # Register empty placeholder first
+                # register empty placeholder first
                 placeholder = []
                 self._object_registry[obj_id] = placeholder
                 
-                # Now reconstruct and append items (may reference placeholder)
+                # now reconstruct and append items (may reference placeholder)
                 for item in items:
                     reconstructed_item = self._reconstruct_recursive(item)
                     placeholder.append(reconstructed_item)
                 
                 return placeholder
             else:
-                # No circular refs, simple reconstruction
+                # no circular refs, simple reconstruction
                 return [self._reconstruct_recursive(item) for item in items]
         
         elif type_name == "tuple":
-            # Tuples are immutable - can't do two-pass
-            # If there's a circular ref to a tuple, we have a problem!
-            # But tuples with circular refs are rare (can't add to themselves after creation)
+            # tuples are immutable - can't do two-pass
+            # if there's a circular ref to a tuple, we have a problem!
+            # but tuples with circular refs are rare (can't add to themselves after creation)
             reconstructed_items = [self._reconstruct_recursive(item) for item in items]
             result = tuple(reconstructed_items)
             
-            # Register after reconstruction
+            # register after reconstruction
             if obj_id is not None:
                 self._object_registry[obj_id] = result
             
             return result
         
         elif type_name == "set":
-            # Sets are mutable, use two-pass
+            # sets are mutable, use two-pass
             if obj_id is not None:
-                # Register empty placeholder first
+                # register empty placeholder first
                 placeholder = set()
                 self._object_registry[obj_id] = placeholder
                 
-                # Now reconstruct and add items (may reference placeholder)
+                # now reconstruct and add items (may reference placeholder)
                 for item in items:
                     reconstructed_item = self._reconstruct_recursive(item)
                     placeholder.add(reconstructed_item)
                 
                 return placeholder
             else:
-                # No circular refs, simple reconstruction
+                # no circular refs, simple reconstruction
                 return {self._reconstruct_recursive(item) for item in items}
         
         elif type_name == "frozenset":
-            # Frozensets are immutable - same as tuple
+            # frozensets are immutable - same as tuple
             reconstructed_items = [self._reconstruct_recursive(item) for item in items]
             result = frozenset(reconstructed_items)
             
-            # Register after reconstruction
+            # register after reconstruction
             if obj_id is not None:
                 self._object_registry[obj_id] = result
             
@@ -810,21 +811,21 @@ class Decerializer:
         
         Returns None if no matching handler found.
         """
-        # First, try to find by type_name (fast path)
+        # first, try to find by type_name (fast path)
         for handler in self.handlers:
             if handler.type_name == type_name:
                 # Double-check the handler class name matches
                 if handler.__class__.__name__ == handler_name:
                     return handler
         
-        # If not found, try matching just by handler class name
+        # if not found, try matching just by handler class name
         # (in case type_name changed between versions)
         for handler in self.handlers:
             if handler.__class__.__name__ == handler_name:
                 self._log(f"Warning: Handler found by name '{handler_name}' but type_name doesn't match")
                 return handler
         
-        # No handler found
+        # no handler found
         return None
     
     def _reconstruct_state_dict(self, state: Any) -> Dict[str, Any]:
@@ -837,20 +838,20 @@ class Decerializer:
         The state itself might be a wrapped collection, so we need to
         reconstruct it first.
         """
-        # First, check if state itself is a wrapped collection
+        # first, check if state itself is a wrapped collection
         if isinstance(state, dict) and "__cerial_type__" in state:
             # State is wrapped - reconstruct it first
             state = self._reconstruct_recursive(state)
         
-        # Now state should be a plain dict - reconstruct its values
+        # now state should be a plain dict - reconstruct its values
         if not isinstance(state, dict):
             # State is not a dict (shouldn't happen, but handle gracefully)
             return state
         
-        # Recursively reconstruct each value in the state dict
+        # recursively reconstruct each value in the state dict
         reconstructed = {}
         for key, value in state.items():
-            # Keys are typically strings, but reconstruct them just in case
+            # keys are typically strings, but reconstruct them just in case
             reconstructed_key = self._reconstruct_recursive(key) if not isinstance(key, str) else key
             reconstructed_value = self._reconstruct_recursive(value)
             reconstructed[reconstructed_key] = reconstructed_value
@@ -870,7 +871,7 @@ class Decerializer:
             placeholder: Placeholder to search for
             real_obj: Real object to replace placeholder with
         """
-        # Handle objects with __dict__
+        # handle objects with __dict__
         if hasattr(obj, '__dict__'):
             for key, value in obj.__dict__.items():
                 if value is placeholder:
@@ -884,7 +885,7 @@ class Decerializer:
                         if v is placeholder:
                             value[k] = real_obj
         
-        # Handle objects with __slots__
+        # handle objects with __slots__
         if hasattr(type(obj), '__slots__'):
             for slot in type(obj).__slots__:
                 try:
@@ -928,15 +929,15 @@ class Decerializer:
         lines.append("DESERIALIZATION ERROR")
         lines.append("=" * 70)
         
-        # What went wrong
+        # what went wrong
         lines.append(f"\nError: {type(error).__name__}: {error}")
         
-        # Where it happened (path through object tree)
+        # where it happened (path through object tree)
         if self._reconstruction_path:
             path_str = " → ".join(self._reconstruction_path)
             lines.append(f"\nPath: {path_str}")
         
-        # What was being reconstructed
+        # what was being reconstructed
         if isinstance(ir_data, dict):
             type_name = ir_data.get("__cerial_type__", "unknown")
             lines.append(f"Type: {type_name}")

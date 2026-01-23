@@ -5,9 +5,11 @@ Includes Thread objects, Executors, and threading.local storage.
 """
 
 import threading
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from typing import Any, Dict
 from .base_class import Handler
+from .reconnector import Reconnector
 
 
 class ThreadingSerializationError(Exception):
@@ -15,9 +17,33 @@ class ThreadingSerializationError(Exception):
     pass
 
 
+@dataclass
+class ThreadReconnector(Reconnector):
+    """
+    Recreate a thread from serialized thread metadata.
+    
+    Use reconnect() to build a new Thread. The thread is NOT started
+    automatically unless auto_start=True is provided.
+    """
+    state: Dict[str, Any]
+    
+    def reconnect(self, auto_start: bool = False, **kwargs: Any) -> threading.Thread:
+        thread = threading.Thread(
+            name=self.state["name"],
+            target=self.state["target"],
+            args=self.state["args"],
+            kwargs=self.state["kwargs"],
+            daemon=self.state["daemon"],
+        )
+        if auto_start:
+            thread.start()
+        return thread
+
+
+
 class ThreadHandler(Handler):
     """
-    Serializes threading.Thread objects (8% importance).
+    Serializes threading.Thread objects.
     
     Threads are execution contexts. We can't truly serialize a running thread,
     but we can capture its configuration.
@@ -56,30 +82,19 @@ class ThreadHandler(Handler):
             "is_alive": obj.is_alive(),
         }
     
-    def reconstruct(self, state: Dict[str, Any]) -> threading.Thread:
+    def reconstruct(self, state: Dict[str, Any]) -> ThreadReconnector:
         """
         Reconstruct thread.
         
-        Creates new thread with same configuration.
-        Note: Thread is NOT started automatically. User must call start().
+        Returns a ThreadReconnector. User can call reconnect() to create
+        a new thread (not started by default).
         """
-        thread = threading.Thread(
-            name=state["name"],
-            target=state["target"],
-            args=state["args"],
-            kwargs=state["kwargs"],
-            daemon=state["daemon"]
-        )
-        
-        # Don't start the thread automatically - let user decide
-        # This prevents unexpected execution
-        
-        return thread
+        return ThreadReconnector(state=state)
 
 
 class ThreadPoolExecutorHandler(Handler):
     """
-    Serializes ThreadPoolExecutor objects (7% importance).
+    Serializes ThreadPoolExecutor objects.
     
     Executors manage pools of threads/processes for parallel execution.
     We serialize the configuration, not running tasks.
@@ -122,7 +137,7 @@ class ThreadPoolExecutorHandler(Handler):
 
 class ProcessPoolExecutorHandler(Handler):
     """
-    Serializes ProcessPoolExecutor objects (7% importance).
+    Serializes ProcessPoolExecutor objects.
     
     Similar to ThreadPoolExecutor but for processes.
     """
@@ -157,7 +172,7 @@ class ProcessPoolExecutorHandler(Handler):
 
 class ThreadLocalHandler(Handler):
     """
-    Serializes threading.local objects (2% importance).
+    Serializes threading.local objects.
     
     threading.local provides thread-local storage - each thread
     sees its own values. We serialize the current thread's values.
@@ -176,7 +191,7 @@ class ThreadLocalHandler(Handler):
         What we capture:
         - data: Dict of current thread's local values
         
-        Note: Only the CURRENT thread's values are serialized.
+        NOTE: Only the CURRENT thread's values are serialized.
         Other threads' values are lost (which is usually fine since
         we're serializing for a different process anyway).
         """

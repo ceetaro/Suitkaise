@@ -815,3 +815,441 @@ poker machine simulation
 creating a language app based on the most common words
 
 - scan japanese website text and find the most common words and characters
+
+
+---
+
+# Reconnectors
+
+## What are Reconnectors?
+
+When `cerial` serializes objects, some resources cannot be directly pickled:
+- Database connections (sockets to remote servers)
+- Network sockets
+- File handles and pipes
+- Threads
+- Compiled regex matches
+
+Instead of failing, `cerial` replaces these with **Reconnector** placeholder objects that store enough metadata to recreate the resource later.
+
+```
+Original Object ──serialize──> Reconnector Placeholder ──reconnect()──> New Live Resource
+```
+
+### Reconnector types in cerial
+
+| Reconnector | Original Type | Stored Metadata |
+|-------------|--------------|-----------------|
+| `DbReconnector` | Database connections | module, class_name, connection params |
+| `SocketReconnector` | `socket.socket` | family, type, proto, addresses |
+| `PipeReconnector` | Pipe file objects | mode, direction |
+| `ThreadReconnector` | `threading.Thread` | name, daemon, target, args |
+| `SubprocessReconnector` | `subprocess.Popen` | args, returncode, output |
+| `MatchReconnector` | `re.Match` | pattern, string, pos, groups |
+
+---
+
+## Using Reconnector.reconnect()
+
+Each Reconnector has a `reconnect(**kwargs)` method that creates a new live resource.
+
+### Resources that don't need auth
+
+These reconnect automatically with no kwargs:
+
+```python
+from suitkaise import cerial
+
+# Serialize object with sockets, pipes, threads, sqlite, etc.
+data = cerial.serialize(my_object)
+restored = cerial.deserialize(data)
+
+# restored.socket is a SocketReconnector, not a socket
+# Call reconnect() to get a live socket
+restored.socket = restored.socket.reconnect()
+
+# Or reconnect everything at once
+restored = cerial.reconnect_all(restored)
+```
+
+### Resources that need auth/credentials
+
+Pass connection parameters as kwargs:
+
+```python
+# Deserialize - db connection becomes DbReconnector
+restored = cerial.deserialize(data)
+
+# restored.db is a DbReconnector, needs credentials to reconnect
+restored.db = restored.db.reconnect(
+    host="localhost",
+    user="myuser",
+    password="secret",
+    database="mydb"
+)
+```
+
+---
+
+## Using reconnect_all()
+
+Instead of calling `.reconnect()` on each Reconnector individually, use `reconnect_all()` to traverse an object and reconnect everything:
+
+```python
+from suitkaise import cerial
+
+data = cerial.serialize(my_object)
+restored = cerial.deserialize(data)
+
+# Reconnect all Reconnectors with credentials
+restored = cerial.reconnect_all(restored, **{
+    "psycopg2.Connection": {
+        "*": {"host": "localhost", "password": "secret"},
+    },
+    "redis.Redis": {
+        "*": {"password": "redis_pass"},
+    },
+})
+```
+
+### kwargs structure
+
+```python
+{
+    "TypeKey": {
+        "*": {...},           # defaults for all instances of this type
+        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+    }
+}
+```
+
+- **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`)
+- **`"*"`** provides defaults for all instances of that type
+- **Specific attr names** override/merge with defaults
+
+### Multiple connections of same type
+
+```python
+restored = cerial.reconnect_all(restored, **{
+    "psycopg2.Connection": {
+        "*": {  # default for all postgres connections
+            "host": "localhost",
+            "user": "myuser",
+            "password": "default_pass",
+        },
+        "analytics_db": {  # override for self.analytics_db
+            "password": "analytics_pass",
+        },
+    },
+})
+```
+
+### No kwargs needed
+
+For resources without auth, just call with no kwargs:
+
+```python
+# Sockets, threads, pipes, sqlite files, regex matches, etc.
+restored = cerial.reconnect_all(restored)
+```
+
+---
+
+## Supported database kwargs
+
+Each database type uses its native connection parameters:
+
+### PostgreSQL (psycopg2)
+
+```python
+"psycopg2.Connection": {
+    "*": {
+        "host": "localhost",
+        "port": 5432,
+        "user": "myuser",
+        "password": "secret",
+        "database": "mydb",
+        # or use dsn...
+        "dsn": "postgresql://user:password@host:port/dbname"
+    }
+}
+```
+
+### MySQL (pymysql)
+
+```python
+"pymysql.Connection": {
+    "*": {
+        "host": "localhost",
+        "port": 3306,
+        "user": "myuser",
+        "password": "secret",
+        "database": "mydb",
+    }
+}
+```
+
+### MongoDB (pymongo)
+
+```python
+"pymongo.Mongoclient": {
+    "*": {
+        "host": "localhost",
+        "port": 27017,
+        "username": "myuser",
+        "password": "secret",
+        # or use uri...
+        "uri": "mongodb://user:password@host:port/dbname"
+    }
+}
+```
+
+### Redis
+
+```python
+"redis.Redis": {
+    "*": {
+        "host": "localhost",
+        "port": 6379,
+        "password": "secret",
+        "db": 0,
+        # or use url...
+        "url": "redis://user:password@host:port/db"
+    }
+}
+```
+
+### Cassandra
+
+```python
+"cassandra.Cluster": {
+    "*": {
+        "contact_points": ["127.0.0.1"],
+        "port": 9042,
+        "username": "myuser",
+        "password": "secret",
+    }
+}
+```
+
+### Elasticsearch
+
+```python
+"elasticsearch.Elasticsearch": {
+    "*": {
+        "hosts": ["localhost:9200"],
+        "http_auth": ("user", "password"),
+        # or use api_key...
+        "api_key": "key",
+    }
+}
+```
+
+### SQLAlchemy
+
+```python
+"sqlalchemy.Engine": {
+    "*": {
+        "url": "postgresql://user:password@host:port/dbname",
+        # or build from params...
+        "driver": "postgresql",
+        "host": "localhost",
+        "port": 5432,
+        "user": "myuser",
+        "password": "secret",
+        "database": "mydb",
+    }
+}
+```
+
+### ODBC (pyodbc)
+
+```python
+"pyodbc.Connection": {
+    "*": {
+        "dsn": "DSN=mydsn;UID=user;PWD=password",
+        # or build from params...
+        "driver": "ODBC Driver 17 for SQL Server",
+        "server": "localhost",
+        "port": 1433,
+        "database": "mydb",
+        "user": "myuser",
+        "password": "secret",
+    }
+}
+```
+
+### Neo4j
+
+```python
+"neo4j.Driver": {
+    "*": {
+        "uri": "bolt://localhost:7687",
+        "user": "neo4j",
+        "password": "secret",
+        # or build uri from params...
+        "scheme": "bolt",
+        "host": "localhost",
+        "port": 7687,
+    }
+}
+```
+
+### InfluxDB v2
+
+```python
+"influxdb_client.Influxdbclient": {
+    "*": {
+        "url": "http://localhost:8086",
+        "token": "my-token",
+        "org": "my-org",
+        # or build url from params...
+        "host": "localhost",
+        "port": 8086,
+    }
+}
+```
+
+### Snowflake
+
+```python
+"snowflake.Connection": {
+    "*": {
+        "user": "myuser",
+        "password": "secret",
+        "account": "myaccount",
+        "warehouse": "mywarehouse",
+        "database": "mydb",
+        "schema": "myschema",
+    }
+}
+```
+
+### Oracle (oracledb)
+
+```python
+"oracledb.Connection": {
+    "*": {
+        "dsn": "localhost:1521/myservice",
+        "user": "myuser",
+        "password": "secret",
+        # or build dsn from params...
+        "host": "localhost",
+        "port": 1521,
+        "service_name": "myservice",
+    }
+}
+```
+
+### ClickHouse
+
+```python
+"clickhouse_driver.Client": {
+    "*": {
+        "host": "localhost",
+        "port": 9000,
+        "user": "default",
+        "password": "secret",
+        "database": "default",
+    }
+}
+```
+
+### MSSQL (pymssql)
+
+```python
+"pymssql.Connection": {
+    "*": {
+        "host": "localhost",
+        "port": 1433,
+        "user": "sa",
+        "password": "secret",
+        "database": "mydb",
+    }
+}
+```
+
+### SQLite
+
+```python
+"sqlite3.Connection": {
+    "*": {
+        "path": "/path/to/database.db",
+        # or use :memory: for in-memory db
+    }
+}
+```
+
+---
+
+# auto_reconnect (processing)
+
+The `@auto_reconnect` decorator makes `Skprocess` automatically call `reconnect_all()` after deserialization in the child process.
+
+## Basic usage
+
+```python
+from suitkaise.processing import Skprocess, auto_reconnect
+
+@auto_reconnect()
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.socket = socket.socket(...)  # becomes SocketReconnector
+    
+    def __run__(self):
+        # self.socket is a live socket again
+        self.socket.send(b"hello")
+```
+
+## With credentials
+
+```python
+from suitkaise.processing import Skprocess, auto_reconnect
+
+@auto_reconnect(**{
+    "psycopg2.Connection": {
+        "*": {
+            "host": "localhost",
+            "password": "secret",
+        },
+        "analytics_db": {"password": "other_pass"},
+    },
+    "redis.Redis": {
+        "*": {"password": "redis_pass"},
+    },
+})
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.db = psycopg2.connect(...)
+        self.analytics_db = psycopg2.connect(...)
+        self.cache = redis.Redis(...)
+    
+    def __run__(self):
+        # db, analytics_db, cache are all live connections
+        cursor = self.db.cursor()
+        ...
+```
+
+## Manual reconnect in __prerun__
+
+If you need dynamic credentials (e.g., from env vars), use `reconnect_all()` directly:
+
+```python
+from suitkaise.processing import Skprocess
+from suitkaise.cerial import reconnect_all
+import os
+
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.db = psycopg2.connect(...)
+    
+    def __prerun__(self):
+        reconnect_all(self, **{
+            "psycopg2.Connection": {
+                "*": {"password": os.environ["DB_PASSWORD"]},
+            },
+        })
+    
+    def __run__(self):
+        cursor = self.db.cursor()
+        ...

@@ -61,11 +61,54 @@ from ._int.errors import (
 
 Process = Skprocess  # Backwards-compatible alias
 
+
+def auto_reconnect(**kwargs):
+    """
+    Class decorator to enable automatic reconnects after deserialization.
+    
+    When a Skprocess decorated with @auto_reconnect is deserialized in the
+    child process, reconnect_all() is called automatically to restore any
+    Reconnector objects (database connections, sockets, etc.).
+    
+    Args:
+        **kwargs: Reconnection parameters keyed by type, then by attr name.
+            Use "*" as the attr key for defaults that apply to all instances.
+    
+    Example:
+        @auto_reconnect(**{
+            "psycopg2.Connection": {
+                "*": {"host": "localhost", "password": "secret"},
+                "analytics_db": {"password": "other_pass"},
+            },
+            "redis.Redis": {
+                "*": {"password": "redis_pass"},
+            },
+        })
+        class MyProcess(Skprocess):
+            def __init__(self):
+                self.db = psycopg2.connect(...)
+                self.analytics_db = psycopg2.connect(...)
+                self.cache = redis.Redis(...)
+            
+            def __run__(self):
+                # db, analytics_db, cache are all reconnected automatically
+                ...
+    """
+    def decorator(cls):
+        cls._auto_reconnect_enabled = True
+        cls._auto_reconnect_kwargs = dict(kwargs) if kwargs else {}
+        return cls
+    return decorator
+
+
 __all__ = [
     # Main classes
     'Skprocess',
     'Process',
     'Pool',
+    
+    # Decorators
+    'auto_reconnect',
     
     # Timers
     'ProcessTimers',

@@ -497,7 +497,7 @@ class EvaluatorWorker(Skprocess):
             agent_id: sum(scores) / len(scores) if scores else 0.0
             for agent_id, scores in combined.items()
         }
-    
+        
         # collect the most recent learned policies (from last rotation)
         self._updated_policies: Dict[str, Dict[str, List[float]]] = {}
         if all_rotation_results:
@@ -646,6 +646,7 @@ def evaluate_policies_simple(
     seed: int,
     base_stack: int = 100,
     samples: int = 10,
+    variations_per_hand: int = 2,
     learn: bool = True,
     mastered_hands: Optional[Set[Tuple[int, int, bool]]] = None,
 ) -> EvalResult:
@@ -683,10 +684,10 @@ def evaluate_policies_simple(
         if key not in mastered_hands:
             sampled_hands.append((c1, c2, key))
     
-    # generate 2 variations per hand (different community cards, stacks, ...)
+    # generate variations per hand (different community cards, stacks, ...)
     states_with_keys: List[Tuple[EvalState, Tuple[int, int, bool]]] = []
     for c1, c2, hand_key in sampled_hands:
-        for _ in range(2):
+        for _ in range(max(1, variations_per_hand)):
             # random stage (weighted toward post-flop for more learning)
             stage = rng.choices([0, 1, 2, 3], weights=[1, 2, 2, 2])[0]
             community = generate_random_community(rng, [c1, c2], stage)

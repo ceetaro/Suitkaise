@@ -13,6 +13,10 @@ import sys
 import time
 import signal
 import multiprocessing
+import socket
+import sqlite3
+import subprocess
+import re
 
 from pathlib import Path
 
@@ -27,10 +31,16 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.processing import Process, ProcessError, RunError
+from suitkaise.processing import Process, ProcessError, RunError, auto_reconnect
 from suitkaise.processing._int.process_class import Skprocess
 from suitkaise.processing._int.timers import ProcessTimers
 from suitkaise import cerial
+from suitkaise.cerial._int.handlers.reconnector import Reconnector
+from suitkaise.cerial._int.handlers.network_handler import DbReconnector, SocketReconnector
+from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
+from suitkaise.cerial._int.handlers.threading_handler import ThreadReconnector
+from suitkaise.cerial._int.handlers.subprocess_handler import SubprocessReconnector
+from suitkaise.cerial._int.handlers.regex_handler import MatchReconnector, MatchObjectHandler
 
 # Import test classes from separate module for multiprocessing compatibility
 from tests.processing.test_process_classes import (
@@ -134,6 +144,60 @@ class StaticUserStateProcess(Process):
         obj.value = state["value"] * 2
         obj.static_flag = "static"
         return obj
+
+
+class _DummyReconnector(Reconnector):
+    def __init__(self, value: str):
+        self.value = value
+    def reconnect(self, **kwargs):
+        return f"connected-{self.value}"
+
+
+@auto_reconnect()
+class AutoReconnectProcess(Process):
+    """Process that auto-reconnects Reconnector fields on deserialize."""
+    def __init__(self):
+        self.resource = _DummyReconnector("alpha")
+        self.nested = {"item": _DummyReconnector("beta")}
+        self.process_config.runs = 1
+
+
+@auto_reconnect()
+class AutoReconnectProcessAll(Process):
+    """Process that auto-reconnects multiple reconnector types."""
+    def __init__(self):
+        match = re.search(r"a(b)c", "zabc")
+        self.reconnectors = {
+            "pipe": PipeReconnector(),
+            "socket": SocketReconnector(state={
+                "family": socket.AF_INET,
+                "type": socket.SOCK_STREAM,
+                "proto": 0,
+                "timeout": None,
+                "blocking": True,
+                "local_addr": None,
+                "remote_addr": None,
+            }),
+            "db": DbReconnector(module="sqlite3", class_name="Connection", details={"path": ":memory:"}),
+            "proc": SubprocessReconnector(state={
+                "args": [sys.executable, "-c", "print('x')"],
+                "returncode": 0,
+                "pid": 123,
+                "poll_result": 0,
+                "stdout_data": None,
+                "stderr_data": None,
+            }),
+            "match": MatchReconnector(state=MatchObjectHandler().extract_state(match)),
+            "thread": ThreadReconnector(state={
+                "name": "worker",
+                "daemon": True,
+                "target": lambda: None,
+                "args": (),
+                "kwargs": {},
+                "is_alive": False,
+            }),
+        }
+        self.process_config.runs = 1
 
 
 class BadSignatureDeserializeProcess(Process):
@@ -419,6 +483,43 @@ def test_process_custom_serialize_deserialize_fallback():
     data = cerial.serialize(proc)
     restored = cerial.deserialize(data)
     assert restored.fallback_flag == "fallback"
+
+
+def test_process_auto_reconnect():
+    """auto_reconnect should run reconnect_all during deserialization."""
+    proc = AutoReconnectProcess()
+    data = cerial.serialize(proc)
+    restored = cerial.deserialize(data)
+    assert restored.resource == "connected-alpha"
+    assert restored.nested["item"] == "connected-beta"
+
+
+def test_process_auto_reconnect_all_types():
+    """auto_reconnect should reconnect all reconnector types."""
+    proc = AutoReconnectProcessAll()
+    data = cerial.serialize(proc)
+    restored = cerial.deserialize(data)
+    rec = restored.reconnectors
+    assert hasattr(rec["pipe"], "send")
+    assert isinstance(rec["socket"], socket.socket)
+    assert isinstance(rec["db"], sqlite3.Connection)
+    assert isinstance(rec["proc"], subprocess.Popen)
+    assert isinstance(rec["match"], re.Match)
+    assert isinstance(rec["thread"], threading.Thread)
+    # Cleanup
+    try:
+        rec["proc"].wait(timeout=5)
+    except Exception:
+        try:
+            rec["proc"].terminate()
+        except Exception:
+            pass
+    rec["socket"].close()
+    rec["db"].close()
+    try:
+        rec["pipe"].close()
+    except Exception:
+        pass
 
 
 def test_process_drain_result_queue_error_non_exception():

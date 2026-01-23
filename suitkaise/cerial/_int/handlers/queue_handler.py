@@ -50,14 +50,14 @@ class QueueHandler(Handler):
         Note: We access the internal deque to create a snapshot without draining.
         This preserves the original queue's state for continued use.
         """
-        # Determine specific queue type
+        # determine specific queue type
         queue_type_name = type(obj).__name__
         
         # SimpleQueue doesn't expose maxsize or a mutex/queue attribute
         if isinstance(obj, queue.SimpleQueue):
             maxsize = 0
             items = []
-            # Snapshot by draining non-blocking, then restore
+            # snapshot by draining non-blocking, then restore
             while True:
                 try:
                     items.append(obj.get_nowait())
@@ -66,18 +66,18 @@ class QueueHandler(Handler):
             for item in items:
                 obj.put(item)
         else:
-            # Get maxsize
+            # get maxsize
             maxsize = obj.maxsize
             
-            # Non-destructive snapshot: access internal queue
+            # non-destructive snapshot: access internal queue
             # queue.Queue uses a collections.deque internally as .queue
-            with obj.mutex:  # Lock the queue to get consistent snapshot
-                items = list(obj.queue)  # Copy the deque contents
+            with obj.mutex:  # lock the queue to get consistent snapshot
+                items = list(obj.queue)  # copy the deque contents
         
         return {
             "queue_type": queue_type_name,
             "maxsize": maxsize,
-            "items": items,  # Will be recursively serialized
+            "items": items,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> queue.Queue:
@@ -88,7 +88,7 @@ class QueueHandler(Handler):
         1. Create new queue of appropriate type and maxsize
         2. Put all items back in (already deserialized)
         """
-        # Create queue of appropriate type
+        # create queue of appropriate type
         queue_type = state["queue_type"]
         maxsize = state["maxsize"]
         
@@ -101,7 +101,7 @@ class QueueHandler(Handler):
         else:
             q = queue.Queue(maxsize=maxsize)
         
-        # Put items back (already deserialized by central deserializer)
+        # put items back (already deserialized by central deserializer)
         for item in state["items"]:
             q.put(item)
         
@@ -114,6 +114,11 @@ class MultiprocessingQueueHandler(Handler):
     
     These are inter-process queues that use pipes and shared memory.
     They're more complex than threading queues.
+
+    NOTE:
+        Multiprocessing queues don't expose full internal state, so we
+        snapshot items best-effort. For reliable cross-process sharing,
+        prefer using Share instead of passing raw multiprocessing.Queue.
     """
     
     type_name = "mp_queue"
@@ -140,20 +145,20 @@ class MultiprocessingQueueHandler(Handler):
         """
         maxsize = obj._maxsize if hasattr(obj, '_maxsize') else 0
         
-        # Attempt to snapshot queue non-destructively
-        # Unfortunately, mp.Queue doesn't expose internal deque like queue.Queue
-        # Best we can do is qsize() if available
+        # attempt to snapshot queue non-destructively
+        # unfortunately, mp.Queue doesn't expose internal deque like queue.Queue
+        # best we can do is qsize() if available
         items = []
         try:
             size = obj.qsize()
-            # Get items without blocking (limited snapshot)
-            for _ in range(min(size, 10000)):  # Safety limit
+            # get items without blocking (limited snapshot)
+            for _ in range(min(size, 10000)):  # safety limit
                 try:
                     items.append(obj.get_nowait())
                 except Exception:
-                    # Queue empty or get failed - stop iteration
+                    # queue empty or get failed - stop iteration
                     break
-            # Put items back to restore state
+            # put items back to restore state
             for item in items:
                 obj.put(item)
         except (NotImplementedError, AttributeError):
@@ -169,13 +174,13 @@ class MultiprocessingQueueHandler(Handler):
         """
         Reconstruct multiprocessing queue.
         
-        Note: We create a new queue. It will have different underlying
+        NOTE: We create a new queue. It will have different underlying
         pipes and shared memory than the original.
         """
-        # Create new multiprocessing queue
+        # create new multiprocessing queue
         q = multiprocessing.Queue(maxsize=state["maxsize"])
         
-        # Put items back
+        # put items back
         for item in state["items"]:
             q.put(item)
         
@@ -252,7 +257,7 @@ class MultiprocessingEventHandler(Handler):
         """
         Reconstruct multiprocessing event.
         
-        Note: Creates new event with different underlying shared memory.
+        NOTE: Creates new event with different underlying shared memory.
         """
         event = multiprocessing.Event()
         

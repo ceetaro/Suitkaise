@@ -31,7 +31,7 @@ class FileHandleHandler(Handler):
     - Use skpath for relative path resolution (if available)
     - On reconstruction, reopen file and seek to same position
     
-    Important: This assumes the file exists in the target process's
+    NOTE: This assumes the file exists in the target process's
     filesystem. For cross-machine serialization, files must be in 
     shared storage or at equivalent paths.
     """
@@ -88,19 +88,19 @@ class FileHandleHandler(Handler):
         Note: We try to get skpath-relative path if available,
         otherwise fall back to absolute path.
         """
-        # Check if file is closed first
+        # check if file is closed first
         is_closed = obj.closed
         
-        # Get file path/name - may be an int for subprocess pipes
+        # get file path/name - may be an int for subprocess pipes
         file_path = obj.name
-        is_pipe = isinstance(file_path, int)  # Subprocess pipes have int file descriptors as names
+        is_pipe = isinstance(file_path, int)  # subprocess pipes have int file descriptors as names
         
-        # For closed files or pipes, we store minimal state
+        # for closed files or pipes, we store minimal state
         if is_closed or is_pipe:
             return {
                 "path": str(file_path) if not is_pipe else None,
                 "relative_path": None,
-                "mode": getattr(obj, 'mode', 'r'),  # Default to 'r' if no mode
+                "mode": getattr(obj, 'mode', 'r'),  # default to 'r' if no mode
                 "position": 0,
                 "encoding": getattr(obj, 'encoding', None),
                 "errors": getattr(obj, 'errors', None),
@@ -109,8 +109,8 @@ class FileHandleHandler(Handler):
                 "is_pipe": is_pipe,
             }
         
-        # Try to compute a relative path only if the file is inside the project root.
-        # Avoid Skpath on temp/system paths to prevent expensive root detection and exceptions.
+        # try to compute a relative path only if the file is inside the project root.
+        # avoid Skpath on temp/system paths to prevent expensive root detection and exceptions.
         relative_path: Optional[str] = None
         try:
             absolute_path = str(Path(file_path).resolve())
@@ -124,17 +124,17 @@ class FileHandleHandler(Handler):
             except ValueError:
                 relative_path = None
         
-        # Get current position in file
+        # get current position in file
         try:
             position = obj.tell()
         except (OSError, IOError, ValueError):
             # ValueError can occur on closed files
             position = 0
         
-        # Get mode - may not exist on all file-like objects
+        # get mode - may not exist on all file-like objects
         mode = getattr(obj, 'mode', 'r')
         
-        # Get encoding info (for text mode files)
+        # get encoding info (for text mode files)
         encoding = getattr(obj, 'encoding', None)
         errors = getattr(obj, 'errors', None)
         newline = getattr(obj, 'newline', None)
@@ -163,16 +163,16 @@ class FileHandleHandler(Handler):
         
         If file doesn't exist or can't be opened, raise clear error.
         """
-        # Handle pipes (subprocess stdout/stderr) - these can't be meaningfully reconstructed
+        # handle pipes (subprocess stdout/stderr) - these can't be meaningfully reconstructed
         if state.get("is_pipe", False):
-            # Return a closed BytesIO as a placeholder for the pipe
+            # return a closed BytesIO as a placeholder for the pipe
             placeholder = io.BytesIO()
             placeholder.close()
             return placeholder
         
-        # Handle closed files - return a placeholder that represents the closed state
+        # handle closed files - return a placeholder that represents the closed state
         if state.get("closed", False):
-            # Return a placeholder object that represents the closed file
+            # return a placeholder object that represents the closed file
             class ClosedFilePlaceholder:
                 """Placeholder for a file that was closed when serialized."""
                 def __init__(self, original_path, original_mode):
@@ -198,33 +198,33 @@ class FileHandleHandler(Handler):
             
             return ClosedFilePlaceholder(state.get("path"), state.get("mode"))
         
-        # Determine which path to use
+        # determine which path to use
         if state.get("relative_path"):
             try:
                 from suitkaise.paths.api import Skpath
-                # Try relative path (better for cross-machine)
+                # try relative path (better for cross-machine)
                 sk_path = Skpath(state["relative_path"])
                 file_path = sk_path.ap
             except ImportError:
-                # skpath not available, fall back to absolute path
+                # Skpath not available, fall back to absolute path
                 file_path = state["path"]
             except (ValueError, TypeError):
-                # Invalid path, fall back to absolute
+                # invalid path, fall back to absolute
                 file_path = state["path"]
             except Exception as e:
-                # Unexpected error - log and fall back
+                # unexpected error, log and fall back
                 import warnings
                 warnings.warn(f"Unexpected error resolving relative path {state['relative_path']}: {e}")
                 file_path = state["path"]
         else:
             file_path = state["path"]
         
-        # Build kwargs for open()
+        # build kwargs for open()
         open_kwargs = {
             "mode": state["mode"],
         }
-        
-        # Add encoding kwargs for text mode
+    
+        # add encoding kwargs for text mode
         if state.get("encoding"):
             open_kwargs["encoding"] = state["encoding"]
         if state.get("errors"):
@@ -232,7 +232,7 @@ class FileHandleHandler(Handler):
         if state.get("newline") is not None:
             open_kwargs["newline"] = state["newline"]
         
-        # Open file
+        # open file
         try:
             file_obj = open(file_path, **open_kwargs)
         except FileNotFoundError as e:
@@ -245,11 +245,11 @@ class FileHandleHandler(Handler):
                 f"Cannot reconstruct file handle for {file_path}: {e}"
             ) from e
         
-        # Seek to same position
+        # seek to same position
         try:
             file_obj.seek(state["position"])
         except (OSError, IOError) as e:
-            # Position might be invalid (file shorter in target), ignore
+            # position might be invalid (file shorter in target), ignore
             pass
         
         return file_obj
@@ -304,25 +304,25 @@ class TemporaryFileHandler(Handler):
         
         Note: We read the entire file content to preserve it.
         """
-        # Save current position
+        # save current position
         original_pos = obj.tell()
         
-        # Read file content
+        # read file content
         obj.seek(0)
         if 'b' in obj.mode:
             content = obj.read()
         else:
             content = obj.read()
         
-        # Restore position
+        # restore position
         obj.seek(original_pos)
         
-        # Try to extract tempfile-specific attributes
+        # try to extract tempfile-specific attributes
         suffix = getattr(obj, 'suffix', '')
         prefix = getattr(obj, 'prefix', 'tmp')
         delete = getattr(obj, 'delete', True)
         
-        # Record the original temp file path for reference
+        # record the original temp file path for reference
         # (though we'll create a new one with different name)
         original_name = obj.name
         
@@ -334,7 +334,7 @@ class TemporaryFileHandler(Handler):
             "prefix": prefix,
             "delete": delete,
             "encoding": getattr(obj, 'encoding', None),
-            "original_name": original_name,  # For debugging/logging
+            "original_name": original_name,  # for debugging/logging
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -352,8 +352,11 @@ class TemporaryFileHandler(Handler):
         This is a fundamental limitation of serializing temporary files -
         they are process-local and system-managed. The content and properties
         are preserved, but not the exact file path.
+
+        Better to give you as close of a representation of the original file as possible,
+        instead of ignoring it and giving you a serialization error.
         """
-        # Create kwargs for NamedTemporaryFile
+        # create kwargs for NamedTemporaryFile
         kwargs = {
             "mode": state["mode"],
             "delete": state["delete"],
@@ -364,14 +367,14 @@ class TemporaryFileHandler(Handler):
         if state["encoding"]:
             kwargs["encoding"] = state["encoding"]
         
-        # Create new temp file
+        # create new temp file
         temp_file = tempfile.NamedTemporaryFile(**kwargs)
         
-        # Write content
+        # write content
         temp_file.write(state["content"])
         temp_file.flush()
         
-        # Seek to same position
+        # seek to same position
         temp_file.seek(state["position"])
         
         return temp_file
@@ -398,14 +401,14 @@ class StringIOHandler(Handler):
         - content: The full string buffer
         - position: Current position (from tell())
         """
-        # Save current position
+        # save current position
         original_pos = obj.tell()
         
-        # Read all content
+        # read all content
         obj.seek(0)
         content = obj.read()
         
-        # Restore position
+        # restore position
         obj.seek(original_pos)
         
         return {
@@ -421,10 +424,10 @@ class StringIOHandler(Handler):
         1. Create new StringIO with content
         2. Seek to same position
         """
-        # Create new StringIO with content
+        # create new StringIO with content
         string_io = io.StringIO(state["content"])
         
-        # Seek to same position
+        # seek to same position
         string_io.seek(state["position"])
         
         return string_io
@@ -452,7 +455,7 @@ class BytesIOHandler(Handler):
         - position: Current position (from tell())
         - closed: Whether the BytesIO is closed
         """
-        # Check if closed first
+        # check if closed first
         if obj.closed:
             return {
                 "content": b"",
@@ -460,14 +463,14 @@ class BytesIOHandler(Handler):
                 "closed": True,
             }
         
-        # Save current position
+        # save current position
         original_pos = obj.tell()
         
-        # Read all content
+        # read all content
         obj.seek(0)
         content = obj.read()
         
-        # Restore position
+        # restore position
         obj.seek(original_pos)
         
         return {
@@ -485,16 +488,16 @@ class BytesIOHandler(Handler):
         2. Create new BytesIO with content
         3. Seek to same position
         """
-        # Handle closed BytesIO (e.g., subprocess pipe placeholders)
+        # handle closed BytesIO (e.g., subprocess pipe placeholders)
         if state.get("closed", False):
             closed_io = io.BytesIO(b"")
             closed_io.close()
             return closed_io
         
-        # Create new BytesIO with content
+        # create new BytesIO with content
         bytes_io = io.BytesIO(state["content"])
         
-        # Seek to same position
+        # seek to same position
         bytes_io.seek(state["position"])
         
         return bytes_io

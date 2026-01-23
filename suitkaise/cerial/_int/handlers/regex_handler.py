@@ -6,8 +6,10 @@ string and flags, then recompile in the target process.
 """
 
 import re
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 from .base_class import Handler
+from .reconnector import Reconnector
 
 
 class RegexSerializationError(Exception):
@@ -23,8 +25,8 @@ class RegexPatternHandler(Handler):
     - Extract pattern string and flags
     - On reconstruction, recompile with same pattern and flags
     
-    Note: Python's re.Pattern objects are already picklable in Python 3.7+,
-    but we handle them explicitly for consistency and to support older versions.
+    NOTE: Python's re.Pattern objects are already picklable in Python 3.7+,
+    but we handle them explicitly for consistency.
     """
     
     type_name = "regex_pattern"
@@ -48,8 +50,8 @@ class RegexPatternHandler(Handler):
         These are all we need to recreate the exact same compiled pattern.
         """
         return {
-            "pattern": obj.pattern,  # The regex pattern string
-            "flags": obj.flags,      # Integer bitmask of flags
+            "pattern": obj.pattern,  # the regex pattern string
+            "flags": obj.flags,      # integer bitmask of flags
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> re.Pattern:
@@ -67,11 +69,12 @@ class MatchObjectHandler(Handler):
     
     Strategy:
     - Extract match information (matched string, groups, positions)
-    - Store as a dict since Match objects cannot be reconstructed
-    - On reconstruction, return a dict with the match info
+    - On reconstruction, return a MatchReconnector that can rerun the match
+      and return a live Match object when possible.
     
-    Note: re.Match objects have no public constructor and cannot be truly
-    reconstructed. We serialize the data for inspection but return a dict.
+    Note: re.Match objects have no public constructor. We can't instantiate
+    them directly, but we can re-run the same pattern on the same input to
+    retrieve a matching object.
     """
     
     type_name = "regex_match"
@@ -100,30 +103,46 @@ class MatchObjectHandler(Handler):
             "string": obj.string,
             "pos": obj.pos,
             "endpos": obj.endpos,
-            "match_string": obj.group(0),  # The matched text
+            "match_string": obj.group(0),  # the matched text
             "span": obj.span(),  # (start, end)
-            "groups": obj.groups(),  # All captured groups
-            "groupdict": obj.groupdict(),  # Named groups
+            "groups": obj.groups(),  # all captured groups
+            "groupdict": obj.groupdict(),  # named groups
         }
     
-    def reconstruct(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def reconstruct(self, state: Dict[str, Any]) -> Any:
         """
         Reconstruct match information.
         
-        Since Match objects cannot be instantiated directly, we return
-        a dict containing all the match information. This preserves the
-        data while being honest about the limitation.
+        Returns a MatchReconnector and attempts to reconnect immediately.
         """
-        return {
-            "__match_info__": True,
-            "pattern": state["pattern"],
-            "flags": state["flags"],
-            "string": state["string"],
-            "pos": state["pos"],
-            "endpos": state["endpos"],
-            "matched": state["match_string"],
-            "span": state["span"],
-            "groups": state["groups"],
-            "groupdict": state["groupdict"],
-        }
+        reconnector = MatchReconnector(state=state)
+        try:
+            match = reconnector.reconnect()
+            return match if match is not None else reconnector
+        except Exception:
+            return reconnector
+
+
+@dataclass
+class MatchReconnector(Reconnector):
+    """
+    Recreate a Match object by re-running the regex on the original string.
+    
+    If the match can't be re-created (pattern or string changed), reconnect()
+    returns None and the caller can fall back to the stored state.
+    """
+    state: Dict[str, Any]
+    
+    def reconnect(self, **kwargs: Any) -> Optional[re.Match]:
+        pattern = self.state["pattern"]
+        flags = self.state["flags"]
+        string = self.state["string"]
+        pos = self.state["pos"]
+        endpos = self.state["endpos"]
+        span = tuple(self.state["span"])
+        compiled = re.compile(pattern, flags)
+        match = compiled.search(string, pos, endpos)
+        if match and match.span() == span:
+            return match
+        return None
 

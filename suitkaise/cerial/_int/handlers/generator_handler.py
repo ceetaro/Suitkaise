@@ -42,7 +42,7 @@ class GeneratorHandler(Handler):
         - remaining_values: Values not yet yielded from the generator
         - generator_name: Name of the generator function (for debugging)
         
-        Note: This EXHAUSTS the generator! Original will be empty.
+        NOTE: This EXHAUSTS the generator! Original will be empty.
         This is the only way to preserve the remaining values.
         
         We do NOT serialize the code object or frame locals because:
@@ -50,11 +50,11 @@ class GeneratorHandler(Handler):
         2. Code objects are very large/complex (co_consts, co_names, bytecode, etc.)
         3. Reconstruction just returns iter(remaining_values) anyway
         """
-        # Get generator function info for debugging/logging only
+        # get generator function info for debugging/logging only
         generator_name = obj.__name__ if hasattr(obj, '__name__') else None
         generator_qualname = obj.__qualname__ if hasattr(obj, '__qualname__') else None
         
-        # Exhaust generator to get remaining values
+        # exhaust generator to get remaining values
         remaining_values = []
         try:
             for value in obj:
@@ -69,7 +69,7 @@ class GeneratorHandler(Handler):
         return {
             "generator_name": generator_name,
             "generator_qualname": generator_qualname,
-            "remaining_values": remaining_values,  # Will be recursively serialized
+            "remaining_values": remaining_values,  # will be recursively serialized
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -83,7 +83,7 @@ class GeneratorHandler(Handler):
         For more advanced use cases, users should implement custom
         __serialize__/__deserialize__ methods on classes that wrap generators.
         """
-        # Return iterator over remaining values
-        # This is not a true generator but preserves the values
+        # return iterator over remaining values
+        # this is not a true generator but preserves the values
         return iter(state["remaining_values"])
 

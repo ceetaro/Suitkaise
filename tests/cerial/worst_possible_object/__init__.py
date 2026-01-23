@@ -1,0 +1,1 @@
+# WorstPossibleObject test package.

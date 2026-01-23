@@ -326,6 +326,15 @@ class Skprocess:
                     if key not in obj.__dict__:
                         obj.__dict__[key] = value
         
+        # Auto-reconnect if enabled via @auto_reconnect decorator
+        if getattr(new_class, '_auto_reconnect_enabled', False):
+            try:
+                from suitkaise.cerial.api import reconnect_all
+                reconnect_kwargs = getattr(new_class, '_auto_reconnect_kwargs', {})
+                obj = reconnect_all(obj, **reconnect_kwargs)
+            except Exception:
+                pass
+        
         return obj
     
     # Fallback for direct calls on Skprocess base class

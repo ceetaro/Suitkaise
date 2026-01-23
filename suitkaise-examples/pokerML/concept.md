@@ -86,4 +86,3 @@ Texas Hold'em game model (simplified but real)
 - pot logic: fixed blinds and random unbalanced starting stacks, side pot logic included
 - goal: agents should be able to identify the card order, and the hierarchy of possible hands, based on what they learn
 
-

@@ -1,6 +1,16 @@
+"""
+Base class for all of the "handlers" that cerial uses to 
+serialize/deserialize specific object types.
+
+This structure is 100% created by me.
+
+The only changes AI made to this file was fixing docstr typos.
+
+Cheers (remember this is licensed under the MIT License)
+"""
+
 from typing import Any, Dict
 from abc import ABC, abstractmethod
-
 
 class Handler(ABC):
     """
@@ -16,8 +26,8 @@ class Handler(ABC):
     - reconstruct(): recreate object from extracted state
     """
     
-    # Subclasses must define this
-    type_name: str  # e.g., "lock", "logger", "class_instance"
+    # subclasses must define this
+    type_name: str  # "lock", "logger", "class_instance"
     
     @abstractmethod
     def can_handle(self, obj: Any) -> bool:
@@ -41,6 +51,8 @@ class Handler(ABC):
         
         Do NOT include metadata like __object_id__ or __handler__ - 
         the central serializer adds that.
+
+        DATA MUST BE EXTRACTED DOWN UNTIL PICKLE CAN HANDLE IT.
         
         Args:
             obj: The object to extract state from

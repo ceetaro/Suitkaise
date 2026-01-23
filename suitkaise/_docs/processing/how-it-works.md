@@ -843,3 +843,101 @@ Method calls are fire-and-forget; they queue a command and return immediately.
 - `share.start()` restarts it if you previously stopped it
 - `share.stop()` / `share.exit()` shuts it down gracefully
 - `share.clear()` clears all shared objects and counters
+
+---
+
+## `auto_reconnect`
+
+### The Problem
+
+When a `Skprocess` is serialized, resources like database connections cannot be pickled. `cerial` replaces them with `Reconnector` placeholders containing metadata to recreate the connection.
+
+After deserialization in the subprocess, these placeholders need to be converted back into live connections.
+
+### How `@auto_reconnect` Works
+
+The `@auto_reconnect(**kwargs)` decorator sets two class attributes:
+
+```python
+cls._auto_reconnect_enabled = True
+cls._auto_reconnect_kwargs = {...}
+```
+
+During deserialization (`_deserialize_with_user`):
+
+1. Check if `_auto_reconnect_enabled` is `True`
+2. If so, call `reconnect_all(obj, **_auto_reconnect_kwargs)`
+3. This walks the entire object, replacing Reconnectors with live resources
+
+### Reconnection Flow
+
+```
+Parent Process                              Subprocess
+──────────────                              ──────────
+MyProcess instance
+    │
+    ├─ self.db = psycopg2.connect(...)
+    │
+    ▼
+cerial.serialize()
+    │
+    ├─ db connection → DbReconnector
+    │
+    ▼
+bytes ─────────────────────────────────────> cerial.deserialize()
+                                                 │
+                                                 ├─ DbReconnector restored
+                                                 │
+                                                 ▼
+                                             _deserialize_with_user()
+                                                 │
+                                                 ├─ _auto_reconnect_enabled?
+                                                 │
+                                                 ▼
+                                             reconnect_all(obj, **kwargs)
+                                                 │
+                                                 ├─ DbReconnector.reconnect(**merged)
+                                                 │
+                                                 ▼
+                                             self.db = live connection
+```
+
+### kwargs Lookup
+
+`reconnect_all()` uses type keys to find kwargs:
+
+1. Get type key from Reconnector (e.g., `"psycopg2.Connection"`)
+2. Look up in kwargs dict
+3. Start with `"*"` defaults
+4. Merge attr-specific overrides on top
+5. Pass merged dict to `reconnect(**merged)`
+
+```python
+# If kwargs is:
+{
+    "psycopg2.Connection": {
+        "*": {"host": "localhost", "password": "default"},
+        "analytics_db": {"password": "special"},
+    }
+}
+
+# Then:
+# self.db (any name) gets: {"host": "localhost", "password": "default"}
+# self.analytics_db gets: {"host": "localhost", "password": "special"}
+```
+
+### Without Decorator
+
+If you need dynamic credentials, call `reconnect_all()` manually in `__prerun__`:
+
+```python
+def __prerun__(self):
+    from suitkaise.cerial import reconnect_all
+    reconnect_all(self, **{
+        "psycopg2.Connection": {
+            "*": {"password": os.environ["DB_PASSWORD"]},
+        },
+    })
+```
+
+This runs after deserialization but before `__run__`, giving you access to subprocess environment variables.

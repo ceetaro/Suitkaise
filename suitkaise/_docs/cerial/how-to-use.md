@@ -181,6 +181,87 @@ For objects with locks, loggers, or other unpicklables, you'll see how cerial re
 
 Simple class instances and functions may look slightly different, as they are not subjected to the entire process.
 
+---
+
+## `Reconnectors`
+
+When `cerial` serializes objects, some resources cannot be directly pickled.
+- Database connections (sockets to remote servers)
+- Network sockets
+- File handles and pipes
+- Threads
+- Compiled regex matches
+
+Instead of giving you nothing, `cerial` replaces these with `Reconnector` objects.
+
+Use `reconnect_all()` to reconnect all `Reconnector` objects in a structure.
+
+### Using `reconnect_all()`
+
+```python
+from suitkaise import cerial
+
+data = cerial.serialize(my_object)
+restored = cerial.deserialize(data)
+
+# reconnect all Reconnectors with credentials
+restored = cerial.reconnect_all(restored, **{
+    "psycopg2.Connection": {
+        "*": {
+            "host": "localhost",
+            "user": "myuser",
+            "password": "secret",
+            "database": "mydb",
+        },
+    },
+    "redis.Redis": {
+        "*": {"password": "redis_pass"},
+    },
+})
+```
+
+### kwargs structure
+
+```python
+{
+    "TypeKey": {
+        "*": {...},           # defaults for all instances of this type
+        "attr_name": {...},   # specific kwargs for attr named "attr_name"
+    }
+}
+```
+
+- **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`, `"redis.Redis"`)
+- **`"*"`** provides defaults for all instances of that type
+- **Specific attr names** override/merge with defaults
+
+### Multiple connections of same type
+
+```python
+restored = cerial.reconnect_all(restored, **{
+    "psycopg2.Connection": {
+        "*": {  # default for all postgres connections
+            "host": "localhost",
+            "user": "myuser",
+            "password": "default_pass",
+        },
+        "analytics_db": {  # override for self.analytics_db
+            "password": "analytics_pass",
+        },
+    },
+})
+```
+
+### No kwargs needed
+
+For resources without credentials (sockets, threads, pipes, sqlite files, regex matches), just call with no kwargs:
+
+```python
+restored = cerial.reconnect_all(restored)
+```
+
+---
+
 JSON Output (Simplified)
 
 ```json
