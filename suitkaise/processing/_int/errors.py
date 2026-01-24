@@ -47,6 +47,7 @@ class ProcessError(Exception):
     """
     
     def __init__(self, message: str, current_run: int = 0, original_error: BaseException | None = None):
+        # store run index and original error for serialization
         self.current_run = current_run
         self.original_error = original_error
         super().__init__(message)

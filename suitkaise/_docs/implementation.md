@@ -1149,3 +1149,20 @@ class MyProcess(Skprocess):
     def __run__(self):
         cursor = self.db.cursor()
         ...
+```
+
+# code review
+
+review each modules code and streamline comments, checking that everything looks how it should.
+
+## 1st pass - focus on code
+
+- cerial - done
+- circuits - done
+- paths - done
+- processing
+- sk
+- timing
+
+
+## 2nd pass - focus on docstrings

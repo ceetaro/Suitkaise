@@ -20,7 +20,7 @@ from .id_utils import normalize_separators
 from .root_detection import detect_project_root
 from .skpath import Skpath
 
-# Thread-safe lock
+# thread-safe lock
 _project_lock = threading.RLock()
 
 
@@ -40,7 +40,7 @@ def _parse_ignore_file(ignore_path: Path) -> list[str]:
         with open(ignore_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                # Skip empty lines and comments
+                # skip empty lines and comments
                 if not line or line.startswith("#"):
                     continue
                 patterns.append(line)
@@ -86,33 +86,33 @@ def _matches_any_pattern(path_str: str, patterns: list[str]) -> bool:
     Returns:
         True if path should be ignored
     """
-    # Normalize to forward slashes for matching
+    # normalize to forward slashes for matching
     path_str = normalize_separators(path_str)
     parts = path_str.split("/")
     
     for pattern in patterns:
-        # Handle negation patterns (starting with !)
+        # handle negation patterns (starting with !)
         if pattern.startswith("!"):
-            continue  # Skip negation for now (would need more complex logic)
+            continue  # skip negation for now (would need more complex logic)
         
-        # Handle directory patterns (ending with /)
+        # handle directory patterns (ending with /)
         is_dir_pattern = pattern.endswith("/")
         if is_dir_pattern:
             pattern = pattern[:-1]
         
-        # Handle patterns with /
+        # handle patterns with /
         if "/" in pattern:
-            # Pattern is relative to root
+            # pattern is relative to root
             if fnmatch.fnmatch(path_str, pattern):
                 return True
             if fnmatch.fnmatch(path_str, pattern + "/*"):
                 return True
         else:
-            # Pattern matches any path component
+            # pattern matches any path component
             for part in parts:
                 if fnmatch.fnmatch(part, pattern):
                     return True
-            # Also try matching the full path
+            # also try matching the full path
             if fnmatch.fnmatch(path_str, pattern):
                 return True
             if fnmatch.fnmatch(path_str, "*/" + pattern):
@@ -144,7 +144,7 @@ def get_project_paths(
     Raises:
         PathDetectionError: If project root cannot be detected
     """
-    # Resolve root
+    # resolve root
     if root is None:
         root_path = detect_project_root()
     elif isinstance(root, Skpath):
@@ -160,7 +160,7 @@ def get_project_paths(
     if not root_path.is_dir():
         raise PathDetectionError(f"Root path is not a directory: {root_path}")
     
-    # Build exclude set
+    # build exclude set
     exclude_set: set[str] = set()
     if exclude is not None:
         if not isinstance(exclude, list):
@@ -173,12 +173,12 @@ def get_project_paths(
             else:
                 exclude_set.add(normalize_separators(str(Path(ex).resolve())))
     
-    # Get ignore patterns
+    # get ignore patterns
     ignore_patterns: list[str] = []
     if use_ignore_files:
         ignore_patterns = _collect_ignore_patterns(root_path)
     
-    # Collect paths
+    # collect paths
     result_paths: list[Any] = []
 
     def add_result(path: Path) -> None:
@@ -254,7 +254,7 @@ def get_project_structure(
     Raises:
         PathDetectionError: If project root cannot be detected
     """
-    # Resolve root
+    # resolve root
     if root is None:
         root_path = detect_project_root()
     elif isinstance(root, Skpath):
@@ -264,7 +264,7 @@ def get_project_structure(
     else:
         root_path = root.resolve()
     
-    # Get all paths
+    # get all paths
     paths = get_project_paths(
         root=root_path,
         exclude=exclude,
@@ -272,7 +272,7 @@ def get_project_structure(
         use_ignore_files=use_ignore_files,
     )
     
-    # Build structure
+    # build structure
     structure: dict[str, Any] = {}
     root_name = root_path.name
     structure[root_name] = {}
@@ -320,7 +320,7 @@ def get_formatted_project_tree(
     Raises:
         PathDetectionError: If project root cannot be detected
     """
-    # Resolve root
+    # resolve root
     if root is None:
         root_path = detect_project_root()
     elif isinstance(root, Skpath):
@@ -330,7 +330,7 @@ def get_formatted_project_tree(
     else:
         root_path = root.resolve()
     
-    # Build exclude set
+    # build exclude set
     exclude_set: set[str] = set()
     if exclude is not None:
         if not isinstance(exclude, list):
@@ -343,12 +343,12 @@ def get_formatted_project_tree(
             else:
                 exclude_set.add(normalize_separators(str(Path(ex).resolve())))
     
-    # Get ignore patterns
+    # get ignore patterns
     ignore_patterns: list[str] = []
     if use_ignore_files:
         ignore_patterns = _collect_ignore_patterns(root_path)
     
-    # Build tree
+    # build tree
     lines: list[str] = [f"{root_path.name}/"]
 
     def should_skip_entry(path: Path) -> bool:

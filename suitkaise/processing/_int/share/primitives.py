@@ -237,11 +237,15 @@ class _AtomicCounterRegistry:
     
     def __init__(self, manager: Optional[SyncManager] = None):
         self._manager = manager or Manager()
+        # registry maps key -> (pending_shm_name, completed_shm_name)
         self._registry = self._manager.dict()  # key -> (pending_name, completed_name)
+        # object to key map for fast per-object waits and cleanup
         self._object_keys = self._manager.dict()  # object_name -> list[key]
         self._lock = self._manager.Lock()
+        # local process cache: shared memory handles per key
         self._local: Dict[str, tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]] = {}
         self._local_object_keys: Dict[str, list[str]] = {}
+        # tracks shm segments created by this process to safely unlink
         self._owned_names: set[str] = set()
 
     def __getstate__(self) -> dict:
@@ -281,12 +285,14 @@ class _AtomicCounterRegistry:
         with self._lock:
             for key in keys:
                 if key not in self._registry:
+                    # create shared memory counters for new keys
                     pending = self._create_shared_counter()
                     completed = self._create_shared_counter()
                     self._registry[key] = (pending.name, completed.name)
                     self._local[key] = (pending, completed)
                     self._owned_names.update({pending.name, completed.name})
                 else:
+                    # attach to existing shared counters when already registered
                     self._local[key] = self._attach_shared_counter(self._registry[key])
             existing = list(self._object_keys.get(object_name, []))
             merged = list(dict.fromkeys(existing + keys))
@@ -294,6 +300,7 @@ class _AtomicCounterRegistry:
             self._local_object_keys[object_name] = merged
     
     def _create_shared_counter(self) -> shared_memory.SharedMemory:
+        # single int counter stored in shared memory
         shm = shared_memory.SharedMemory(create=True, size=ctypes.sizeof(ctypes.c_int))
         struct.pack_into("i", shm.buf, 0, 0)
         return shm
@@ -312,6 +319,7 @@ class _AtomicCounterRegistry:
         with self._lock:
             counter = self._registry.get(key)
             if counter is None:
+                # lazily create counters if a key is seen for the first time
                 pending = self._create_shared_counter()
                 completed = self._create_shared_counter()
                 self._registry[key] = (pending.name, completed.name)
@@ -339,6 +347,7 @@ class _AtomicCounterRegistry:
         counter = self._get_counter(key)
         pending, _ = counter
         with self._lock:
+            # pending increments happen before enqueueing a write command
             value = struct.unpack_from("i", pending.buf, 0)[0] + 1
             struct.pack_into("i", pending.buf, 0, value)
             return value
@@ -347,6 +356,7 @@ class _AtomicCounterRegistry:
         counter = self._get_counter(key)
         pending, completed = counter
         with self._lock:
+            # coordinator marks a write as completed after commit
             pending_val = struct.unpack_from("i", pending.buf, 0)[0]
             pending_val = max(0, pending_val - 1)
             struct.pack_into("i", pending.buf, 0, pending_val)
@@ -359,6 +369,7 @@ class _AtomicCounterRegistry:
             counter = self._get_counter(key)
             pending, completed = counter
             with self._lock:
+                # snapshot pending + completed to avoid read starvation
                 pending_val = struct.unpack_from("i", pending.buf, 0)[0]
                 completed_val = struct.unpack_from("i", completed.buf, 0)[0]
             targets[key] = completed_val + pending_val
@@ -390,6 +401,49 @@ class _AtomicCounterRegistry:
         keys = list(self._object_keys.get(object_name, []))
         self._local_object_keys[object_name] = keys
         return keys
+
+    def remove_object(self, object_name: str) -> None:
+        """Remove all counters for a shared object."""
+        # use cached keys if available; fall back to manager registry
+        keys = self._local_object_keys.get(object_name)
+        if keys is None:
+            keys = list(self._object_keys.get(object_name, []))
+        keys = list(dict.fromkeys(keys))
+        entries: list[tuple[str, str]] = []
+        locals: list[tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]] = []
+        with self._lock:
+            try:
+                del self._object_keys[object_name]
+            except Exception:
+                pass
+            self._local_object_keys.pop(object_name, None)
+            for key in keys:
+                entry = self._registry.pop(key, None)
+                if entry is not None:
+                    entries.append(entry)
+                local = self._local.pop(key, None)
+                if local is not None:
+                    locals.append(local)
+        for pending, completed in locals:
+            try:
+                pending.close()
+            except Exception:
+                pass
+            try:
+                completed.close()
+            except Exception:
+                pass
+        # unlink only shared memory segments owned by this process
+        for pending_name, completed_name in entries:
+            for name in (pending_name, completed_name):
+                try:
+                    shm = shared_memory.SharedMemory(name=name)
+                    shm.close()
+                    if name in self._owned_names:
+                        shm.unlink()
+                        self._owned_names.discard(name)
+                except Exception:
+                    pass
 
     def reset(self) -> None:
         """Clear all counters and local caches."""

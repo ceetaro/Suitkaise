@@ -1,16 +1,4 @@
 """
-Skpath API - Smart Path Operations for Suitkaise
-
-This module provides enhanced path functionality with automatic project root
-detection, cross-platform path normalization, and powerful path utilities.
-
-Key Features:
-- Skpath class: Enhanced Path with ap (absolute), np (normalized), and id properties
-- @autopath decorator: Automatic type conversion for path parameters
-- Project root detection: Automatic detection with custom root override
-- Path utilities: Project-wide path listing, structure, and tree visualization
-
-Philosophy: Make path operations intuitive while providing cross-platform compatibility.
 """
 
 from __future__ import annotations
@@ -18,23 +6,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-# Import internal implementations
+# import internals
 try:
     from ._int import (
-        # Core class
+        # core class
         Skpath,
         
-        # Types
+        # types
         AnyPath,
         
-        # Decorator
+        # decorator
         autopath,
         
-        # Exceptions
+        # exceptions
         PathDetectionError,
         NotAFileError,
         
-        # Root management
+        # root management
         CustomRoot,
         set_custom_root,
         get_custom_root,
@@ -42,18 +30,18 @@ try:
         clear_root_cache,
         detect_project_root,
         
-        # Caller utilities
+        # caller utilities
         detect_caller_path,
         detect_current_dir,
         get_cwd_path,
         get_module_file_path,
         
-        # Project utilities
+        # project utilities
         get_project_paths as _get_project_paths,
         get_project_structure as _get_project_structure,
         get_formatted_project_tree as _get_formatted_project_tree,
         
-        # ID utilities
+        # id utils
         encode_path_id,
         decode_path_id,
         normalize_separators,
@@ -65,31 +53,15 @@ except ImportError as e:
     )
 
 
-# ============================================================================
-# Core Class (re-exported)
-# ============================================================================
-
-# Skpath is imported directly from _int
-
-
-# ============================================================================
-# Decorator (re-exported)
-# ============================================================================
-
-# autopath is imported directly from _int
-
-
-# ============================================================================
-# Project Root Functions
-# ============================================================================
+# project root functions
 
 def get_project_root(expected_name: str | None = None) -> Skpath:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        root = skpath.get_project_root()
+        root = paths.get_project_root()
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -119,17 +91,16 @@ def get_project_root(expected_name: str | None = None) -> Skpath:
     return Skpath(root_path)
 
 
-# ============================================================================
-# Caller Path Functions
-# ============================================================================
+
+# caller path functions
 
 def get_caller_path() -> Skpath:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        caller = skpath.get_caller_path()
+        caller = paths.get_caller_path()
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -155,9 +126,9 @@ def get_current_dir() -> Skpath:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        current_dir = skpath.get_current_dir()
+        current_dir = paths.get_current_dir()
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -180,9 +151,9 @@ def get_cwd() -> Skpath:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        cwd = skpath.get_cwd()
+        cwd = paths.get_cwd()
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -198,9 +169,9 @@ def get_module_path(obj: Any) -> Skpath | None:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        path = skpath.get_module_path(SomeClass)
+        path = paths.get_module_path(SomeClass)
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -224,9 +195,8 @@ def get_module_path(obj: Any) -> Skpath | None:
     return Skpath(path)
 
 
-# ============================================================================
-# ID Functions
-# ============================================================================
+
+# id functions
 
 def get_id(
     path: str | Path | "Skpath",
@@ -234,9 +204,9 @@ def get_id(
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        path_id = skpath.get_id("myproject/feature/file.txt")
+        path_id = paths.get_id("myproject/feature/file.txt")
         ```
     ────────────────────────────────────────────────────────
         ```python
@@ -261,9 +231,8 @@ def get_id(
     return Skpath(path).id
 
 
-# ============================================================================
-# Project Path Functions
-# ============================================================================
+
+# project path functions
 
 def get_project_paths(
     root: str | Path | "Skpath" | None = None,
@@ -274,19 +243,19 @@ def get_project_paths(
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
         # Get all paths in project
-        paths = skpath.get_project_paths()
+        paths = paths.get_project_paths()
         
         # Get paths as strings for memory efficiency
-        paths = skpath.get_project_paths(as_strings=True)
+        paths = paths.get_project_paths(as_strings=True)
         
         # Exclude specific paths
-        paths = skpath.get_project_paths(exclude=["build", "dist"])
+        paths = paths.get_project_paths(exclude=["build", "dist"])
         
         # Use custom root
-        paths = skpath.get_project_paths(root="src")
+        paths = paths.get_project_paths(root="src")
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -322,9 +291,9 @@ def get_project_structure(
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        structure = skpath.get_project_structure()
+        structure = paths.get_project_structure()
         # Returns:
         # {
         #     "myproject": {
@@ -338,7 +307,7 @@ def get_project_structure(
         ```
     ────────────────────────────────────────────────────────\n
 
-    Get hierarchical dict representation of project structure.
+    Get a hierarchical dict representation of the project structure.
     
     Args:
         root: Custom root directory (defaults to detected project root)
@@ -368,9 +337,9 @@ def get_formatted_project_tree(
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import skpath
+        from suitkaise import paths
         
-        tree = skpath.get_formatted_project_tree()
+        tree = paths.get_formatted_project_tree()
         print(tree)
         
         # Output:
@@ -409,15 +378,13 @@ def get_formatted_project_tree(
     )
 
 
-# ============================================================================
-# Path Validation Utilities
-# ============================================================================
+# path validation utilities
 
-# Characters that are invalid in filenames across common operating systems
+# chars that are invalid in filenames across common operating systems
 _INVALID_FILENAME_CHARS = set('<>:"/\\|?*\0')
-# Additional characters that are problematic
+# additional chars that are problematic
 _PROBLEMATIC_CHARS = set('\t\n\r')
-# Reserved names on Windows
+# reserved names on Windows
 _WINDOWS_RESERVED = {
     'CON', 'PRN', 'AUX', 'NUL',
     'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -455,21 +422,21 @@ def is_valid_filename(filename: str) -> bool:
     if not filename or not filename.strip():
         return False
     
-    # Check for invalid characters
+    # check for invalid characters
     if any(char in _INVALID_FILENAME_CHARS for char in filename):
         return False
     
-    # Check for problematic characters
+    # check for problematic characters
     if any(char in _PROBLEMATIC_CHARS for char in filename):
         return False
     
-    # Check Windows reserved names (case-insensitive)
+    # check Windows reserved names (case-insensitive)
     name_upper = filename.upper()
     base_name = name_upper.split('.')[0]  # CON.txt -> CON
     if base_name in _WINDOWS_RESERVED:
         return False
     
-    # Names ending with space or period are problematic on Windows
+    # names ending with space or period are problematic on Windows
     if filename.endswith(' ') or filename.endswith('.'):
         return False
     
@@ -522,78 +489,76 @@ def streamline_path(
     """
     result = path
     
-    # Strip whitespace first
+    # strip whitespace first
     if strip_whitespace:
         result = result.strip()
     
-    # Replace invalid characters
+    # replace invalid characters
     for char in _INVALID_FILENAME_CHARS:
         result = result.replace(char, replacement_char)
     
-    # Replace problematic characters
+    # replace problematic characters
     for char in _PROBLEMATIC_CHARS:
         result = result.replace(char, replacement_char)
     
-    # Handle unicode if not allowed
+    # handle unicode if not allowed
     if not allow_unicode:
-        # Replace non-ASCII characters
+        # replace non-ASCII characters
         result = ''.join(
             char if ord(char) < 128 else replacement_char
             for char in result
         )
     
-    # Lowercase
+    # lowercase
     if lowercase:
         result = result.lower()
     
-    # Truncate to max length
+    # truncate to max length
     if max_length is not None and len(result) > max_length:
         result = result[:max_length]
     
-    # Clean up trailing spaces/periods that may have been introduced
+    # clean up trailing spaces/periods that may have been introduced
     result = result.rstrip(' .')
     
     return result
 
 
-# ============================================================================
-# Module Exports
-# ============================================================================
+# module exports
 
 __all__ = [
-    # Core class
+    # core class
     "Skpath",
     
-    # Types
+    # types
     "AnyPath",
     
-    # Decorator
+    # decorator
     "autopath",
     
-    # Exceptions
+    # exceptions
     "PathDetectionError",
     "NotAFileError",
     
-    # Root management
+    # root management
     "CustomRoot",
     "set_custom_root",
     "get_custom_root",
     "clear_custom_root",
     "get_project_root",
     
-    # Path functions
+    # path functions
     "get_caller_path",
     "get_current_dir",
     "get_cwd",
     "get_module_path",
     "get_id",
     
-    # Project functions
+    # project functions
     "get_project_paths",
     "get_project_structure",
     "get_formatted_project_tree",
     
-    # Path utilities
+    # path utilities
     "is_valid_filename",
     "streamline_path",
 ]

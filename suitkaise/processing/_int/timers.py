@@ -23,10 +23,10 @@ class ProcessTimers:
     """
     
     def __init__(self):
-        # Import here to avoid circular imports
+        # import here to avoid circular imports
         from suitkaise.timing import Sktimer
         
-        # Individual section timers
+        # individual section timers created lazily
         self.prerun: Sktimer | None = None
         self.run: Sktimer | None = None
         self.postrun: Sktimer | None = None
@@ -34,7 +34,7 @@ class ProcessTimers:
         self.result: Sktimer | None = None
         self.error: Sktimer | None = None
         
-        # Aggregate timer for full iteration (prerun + run + postrun)
+        # aggregate timer for full iteration (prerun + run + postrun)
         self.full_run: Sktimer = Sktimer()
     
     def _update_full_run(self) -> None:
@@ -48,6 +48,7 @@ class ProcessTimers:
         
         for timer in [self.prerun, self.run, self.postrun]:
             if timer is not None and timer.num_times > 0:
+                # only count timers with recorded values
                 most_recent = timer.most_recent
                 if most_recent is not None:
                     total += most_recent
@@ -69,6 +70,7 @@ class ProcessTimers:
         
         current = getattr(self, section, None)
         if current is None:
+            # allocate timer for this section on first use
             new_timer = Sktimer()
             setattr(self, section, new_timer)
             return new_timer

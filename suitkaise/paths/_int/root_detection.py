@@ -14,35 +14,33 @@ from pathlib import Path
 from .exceptions import PathDetectionError
 from .id_utils import normalize_separators
 
-# Thread-safe locks
+# thread-safe locks
 _root_lock = threading.RLock()
 _cache_lock = threading.RLock()
 
-# Module-level state
+# module-level state
 _custom_root: Path | None = None
 _cached_root: Path | None = None
 _cached_root_source: Path | None = None  # The path used to detect the cached root
 
 
-# ============================================================================
-# Project Root Indicators
-# ============================================================================
+# project root indicators
 
-# Definitive indicators - if found, this IS the project root
+# guaranteed indicators - if found, this IS the project root
 DEFINITIVE_INDICATORS = frozenset({
-    "setup.sk",      # Suitkaise custom marker (highest priority)
+    "setup.sk",      # suitkaise custom marker (highest priority)
     "setup.py",
     "setup.cfg",
     "pyproject.toml",
 })
 
-# Strong indicators - likely project root
+# strong indicators - likely project root
 STRONG_INDICATORS = frozenset({
     ".gitignore",
     ".git",
 })
 
-# License files (case-insensitive matching)
+# license files (case-insensitive matching)
 LICENSE_PATTERNS = frozenset({
     "license",
     "license.txt",
@@ -60,7 +58,7 @@ README_PATTERNS = frozenset({
     "readme.rst",
 })
 
-# Requirements files
+# requirements files
 REQUIREMENTS_PATTERNS = frozenset({
     "requirements.txt",
     "requirements.pip",
@@ -69,9 +67,7 @@ REQUIREMENTS_PATTERNS = frozenset({
 })
 
 
-# ============================================================================
-# Custom Root Management
-# ============================================================================
+# custom root management
 
 def set_custom_root(path: str | Path) -> None:
     """
@@ -158,12 +154,10 @@ class CustomRoot:
         with _root_lock:
             _custom_root = self._previous_root
         
-        return None  # Don't suppress exceptions
+        return None  # don't suppress exceptions
 
 
-# ============================================================================
-# Root Detection
-# ============================================================================
+# root detection
 
 def _has_indicator(directory: Path) -> bool:
     """Check if directory has any project root indicators."""
@@ -173,23 +167,23 @@ def _has_indicator(directory: Path) -> bool:
     except (PermissionError, OSError):
         return False
     
-    # Check definitive indicators
+    # check definitive indicators
     if contents & DEFINITIVE_INDICATORS:
         return True
     
-    # Check strong indicators
+    # check strong indicators
     if contents & STRONG_INDICATORS:
         return True
     
-    # Check license files (case-insensitive)
+    # check license files (case-insensitive)
     if contents_lower & LICENSE_PATTERNS:
         return True
     
-    # Check README files (case-insensitive)
+    # check README files (case-insensitive)
     if contents_lower & README_PATTERNS:
         return True
     
-    # Check requirements files
+    # check requirements files
     if contents_lower & REQUIREMENTS_PATTERNS:
         return True
     
@@ -213,11 +207,11 @@ def _find_root_from_path(start_path: Path) -> Path | None:
     """
     current = start_path.resolve()
     
-    # If it's a file, start from its parent
+    # if it's a file, start from its parent
     if current.is_file():
         current = current.parent
     
-    # First pass: look for setup.sk specifically (highest priority)
+    # first pass: look for setup.sk specifically (highest priority)
     check_path = current
     while check_path != check_path.parent:
         setup_sk = check_path / "setup.sk"
@@ -225,18 +219,18 @@ def _find_root_from_path(start_path: Path) -> Path | None:
             return check_path
         check_path = check_path.parent
     
-    # Second pass: look for any indicator
+    # second pass: look for any indicator
     check_path = current
     best_root: Path | None = None
     
     while check_path != check_path.parent:
         if _has_indicator(check_path):
             best_root = check_path
-            # Don't break - keep going up to find the outermost root
-            # This handles nested projects correctly
+            # don't break - keep going up to find the outermost root
+            # this handles nested projects correctly
         check_path = check_path.parent
     
-    # Check filesystem root
+    # check filesystem root
     if _has_indicator(check_path):
         best_root = check_path
     
@@ -267,7 +261,7 @@ def detect_project_root(
     """
     global _cached_root, _cached_root_source
     
-    # Check custom root first
+    # check custom root first
     with _root_lock:
         if _custom_root is not None:
             if expected_name and _custom_root.name != expected_name:
@@ -276,7 +270,7 @@ def detect_project_root(
                 )
             return _custom_root
     
-    # Determine start path
+    # determine start path
     if from_path is not None:
         if isinstance(from_path, str):
             start_path = Path(from_path).resolve()
@@ -285,18 +279,18 @@ def detect_project_root(
     else:
         start_path = Path.cwd()
     
-    # Check cache
+    # check cache
     with _cache_lock:
         if _cached_root is not None and _cached_root_source is not None:
-            # Cache hit if we're searching from within the same project
+            # cache hit if we're searching from within the same project
             try:
                 start_path.relative_to(_cached_root)
                 if expected_name is None or _cached_root.name == expected_name:
                     return _cached_root
             except ValueError:
-                pass  # Not relative to cached root, need to detect again
-    
-    # Detect root
+                pass  # not relative to cached root, need to detect again
+
+    # detect root
     root = _find_root_from_path(start_path)
     
     if root is None:
@@ -309,7 +303,7 @@ def detect_project_root(
             f"Detected root '{root.name}' doesn't match expected name '{expected_name}'"
         )
     
-    # Cache the result
+    # cache the result
     with _cache_lock:
         _cached_root = root
         _cached_root_source = start_path

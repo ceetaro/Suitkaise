@@ -17,10 +17,10 @@ from typing import Any
 from .exceptions import PathDetectionError
 from .id_utils import normalize_separators
 
-# Thread-safe lock
+# thread-safe lock
 _caller_lock = threading.RLock()
 
-# Suitkaise package path (detected once, cached)
+# suitkaise package path (detected once, cached)
 _suitkaise_path: str | None = None
 
 
@@ -30,9 +30,9 @@ def _get_suitkaise_path() -> str:
     
     with _caller_lock:
         if _suitkaise_path is None:
-            # Get the path to the suitkaise package
+            # get the path to the suitkaise package
             current_file = Path(__file__).resolve()
-            # Go up from _int/caller_paths.py to suitkaise/
+            # go up from _int/caller_paths.py to suitkaise/
             _suitkaise_path = normalize_separators(
                 str(current_file.parent.parent.parent)
             )
@@ -58,18 +58,18 @@ def get_caller_frame(skip_frames: int = 0) -> inspect.FrameInfo | None:
     """
     stack = inspect.stack()
     
-    # Skip internal frames and find first external caller
+    # skip internal frames and find first external caller
     external_frame_count = 0
     
     for frame_info in stack:
         if _is_suitkaise_frame(frame_info):
             continue
         
-        # Skip built-in/frozen modules
+        # skip built-in/frozen modules
         if frame_info.filename.startswith("<"):
             continue
         
-        # Found an external frame
+        # found an external frame
         if external_frame_count >= skip_frames:
             return frame_info
         
@@ -155,20 +155,20 @@ def get_module_file_path(obj: Any) -> Path | None:
     """
     module: ModuleType | None = None
     
-    # Handle module name strings
+    # handle module name strings
     if isinstance(obj, str):
         if obj in sys.modules:
             module = sys.modules[obj]
         else:
-            # Try to import it
+            # try to import it
             import importlib
             module = importlib.import_module(obj)
     
-    # Handle module objects
+    # handle module objects
     elif isinstance(obj, ModuleType):
         module = obj
     
-    # Handle objects with __module__ attribute
+    # handle objects with __module__ attribute
     elif hasattr(obj, "__module__"):
         module_name = obj.__module__
         if module_name in sys.modules:
@@ -177,7 +177,7 @@ def get_module_file_path(obj: Any) -> Path | None:
     if module is None:
         return None
     
-    # Get the file from the module
+    # get the file from the module
     module_file = getattr(module, "__file__", None)
     
     if module_file is None:

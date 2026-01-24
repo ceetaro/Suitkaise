@@ -84,25 +84,24 @@ class Skprocess:
         print(process.__run__.timer.mean)
     """
     
-    # Class-level attribute declarations for type checking
+    # class-level attribute declarations for type checking
     process_config: ProcessConfig
     timers: ProcessTimers | None
-    process_timer: "Sktimer | None"  # Alias for full_run timer
     error: BaseException | None
     _current_run: int
     _start_time: float | None
     _stop_event: "Event | None"
     _result_queue: "Queue[Any] | None"
-    _tell_queue: "Queue[Any] | None"  # Parent → Child communication
-    _listen_queue: "Queue[Any] | None"  # Child → Parent communication
+    _tell_queue: "Queue[Any] | None"  # parent to child communication
+    _listen_queue: "Queue[Any] | None"  # child to parent communication
     _subprocess: multiprocessing.Process | None
     _result: Any
     _has_result: bool
     
-    # Class-level flag to track if __init_subclass__ should wrap __init__
+    # class-level flag to track if __init_subclass__ should wrap __init__
     _is_base_class = True
     
-    # Internal attribute names (used for serialization filtering)
+    # internal attribute names (used for serialization filtering)
     _INTERNAL_ATTRS = frozenset({
         'process_config', 'timers', 'error', '_current_run', '_start_time',
         '_stop_event', '_result_queue', '_tell_queue', '_listen_queue',
@@ -124,44 +123,46 @@ class Skprocess:
         """
         super().__init_subclass__(**kwargs)
         
-        # Only wrap if this class defines its own __init__
+        # only wrap if this class defines its own __init__
         if '__init__' in cls.__dict__:
             original_init = cls.__dict__['__init__']
             
             def wrapped_init(self, *args, **kwargs):
-                # Run parent setup first
+                # run parent setup first
                 Skprocess._setup(self)
-                # Then run user's __init__
+                # then run user's __init__
                 original_init(self, *args, **kwargs)
             
-            # Preserve function metadata
+            # preserve function metadata for introspection
             wrapped_init.__name__ = original_init.__name__
             wrapped_init.__doc__ = original_init.__doc__
             cls.__init__ = wrapped_init
         else:
-            # No __init__ defined, but we still need setup to run
+            # no __init__ defined but setup still needs to run
             def default_init(self, *args, **kwargs):
                 Skprocess._setup(self)
             
             cls.__init__ = default_init
         
-        # Handle serialization methods for cerial compatibility.
-        # cerial requires these to be in the class's own __dict__ (not inherited)
-        # for locally-defined classes.
-        #
-        # IMPORTANT: cerial handles locally-defined vs module-level classes differently:
-        # - Locally-defined (has <locals> in qualname): requires staticmethod with (cls, state) signature
+        # handle serialization methods for cerial compatibility.
+        #   cerial requires these to be in the class's own __dict__ (not inherited)
+        #   for locally-defined classes.
+
+        # NOTE: cerial handles locally-defined vs module-level classes differently
+
+        # - locally defined (has <locals> in qualname): requires staticmethod with (cls, state) signature
         #   cerial calls: deserialize_func(cls, state["custom_state"])
-        # - Module-level: expects classmethod with (state) signature (cls is implicit)
+
+        # - module level: expects classmethod with (state) signature (cls is implicit)
         #   cerial calls: cls.__deserialize__(state["custom_state"])
-        #
-        # If user defined their own __serialize__/__deserialize__, we capture them
+
+        # if user defined their own __serialize__/__deserialize__, we capture them
         # and wrap to include Skprocess internals alongside user's custom state.
         
         user_serialize = cls.__dict__.get('__serialize__')
         user_deserialize = cls.__dict__.get('__deserialize__')
         
-        # Create the __serialize__ method that handles both Skprocess state and user state
+        # create the __serialize__ method that handles both Skprocess state and user state
         def make_serialize(user_ser):
             def __serialize__(self):
                 return Skprocess._serialize_with_user(self, user_ser)
@@ -169,12 +170,12 @@ class Skprocess:
         
         cls.__serialize__ = make_serialize(user_serialize)
         
-        # Determine if this is a locally-defined class
+        # determine if this is a locally-defined class
         is_local = "<locals>" in cls.__qualname__
         
         if is_local:
-            # For locally-defined classes: staticmethod with (cls, state) signature
-            # cerial calls: deserialize_func(cls, state["custom_state"])
+            # for locally-defined classes use staticmethod with (cls, state) signature
+            # cerial calls deserialize_func(cls, state["custom_state"])
             def make_deserialize_static(user_deser):
                 def __deserialize__(reconstructed_cls, state):
                     return Skprocess._deserialize_with_user(reconstructed_cls, state, user_deser)
@@ -182,8 +183,8 @@ class Skprocess:
             
             cls.__deserialize__ = make_deserialize_static(user_deserialize)
         else:
-            # For module-level classes: classmethod with (state) signature (cls is implicit)
-            # cerial calls: cls.__deserialize__(state["custom_state"])
+            # for module-level classes use classmethod with (state) signature
+            # cerial calls cls.__deserialize__(state["custom_state"])
             def make_deserialize_classmethod(user_deser):
                 @classmethod
                 def __deserialize__(inner_cls, state):
@@ -192,11 +193,11 @@ class Skprocess:
             
             cls.__deserialize__ = make_deserialize_classmethod(user_deserialize)
     
-    # =========================================================================
-    # Serialization support for cerial
-    # =========================================================================
+
+
+    # serialization support for cerial
     
-    # Lifecycle method names that need to be captured during serialization
+    # lifecycle method names that need to be captured during serialization
     _LIFECYCLE_METHODS = (
         '__prerun__', '__run__', '__postrun__', 
         '__onfinish__', '__result__', '__error__'
@@ -219,25 +220,25 @@ class Skprocess:
         """
         cls = instance.__class__
         
-        # Capture lifecycle methods defined on THIS class (not inherited from Skprocess)
+        # capture lifecycle methods defined on this class only
         lifecycle_methods = {}
         for name in Skprocess._LIFECYCLE_METHODS:
             if name in cls.__dict__:
-                # This is a method defined on the subclass
+                # this is a method defined on the subclass
                 lifecycle_methods[name] = cls.__dict__[name]
         
-        # Capture any other class-level attributes (non-dunder, non-private)
+        # capture class-level attributes that are not dunder or private
         class_attrs = {}
         for name, value in cls.__dict__.items():
             if name.startswith('_'):
                 continue
             if name in lifecycle_methods:
                 continue
-            # Include class variables, but not inherited stuff
+            # include class variables, but not inherited stuff
             class_attrs[name] = value
         
-        # Prepare instance dict, excluding TimedMethod wrappers
-        # (they'll be recreated on deserialization)
+        # prepare instance dict and skip TimedMethod wrappers
+        # they are recreated after deserialization
         instance_dict = {}
         for key, value in instance.__dict__.items():
             if isinstance(value, TimedMethod):
@@ -251,7 +252,7 @@ class Skprocess:
             'class_attrs': class_attrs,
         }
         
-        # If user defined their own __serialize__, call it and include that state
+        # include user custom state if __serialize__ is defined
         if user_serialize is not None:
             state['user_custom_state'] = user_serialize(instance)
             state['has_user_serialize'] = True
@@ -271,62 +272,61 @@ class Skprocess:
         Recreates the subclass dynamically with type() and restores state.
         If user had custom deserialize, applies it after Skprocess reconstruction.
         """
-        # Build class dict with lifecycle methods and class attributes
+        # build class dict with lifecycle methods and class attributes
         class_dict = {}
         class_dict.update(state.get('class_attrs', {}))
         class_dict.update(state['lifecycle_methods'])
         
-        # Create the subclass dynamically
-        # Note: This triggers __init_subclass__ which sets up __init__ wrapping
+        # create the subclass dynamically
+        # note this triggers __init_subclass__ which sets up __init__ wrapping
         new_class = type(
             state['class_name'],
             (Skprocess,),
             class_dict
         )
         
-        # Create instance without calling __init__
-        # We bypass __init__ because we're restoring state directly
+        # create instance without calling __init__
+        # bypass __init__ because state is restored directly
         obj = object.__new__(new_class)
         
-        # Restore instance state directly (includes config, timers, etc.)
+        # restore instance state directly including config and timers
         obj.__dict__.update(state['instance_dict'])
         
-        # Set up timed method wrappers
+        # set up timed method wrappers
         Skprocess._setup_timed_methods(obj)
         
-        # If user defined their own __deserialize__, apply it now
+        # apply user __deserialize__ if present
         if state.get('has_user_serialize') and user_deserialize is not None:
-            # User's __deserialize__ should be a classmethod that takes (cls, state)
-            # We call it with the user's custom state portion
+            # user's __deserialize__ should be a classmethod that takes (cls, state)
+            # we call it with the user's custom state portion
             user_state = state.get('user_custom_state', {})
             
-            # Handle both classmethod and staticmethod signatures
-            # The user_deserialize we captured is the raw method/function
+            # handle both classmethod and staticmethod signatures
+            # the user_deserialize we captured is the raw method/function
             if isinstance(user_deserialize, classmethod):
-                # It's already a classmethod descriptor, extract the function
+                # it's already a classmethod descriptor, extract the function
                 user_func = user_deserialize.__func__
                 user_result = user_func(new_class, user_state)
             elif isinstance(user_deserialize, staticmethod):
-                # It's a staticmethod, extract and call with (cls, state)
+                # it's a staticmethod, extract and call with (cls, state)
                 user_func = user_deserialize.__func__
                 user_result = user_func(new_class, user_state)
             else:
-                # Regular function or unbound method - try calling as classmethod-style
+                # regular function or unbound method - try calling as classmethod style
                 try:
                     user_result = user_deserialize(new_class, user_state)
                 except TypeError:
-                    # Maybe it just expects state
+                    # try to see if it expects state
                     user_result = user_deserialize(user_state)
             
-            # If user's __deserialize__ returned an object, use it to update our obj
-            # This allows user to restore their custom attributes
+            # if user deserialize returned an object merge its attributes
             if user_result is not None and hasattr(user_result, '__dict__'):
-                # Merge user's restored attributes into our obj
+                # merge user's restored attributes into our obj
                 for key, value in user_result.__dict__.items():
                     if key not in obj.__dict__:
                         obj.__dict__[key] = value
         
-        # Auto-reconnect if enabled via @auto_reconnect decorator
+        # auto-reconnect if enabled via @auto_reconnect decorator
         if getattr(new_class, '_auto_reconnect_enabled', False):
             try:
                 from suitkaise.cerial.api import reconnect_all
@@ -337,7 +337,7 @@ class Skprocess:
         
         return obj
     
-    # Fallback for direct calls on Skprocess base class
+    # fallback for direct calls on Skprocess base class
     def __serialize__(self) -> dict:
         """Serialize this Skprocess instance (base class fallback)."""
         return Skprocess._serialize_with_user(self, None)
@@ -347,10 +347,10 @@ class Skprocess:
         """Deserialize for module-level classes (base class fallback)."""
         return Skprocess._deserialize_with_user(cls, state, None)
     
-    # =========================================================================
-    # Internal setup
-    # =========================================================================
-    
+
+
+    # internal setup
+
     @staticmethod
     def _setup(instance: "Skprocess") -> None:
         """
@@ -358,33 +358,33 @@ class Skprocess:
         
         Called automatically before user's __init__.
         """
-        # Configuration with defaults
+        # configuration with defaults
         instance.process_config = ProcessConfig()
         
-        # Timers container (created when needed)
+        # timers container created when needed
         instance.timers = None
         
-        # Runtime state
+        # runtime state
         instance._current_run = 0
         instance._start_time = None
         
-        # Error state (set when error occurs, used by __error__)
+        # error state set when error occurs for __error__
         instance.error = None
         
-        # Communication primitives (created on start())
+        # communication primitives created on start
         instance._stop_event = None
         instance._result_queue = None
         instance._tell_queue = None  # Parent → Child
         instance._listen_queue = None  # Child → Parent
         
-        # Subprocess handle
+        # subprocess handle
         instance._subprocess = None
         
-        # Result storage (populated after process completes)
+        # result storage populated after process completes
         instance._result = None
         instance._has_result = False
         
-        # Set up timed method wrappers
+        # set up timed method wrappers
         Skprocess._setup_timed_methods(instance)
     
     @staticmethod
@@ -406,18 +406,18 @@ class Skprocess:
         }
         
         for method_name, timer_name in method_to_timer.items():
-            # Check if user defined this method (not just inherited from Skprocess)
+        # check if user defined this method on the subclass
             if method_name in cls.__dict__:
-                # Get the actual method
+                # get the actual method
                 method = getattr(instance, method_name)
-                # Create wrapper
+                # create wrapper
                 wrapper = TimedMethod(method, instance, timer_name)
-                # Store as instance attribute (shadows class method)
+                # store as instance attribute (shadows class method)
                 setattr(instance, method_name, wrapper)
     
-    # =========================================================================
-    # Lifecycle methods (override these in subclass)
-    # =========================================================================
+
+    # lifecycle methods (override these in subclass)
+
     
     def __prerun__(self) -> None:
         """Called before each __run__() iteration. Override in subclass."""
@@ -448,9 +448,9 @@ class Skprocess:
         """
         return self.error
     
-    # =========================================================================
-    # Control methods (called from parent process)
-    # =========================================================================
+
+    # control methods (called from parent process)
+
     
     def start(self) -> None:
         """
@@ -459,31 +459,31 @@ class Skprocess:
         Serializes this Skprocess object, spawns a subprocess, and runs
         the engine there.
         """
-        # Import here to avoid circular imports
+        # import here to avoid circular imports
         from .engine import _engine_main
         from suitkaise import cerial
         
-        # Ensure timers exist
+        # ensure timers exist for this run
         if self.timers is None:
             self.timers = ProcessTimers()
         
-        # Serialize current state
+        # serialize current state for subprocess transfer
         serialized = cerial.serialize(self)
         
-        # Save original state for retries (lives system)
+        # save original state for retries in the lives system
         original_state = serialized
         
-        # Create communication primitives
+        # create communication primitives for control and results
         self._stop_event = multiprocessing.Event()
         self._result_queue = multiprocessing.Queue()
         self._tell_queue = multiprocessing.Queue()  # Parent → Child
         self._listen_queue = multiprocessing.Queue()  # Child → Parent
         
-        # Record start time
-        from suitkaise import sktime
-        self._start_time = sktime.time()
+        # record start time for join_in and timers
+        from suitkaise import timing
+        self._start_time = timing.time()
         
-        # Spawn subprocess
+        # spawn subprocess to run the engine
         self._subprocess = multiprocessing.Process(
             target=_engine_main,
             args=(serialized, self._stop_event, self._result_queue, 
@@ -523,13 +523,13 @@ class Skprocess:
             self._subprocess.terminate()
             self._subprocess.join(timeout=5)
             
-            # If still alive after terminate, force kill
+            # if still alive after terminate, force kill
             if self._subprocess.is_alive():
                 self._subprocess.kill()
     
-    # -------------------------------------------------------------------------
-    # Async wait implementation for modifiers
-    # -------------------------------------------------------------------------
+
+
+    # async wait implementation for modifiers
     
     async def _async_wait(self, timeout: float | None = None) -> bool:
         """Async implementation of wait()."""
@@ -553,8 +553,8 @@ class Skprocess:
         if self._subprocess is None:
             return True
         
-        # Must drain result queue BEFORE waiting for subprocess
-        # Otherwise deadlock: subprocess can't exit until queue is drained,
+        # must drain result queue BEFORE waiting for subprocess
+        # otherwise deadlock: subprocess can't exit until queue is drained,
         # but we can't drain until subprocess exits
         self._drain_result_queue()
         
@@ -612,21 +612,21 @@ class Skprocess:
         import queue as queue_module
         
         try:
-            # Use short timeout for polling - subprocess may still be producing
+            # use short timeout for polling - subprocess may still be producing
             message = self._result_queue.get(timeout=1.0)
             
-            # Update timers from subprocess
+            # update timers from subprocess
             if 'timers' in message and message['timers'] is not None:
                 self.timers = cerial.deserialize(message['timers'])
                 Skprocess._setup_timed_methods(self)
             
             if message["type"] == "error":
                 error_data = cerial.deserialize(message["data"])
-                # If __error__() returned a non-exception, wrap it
+                # if __error__() returned a non-exception, wrap it
                 if isinstance(error_data, BaseException):
                     self._result = error_data
                 else:
-                    # Create a generic ProcessError wrapping the error info
+                    # create a generic ProcessError wrapping the error info
                     from .errors import ProcessError
                     self._result = ProcessError(f"Process failed: {error_data}")
             else:
@@ -634,12 +634,11 @@ class Skprocess:
             
             self._has_result = True
         except queue_module.Empty:
-            # No result yet - subprocess may still be running
+            # no result yet - subprocess may still be running
             pass
     
-    # -------------------------------------------------------------------------
-    # Async result implementation for modifiers
-    # -------------------------------------------------------------------------
+
+    # async result implementation for modifiers
     
     async def _async_result(self) -> Any:
         """Async implementation of result()."""
@@ -666,7 +665,7 @@ class Skprocess:
         Raises:
             ProcessError: If the process failed (after exhausting lives).
         """
-        # Wait drains the queue and stores result
+        # wait drains the queue and stores result
         self.wait()
         
         if self._has_result:
@@ -674,7 +673,7 @@ class Skprocess:
                 raise self._result
             return self._result
         
-        # No result retrieved - subprocess may have crashed silently
+        # no result retrieved - subprocess may have crashed silently
         return None
     
     result = _ModifiableMethod(
@@ -737,9 +736,9 @@ class Skprocess:
         serialized = cerial.serialize(data)
         self._tell_queue.put(serialized)
     
-    # -------------------------------------------------------------------------
-    # Async listen implementation for modifiers
-    # -------------------------------------------------------------------------
+
+    
+    # async listen implementation for modifiers
     
     async def _async_listen(self, timeout: float | None = None) -> Any:
         """Async implementation of listen()."""

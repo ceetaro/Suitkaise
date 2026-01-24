@@ -32,18 +32,19 @@ def _signal_based_timeout(
     import signal
     
     def handler(signum, frame):
+        # raise a timeout error inside the running thread
         raise ProcessTimeoutError(section, timeout, current_run)
     
-    # Save old handler and set new one
+    # save old handler and set new one
     old_handler = signal.signal(signal.SIGALRM, handler)
     
-    # Set alarm (only supports integer seconds, so we round up)
+    # set alarm (only supports integer seconds, so we round up)
     signal.alarm(int(timeout) + 1 if timeout % 1 else int(timeout))
     
     try:
         return func()
     finally:
-        # Cancel alarm and restore old handler
+        # cancel alarm and restore old handler
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
@@ -68,6 +69,7 @@ def _thread_based_timeout(
     if timeout is None:
         return func()
     
+    # shared slots for returning value or exception from thread
     result: list[Any] = [None]
     exception: list[BaseException | None] = [None]
     completed = threading.Event()
@@ -83,21 +85,21 @@ def _thread_based_timeout(
     thread = threading.Thread(target=wrapper, daemon=True)
     thread.start()
     
-    # Wait for completion or timeout
+    # wait for completion or timeout
     finished = completed.wait(timeout=timeout)
     
     if not finished:
-        # Thread is still running - we can't kill it, but we know timeout occurred
+        # thread is still running and timeout occurred
         raise ProcessTimeoutError(section, timeout, current_run)
     
-    # Thread finished - check for exception
+    # thread finished so check for exception
     if exception[0] is not None:
         raise exception[0]
     
     return result[0]
 
 
-# Select implementation based on platform
+# select implementation based on platform
 if platform.system() != 'Windows':
     run_with_timeout = _signal_based_timeout
 else:

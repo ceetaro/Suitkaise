@@ -399,6 +399,34 @@ def test_share_set_multiple_objects():
 
 
 # =============================================================================
+# Share Deletion Tests
+# =============================================================================
+
+def test_share_delete_object_cleans_state():
+    """Deleting a shared object should clean coordinator state."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        # ensure registration
+        assert "counter" in share._coordinator._source_store
+        assert "counter" in list(share._coordinator._object_names)
+        assert share._coordinator.get_object_keys("counter")
+
+        del share.counter
+
+        assert "counter" not in share._coordinator._source_store
+        assert "counter" not in list(share._coordinator._object_names)
+        assert share._coordinator.get_object_keys("counter") == []
+        try:
+            _ = share.counter
+            assert False, "Expected AttributeError after deletion"
+        except AttributeError:
+            pass
+    finally:
+        share.exit()
+
+
+# =============================================================================
 # Share Operations Tests
 # =============================================================================
 
@@ -592,6 +620,7 @@ def run_all_tests():
     runner.run_test("Share set user class", test_share_set_user_class, timeout=10)
     runner.run_test("Share set multiple objects", test_share_set_multiple_objects, timeout=10)
     runner.run_test("Share clear", test_share_clear, timeout=10)
+    runner.run_test("Share delete object cleans state", test_share_delete_object_cleans_state, timeout=10)
     
     # Share operations tests
     runner.run_test("Share Sktimer add_time()", test_share_timer_add_time, timeout=15)

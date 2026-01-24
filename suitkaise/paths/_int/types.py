@@ -13,6 +13,6 @@ if TYPE_CHECKING:
     from .skpath import Skpath
 
 # AnyPath accepts str, Path, or Skpath
-# Note: Does NOT include None - use AnyPath | None when None is acceptable
-# Using Union for forward reference compatibility at runtime
+# NOTE: Does NOT include None - use AnyPath | None when None is acceptable
+# using Union for forward reference compatibility at runtime
 AnyPath = Union[str, Path, "Skpath"]

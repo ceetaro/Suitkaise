@@ -1,15 +1,4 @@
 """
-Cerial API - Serialization for the Unpicklable
-
-This module provides user-friendly serialization for objects that 
-standard pickle cannot handle: locks, loggers, file handles, 
-thread-local data, and more.
-
-Key Features:
-- Serialize complex objects with locks, loggers, and other unpicklables
-- Automatic circular reference handling
-- Handlers for common unpicklable types
-- Clear error messages for debugging
 """
 
 from ._int.serializer import Cerializer, SerializationError
@@ -165,7 +154,7 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
         with restored.lock: # will work
 
         # once reconnected, conn will work
-        restored.conn.reconnect(password="mypassword")
+        restored.conn.reconnect(auth="mypassword")
         ```
     ────────────────────────────────────────────────────────
     """
@@ -175,7 +164,7 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     return _default_deserializer.deserialize(data)
 
 
-def reconnect_all(obj, **kwargs):
+def reconnect_all(obj, **auth):
     """
     Recursively reconnect Reconnector objects inside a structure.
     
@@ -185,17 +174,17 @@ def reconnect_all(obj, **kwargs):
     
     Args:
         obj: Object or container to traverse.
-        **kwargs: Passwords keyed by type. Simplified dict[str, str] pattern:
+        **auth: Credentials keyed by type. Simplified dict[str, str] pattern:
             reconnect_all(obj, **{
                 "psycopg2.Connection": {
-                    "*": "secret",           # default password
-                    "analytics_db": "other", # specific attr password
+                    "*": "secret",           # default auth
+                    "analytics_db": "other", # specific attr auth
                 },
                 "redis.Redis": {
                     "*": "redis_pass",
                 },
             })
-            The "*" key provides default password for all instances of that type.
+            The "*" key provides default auth for all instances of that type.
             Specific attr names override the default.
     """
     visited: set[int] = set()
@@ -235,26 +224,26 @@ def reconnect_all(obj, **kwargs):
         
         return None
     
-    def _get_password_for(reconnector: Reconnector, attr_name: str | None) -> str | None:
-        """Look up password for a reconnector based on type and attr name."""
+    def _get_auth_for(reconnector: Reconnector, attr_name: str | None) -> str | None:
+        """Look up auth for a reconnector based on type and attr name."""
         type_key = _get_reconnector_type_key(reconnector)
-        if not type_key or type_key not in kwargs:
+        if not type_key or type_key not in auth:
             return None
         
-        type_passwords = kwargs[type_key]
-        if not isinstance(type_passwords, dict):
+        type_auth = auth[type_key]
+        if not isinstance(type_auth, dict):
             return None
         
-        # Check for specific attr password first, then fall back to "*" default
-        if attr_name and attr_name in type_passwords:
-            return type_passwords[attr_name]
-        return type_passwords.get("*")
+        # Check for specific attr auth first, then fall back to "*" default
+        if attr_name and attr_name in type_auth:
+            return type_auth[attr_name]
+        return type_auth.get("*")
     
     def _recurse(item, attr_name: str | None = None):
         if isinstance(item, Reconnector):
             try:
-                password = _get_password_for(item, attr_name)
-                return item.reconnect(password=password) if password else item.reconnect()
+                auth_value = _get_auth_for(item, attr_name)
+                return item.reconnect(auth=auth_value) if auth_value else item.reconnect()
             except Exception:
                 return item
         

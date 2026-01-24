@@ -1,15 +1,5 @@
 """
 circuits API
-
-This module provides circuit breaker pattern implementations for 
-controlled failure handling and resource management in loops.
-
-Two circuit types:
-- Circuit: Auto-resets after sleeping (for rate limiting, backoff)
-- BreakingCircuit: Stays broken until manually reset (for failure limits)
-
-Methods `short()` and `trip()` support `.asynced()` for async usage:
-    await circuit.short.asynced()()  # Uses asyncio.sleep instead of time.sleep
 """
 
 import asyncio

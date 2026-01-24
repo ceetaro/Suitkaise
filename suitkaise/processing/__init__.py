@@ -59,11 +59,10 @@ from .api import (
 
 from ._int.share import Share
 
-Process = Skprocess  # Backwards-compatible alias
+# Share provides cross-process shared state for processing users
 
 __all__ = [
     'Skprocess',
-    'Process',
     'Pool',
     'Share',
     'auto_reconnect',

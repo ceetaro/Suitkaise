@@ -22,7 +22,7 @@ from multiprocessing.managers import SyncManager
 from .coordinator import _Coordinator
 from .proxy import _ObjectProxy
 
-# Import Skclass for auto-wrapping user objects
+# import Skclass for auto-wrapping user objects
 from suitkaise.sk import Skclass
 
 
@@ -53,7 +53,7 @@ class Share:
         share.stop()  # Stop the coordinator
     """
     
-    # Attrs that belong to Share itself, not shared objects
+    # attrs that belong to Share itself, not shared objects
     _SHARE_ATTRS = frozenset({
         '_coordinator', '_proxies', '_started',
     })
@@ -76,7 +76,7 @@ class Share:
         object.__setattr__(self, '_proxies', {})  # name -> proxy
         object.__setattr__(self, '_started', False)
         object.__setattr__(self, '_client_mode', client_mode)
-        # Auto-start coordinator on creation
+        # auto-start coordinator on creation
         if auto_start and not client_mode:
             self.start()
     
@@ -89,20 +89,22 @@ class Share:
         - Primitives (int, str, etc.) are stored directly in source of truth
         """
         if name in self._SHARE_ATTRS:
+            # internal attributes are stored directly on the Share instance
             object.__setattr__(self, name, value)
             return
         
-        # Check if this is an object with _shared_meta (suitkaise or @sk wrapped)
+        # check if this is an object with _shared_meta (suitkaise or @sk wrapped)
         has_meta = hasattr(type(value), '_shared_meta')
         
-        # If it's a class instance without _shared_meta, auto-wrap with Skclass
+        # if it's a user class instance without _shared_meta, auto-wrap with Skclass
         if not has_meta and self._is_user_class_instance(value):
-            # Apply Skclass to generate _shared_meta
+            # apply Skclass to generate _shared_meta
             sk_wrapper = Skclass(type(value))
-            # Now the class has _shared_meta attached
+            # now the class has _shared_meta attached
             has_meta = True
         
-        # Register the object with coordinator
+        # register the object with the coordinator and compute read/write attrs
+        #   for efficient barrier waits in the proxy
         attrs: set[str] = set()
         if has_meta:
             meta = getattr(type(value), '_shared_meta', {})
@@ -115,11 +117,11 @@ class Share:
         self._coordinator.register_object(name, value, attrs=attrs if attrs else None)
         
         if has_meta:
-            # Create a proxy for this object
+            # create a proxy for this object
             proxy = _ObjectProxy(name, self._coordinator, type(value))
             self._proxies[name] = proxy
         else:
-            # No proxy - we'll fetch directly from source of truth
+            # no proxy - we'll fetch directly from source of truth
             self._proxies[name] = None
     
     def _is_user_class_instance(self, value: Any) -> bool:
@@ -128,14 +130,14 @@ class Share:
         
         Returns False for primitives, builtins, and known non-shareable types.
         """
-        # Skip primitives and builtins
+        # skip primitives and builtins
         if isinstance(value, (
             int, float, str, bytes, bool, type(None),
             list, dict, tuple, set, frozenset,
         )):
             return False
         
-        # It's a class instance
+        # it's a class instance
         return True
     
     def __getattr__(self, name: str) -> Any:
@@ -157,9 +159,10 @@ class Share:
         
         proxy = proxies[name]
         if proxy is not None:
+            # proxy handles read/write barriers and command queueing
             return proxy
         
-        # No proxy - fetch directly from source of truth
+        # no proxy - fetch directly from source of truth (serialized state)
         coordinator = object.__getattribute__(self, '_coordinator')
         obj = coordinator.get_object(name)
         if obj is None:
@@ -174,8 +177,11 @@ class Share:
             raise AttributeError(f"Cannot delete Share attribute '{name}'")
         
         if name in self._proxies:
+            # remove local proxy first to avoid future access
             del self._proxies[name]
-            # TODO: Also remove from coordinator's source of truth
+            coordinator = object.__getattribute__(self, '_coordinator')
+            # drop coordinator state so the object can't be resurrected
+            coordinator.remove_object(name)
     
     def start(self) -> None:
         """
@@ -264,7 +270,7 @@ class Share:
         from suitkaise import cerial
         coordinator_state = None
         if object.__getattribute__(self, '_started'):
-            # Serialize coordinator state separately to avoid proxy pickling issues.
+            # serialize coordinator state separately to avoid proxy pickling issues
             coordinator_state = cerial.serialize(coordinator.get_state())
         return {
             "mode": "live" if object.__getattribute__(self, '_started') else "snapshot",

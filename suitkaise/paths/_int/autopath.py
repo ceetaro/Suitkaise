@@ -197,7 +197,7 @@ def _convert_value(
                 # normalize through Skpath, then extract string
                 result = Skpath(value).ap
             except Exception:
-                result = str(value)  # fall back to simple str conversion
+                result = str(value) # fall back to simple str conversion
         else:
             return value
     else:

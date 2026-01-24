@@ -34,7 +34,7 @@ class _ObjectProxy:
         print(proxy.mean)    # Waits for writes, fetches fresh value
     """
     
-    # Attributes that belong to the proxy itself, not the wrapped object
+    # attributes that belong to the proxy itself, not the wrapped object
     _PROXY_ATTRS = frozenset({
         '_object_name', '_coordinator', '_wrapped_class', '_shared_meta',
     })
@@ -57,7 +57,7 @@ class _ObjectProxy:
         object.__setattr__(self, '_coordinator', coordinator)
         object.__setattr__(self, '_wrapped_class', wrapped_class)
         
-        # Cache the _shared_meta if it exists
+        # cache the _shared_meta if it exists
         meta = getattr(wrapped_class, '_shared_meta', None)
         object.__setattr__(self, '_shared_meta', meta)
     
@@ -69,16 +69,15 @@ class _ObjectProxy:
         - If it's a property in _shared_meta, wait for writes and return value
         - Otherwise, fetch from source of truth and return the attr
         """
-        # Check if it's a method
+        # methods in _shared_meta are wrapped as fire-and-forget commands
         if self._shared_meta and name in self._shared_meta.get('methods', {}):
             return _MethodProxy(self, name)
         
-        # Check if it's a property in metadata
+        # properties in _shared_meta require read barriers before access
         if self._shared_meta and name in self._shared_meta.get('properties', {}):
             return self._read_property(name)
         
-        # Fallback: fetch object and get attr directly
-        # This handles attrs not in _shared_meta
+        # fallback: fetch object and get attr directly for untracked attrs
         return self._read_attr(name)
     
     def __setattr__(self, name: str, value: Any) -> None:
@@ -91,8 +90,7 @@ class _ObjectProxy:
             object.__setattr__(self, name, value)
             return
         
-        # Queue a setattr command
-        # We treat this as writing to the attr itself
+        # queue a setattr command and mark the attr as written
         self._coordinator.increment_pending(f"{self._object_name}.{name}")
         self._coordinator.queue_command(
             self._object_name,
@@ -109,18 +107,17 @@ class _ObjectProxy:
         Uses _shared_meta to know which attrs the property reads from,
         then waits for all those attrs to have no pending writes.
         """
-        # Get the attrs this property reads from
+        # translate property read deps into counter keys
         prop_meta = self._shared_meta['properties'].get(name, {})
         read_attrs = prop_meta.get('reads', [])
         
-        # Build counter keys
         keys = [f"{self._object_name}.{attr}" for attr in read_attrs]
         
-        # Wait for pending writes to complete
+        # wait for all relevant writes to complete before reading
         if keys:
             self._coordinator.wait_for_read(keys, timeout=10.0)
         
-        # Fetch current state and return the property value
+        # fetch a fresh snapshot from the coordinator and read the property
         obj = self._coordinator.get_object(self._object_name)
         if obj is None:
             raise AttributeError(f"Object '{self._object_name}' not found")
@@ -134,8 +131,7 @@ class _ObjectProxy:
         Conservatively waits for ALL pending writes on this object,
         then fetches the current state.
         """
-        # Get all pending counter keys for this object
-        # This is conservative but safe
+        # unknown attrs: wait on all registered keys for this object
         all_keys = self._coordinator.get_object_keys(self._object_name)
         
         if all_keys:
@@ -173,16 +169,16 @@ class _MethodProxy:
         proxy = self._object_proxy
         meta = proxy._shared_meta
         
-        # Get the attrs this method writes to
+        # determine which attrs this method mutates (from _shared_meta)
         method_meta = meta['methods'].get(self._method_name, {})
         write_attrs = method_meta.get('writes', [])
         
-        # Increment pending counters
+        # increment pending counters before queueing so reads block properly
         for attr in write_attrs:
             key = f"{proxy._object_name}.{attr}"
             proxy._coordinator.increment_pending(key)
         
-        # Queue the command
+        # queue the command to be executed by the coordinator process
         proxy._coordinator.queue_command(
             proxy._object_name,
             self._method_name,

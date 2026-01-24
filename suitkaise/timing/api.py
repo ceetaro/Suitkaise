@@ -44,9 +44,9 @@ def time() -> float:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        start_time = sktime.time()
+        start_time = timing.time()
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -80,32 +80,32 @@ def sleep(seconds: float) -> float:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
 
-        start_time = sktime.time()
+        start_time = timing.time()
         
         # sleep for 2 seconds
-        sktime.sleep(2)
+        timing.sleep(2)
 
-        end_time = sktime.time()
+        end_time = timing.time()
 
         # elapsed time should be about 2 seconds
         elapsed_time = end_time - start_time
         ```
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        start_time = sktime.time()
+        start_time = timing.time()
         
-        end_time = sktime.sleep(2)
+        end_time = timing.sleep(2)
         ```
     ────────────────────────────────────────────────────────
         ```python
         # Async version
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        end_time = await sktime.sleep.asynced()(2)
+        end_time = await timing.sleep.asynced()(2)
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -135,23 +135,23 @@ def elapsed(time1: float, time2: Optional[float] = None) -> float:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        start_time = sktime.time()
+        start_time = timing.time()
         
-        sktime.sleep(2)
+        timing.sleep(2)
         
-        elapsed = sktime.elapsed(start_time) # end time automatically set to current time
+        elapsed = timing.elapsed(start_time) # end time automatically set to current time
         
         # with 2 times
-        start_time = sktime.time() # 100
-        sktime.sleep(2)
-        end_time = sktime.time() # 102
+        start_time = timing.time() # 100
+        timing.sleep(2)
+        end_time = timing.time() # 102
         
-        elapsed1 = sktime.elapsed(start_time, end_time)  # |100 - 102| = 2
-        elapsed2 = sktime.elapsed(end_time, start_time)  # |102 - 100| = 2
+        elapsed1 = timing.elapsed(start_time, end_time)  # |100 - 102| = 2
+        elapsed2 = timing.elapsed(end_time, start_time)  # |102 - 100| = 2
         
-        elapsed3 = sktime.elapsed(start_time)       # Uses current time as end
+        elapsed3 = timing.elapsed(start_time)       # Uses current time as end
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -188,9 +188,9 @@ class TimeThis:
     ────────────────────────────────────────────────────────
         ```python
         # create a one-use timer
-        from suitkaise import sktime
+        from suitkaise import timing
 
-        with sktime.TimeThis() as timer:
+        with timing.TimeThis() as timer:
 
             # ... timed ...
 
@@ -202,12 +202,12 @@ class TimeThis:
     ────────────────────────────────────────────────────────
         ```python
         # create a context manager for an existing timer
-        from suitkaise import sktime
+        from suitkaise import timing
 
-        my_timer = sktime.Sktimer()
+        my_timer = timing.Sktimer()
     
         def function1():
-            with sktime.TimeThis(my_timer):
+            with timing.TimeThis(my_timer):
 
                 # ... timed ...
                 return create_random_object()
@@ -218,7 +218,7 @@ class TimeThis:
             if not is_valid(object):
                 return None
 
-            with sktime.TimeThis(my_timer):
+            with timing.TimeThis(my_timer):
 
                 # ... timed ...
                 process_object(object)
@@ -250,16 +250,16 @@ class TimeThis:
         # Independent timing context
 
         # Real example: File compression comparison
-        from suitkaise import sktime
+        from suitkaise import timing
 
         large_dataset = get_large_dataset()
 
-        with sktime.TimeThis() as gzip_timer:
+        with timing.TimeThis() as gzip_timer:
             compress_file_with_gzip("large_dataset.csv")
         
         print(f"GZIP compression took: {gzip_timer.most_recent:.3f}s")
         
-        with sktime.TimeThis() as lzma_timer:
+        with timing.TimeThis() as lzma_timer:
             compress_file_with_lzma("large_dataset.csv")
             
         print(f"LZMA compression took: {lzma_timer.most_recent:.3f}s")
@@ -269,11 +269,11 @@ class TimeThis:
         # Independent timing context
 
         # Real example: Database query with user interaction
-        from suitkaise import sktime
+        from suitkaise import timing
 
         exported = False
 
-        with sktime.TimeThis() as timer:
+        with timing.TimeThis() as timer:
             results = database.query("SELECT * FROM users WHERE active=1")
             
             # Pause timing while user reviews results
@@ -295,18 +295,18 @@ class TimeThis:
         # Explicit timer
 
         # Real example: API call performance monitoring
-        from suitkaise import sktime
+        from suitkaise import timing
         import requests
 
-        api_timer = sktime.Sktimer()
+        api_timer = timing.Sktimer()
         
         # Time multiple API calls to build statistics
-        with sktime.TimeThis(api_timer) as timer:
+        with timing.TimeThis(api_timer) as timer:
             response = requests.get("https://api.github.com/users/octocat")
         
         print(f"API call 1: {timer.most_recent:.3f}s")
         
-        with sktime.TimeThis(api_timer) as timer:
+        with timing.TimeThis(api_timer) as timer:
             response = requests.get("https://api.github.com/users/torvalds")
         
         print(f"API call 2: {timer.most_recent:.3f}s")
@@ -375,10 +375,10 @@ def timethis(
     Auto-created `Sktimer` (quickest way to use `Sktimer`):
 
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
 
         # No timer argument - creates global Sktimer automatically
-        @sktime.timethis()  
+        @timing.timethis()  
         def quick_function():
             # Code to time
             pass
@@ -400,18 +400,18 @@ def timethis(
     Explicit `Sktimer` (for gathering data from multiple functions):
 
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         import random
 
-        performance_timer = sktime.Sktimer()
+        performance_timer = timing.Sktimer()
         
-        @sktime.timethis()
-        @sktime.timethis(performance_timer)
+        @timing.timethis()
+        @timing.timethis(performance_timer)
         def multiply(a: int, b: int) -> int:
             return a * b
 
-        @sktime.timethis()
-        @sktime.timethis(performance_timer)
+        @timing.timethis()
+        @timing.timethis(performance_timer)
         def divide(a: int, b: int) -> float:
             return a / b
 

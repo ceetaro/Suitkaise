@@ -5,7 +5,8 @@ This module provides the Share container for sharing data between processes
 with automatic synchronization, read barriers, and coordinator-based writes.
 """
 
-# Internal primitives - not exported, used by other internal modules
+# internal primitives - not exported, used by other internal modules
+# these imports define the private surface area for the share subsystem
 from .primitives import (
     _WriteCounter,
     _CounterRegistry,
@@ -26,7 +27,7 @@ from .share import (
     Share,
 )
 
-# Public exports
+# public exports
 __all__ = [
     'Share',
 ]

@@ -38,7 +38,7 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
         Absolute difference between timestamps in seconds
     """
     if time2 is None:
-        # Use wall clock to remain compatible with sktime.time()
+        # Use wall clock to remain compatible with timing.time()
         time2 = time.time()
     
     # Return absolute difference so order doesn't matter
@@ -49,9 +49,9 @@ class TimerStats:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        timer = sktime.Sktimer()
+        timer = timing.Sktimer()
         # ... record multiple timings ...
         
         # Get frozen snapshot
@@ -142,9 +142,9 @@ class Sktimer:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise import sktime
+        from suitkaise import timing
         
-        timer = sktime.Sktimer()
+        timer = timing.Sktimer()
         
         for i in range(100):
             timer.start()
@@ -159,7 +159,7 @@ class Sktimer:
     ────────────────────────────────────────────────────────
         ```python
         # Pause/resume to exclude user input from timing
-        timer = sktime.Sktimer()
+        timer = timing.Sktimer()
         timer.start()
         
         do_initial_work()
@@ -262,9 +262,9 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            from suitkaise import sktime
+            from suitkaise import timing
             
-            timer = sktime.Sktimer()
+            timer = timing.Sktimer()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -661,7 +661,7 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            timer = sktime.Sktimer()
+            timer = timing.Sktimer()
             
             # Add pre-measured times
             timer.add_time(1.5)

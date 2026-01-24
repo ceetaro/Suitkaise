@@ -40,4 +40,5 @@ class ProcessConfig:
     runs: int | None = None
     join_in: float | None = None
     lives: int = 1
+    # timeouts are grouped by lifecycle section
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)

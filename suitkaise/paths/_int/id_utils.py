@@ -10,7 +10,7 @@ import base64
 import hashlib
 import threading
 
-# Thread-safe lock for any shared state
+# thread-safe lock for any shared state
 _id_lock = threading.RLock()
 
 
@@ -58,7 +58,7 @@ def encode_path_id(path_str: str) -> str:
     """
     normalized = normalize_separators(path_str)
     encoded = base64.urlsafe_b64encode(normalized.encode("utf-8"))
-    # Remove padding for cleaner IDs
+    # remove padding for cleaner IDs
     return encoded.decode("utf-8").rstrip("=")
 
 
@@ -73,7 +73,7 @@ def decode_path_id(encoded_id: str) -> str | None:
         Decoded path string with forward slashes, or None if decoding fails
     """
     try:
-        # Add back padding if needed
+        # add back padding if needed
         padding = 4 - (len(encoded_id) % 4)
         if padding != 4:
             encoded_id += "=" * padding
@@ -97,20 +97,20 @@ def is_valid_encoded_id(s: str) -> bool:
     Returns:
         True if string appears to be base64url encoded
     """
-    # Base64url uses A-Z, a-z, 0-9, -, _
-    # Must not contain path separators or common path characters
+    # base64url uses A-Z, a-z, 0-9, -, _
+    # must not contain path separators or common path characters
     if not s:
         return False
     
-    # If it contains path separators, it's likely a path, not an ID
+    # if it contains path separators, it's likely a path, not an ID
     if "/" in s or "\\" in s:
         return False
     
-    # If it contains spaces or common file extensions, likely a path
+    # if it contains spaces or common file extensions, likely a path
     if " " in s or s.startswith("."):
         return False
     
-    # Check if all characters are valid base64url characters
+    # check if all characters are valid base64url characters
     valid_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=")
     return all(c in valid_chars for c in s)
 
@@ -130,5 +130,5 @@ def hash_path_md5(path_str: str) -> int:
     """
     normalized = normalize_separators(path_str)
     md5_hash = hashlib.md5(normalized.encode("utf-8")).hexdigest()
-    # Convert first 16 hex chars to int (64 bits, fits in Python int)
+    # convert first 16 hex chars to int (64 bits, fits in Python int)
     return int(md5_hash[:16], 16)

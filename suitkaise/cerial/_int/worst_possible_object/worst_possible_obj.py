@@ -808,10 +808,10 @@ class WorstPossibleObject:
         self._track_init('complex', 'clear_custom_root (function)', self.skpath_clear_custom_root_func)
         
         # === SKTime module-level functions ===
-        # Note: 'time' shadows datetime.time, so we reference it via sktime module
-        from suitkaise import sktime as sktime_module
-        self.sktime_time_func = sktime_module.time
-        self._track_init('complex', 'sktime.time (function)', self.sktime_time_func)
+        # note 'time' shadows datetime.time so we reference it via timing module
+        from suitkaise import timing as timing_module
+        self.sktime_time_func = timing_module.time
+        self._track_init('complex', 'timing.time (function)', self.sktime_time_func)
         
         self.sktime_sleep_func = sleep
         self._track_init('complex', 'sleep (function)', self.sktime_sleep_func)

@@ -26,7 +26,7 @@ from .id_utils import (
 )
 from .root_detection import detect_project_root
 
-# Thread-safe lock for Skpath operations
+# thread-safe lock for Skpath operations
 _skpath_lock = threading.RLock()
 
 
@@ -98,11 +98,11 @@ class Skpath:
         self._id: str | None = None
         self._hash: int | None = None
         
-        # Handle None - use caller's path
+        # handle None - use caller's path
         if path is None:
             self._path = detect_caller_path(skip_frames=_skip_frames + 1)
         
-        # Handle Skpath - copy values
+        # handle Skpath - copy values
         elif isinstance(path, Skpath):
             self._path = path._path
             self._root = path._root
@@ -111,11 +111,11 @@ class Skpath:
             self._id = path._id
             self._hash = path._hash
         
-        # Handle Path
+        # handle Path
         elif isinstance(path, Path):
             self._path = path.resolve()
         
-        # Handle string
+        # handle string
         elif isinstance(path, str):
             self._path = self._resolve_string_path(path, _skip_frames + 1)
         
@@ -133,21 +133,21 @@ class Skpath:
         2. If it could be an encoded ID, try to decode it
         3. Fall back to treating as path
         """
-        # Check if it looks like a path (has separators)
+        # check if it looks like a path (has separators)
         if "/" in path_str or "\\" in path_str:
             return Path(path_str).resolve()
         
-        # Check if the path exists as-is (relative path without separators)
+        # check if the path exists as-is (relative path without separators)
         test_path = Path(path_str)
         if test_path.exists():
             return test_path.resolve()
         
-        # Try as encoded ID
+        # try as encoded ID
         if is_valid_encoded_id(path_str):
             decoded = decode_path_id(path_str)
             if decoded is not None:
                 decoded_path = Path(decoded)
-                # If decoded path is relative, resolve from project root
+                # if decoded path is relative, resolve from project root
                 if not decoded_path.is_absolute():
                     try:
                         root = detect_project_root()
@@ -159,13 +159,13 @@ class Skpath:
                 elif decoded_path.exists():
                     return decoded_path.resolve()
         
-        # Fall back to treating as path (may not exist, that's OK)
+        # fall back to treating as path (may not exist, that's OK)
         return Path(path_str).resolve()
+
+
     
-    # ========================================================================
-    # Core Properties
-    # ========================================================================
-    
+    # core properties
+
     @property
     def ap(self) -> str:
         """
@@ -195,7 +195,7 @@ class Skpath:
             rel_path = self._path.relative_to(root)
             return normalize_separators(str(rel_path))
         except (ValueError, PathDetectionError):
-            # Path is outside project root or root couldn't be detected
+            # path is outside project root or root couldn't be detected
             return ""
     
     @property
@@ -203,11 +203,11 @@ class Skpath:
         """
         Reversible encoded ID for the path.
         
-        Uses base64url encoding of np (if available) or ap.
+        Uses base64url encoding of rp (if available) or ap.
         Can be used to reconstruct the Skpath: Skpath(encoded_id)
         """
         if self._id is None:
-            # Prefer rp for cross-platform compatibility
+            # prefer rp for cross-platform compatibility
             path_to_encode = self.rp if self.rp else self.ap
             self._id = encode_path_id(path_to_encode)
         return self._id
@@ -239,10 +239,10 @@ class Skpath:
             self._root = detect_project_root(from_path=self._path)
         return self._root
     
-    # ========================================================================
-    # pathlib.Path Compatible Properties
-    # ========================================================================
-    
+
+
+    # pathlib compatible properties
+
     @property
     def name(self) -> str:
         """The final component of the path (filename with extension)."""
@@ -330,9 +330,9 @@ class Skpath:
         """
         return self._path.lstat()
     
-    # ========================================================================
-    # Additional Properties
-    # ========================================================================
+
+
+    # additional properties
     
     @property
     def as_dict(self) -> dict[str, Any]:
@@ -340,7 +340,7 @@ class Skpath:
         Get a dictionary representation of the path.
         
         Returns:
-            Dict with ap, np, root, name, and exists
+            Dict with ap, rp, root, name, and exists
         """
         return {
             "ap": self.ap,
@@ -366,10 +366,9 @@ class Skpath:
         return to_os_separators(self.ap)
     
     
-    # ========================================================================
-    # pathlib.Path Compatible Methods
-    # ========================================================================
-    
+
+    # pathlib methods
+
     def iterdir(self) -> Generator["Skpath", None, None]:
         """
         Iterate over directory contents.
@@ -632,9 +631,9 @@ class Skpath:
         """
         return Skpath(self._path.absolute())
     
-    # ========================================================================
-    # Dunder Methods
-    # ========================================================================
+
+
+    # dunder methods
     
     def __str__(self) -> str:
         """Return the absolute path with normalized separators."""
@@ -684,14 +683,14 @@ class Skpath:
         Check equality with another path.
         
         Converts both to Skpath and compares:
-        1. First by normalized path (np)
-        2. Falls back to absolute path (ap) if np's aren't equal
+        1. First by relative path (rp)
+        2. Falls back to absolute path (ap) if rp's aren't equal
         """
         if other is None:
             return False
         
         try:
-            # Convert to Skpath if needed
+            # convert to Skpath if needed
             if isinstance(other, Skpath):
                 other_skpath = other
             elif isinstance(other, (str, Path)):
@@ -699,11 +698,11 @@ class Skpath:
             else:
                 return NotImplemented
             
-            # Compare np first
+            # compare rp first
             if self.rp and other_skpath.rp and self.rp == other_skpath.rp:
                 return True
             
-            # Fall back to ap comparison
+            # all back to ap comparison
             return self.ap == other_skpath.ap
             
         except (PathDetectionError, TypeError):
@@ -720,7 +719,7 @@ class Skpath:
         """
         Return hash for use in sets and dict keys.
         
-        Uses MD5 hash of np (or ap if outside project root).
+        Uses MD5 hash of rp (or ap if outside project root).
         """
         if self._hash is None:
             path_to_hash = self.rp if self.rp else self.ap

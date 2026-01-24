@@ -42,8 +42,6 @@ from .timing import (
     clear_global_timers,
 )
 
-# Alias for timing module (used internally as sktime)
-from . import timing as sktime
 
 # ============================================================================
 # Paths Module Exports
@@ -155,7 +153,6 @@ __all__ = [
     "TimeThis",
     "timethis",
     "clear_global_timers",
-    "sktime",  # no alias needed, lib is unreleased
     
     # Paths
     "Skpath",

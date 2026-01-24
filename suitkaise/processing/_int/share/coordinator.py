@@ -53,15 +53,15 @@ class _Coordinator:
         
         self._manager = manager
         
-        # Shared primitives - all use Manager for cross-process access
+        # shared primitives - all use Manager for cross-process access
         if command_queue is None or counter_registry is None or source_store is None or source_lock is None or object_names is None:
             self._manager = manager or Manager()
             self._command_queue = self._manager.Queue()
-            # Write tracking with atomic counters (prevents read starvation)
+            # write tracking with atomic counters (prevents read starvation)
             self._counter_registry = _AtomicCounterRegistry(self._manager)
             self._source_store = self._manager.dict()  # object_name -> serialized bytes
             self._source_lock = self._manager.Lock()
-            # Object name registry (which objects are registered)
+            # object name registry (which objects are registered)
             self._object_names = self._manager.list()
         else:
             self._command_queue = command_queue
@@ -70,16 +70,17 @@ class _Coordinator:
             self._source_lock = source_lock
             self._object_names = object_names
         
-        # Process management
+        # process management
         self._process: Optional[Process] = None
         self._stop_event: Optional[Event] = None
         self._error_event: Optional[Event] = None
         
-        # Configuration
-        self._poll_timeout = 0.1  # How long to wait for commands
+        # configuration
+        self._poll_timeout = 0.1  # how long to wait for commands
 
     def get_state(self) -> dict:
         """Return proxy state for sharing this coordinator across processes."""
+        # only include the manager-backed primitives and config needed to reconstruct
         return {
             "command_queue": self._command_queue,
             "counter_registry": self._counter_registry,
@@ -116,13 +117,16 @@ class _Coordinator:
         """
         from suitkaise import cerial
         
+        # persist initial serialized state as source of truth
         with self._source_lock:
             serialized = cerial.serialize(obj)
             self._source_store[object_name] = serialized
         
+        # track names for introspection and cleanup
         if object_name not in list(self._object_names):
             self._object_names.append(object_name)
         
+        # register counter keys for read/write synchronization
         if attrs:
             self._counter_registry.register_keys(object_name, attrs)
     
@@ -169,7 +173,7 @@ class _Coordinator:
         if written_attrs is None:
             written_attrs = []
         
-        # Serialize args/kwargs with cerial for complex objects
+        # serialize args/kwargs so complex objects survive process boundaries
         serialized_args = cerial.serialize(args)
         serialized_kwargs = cerial.serialize(kwargs)
         
@@ -231,6 +235,38 @@ class _Coordinator:
         """Get all registered counter keys for an object."""
         return self._counter_registry.keys_for_object(object_name)
 
+    def remove_object(self, object_name: str) -> None:
+        """Remove an object from coordinator state."""
+        with self._source_lock:
+            try:
+                if object_name in self._source_store:
+                    del self._source_store[object_name]
+            except Exception:
+                try:
+                    del self._source_store[object_name]
+                except Exception:
+                    pass
+        # remove from name registry (may contain duplicates on some managers)
+        try:
+            if object_name in list(self._object_names):
+                self._object_names.remove(object_name)
+        except Exception:
+            try:
+                while True:
+                    self._object_names.remove(object_name)
+            except Exception:
+                pass
+        # release counters and shared memory slots for this object's attrs
+        try:
+            self._counter_registry.remove_object(object_name)
+        except Exception:
+            pass
+        # tell the coordinator process to drop its mirror cache
+        try:
+            self._command_queue.put(("__remove__", object_name, None, None, None))
+        except Exception:
+            pass
+
     def clear(self) -> None:
         """Clear all registered objects and counters."""
         with self._source_lock:
@@ -243,7 +279,7 @@ class _Coordinator:
             except Exception:
                 pass
         self._counter_registry.reset()
-        # Clear coordinator-side mirrors
+        # clear coordinator-side mirrors
         self._command_queue.put(("__clear__", None, None, None, None))
     
     def start(self) -> None:
@@ -253,9 +289,9 @@ class _Coordinator:
         The coordinator will run until stop() is called.
         """
         if self._process is not None and self._process.is_alive():
-            return  # Already running
+            return  # already running
         
-        # Use manager-backed Events when available to avoid SemLock issues on spawn.
+        # use manager-backed Events when available to avoid SemLock issues on spawn
         if self._manager is not None:
             self._stop_event = self._manager.Event()
             self._error_event = self._manager.Event()
@@ -294,17 +330,18 @@ class _Coordinator:
         if self._process is None or not self._process.is_alive():
             return True
         
+        # signal shutdown and wait for the process to exit gracefully
         if self._stop_event is not None:
             self._stop_event.set()
         
         self._process.join(timeout=timeout)
         
         if self._process.is_alive():
-            # Force kill if didn't stop gracefully
+            # force kill if didn't stop gracefully
             self._process.terminate()
             self._process.join(timeout=1.0)
             return False
-        # Cleanup shared-memory counters after stopping
+        # cleanup shared-memory counters after stopping
         try:
             self._counter_registry.reset()
         except Exception:
@@ -315,6 +352,7 @@ class _Coordinator:
         """
         Forcefully terminate the coordinator immediately.
         """
+        # used as a last resort when shutdown hangs
         if self._process is not None and self._process.is_alive():
             self._process.terminate()
             self._process.join(timeout=1.0)
@@ -367,44 +405,61 @@ def _coordinator_main(
     import queue as queue_module
     from suitkaise import cerial
     
-    # Local cache of deserialized objects for efficiency
+    # local cache of deserialized objects for efficiency
     mirrors: Dict[str, Any] = {}
     
     def _stop_requested() -> bool:
         try:
             return stop_event.is_set()
         except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
-            # Manager connection is gone; treat as shutdown.
+            # manager connection is gone; treat as shutdown
             return True
 
     def _safe_set_error() -> None:
         try:
             error_event.set()
         except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
-            # Manager connection is gone; can't report error.
+            # manager connection is gone; can't report error
             return
 
     try:
         while not _stop_requested():
-            # Try to get a command
+            # try to get a command
             try:
                 command = command_queue.get(timeout=poll_timeout)
             except queue_module.Empty:
-                continue  # No command, check stop_event again
+                continue  # no command, check stop_event again
             except (EOFError, BrokenPipeError, FileNotFoundError, OSError):
                 break
             
             if command is None:
                 continue
             
-            # Unpack command
+            # unpack command
             object_name, method_name, serialized_args, serialized_kwargs, written_attrs = command
             
             if object_name == "__clear__":
+                # reset coordinator-side mirror cache
                 mirrors.clear()
                 continue
+
+            if object_name == "__remove__":
+                # explicitly drop a single object mirror
+                target_name = method_name
+                if target_name:
+                    mirrors.pop(target_name, None)
+                    with source_lock:
+                        try:
+                            if target_name in source_store:
+                                del source_store[target_name]
+                        except Exception:
+                            try:
+                                del source_store[target_name]
+                            except Exception:
+                                pass
+                continue
             
-            # Deserialize args/kwargs
+            # deserialize args/kwargs for the method invocation
             try:
                 args = cerial.deserialize(serialized_args)
                 kwargs = cerial.deserialize(serialized_kwargs)
@@ -413,7 +468,7 @@ def _coordinator_main(
                 _update_counters_after_write(counter_registry, object_name, written_attrs)
                 continue
             
-            # Get the mirror object (from cache or source of truth)
+            # get the mirror object (from cache or source of truth)
             mirror = mirrors.get(object_name)
             if mirror is None:
                 with source_lock:
@@ -423,28 +478,28 @@ def _coordinator_main(
                         mirrors[object_name] = mirror
             
             if mirror is None:
-                # Object not found, update counters and skip
+                # object not found, update counters and skip
                 _update_counters_after_write(counter_registry, object_name, written_attrs)
                 continue
             
-            # Execute the method on the mirror
+            # execute the method on the mirror
             try:
                 method = getattr(mirror, method_name)
                 method(*args, **kwargs)
             except Exception as e:
-                # Log error but continue processing
+                # log error but continue processing
                 traceback.print_exc()
             
-            # Commit updated state to source of truth
+            # commit updated state to source of truth
             with source_lock:
                 serialized = cerial.serialize(mirror)
                 source_store[object_name] = serialized
             
-            # Update counters: decrement pending, increment completed
+            # update counters: decrement pending, increment completed
             _update_counters_after_write(counter_registry, object_name, written_attrs)
     
     except Exception as e:
-        # Fatal error in coordinator loop
+        # fatal error in coordinator loop
         _safe_set_error()
         traceback.print_exc()
         raise

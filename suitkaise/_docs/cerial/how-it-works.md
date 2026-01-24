@@ -435,26 +435,26 @@ During deserialization:
 
 ### Database Reconnector Details
 
-Each database reconnector has a `reconnect(password=None)` method:
+Each database reconnector has a `reconnect(auth=None)` method:
 
 - **No-auth types** (SQLite, DuckDB): `reconnect()` with no args
-- **Auth types**: `reconnect(password=None)` — only password is needed
+- **Auth types**: `reconnect(auth=None)` — only credentials are needed
 
 For example, `PostgresReconnector.reconnect()`:
 
 ```python
-def reconnect(self, password: str | None = None) -> Any:
+def reconnect(self, auth: str | None = None) -> Any:
 ```
 
-On `reconnect(password)`:
+On `reconnect(auth)`:
 1. Uses stored `details` for connection metadata (host, port, user, database)
 2. Imports the database module (psycopg2, pymysql, etc.)
-3. Calls the native connection function with stored params + password
+3. Calls the native connection function with stored params + auth
 4. Returns the new live connection
 
 **Special cases**:
-- **Elasticsearch**: `password` is the api_key if no user was stored
-- **InfluxDB v2**: `password` represents the token
+- **Elasticsearch**: `auth` is the api_key if no user was stored
+- **InfluxDB v2**: `auth` represents the token
 
 ### reconnect_all() Implementation
 
@@ -463,7 +463,7 @@ On `reconnect(password)`:
 1. If item is a `Reconnector`:
    - Look up type key in kwargs (e.g., `"psycopg2.Connection"`)
    - Check for attr-specific password, fall back to `"*"` default
-   - Call `item.reconnect(password)` or `item.reconnect()` if no password
+   - Call `item.reconnect(auth)` or `item.reconnect()` if no auth
    - Replace item with the result
 
 2. If item is a container (list, dict, set, tuple):

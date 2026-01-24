@@ -910,7 +910,7 @@ bytes ────────────────────────�
 2. Look up in kwargs dict
 3. Check for attr-specific password first
 4. Fall back to `"*"` default
-5. Pass password to `reconnect(password)`
+5. Pass auth to `reconnect(auth)`
 
 ```python
 # If kwargs is:
