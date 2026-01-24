@@ -26,7 +26,7 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise import cerial
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
 from suitkaise.processing._int.engine import (
     _engine_main,
     _engine_main_inner,
@@ -38,6 +38,8 @@ from suitkaise.processing._int.engine import (
 from suitkaise.processing._int.errors import RunError, ResultError
 from suitkaise.processing._int.timers import ProcessTimers
 from suitkaise.processing._int.process_class import Skprocess
+
+Process = Skprocess
 
 try:
     from _suitkaise_wip.fdl._int.setup.text_wrapping import _TextWrapper

@@ -1,5 +1,5 @@
 """
-SKTime API - Smart Timing Operations for Suitkaise
+sktime API - Smart Timing Operations for Suitkaise
 
 This module provides user-friendly timing functionality with statistical analysis,
 sophisticated timing classes, and convenient decorators for performance measurement.
@@ -11,13 +11,12 @@ Key Features:
 Philosophy: Make timing operations intuitive while providing powerful analysis capabilities.
 """
 
-import time
 import asyncio
 import threading
 from typing import List, Optional, Union, Callable, Any, Dict
 from functools import wraps
 
-# Import internal time operations with fallback
+# import internal time operations with fallback
 try:
     from ._int.time_ops import (
         _elapsed_time,
@@ -32,13 +31,12 @@ except ImportError:
         "Ensure that the internal time operations module is available."
     )
 
-# Import asyncable wrapper
+# import asyncable wrapper
 from suitkaise.sk._int.asyncable import _AsyncableFunction
 
 
-# ============================================================================
-# Simple Timing Functions
-# ============================================================================
+
+# simple timing functions
 
 def time() -> float:
     """
@@ -72,7 +70,7 @@ async def _async_sleep(seconds: float) -> float:
     return _get_current_time()
 
 
-# Create the asyncable sleep function
+# create the asyncable sleep function
 _sleep_impl = _AsyncableFunction(_sync_sleep, _async_sleep, name='sleep')
 
 
@@ -127,7 +125,7 @@ def sleep(seconds: float) -> float:
     return _sleep_impl(seconds)
 
 
-# Attach asynced method to sleep function
+# attach asynced method to sleep function
 sleep.asynced = _sleep_impl.asynced
 
 
@@ -172,17 +170,8 @@ def elapsed(time1: float, time2: Optional[float] = None) -> float:
     return _elapsed_time(time1, time2)
 
 
-# ============================================================================
-# Sktimer - imported directly from _int.time_ops
-# ============================================================================
-# Sktimer class is now imported directly from the internal module.
-# This simplifies serialization and removes unnecessary wrapper indirection.
 
-
-# ============================================================================
-# TimeThis Context Manager
-# ============================================================================
-
+# TimeThis context manager
 class TimeThis:
     """
     ────────────────────────────────────────────────────────
@@ -345,9 +334,7 @@ class TimeThis:
             self.timer.add_time(elapsed)
 
 
-# ============================================================================
-# Timing Decorators
-# ============================================================================
+# timethis decorator
 
 def timethis(
     timer: Optional[Sktimer] = None,
@@ -454,14 +441,14 @@ def timethis(
         
     """
     def decorator(func: Callable) -> Callable:
-        # Determine timer to use
+        # determine timer to use
         if timer is not None:
             if max_times is not None:
                 timer.set_max_times(max_times)
-            # Use provided timer directly (no longer a wrapper)
+            # use provided timer directly (no longer a wrapper)
             wrapper = _timethis_decorator(timer, threshold)(func)
         else:
-            # Create global timer with naming convention (do this once at decoration time)
+            # create global timer with naming convention (do this once at decoration time)
             import inspect
             
             frame = inspect.currentframe()
@@ -470,22 +457,22 @@ def timethis(
             else:
                 module_name = 'unknown'
             
-            # Extract just the module name (remove package path)
+            # extract just the module name (remove package path)
             if '.' in module_name:
                 module_name = module_name.split('.')[-1]
             
-            # Check if function is in a class by looking at qualname
+            # check if function is in a class by looking at qualname
             func_qualname = func.__qualname__
             if '.' in func_qualname:
-                # Function is in a class: Class.method
+                # function is in a class: Class.method
                 class_name, func_name = func_qualname.rsplit('.', 1)
                 timer_name = f"{module_name}_{class_name}_{func_name}_timer"
             else:
-                # Function is at module level
+                # function is at module level
                 func_name = func_qualname
                 timer_name = f"{module_name}_{func_name}_timer"
             
-            # Get or create global timer (thread-safe)
+            # get or create global timer (thread-safe)
             if not hasattr(timethis, '_global_timers'):
                 setattr(timethis, '_global_timers', {})
                 setattr(timethis, '_timers_lock', threading.RLock())
@@ -500,7 +487,7 @@ def timethis(
             
             wrapper = _timethis_decorator(global_timers[timer_name], threshold)(func)
             
-            # Attach timer to function for easy access
+            # attach timer to function for easy access
             setattr(wrapper, 'timer', global_timers[timer_name])
         
         return wrapper
@@ -521,28 +508,24 @@ def clear_global_timers() -> None:
             timers.clear()
 
 
-# Note: We've enhanced timethis() to support both explicit Sktimer instances and
-# automatic global timer creation, providing the best of both worlds: convenience
-# when you want quick timing, and explicit control when you need detailed analysis.
-
 
 # ============================================================================
 # Module Exports
 # ============================================================================
 
 __all__ = [
-    # Simple timing functions
+    # simple timing functions
     'time',
     'sleep',
     'elapsed',
     
-    # Timing classes
+    # timing classes
     'Sktimer',
 
-    # Context managers
+    # context managers
     'TimeThis',
     
-    # Decorators
+    # decorators
     'timethis',
     'clear_global_timers',
 ]

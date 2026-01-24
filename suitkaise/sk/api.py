@@ -197,12 +197,14 @@ class Skfunction(Generic[P, R]):
     - .asynced() for async version (if function has blocking calls)
     - .retry() for automatic retry with delay
     - .timeout() for execution time limits
+    - .rate_limit() for per-second throttling
     - .background() for fire-and-forget execution
     
     Modifiers can be chained in any order - they are always applied consistently:
-    1. Retry (outermost) - retries the whole operation
-    2. Timeout (inside retry) - times out each attempt
-    3. Function call (innermost)
+    1. Rate limit (outermost) - throttles before each attempt
+    2. Retry (wraps each attempt)
+    3. Timeout (inside retry) - times out each attempt
+    4. Function call (innermost)
     
     Usage:
         import time
@@ -229,6 +231,9 @@ class Skfunction(Generic[P, R]):
         # Chain them (order doesn't matter - behavior is consistent)
         result = sk_fetch.retry(3).timeout(10.0)("https://api.com")
         result = sk_fetch.timeout(10.0).retry(3)("https://api.com")  # same behavior
+        
+        # Rate limiting
+        result = sk_fetch.rate_limit(2.0)("https://api.com")
     """
     
     def __init__(
@@ -483,7 +488,7 @@ class AsyncSkfunction(Generic[P, R]):
     """
     Async version of Skfunction, returned by Skfunction.asynced().
     
-    Supports chaining with .timeout(), .retry() for async operations.
+    Supports chaining with .timeout(), .retry(), and .rate_limit() for async operations.
     Modifiers can be chained in any order - behavior is consistent.
     
     Usage:
@@ -498,6 +503,9 @@ class AsyncSkfunction(Generic[P, R]):
         # Chain multiple (order doesn't matter)
         result = await sk_func.asynced().retry(3).timeout(10.0)("https://api.com")
         result = await sk_func.asynced().timeout(10.0).retry(3)("https://api.com")
+        
+        # Rate limiting
+        result = await sk_func.asynced().rate_limit(2.0)("https://api.com")
     """
     
     def __init__(

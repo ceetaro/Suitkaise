@@ -437,7 +437,7 @@ class MyClass:
         return self.total
 ``` -->
 
----
+<!-- ---
 
 ## Testing Plan
 
@@ -504,9 +504,9 @@ tests/
   
   run_all_tests.py          # Run ALL tests across all modules
   run_all_benchmarks.py     # Run ALL benchmarks across all modules
-```
+``` -->
 
-### Test Requirements
+<!-- ### Test Requirements
 
 1. **IDE Runnable**: Every test file has `if __name__ == '__main__':` block
 2. **Self-contained**: Each test file can run independently
@@ -617,7 +617,7 @@ python tests/run_all_tests.py
 
 # Run ALL benchmarks
 python tests/run_all_benchmarks.py
-```
+``` -->
 
 <!-- ## Update docs
 
@@ -656,7 +656,7 @@ sk:
 
 ## Final additions
 
-add downloadable tests to the site and pytest fixtures
+add downloadable tests to the site
 
 add badges (coverage, CI status, etc) to the README
 
@@ -685,14 +685,14 @@ add Skprocess.run() that does start + wait + result
 
 add rate_limit() modifier for sk -->
 
-```python
+<!-- ```python
 @sk
 def my_function():
     time.sleep(1)
     return "Hello, world!"
 
 my_function.rate_limit(per_second=N)
-```
+``` -->
 
 <!--
 add more blocking call patterns (boto3, redis, pymongo, etc)
@@ -738,7 +738,7 @@ refactor site to have a more interactive home page that shows off things more
 
 upload version to test pypi
 
-2 paragraph summary on how modules work a d finish quick start guide
+2 paragraph summary on how modules work and finish quick start guide
 
 ```text
 Think of the printing press, an invention that made production of paper media faster, more standardized, and less prone to human error. People didn't have to write books by hand anymore, saving them a large amount of time and effort.
@@ -1160,8 +1160,8 @@ review each modules code and streamline comments, checking that everything looks
 - cerial - done
 - circuits - done
 - paths - done
-- processing
-- sk
+- processing - done
+- sk - done
 - timing
 
 

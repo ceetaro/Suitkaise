@@ -24,7 +24,7 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.processing import (
-    Process,
+    Skprocess,
     Pool,
     ProcessError,
     PreRunError,
@@ -35,6 +35,8 @@ from suitkaise.processing import (
     ErrorHandlerError,
     ProcessTimeoutError,
 )
+
+Process = Skprocess
 
 
 # =============================================================================

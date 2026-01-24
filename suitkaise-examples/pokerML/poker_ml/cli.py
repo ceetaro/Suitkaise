@@ -130,8 +130,10 @@ def interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_sa
                 position = max(0, min(5, position))
             except ValueError:
                 position = 3
+            position_label = position_names.get(position, str(position))
         else:
             position = 3
+            position_label = "No position (ante)"
         
         # get forced bet amounts to set reasonable defaults
         if using_blinds:
@@ -181,7 +183,7 @@ def interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_sa
         pot_odds = 0.0 if to_call == 0 else to_call / max(pot + to_call, 1)
         hand_potential = calculate_hand_potential(hole_cards, community_cards, rng, strength_samples)
         spr = calculate_spr(stack, pot)
-        position_value = calculate_position_value(position, 6)
+        position_value = calculate_position_value(position, 6) if using_blinds else 0.5
         implied_odds = calculate_implied_odds(win_prob, hand_potential, spr, to_call, pot)
         hand_bucket = hand_strength_bucket(hole_cards, community_cards, rng, strength_samples)
         
@@ -217,7 +219,7 @@ def interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_sa
         print(row("📊 Scenario Analysis", emoji=True))
         print(f"   ├{'─' * 44}┤")
         print(row(f"Stage: {stage_names[stage]}"))
-        print(row(f"Position: {position_names.get(position, str(position))}"))
+        print(row(f"Position: {position_label}"))
         print(row(f"Hole cards: {hole_str}"))
         print(row(f"Community: {community_str}"))
         print(row(f"Stack: {stack}"))

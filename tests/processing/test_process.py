@@ -31,8 +31,10 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.processing import Process, ProcessError, RunError, auto_reconnect
+from suitkaise.processing import Skprocess, ProcessError, RunError, auto_reconnect
 from suitkaise.processing._int.process_class import Skprocess
+
+Process = Skprocess
 from suitkaise.processing._int.timers import ProcessTimers
 from suitkaise import cerial
 from suitkaise.cerial._int.handlers.reconnector import Reconnector

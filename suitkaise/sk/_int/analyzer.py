@@ -13,19 +13,19 @@ import textwrap
 from typing import Dict, List, Set, Tuple, Any, Type
 
 
-# Known blocking calls that should be wrapped with to_thread()
+# known blocking calls that should be wrapped with to_thread()
 # NOTE: store lowercase entries and compare against lowercased call names.
 BLOCKING_CALLS: Set[str] = {
     # time module
     'time.sleep',
     'sleep',  # if imported as `from time import sleep`
     
-    # suitkaise timing
+    # timing (suitkaise)
     'timing.sleep',
     'sktime.sleep',
     'suitkaise.timing.sleep',
     
-    # File I/O
+    # file io
     'open',
     'read',
     'write',
@@ -46,7 +46,7 @@ BLOCKING_CALLS: Set[str] = {
     'subprocess.check_output',
     'subprocess.popen',
     
-    # requests library
+    # requests
     'requests.get',
     'requests.post',
     'requests.put',
@@ -136,7 +136,7 @@ BLOCKING_CALLS: Set[str] = {
     'elasticsearch.elasticsearch',
     'opensearchpy.opensearch',
     
-    # Database (common patterns)
+    # database (common patterns)
     'cursor.execute',
     'cursor.executemany',
     'cursor.fetchone',
@@ -146,8 +146,8 @@ BLOCKING_CALLS: Set[str] = {
     'connection.rollback',
 }
 
-# Method names that typically indicate blocking behavior
-# If a call ends with one of these, it's considered blocking
+# method names that typically indicate blocking behavior
+# if a call ends with one of these, it's considered blocking
 BLOCKING_METHOD_PATTERNS: Set[str] = {
     'sleep',
     'wait',
@@ -273,7 +273,7 @@ BLOCKING_METHOD_PATTERNS: Set[str] = {
     'trip',     # Circuit.trip (may sleep)
 }
 
-# Broad heuristics: only apply when the call name suggests I/O context.
+# broad heuristics: only apply when the call name suggests IO context.
 BROAD_BLOCKING_METHOD_PATTERNS: Set[str] = {
     'get',
     'set',
@@ -362,18 +362,18 @@ class _AttributeVisitor(ast.NodeVisitor):
     
     def visit_Attribute(self, node: ast.Attribute) -> None:
         """Track self.attr access."""
-        # Check if this is self.something
+        # check if this is self.something
         if isinstance(node.value, ast.Name) and node.value.id == 'self':
             attr_name = node.attr
             
-            # Check context - are we reading or writing?
+            # check context - are we reading or writing?
             if isinstance(node.ctx, ast.Store):
                 self.writes.add(attr_name)
             elif isinstance(node.ctx, ast.Load):
-                # Could be a read, but also check if it's target of augmented assign
+                # could be a read, but also check if it's target of augmented assign
                 self.reads.add(attr_name)
         
-        # Continue visiting children
+        # continue visiting children
         self.generic_visit(node)
     
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
@@ -384,7 +384,7 @@ class _AttributeVisitor(ast.NodeVisitor):
                 self.reads.add(attr_name)
                 self.writes.add(attr_name)
         
-        # Visit the value expression
+        # visit the value expression
         self.visit(node.value)
 
 
@@ -405,14 +405,14 @@ class _BlockingCallVisitor(ast.NodeVisitor):
             parts = call_name_lower.split('.')
             tail = parts[-1]
             
-            # Check if it's a known blocking call
+            # check if it's a known blocking call
             if call_name_lower in BLOCKING_CALLS:
                 self.blocking_calls.append(call_name)
             else:
-                # Check for specific blocking method names
+                # check for specific blocking method names
                 if tail in BLOCKING_METHOD_PATTERNS:
                     self.blocking_calls.append(call_name)
-                # Broad heuristics: only when context suggests I/O
+                # broad heuristics: only when context suggests I/O
                 elif tail in BROAD_BLOCKING_METHOD_PATTERNS:
                     has_io_context = any(
                         any(context in part for context in IO_CONTEXT_PARTS)
@@ -421,7 +421,7 @@ class _BlockingCallVisitor(ast.NodeVisitor):
                     if has_io_context:
                         self.blocking_calls.append(call_name)
         
-        # Continue visiting children
+        # continue visiting children
         self.generic_visit(node)
     
     def _get_call_name(self, node: ast.Call) -> str | None:
@@ -449,7 +449,7 @@ def _get_method_source(method) -> str | None:
     """Get the source code of a method, handling indentation."""
     try:
         source = inspect.getsource(method)
-        # Dedent to handle methods defined inside classes
+        # dedent to handle methods defined inside classes
         return textwrap.dedent(source)
     except (OSError, TypeError):
         return None
@@ -468,11 +468,11 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
     Returns:
         Tuple of (reads, writes, blocking_calls)
     """
-    # Check for explicit @blocking decorator FIRST
-    # If found, we can skip AST analysis for blocking detection
+    # check for explicit @blocking decorator FIRST
+    # if found, we can skip AST analysis for blocking detection
     has_blocking_decorator = getattr(method, '_sk_blocking', False)
     if has_blocking_decorator:
-        # Still need to analyze for attribute access (_shared_meta)
+        # still need to analyze for attribute access (_shared_meta)
         source = _get_method_source(method)
         if source is None:
             return set(), set(), ['@blocking']
@@ -482,12 +482,12 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
         except SyntaxError:
             return set(), set(), ['@blocking']
         
-        # Only analyze attributes, skip blocking call detection
+        # only analyze attributes, skip blocking call detection
         attr_visitor = _AttributeVisitor()
         attr_visitor.visit(tree)
         return attr_visitor.reads, attr_visitor.writes, ['@blocking']
     
-    # No @blocking decorator - do full AST analysis
+    # no @blocking decorator - do full AST analysis
     source = _get_method_source(method)
     if source is None:
         return set(), set(), []
@@ -497,11 +497,11 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
     except SyntaxError:
         return set(), set(), []
     
-    # Find attribute accesses
+    # find attribute accesses
     attr_visitor = _AttributeVisitor()
     attr_visitor.visit(tree)
     
-    # Find blocking calls via AST analysis
+    # find blocking calls via AST analysis
     blocking_visitor = _BlockingCallVisitor()
     blocking_visitor.visit(tree)
     
@@ -525,16 +525,16 @@ def analyze_class(cls: Type) -> Tuple[Dict[str, Any], Dict[str, List[str]]]:
     blocking_calls: Dict[str, List[str]] = {}
     
     for name, member in inspect.getmembers(cls):
-        # Skip dunder methods except __init__
+        # skip dunder methods except __init__
         if name.startswith('__') and name != '__init__':
             continue
         
-        # For _shared_meta: skip private methods (except __init__)
-        # For blocking detection: include ALL methods (including private)
+        # for _shared_meta: skip private methods (except __init__)
+        # for blocking detection: include ALL methods (including private)
         is_private = name.startswith('_') and name != '__init__'
         
         if isinstance(member, property):
-            # Analyze property getter
+            # analyze property getter
             if member.fget:
                 reads, writes, blocks = _analyze_method(member.fget)
                 if not is_private:
@@ -543,7 +543,7 @@ def analyze_class(cls: Type) -> Tuple[Dict[str, Any], Dict[str, List[str]]]:
                     blocking_calls[name] = blocks
                     
         elif callable(member) and not isinstance(member, type):
-            # It's a method
+            # it's a method
             reads, writes, blocks = _analyze_method(member)
             if not is_private:
                 shared_meta['methods'][name] = {'writes': list(writes)}

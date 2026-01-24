@@ -8,8 +8,10 @@ import sys
 import inspect
 from concurrent.futures import Future
 
-from suitkaise.processing import Process, Pool, ResultTimeoutError
+from suitkaise.processing import Skprocess, Pool, ResultTimeoutError
 from suitkaise.sk import SkModifierError
+
+Process = Skprocess
 
 
 # =============================================================================

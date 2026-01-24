@@ -38,10 +38,10 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
         Absolute difference between timestamps in seconds
     """
     if time2 is None:
-        # Use wall clock to remain compatible with timing.time()
+        # use wall clock to remain compatible with timing.time()
         time2 = time.time()
     
-    # Return absolute difference so order doesn't matter
+    # return absolute difference so order doesn't matter
     return fabs(time2 - time1)
 
 
@@ -82,7 +82,7 @@ class TimerStats:
         `total_time_paused`: Total time spent paused
     """
     def __init__(self, times: List[float], original_start_time: Optional[float], paused_durations: List[float]):
-        self.times = times.copy()  # Make a copy to ensure immutability
+        self.times = times.copy()  # make a copy to ensure immutability
 
         self.original_start_time = original_start_time
         self.num_times = len(times)
@@ -101,7 +101,7 @@ class TimerStats:
         self.max = max(times) if times else None
         self.stdev = statistics.stdev(times) if len(times) > 1 else None
         self.variance = statistics.variance(times) if len(times) > 1 else None
-        # Removed hardcoded percentile_95 and percentile_99 - use percentile() method instead
+        # removed hardcoded percentile_95 and percentile_99 - use percentile() method instead
 
     def percentile(self, percent: float) -> Optional[float]:
         """
@@ -125,7 +125,7 @@ class TimerStats:
         if index == int(index):
             return sorted_times[int(index)]
         else:
-            # Linear interpolation between two values
+            # linear interpolation between two values
             lower_index = int(index)
             upper_index = lower_index + 1
             weight = index - lower_index
@@ -219,8 +219,9 @@ class Sktimer:
         `get_statistics()` / `get_stats()`: Frozen snapshot (TimerStats)
     """
     
-    # Metadata for Share - declares which attributes each method/property
-    # reads from or writes to. Used by the Share for synchronization.
+    # metadata for Share - declares which attributes each method/property
+    #   reads from or writes to 
+    # used by the Share for synchronization
     _shared_meta = {
         'methods': {
             'start': {'writes': ['_sessions', 'original_start_time']},
@@ -277,30 +278,30 @@ class Sktimer:
         Args:
             max_times: Keep only the most recent N measurements (rolling window)
         """
-        # Earliest start across all sessions
+        # earliest start across all sessions
         self.original_start_time: Optional[float] = None
 
-        # Aggregated list of all recorded times across all sessions
+        # aggregated list of all recorded times across all sessions
         self.times: List[float] = []
-        # Parallel list of paused durations per recorded time
+        # parallel list of paused durations per recorded time
         self._paused_durations: List[float] = []
         
-        # Optional rolling window size (None = keep all)
+        # optional rolling window size (None = keep all)
         self._max_times: Optional[int] = None
 
-        # Thread safety lock for manager state (times, sessions)
+        # thread safety lock for manager state (times, sessions)
         self._lock = threading.RLock()
 
-        # Session management: keyed by thread ident
+        # session management: keyed by thread ident
         self._sessions: Dict[int, "TimerSession"] = {}
         
         if max_times is not None:
             self.set_max_times(max_times)
         
-    # =========================================================================
-    # Statistics Properties (live, always up-to-date)
-    # =========================================================================
-    
+
+
+    # statistics properties (live, always up-to-date)
+
     @property
     def num_times(self) -> int:
         """Number of timing measurements recorded."""
@@ -450,9 +451,9 @@ class Sktimer:
             return (sorted_times[lower_index] * (1 - weight) + 
                     sorted_times[upper_index] * weight)
 
-    # =========================================================================
-    # Internal Session Management
-    # =========================================================================
+
+
+    # internal session management
 
     def _get_or_create_session(self) -> "TimerSession":
 
@@ -494,7 +495,7 @@ class Sktimer:
         Returns:
             Start timestamp (from `perf_counter()`)
         """
-        # Warn if there's already an active frame (user might not intend nesting)
+        # warn if there's already an active frame (user might not intend nesting)
         if self._has_active_frame():
             warnings.warn(
                 "Sktimer.start() called while timing is already in progress. "
@@ -504,7 +505,7 @@ class Sktimer:
                 stacklevel=2
             )
         
-        # Create or get the session for the current thread and start a new frame
+        # create or get the session for the current thread and start a new frame
         sess = self._get_or_create_session()
         started = sess.start()
 
@@ -533,7 +534,7 @@ class Sktimer:
         Raises:
             `RuntimeError`: If timer was not started
         """
-        # Stop the current thread's top frame
+        # stop the current thread's top frame
         sess = self._get_or_create_session()
         elapsed, paused_total = sess.stop()
 
@@ -568,10 +569,10 @@ class Sktimer:
         Raises:
             `RuntimeError`: If timer was not started
         """
-        # Stop the current thread's top frame but don't record it
+        # stop the current thread's top frame but don't record it
         sess = self._get_or_create_session()
         elapsed, _ = sess.stop()
-        # Intentionally NOT appending to self.times or self._paused_durations
+        # intentionally NOT appending to self.times or self._paused_durations
         return elapsed
 
     def lap(self) -> float:
@@ -600,7 +601,7 @@ class Sktimer:
         Raises:
             `RuntimeError`: If timer was not started
         """
-        # Lap the current thread's top frame (record and continue)
+        # lap the current thread's top frame (record and continue)
         sess = self._get_or_create_session()
         elapsed, paused_total = sess.lap()
 
@@ -784,7 +785,7 @@ class TimerSession:
         self._lock = threading.RLock()
 
     def _now(self) -> float:
-        # Use high-resolution monotonic clock for intervals
+        # use high-resolution monotonic clock for intervals
         return perf_counter()
 
     def start(self) -> float:
@@ -875,7 +876,7 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Avoid nested timing frames on the same timer
+            # avoid nested timing frames on the same timer
             if timer._has_active_frame():
                 start = perf_counter()
                 try:
@@ -885,21 +886,21 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
                     if elapsed >= threshold:
                         timer.add_time(elapsed)
             else:
-                # Concurrent session-aware: each thread call starts/stops its own session
+                # concurrent session-aware: each thread call starts/stops its own session
                 timer.start()
                 try:
                     result = func(*args, **kwargs)
                     return result
                 finally:
-                    # Get elapsed time without recording
+                    # get elapsed time without recording
                     elapsed = timer.discard()
-                    # Only record if above threshold
+                    # only record if above threshold
                     if elapsed >= threshold:
                         timer.add_time(elapsed)
         return wrapper
     return decorator
 
-# Convenience functions for direct access
+# convenience functions for direct access
 def _get_current_time() -> float:
     """Get current Unix timestamp."""
     return time.time()

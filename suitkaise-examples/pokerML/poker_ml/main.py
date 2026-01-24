@@ -189,8 +189,10 @@ def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_s
                 position = max(0, min(5, position))
             except ValueError:
                 position = 3
+            position_label = position_names.get(position, str(position))
         else:
             position = 3
+            position_label = "No position (ante)"
         
         # get forced bet amounts to set reasonable defaults
         if using_blinds:
@@ -240,7 +242,7 @@ def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_s
         pot_odds = 0.0 if to_call == 0 else to_call / max(pot + to_call, 1)
         hand_potential = calculate_hand_potential(hole_cards, community_cards, rng, strength_samples)
         spr = calculate_spr(stack, pot)
-        position_value = calculate_position_value(position, 6)
+        position_value = calculate_position_value(position, 6) if using_blinds else 0.5
         implied_odds = calculate_implied_odds(win_prob, hand_potential, spr, to_call, pot)
         hand_bucket = hand_strength_bucket(hole_cards, community_cards, rng, strength_samples)
         
@@ -276,7 +278,7 @@ def _interactive_scenario_mode(best_policy_snapshot: dict, seed: int, strength_s
         print(row("📊 Scenario Analysis", emoji=True))
         print(f"   ├{'─' * 44}┤")
         print(row(f"Stage: {stage_names[stage]}"))
-        print(row(f"Position: {position_names.get(position, str(position))}"))
+        print(row(f"Position: {position_label}"))
         print(row(f"Hole cards: {hole_str}"))
         print(row(f"Community: {community_str}"))
         print(row(f"Stack: {stack}"))
@@ -343,7 +345,7 @@ def main() -> None:
     parser.add_argument("--no-wait", action="store_true")
     parser.add_argument("--no-interactive", action="store_true", help="Skip interactive scenario mode after training")
     parser.add_argument("--epochs", type=int, default=None, help="Max epochs (default: unlimited, trains until target score)")
-    parser.add_argument("--target-score", type=float, default=0.80, help="Stop training when best model reaches this score (default 0.80 = human-level)")
+    parser.add_argument("--target-score", type=float, default=0.80, help="Stop training when best model reaches this score (default 0.90 = human-level)")
     parser.add_argument("--tables", type=int, default=6)
     parser.add_argument("--players", type=int, default=6)
     parser.add_argument("--starting-stack", type=int, default=200)
@@ -681,11 +683,19 @@ def main() -> None:
                 winners_snapshots["_global_best_"] = global_best_policy
             
             # mutation parameters - tuned for exploration
-            MUTATION_CHANCE = 0.4         # 40% chance winner mutates
-            RADICAL_MUTATION_CHANCE = 0.15  # 15% chance of large mutation
-            RANDOM_POLICY_CHANCE = 0.05   # 5% chance of fresh random policy
-            SMALL_MUTATION_RANGE = 0.1    # ±10% weight adjustment
-            RADICAL_MUTATION_RANGE = 0.3  # ±30% weight adjustment
+            MUTATION_CHANCE = 0.4           # base chance winner mutates
+            RADICAL_MUTATION_CHANCE = 0.15  # chance of large mutation
+            RANDOM_POLICY_CHANCE = 0.05     # base chance of fresh random policy
+            SMALL_MUTATION_RANGE = 0.1      # ±10% weight adjustment
+            RADICAL_MUTATION_RANGE = 0.3    # ±30% weight adjustment
+
+            # increase mutation pressure as we approach the target score
+            if args.target_score > 0:
+                proximity = min(1.0, max(0.0, global_best_score / args.target_score))
+            else:
+                proximity = 0.0
+            mutation_chance = min(0.9, MUTATION_CHANCE + 0.3 * proximity)
+            fresh_policy_chance = min(0.2, RANDOM_POLICY_CHANCE + 0.1 * proximity)
             
             def mutate_policy(policy: dict, radical: bool = False) -> dict:
                 """apply random mutations to policy weights."""
@@ -710,13 +720,13 @@ def main() -> None:
             
             for agent_id in share.policies.keys():
                 # small chance of completely fresh random policy
-                if random.random() < RANDOM_POLICY_CHANCE:
+                if random.random() < fresh_policy_chance:
                     new_policies[agent_id] = fresh_policy()
                     fresh_injected += 1
                 elif agent_id in winners_snapshots:
                     # winners: keep but maybe mutate
                     policy = winners_snapshots[agent_id].copy()
-                    if random.random() < MUTATION_CHANCE:
+                    if random.random() < mutation_chance:
                         radical = random.random() < RADICAL_MUTATION_CHANCE
                         policy = mutate_policy(policy, radical)
                         mutations_applied += 1

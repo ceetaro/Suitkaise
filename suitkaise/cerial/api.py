@@ -243,7 +243,15 @@ def reconnect_all(obj, **auth):
         if isinstance(item, Reconnector):
             try:
                 auth_value = _get_auth_for(item, attr_name)
-                return item.reconnect(auth=auth_value) if auth_value else item.reconnect()
+                if auth_value is None:
+                    return item.reconnect()
+                try:
+                    return item.reconnect(auth_value)
+                except TypeError:
+                    try:
+                        return item.reconnect(auth=auth_value)
+                    except TypeError:
+                        return item.reconnect(password=auth_value)
             except Exception:
                 return item
         

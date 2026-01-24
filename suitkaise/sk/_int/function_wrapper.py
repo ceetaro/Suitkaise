@@ -1,7 +1,7 @@
 """
 Function wrapper utilities for Skfunction.
 
-Provides retry, timeout, and background execution wrappers.
+Provides retry, timeout, rate_limit, and background execution wrappers.
 """
 
 import asyncio
@@ -27,25 +27,31 @@ class RateLimiter:
     def __init__(self, per_second: float):
         if per_second <= 0:
             raise ValueError("per_second must be > 0")
+        # minimum spacing between calls
         self._min_interval = 1.0 / per_second
         self._lock = threading.Lock()
         self._async_lock = asyncio.Lock()
+        # last call timestamp in monotonic time
         self._last_call = 0.0
 
     def acquire(self) -> None:
         with self._lock:
             now = time.monotonic()
+            # compute remaining delay before next allowed call
             wait_time = (self._last_call + self._min_interval) - now
             if wait_time > 0:
                 time.sleep(wait_time)
+            # update last call after any wait
             self._last_call = time.monotonic()
 
     async def acquire_async(self) -> None:
         async with self._async_lock:
             now = time.monotonic()
+            # compute remaining delay before next allowed call
             wait_time = (self._last_call + self._min_interval) - now
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
+            # update last call after any wait
             self._last_call = time.monotonic()
 
 
@@ -71,19 +77,22 @@ def create_retry_wrapper(
     """
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # track last exception to rethrow after retries
         last_exception: Optional[Exception] = None
         sleep_time = delay
         
         for attempt in range(times):
             try:
+                # call function for this attempt
                 return func(*args, **kwargs)
             except exceptions as e:
                 last_exception = e
                 if attempt < times - 1:
+                    # backoff before next attempt
                     time.sleep(sleep_time)
                     sleep_time *= factor
         
-        # All retries exhausted
+        # all retries exhausted
         raise last_exception  # type: ignore
     
     return wrapper
@@ -101,16 +110,18 @@ def create_async_retry_wrapper(
     """
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # track last exception to rethrow after retries
         last_exception: Optional[Exception] = None
         sleep_time = delay
         
         for attempt in range(times):
             try:
-                # Run sync function in thread pool
+                # run sync function in thread pool for async usage
                 return await asyncio.to_thread(func, *args, **kwargs)
             except exceptions as e:
                 last_exception = e
                 if attempt < times - 1:
+                    # backoff before next attempt
                     await asyncio.sleep(sleep_time)
                     sleep_time *= factor
         
@@ -127,10 +138,12 @@ def create_rate_limit_wrapper(
     """
     Create a wrapper that rate limits function calls.
     """
+    # reuse limiter if provided to share state across wrappers
     limiter = limiter or RateLimiter(per_second)
 
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # block until rate limit allows this call
         limiter.acquire()
         return func(*args, **kwargs)
 
@@ -145,10 +158,12 @@ def create_async_rate_limit_wrapper(
     """
     Create an async wrapper that rate limits a sync function.
     """
+    # reuse limiter if provided to share state across wrappers
     limiter = limiter or RateLimiter(per_second)
 
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # await rate limit before running in thread
         await limiter.acquire_async()
         return await asyncio.to_thread(func, *args, **kwargs)
     
@@ -175,11 +190,13 @@ def create_timeout_wrapper(
     
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # run in a single worker thread and wait for timeout
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(func, *args, **kwargs)
             try:
                 return future.result(timeout=seconds)
             except concurrent.futures.TimeoutError:
+                # raise a consistent timeout error for callers
                 raise FunctionTimeoutError(
                     f"{func.__name__} timed out after {seconds} seconds"
                 )
@@ -197,11 +214,13 @@ def create_async_timeout_wrapper(
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
+            # run sync function in thread and apply asyncio timeout
             return await asyncio.wait_for(
                 asyncio.to_thread(func, *args, **kwargs),
                 timeout=seconds,
             )
         except asyncio.TimeoutError:
+            # raise a consistent timeout error for callers
             raise FunctionTimeoutError(
                 f"{func.__name__} timed out after {seconds} seconds"
             )
@@ -223,15 +242,17 @@ def create_background_wrapper(
     Returns:
         Wrapped function that returns a Future
     """
-    # Use a shared executor for background tasks
-    # This is created lazily and reused
+    # use a shared executor for background tasks
+    # this is created lazily and reused
     executor: Optional[ThreadPoolExecutor] = None
     
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[R]:
         nonlocal executor
         if executor is None:
+            # create executor on first background call
             executor = ThreadPoolExecutor(max_workers=4)
+        # return Future immediately to avoid blocking
         return executor.submit(func, *args, **kwargs)
     
     return wrapper
@@ -251,6 +272,7 @@ def create_async_wrapper(
     """
     @functools.wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # run sync function in thread pool for async use
         return await asyncio.to_thread(func, *args, **kwargs)
     
     return wrapper
@@ -266,12 +288,14 @@ def create_async_timeout_wrapper_v2(
     @functools.wraps(async_func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
+            # apply timeout to already-async function
             return await asyncio.wait_for(
                 async_func(*args, **kwargs),
                 timeout=seconds,
             )
         except asyncio.TimeoutError:
             func_name = getattr(async_func, '__name__', 'function')
+            # raise a consistent timeout error for callers
             raise FunctionTimeoutError(
                 f"{func_name} timed out after {seconds} seconds"
             )
@@ -291,15 +315,18 @@ def create_async_retry_wrapper_v2(
     """
     @functools.wraps(async_func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # track last exception to rethrow after retries
         last_exception: Optional[Exception] = None
         sleep_time = delay
         
         for attempt in range(times):
             try:
+                # call async function for this attempt
                 return await async_func(*args, **kwargs)
             except exceptions as e:
                 last_exception = e
                 if attempt < times - 1:
+                    # backoff before next attempt
                     await asyncio.sleep(sleep_time)
                     sleep_time *= factor
         
@@ -316,10 +343,12 @@ def create_async_rate_limit_wrapper_v2(
     """
     Create an async rate limit wrapper for already-async functions.
     """
+    # reuse limiter if provided to share state across wrappers
     limiter = limiter or RateLimiter(per_second)
 
     @functools.wraps(async_func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        # await rate limit before calling async function
         await limiter.acquire_async()
         return await async_func(*args, **kwargs)
     

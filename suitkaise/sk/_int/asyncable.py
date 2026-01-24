@@ -2,7 +2,7 @@
 Lightweight asyncable wrappers for suitkaise internal methods/functions.
 
 These provide .asynced() support without the full Skfunction overhead.
-For user functions, retry/timeout/background are available via the sk module.
+For user functions, retry, rate_limit, background, timeout, and asynced are available via the sk module.
 
 For internal suitkaise methods that fetch results (like Process.result),
 we also provide .timeout() and .background() via _ModifiableMethod.
@@ -16,7 +16,7 @@ from typing import Callable, TypeVar, ParamSpec, Any, Optional
 P = ParamSpec('P')
 R = TypeVar('R')
 
-# Shared executor for background operations
+# shared executor for background operations
 _background_executor: ThreadPoolExecutor | None = None
 
 
@@ -51,7 +51,7 @@ class _AsyncableFunction:
         self._async_func = async_func
         self._name = name or sync_func.__name__
         
-        # Copy over function metadata
+        # copy over function metadata
         functools.update_wrapper(self, sync_func)
     
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
@@ -91,10 +91,10 @@ class _AsyncableMethod:
     
     def __get__(self, obj, objtype=None):
         if obj is None:
-            # Accessed on class, return descriptor
+            # accessed on class, return descriptor
             return self
         
-        # Accessed on instance, return bound method wrapper
+        # accessed on instance, return bound method wrapper
         return _AsyncableBoundMethod(
             obj,
             self._sync_method,
@@ -193,21 +193,23 @@ def asyncable_method(async_method: Callable) -> Callable[[Callable], _AsyncableM
     return decorator
 
 
-# =============================================================================
-# Modifiable Methods - for result-fetching operations
-# =============================================================================
-# These support .timeout(), .background(), and .asynced() modifiers
-# Used for Process.result(), Process.wait(), Process.listen(), etc.
+# modifiable methods - for result-fetching operations
+
+# these support .timeout(), .background(), and .asynced() modifiers
+
+# used for Process.result(), Process.wait(), Process.listen(), etc.
 
 
 class _ModifiableMethod:
     """
-    Descriptor that provides .timeout(), .background(), and .asynced() for methods.
+    Descriptor that provides modifiers for blocking methods.
     
-    Used for result-fetching operations that block and may need:
-    - timeout: Raise error if takes too long
-    - background: Return Future immediately
-    - asynced: Return coroutine for await
+    Supports:
+    - retry: retry on failure with backoff rules
+    - rate_limit: throttle calls per second
+    - background: return Future immediately
+    - timeout: raise error if call takes too long
+    - asynced: return coroutine for await
     """
     
     def __init__(
@@ -422,14 +424,12 @@ class _ModifiableBoundMethod:
         return f"<modifiable bound method {type(self._instance).__name__}.{self._name}>"
 
 
-# =============================================================================
-# Modifiable Async Methods - for async instance methods
-# =============================================================================
 
+# modifiable async methods - for async instance methods
 class _AsyncModifiableMethod:
     """
-    Descriptor that provides .timeout(), .retry(), .background(), and .asynced()
-    support for async instance methods.
+    Descriptor that provides .retry(), .rate_limit(), .background(), .timeout(),
+    and .asynced() support for async instance methods.
     """
     
     def __init__(
@@ -457,8 +457,8 @@ class _AsyncModifiableMethod:
 
 class _AsyncModifiableBoundMethod:
     """
-    Bound method wrapper with .timeout(), .retry(), .background(), and .asynced()
-    support for async methods.
+    Bound method wrapper with .retry(), .rate_limit(), .background(), .timeout(),
+    and .asynced() support for async methods.
     """
     
     def __init__(

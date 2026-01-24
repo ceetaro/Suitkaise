@@ -38,11 +38,13 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.paths import Skpath, get_project_root, get_project_paths
-from suitkaise.processing import Process, Pool, Share
+from suitkaise.processing import Skprocess, Pool, Share
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.timing import Sktimer, TimeThis, timethis
 from suitkaise.cerial import serialize, deserialize
 from suitkaise.sk import sk
+
+Process = Skprocess
 
 
 # =============================================================================

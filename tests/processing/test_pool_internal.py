@@ -25,7 +25,9 @@ sys.path.insert(0, str(project_root))
 
 from suitkaise import cerial
 from suitkaise.processing._int.pool import _pool_worker, _run_process_inline, _ordered_results, _unordered_results
-from suitkaise.processing import Process
+from suitkaise.processing import Skprocess
+
+Process = Skprocess
 from suitkaise.processing._int.errors import RunError, ProcessTimeoutError
 
 try:
