@@ -509,6 +509,82 @@ def test_timethis_exception_propagates():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_timethis_auto_example():
+    """Docstring example: auto-created timer."""
+    clear_global_timers()
+    
+    @timethis()
+    def quick_function():
+        stdlib_time.sleep(0.005)
+    
+    quick_function()
+    assert hasattr(quick_function, "timer")
+    assert quick_function.timer.most_recent >= 0
+
+
+def test_doc_timethis_shared_timer_example():
+    """Docstring example: pre-created timer shared across functions."""
+    t = Sktimer()
+    
+    @timethis(t)
+    def multiply(a: int, b: int) -> int:
+        return a * b
+    
+    @timethis(t)
+    def divide(a: int, b: int) -> float:
+        return a / b
+    
+    for a, b in zip([1, 2, 3], [1, 2, 3]):
+        multiply(a, b)
+        divide(a, b)
+    
+    assert t.num_times == 6
+    assert t.mean >= 0
+
+
+def test_doc_timethis_stacked_example():
+    """Docstring example: stacked decorators with perf timer."""
+    perf_timer = Sktimer()
+    
+    @timethis()
+    @timethis(perf_timer)
+    def multiply(a: int, b: int) -> int:
+        return a * b
+    
+    @timethis()
+    @timethis(perf_timer)
+    def divide(a: int, b: int) -> float:
+        return a / b
+    
+    for a, b in zip([1, 2, 3], [1, 2, 3]):
+        multiply(a, b)
+        divide(a, b)
+    
+    assert perf_timer.num_times == 6
+    assert hasattr(multiply, "timer")
+    assert hasattr(divide, "timer")
+
+
+def test_doc_clear_global_timers_example():
+    """Docstring example: clear auto-created timers."""
+    clear_global_timers()
+    
+    @timethis()
+    def quick_function():
+        return "ok"
+    
+    quick_function()
+    assert quick_function.timer.num_times == 1
+    
+    clear_global_timers()
+    global_timers = getattr(timethis, "_global_timers", {})
+    assert global_timers == {}
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -558,6 +634,12 @@ def run_all_tests():
     # Exception tests
     runner.run_test("@timethis exception still times", test_timethis_exception_still_times)
     runner.run_test("@timethis exception propagates", test_timethis_exception_propagates)
+    
+    # docstring examples
+    runner.run_test("doc: timethis auto", test_doc_timethis_auto_example)
+    runner.run_test("doc: timethis shared timer", test_doc_timethis_shared_timer_example)
+    runner.run_test("doc: timethis stacked", test_doc_timethis_stacked_example)
+    runner.run_test("doc: clear_global_timers", test_doc_clear_global_timers_example)
     
     return runner.print_results()
 

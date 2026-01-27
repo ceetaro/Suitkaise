@@ -136,6 +136,17 @@ def test_project_root_has_indicators():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_get_project_root_example():
+    """Docstring example: get_project_root equivalent to Skpath().root."""
+    clear_custom_root()
+    root = get_project_root()
+    assert root.ap == Skpath().root.ap
+
+
+# =============================================================================
 # Custom Root Tests
 # =============================================================================
 
@@ -243,6 +254,9 @@ def run_all_tests():
     # Skpath.root tests
     runner.run_test("Skpath.root property", test_skpath_root_property)
     runner.run_test("Skpath.root consistent", test_skpath_root_consistent)
+    
+    # docstring examples
+    runner.run_test("doc: get_project_root", test_doc_get_project_root_example)
     
     return runner.print_results()
 

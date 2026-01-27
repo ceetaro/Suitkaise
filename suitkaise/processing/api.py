@@ -5,7 +5,7 @@
     ```
 ────────────────────────────────────────────────────────\n
 
-Api for processing.
+Api for processing
 """
 
 # import internal components
@@ -43,7 +43,7 @@ def autoreconnect(**auth):
         ```
     ────────────────────────────────────────────────────────\n
 
-    Class decorator to enable automatic reconnects after deserialization.
+    Class decorator that automatically reconnects all Reconnector objects.
     
     When a Skprocess decorated with @autoreconnect is deserialized in the
     child process, reconnect_all() is called automatically to restore any
@@ -53,7 +53,8 @@ def autoreconnect(**auth):
         **auth: Reconnection parameters keyed by type, then by attr name.
             Use "*" as the attr key for defaults that apply to all instances.
     
-    Example:
+    ────────────────────────────────────────────────────────
+    ```python
         @autoreconnect(**{
             "psycopg2.Connection": {
                 "*": {"host": "localhost", "password": "secret"},
@@ -72,6 +73,8 @@ def autoreconnect(**auth):
             def __run__(self):
                 # db, analytics_db, cache are all reconnected automatically
                 ...
+    ```
+    ────────────────────────────────────────────────────────
     """
     def decorator(cls):
         # mark class for reconnect on deserialize in child process

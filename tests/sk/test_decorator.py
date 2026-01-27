@@ -21,7 +21,8 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import sk, Skclass, Skfunction, SkModifierError
+from suitkaise.sk import sk, SkModifierError
+from suitkaise.sk.api import Skclass, Skfunction
 
 
 # =============================================================================
@@ -370,6 +371,43 @@ def test_sk_function_background():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_sk_class_example():
+    """Docstring example: @sk class decorator."""
+    @sk
+    class Sktimer:
+        def __init__(self):
+            self.value = 0
+    
+    timer = Sktimer()
+    assert hasattr(Sktimer, "_shared_meta")
+    assert timer.value == 0
+
+
+def test_doc_sk_function_example():
+    """Docstring example: @sk function decorator."""
+    @sk
+    def double(x):
+        return x * 2
+    
+    assert double(2) == 4
+
+
+def test_doc_sk_call_syntax_example():
+    """Docstring example: sk(func) call syntax."""
+    def add_one(x):
+        return x + 1
+    
+    sk_func = sk(add_one)
+    assert callable(sk_func)
+    assert sk_func(2) == 3
+    assert hasattr(sk_func, "retry")
+    assert hasattr(sk_func, "timeout")
+
+
+# =============================================================================
 # Error Cases
 # =============================================================================
 
@@ -407,6 +445,11 @@ def run_all_tests():
     runner.run_test("@sk function retry", test_sk_function_retry)
     runner.run_test("@sk function timeout", test_sk_function_timeout)
     runner.run_test("@sk function background", test_sk_function_background)
+    
+    # docstring examples
+    runner.run_test("doc: @sk class", test_doc_sk_class_example)
+    runner.run_test("doc: @sk function", test_doc_sk_function_example)
+    runner.run_test("doc: sk(func)", test_doc_sk_call_syntax_example)
     
     # Error cases
     runner.run_test("@sk on invalid", test_sk_on_invalid)

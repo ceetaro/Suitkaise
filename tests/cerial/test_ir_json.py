@@ -156,6 +156,44 @@ def test_ir_to_jsonable_contains_markers():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_serialize_ir_example():
+    """Docstring example: serialize_ir."""
+    ir = cerial.serialize_ir({"a": 1})
+    assert isinstance(ir, dict)
+
+
+def test_doc_ir_to_jsonable_example():
+    """Docstring example: ir_to_jsonable."""
+    ir = cerial.serialize_ir({"a": 1})
+    jsonable = cerial.ir_to_jsonable(ir)
+    assert isinstance(jsonable, (dict, list))
+
+
+def test_doc_ir_to_json_example():
+    """Docstring example: ir_to_json."""
+    ir = cerial.serialize_ir({"a": 1})
+    json_text = cerial.ir_to_json(ir)
+    parsed = json.loads(json_text)
+    assert isinstance(parsed, dict)
+
+
+def test_doc_to_jsonable_example():
+    """Docstring example: to_jsonable."""
+    jsonable = cerial.to_jsonable({"a": 1})
+    assert isinstance(jsonable, (dict, list))
+
+
+def test_doc_to_json_example():
+    """Docstring example: to_json."""
+    json_text = cerial.to_json({"a": 1})
+    parsed = json.loads(json_text)
+    assert isinstance(parsed, dict)
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -164,6 +202,11 @@ def run_all_tests():
     runner.run_test("JSON output is valid", test_ir_to_json_output_is_valid)
     runner.run_test("to_json output is valid", test_to_json_matches_ir_path)
     runner.run_test("JSON markers present", test_ir_to_jsonable_contains_markers)
+    runner.run_test("doc: serialize_ir", test_doc_serialize_ir_example)
+    runner.run_test("doc: ir_to_jsonable", test_doc_ir_to_jsonable_example)
+    runner.run_test("doc: ir_to_json", test_doc_ir_to_json_example)
+    runner.run_test("doc: to_jsonable", test_doc_to_jsonable_example)
+    runner.run_test("doc: to_json", test_doc_to_json_example)
     return runner.print_results()
 
 

@@ -207,6 +207,55 @@ def test_sleep_asynced_returns_time():
     asyncio.run(async_test())
 
 
+# =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_time_example():
+    """Docstring example for time()."""
+    start_time = time()
+    assert isinstance(start_time, float)
+
+
+def test_doc_sleep_elapsed_example():
+    """Docstring example: sleep with elapsed time."""
+    start_time = time()
+    sleep(0.01)
+    end_time = time()
+    elapsed_time = end_time - start_time
+    assert elapsed_time >= 0
+
+
+def test_doc_sleep_return_example():
+    """Docstring example: sleep returns end time."""
+    start_time = time()
+    end_time = sleep(0.01)
+    assert end_time >= start_time
+
+
+def test_doc_sleep_async_example():
+    """Docstring example: async sleep via asynced()."""
+    async def run():
+        end_time = await sleep.asynced()(0.01)
+        assert isinstance(end_time, float)
+    asyncio.run(run())
+
+
+def test_doc_elapsed_example():
+    """Docstring example for elapsed() order independence."""
+    start_time = time()
+    sleep(0.01)
+    elapsed1 = elapsed(start_time)
+    start_time = time()
+    sleep(0.01)
+    end_time = time()
+    elapsed2 = elapsed(start_time, end_time)
+    elapsed3 = elapsed(end_time, start_time)
+    assert elapsed1 >= 0
+    assert elapsed2 >= 0
+    assert elapsed3 >= 0
+
+
 def test_sleep_asynced_concurrent():
     """Multiple sleep.asynced() should run concurrently."""
     async def async_test():
@@ -312,6 +361,13 @@ def run_all_tests():
     runner.run_test("elapsed() single time", test_elapsed_single_time)
     runner.run_test("elapsed() same time", test_elapsed_same_time)
     runner.run_test("elapsed() precision", test_elapsed_precision)
+    
+    # docstring examples
+    runner.run_test("doc: time()", test_doc_time_example)
+    runner.run_test("doc: sleep elapsed", test_doc_sleep_elapsed_example)
+    runner.run_test("doc: sleep returns time", test_doc_sleep_return_example)
+    runner.run_test("doc: sleep async", test_doc_sleep_async_example)
+    runner.run_test("doc: elapsed order", test_doc_elapsed_example)
     
     return runner.print_results()
 

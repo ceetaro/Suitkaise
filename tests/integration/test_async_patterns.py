@@ -175,7 +175,7 @@ def test_timer_with_skclass():
     You want the Sktimer to work seamlessly with the Sk wrapper system.
     """
     from suitkaise.timing import Sktimer
-    from suitkaise.sk import Skclass
+    from suitkaise.sk.api import Skclass
     
     # The Sktimer class has _shared_meta, making it compatible
     # with Suitkaise's sharing and async systems
@@ -199,7 +199,7 @@ def test_skfunction_with_timing():
     """
     async def async_context():
         from suitkaise.timing import sleep
-        from suitkaise.sk import Skfunction
+        from suitkaise.sk.api import Skfunction
         import time as t
         
         # Your legacy blocking function
@@ -278,7 +278,7 @@ def test_all_async_together():
     async def full_application():
         from suitkaise.timing import sleep, Sktimer
         from suitkaise.circuits import Circuit
-        from suitkaise.sk import Skfunction
+        from suitkaise.sk.api import Skfunction
         import time as t
         
         # Legacy blocking function (e.g., database call)

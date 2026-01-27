@@ -478,7 +478,7 @@ def streamline_path(
         path = streamline_path("My File<1>.txt", chars_to_replace=" ")
         # "My_File_1_.txt"
         
-        # lowercase and limit len
+        # lowercase and limit len (suffix preserved; not counted in max_len)
         path = streamline_path("My Long Filename.txt", max_len=10, lowercase=True, chars_to_replace=" ")
         # "my_long_fi.txt"
         
@@ -542,14 +542,13 @@ def streamline_path(
     if lowercase:
         result = result.lower()
     
-    # truncate to max len (preserve suffix)
+    # truncate to max len (preserve suffix; suffix not counted)
     if max_len is not None and len(result) > max_len:
         dot_index = result.rfind(".")
         if dot_index > 0:
             suffix = result[dot_index:]
             stem = result[:dot_index]
-            stem_max = max(0, max_len - len(suffix))
-            result = f"{stem[:stem_max]}{suffix}"
+            result = f"{stem[:max_len]}{suffix}"
         else:
             result = result[:max_len]
     
@@ -572,7 +571,7 @@ def streamline_path_quick(
 
         path = paths.streamline_path_quick("My File<1>файл.txt")
 
-        # "my_file_1_____.txt"
+        # "My_File_1_____.txt"
         ```
     ────────────────────────────────────────────────────────\n
 

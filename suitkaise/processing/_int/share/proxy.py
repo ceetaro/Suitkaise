@@ -10,6 +10,7 @@ Uses _shared_meta on the wrapped class to know which attrs each method/property 
 """
 
 from typing import Any, Optional, TYPE_CHECKING
+import warnings
 
 if TYPE_CHECKING:
     from .coordinator import _Coordinator
@@ -90,6 +91,13 @@ class _ObjectProxy:
             object.__setattr__(self, name, value)
             return
         
+        if not self._coordinator.is_alive:
+            warnings.warn(
+                "Share is stopped. Changes are queued but will not take "
+                "effect until share.start() is called.",
+                RuntimeWarning,
+            )
+
         # queue a setattr command and mark the attr as written
         self._coordinator.increment_pending(f"{self._object_name}.{name}")
         self._coordinator.queue_command(
@@ -167,6 +175,13 @@ class _MethodProxy:
         then queues the command. Returns immediately.
         """
         proxy = self._object_proxy
+        
+        if not proxy._coordinator.is_alive:
+            warnings.warn(
+                "Share is stopped. Changes are queued but will not take "
+                "effect until share.start() is called.",
+                RuntimeWarning,
+            )
         meta = proxy._shared_meta
         
         # determine which attrs this method mutates (from _shared_meta)

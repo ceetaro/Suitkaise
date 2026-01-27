@@ -30,8 +30,8 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import Skfunction, sk
-from suitkaise.sk.api import AsyncSkfunction, SkModifierError
+from suitkaise.sk import sk
+from suitkaise.sk.api import Skfunction, AsyncSkfunction, SkModifierError
 
 
 # =============================================================================
@@ -327,6 +327,37 @@ async def test_asyncskfunction_rate_limit_spacing():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+async def test_doc_asyncskfunction_timeout_example():
+    """Docstring example: async timeout usage."""
+    result = await Skfunction(blocking_return_42).asynced().timeout(0.1)()
+    assert result == 42
+
+
+async def test_doc_asyncskfunction_retry_example():
+    """Docstring example: async retry usage."""
+    def flaky_blocking():
+        if not hasattr(flaky_blocking, "attempts"):
+            flaky_blocking.attempts = 0
+        flaky_blocking.attempts += 1
+        stdlib_time.sleep(0.001)
+        if flaky_blocking.attempts < 2:
+            raise ValueError("fail")
+        return "ok"
+    
+    result = await Skfunction(flaky_blocking).asynced().retry(3)()
+    assert result == "ok"
+
+
+async def test_doc_asyncskfunction_rate_limit_example():
+    """Docstring example: async rate_limit usage."""
+    result = await Skfunction(blocking_return_42).asynced().rate_limit(100.0)()
+    assert result == 42
+
+
+# =============================================================================
 # Error Handling Tests
 # =============================================================================
 
@@ -477,6 +508,11 @@ def run_all_tests():
     runner.run_test("AsyncSkfunction many args", test_asyncskfunction_many_args)
     runner.run_test("AsyncSkfunction *args", test_asyncskfunction_star_args)
     runner.run_test("AsyncSkfunction **kwargs", test_asyncskfunction_star_kwargs)
+    
+    # docstring examples
+    runner.run_test("doc: async timeout", test_doc_asyncskfunction_timeout_example)
+    runner.run_test("doc: async retry", test_doc_asyncskfunction_retry_example)
+    runner.run_test("doc: async rate_limit", test_doc_asyncskfunction_rate_limit_example)
     
     return runner.print_results()
 

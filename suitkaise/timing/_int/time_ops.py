@@ -179,16 +179,16 @@ class Sktimer:
     standard deviation, and percentiles for performance analysis.
     
     All statistics are accessed directly on the timer:
-        - `timer.mean`
-        - `timer.stdev`
-        - `timer.percentile(95)`
+    - `timer.mean`
+    - `timer.stdev`
+    - `timer.percentile(95)`
     
     Features:
-        - Thread-safe with per-thread timing sessions
-        - Supports nested timing (stackable frames)
-        - Pause/resume functionality
-        - Discard unwanted measurements
-        - Optional rolling window (keep last N measurements)
+    - Thread-safe with per-thread timing sessions
+    - Supports nested timing (stackable frames)
+    - Pause/resume functionality
+    - Discard unwanted measurements
+    - Optional rolling window (keep last N measurements)
     
     Control Methods:
         `start()`: Start timing
@@ -520,9 +520,9 @@ class Sktimer:
             ```python
             timer.start()
             do_work()
-            elapsed = timer.stop()  # Returns elapsed time, records it
+            elapsed = timer.stop()  # returns elapsed time, records it
             
-            print(timer.most_recent)  # Same as elapsed
+            print(timer.most_recent)  # same as elapsed
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -551,9 +551,9 @@ class Sktimer:
             timer.start()
             try:
                 result = risky_operation()
-                timer.stop()  # Record successful timing
+                timer.stop()  # record successful timing
             except Exception:
-                timer.discard()  # Don't record failed timing
+                timer.discard()  # don't record failed timing
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -583,7 +583,9 @@ class Sktimer:
             
             for i in range(100):
                 do_work()
-                timer.lap()  # Records time since last lap/start, continues timing
+                timer.lap()  # records time since last lap/start, continues timing
+
+            timer.discard() # don't record the 101st measurement that is still running
             
             # 100 measurements recorded
             print(timer.mean)
@@ -616,14 +618,17 @@ class Sktimer:
         ────────────────────────────────────────────────────────
             ```python
             timer.start()
-            do_initial_work()
+
+            do_something()
             
-            timer.pause()
-            user_input = input("Continue? ")  # Time paused - not counted
-            timer.resume()
+            timer.pause() # pause timer
+
+            # user input time not counted because timer is paused
+            user_input = input("Continue? ")
+
+            timer.resume() # resume timer
             
-            do_more_work()
-            elapsed = timer.stop()  # Only counts work time
+            do_something_else()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -642,9 +647,18 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            timer.pause()
-            # ... time not counted ...
-            timer.resume()  # Continue timing
+            timer.start()
+
+            do_something()
+            
+            timer.pause() # pause timer
+
+            # user input time not counted because timer is paused
+            user_input = input("Continue? ")
+
+            timer.resume() # resume timer
+            
+            do_something_else()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -664,7 +678,7 @@ class Sktimer:
             ```python
             timer = timing.Sktimer()
             
-            # Add pre-measured times
+            # add pre-measured times
             timer.add_time(1.5)
             timer.add_time(2.3)
             timer.add_time(1.8)
@@ -688,10 +702,10 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            # Get frozen snapshot of statistics
+            # get frozen snapshot of statistics
             snapshot = timer.get_statistics()
             
-            # Snapshot won't change even if timer continues
+            # snapshot won't change even if timer continues
             timer.start()
             do_more_work()
             timer.stop()
@@ -721,7 +735,7 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            snapshot = timer.get_stats()  # Same as get_statistics()
+            snapshot = timer.get_stats()  # same as get_statistics()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -736,7 +750,7 @@ class Sktimer:
         """
         ────────────────────────────────────────────────────────
             ```python
-            timer.reset()  # Clears all measurements, like a new Sktimer()
+            timer.reset()  # clears all measurements, like a new Sktimer()
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -747,7 +761,7 @@ class Sktimer:
         with self._lock:
             self.times.clear()
             self.original_start_time = None
-            # Reset sessions as well
+            # reset sessions as well
             self._sessions.clear()
             self._paused_durations.clear()
 

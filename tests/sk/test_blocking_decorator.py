@@ -21,7 +21,8 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import sk, blocking, Skfunction, SkModifierError
+from suitkaise.sk import sk, blocking, SkModifierError
+from suitkaise.sk.api import Skfunction
 
 
 # =============================================================================
@@ -424,6 +425,44 @@ def test_multiple_blocking_decorators():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_blocking_function_example():
+    """Docstring example: @blocking on a function."""
+    @blocking
+    def heavy():
+        total = 0
+        for i in range(1000):
+            total += i
+        return total
+    
+    sk_func = Skfunction(heavy)
+    future = sk_func.background()()
+    assert future.result(timeout=5) > 0
+
+
+def test_doc_blocking_method_example():
+    """Docstring example: @blocking on a method."""
+    @sk
+    class Worker:
+        def __init__(self):
+            self.value = 0
+        
+        @blocking
+        def compute(self, n: int = 100):
+            total = 0
+            for i in range(n):
+                total += i
+            self.value = total
+            return total
+    
+    worker = Worker()
+    result = worker.compute.background()(50).result(timeout=5)
+    assert result == worker.value
+
+
+# =============================================================================
 # Run Tests
 # =============================================================================
 
@@ -449,6 +488,10 @@ def run_all_tests():
     runner.run_test("blocking preserves docstring", test_blocking_preserves_docstring)
     runner.run_test("blocking preserves name", test_blocking_preserves_name)
     runner.run_test("multiple blocking decorators", test_multiple_blocking_decorators)
+    
+    # docstring examples
+    runner.run_test("doc: blocking function", test_doc_blocking_function_example)
+    runner.run_test("doc: blocking method", test_doc_blocking_method_example)
     
     return runner.print_results()
 

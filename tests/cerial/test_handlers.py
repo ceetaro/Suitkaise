@@ -452,6 +452,42 @@ def test_serialize_multiple_calls():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_serialize_example():
+    """Docstring example: serialize basic object."""
+    data = {"a": 1}
+    serialized = serialize(data)
+    assert serialized is not None
+
+
+def test_doc_deserialize_example():
+    """Docstring example: deserialize bytes back to object."""
+    original = {"name": "test"}
+    serialized = serialize(original)
+    restored = deserialize(serialized)
+    assert restored == original
+
+
+def test_doc_serialize_complex_example():
+    """Docstring example: serialize complex object with lock/logger."""
+    import threading
+    import logging
+    
+    class ComplexService:
+        def __init__(self):
+            self.lock = threading.Lock()
+            self.logger = logging.getLogger("service")
+    
+    service = ComplexService()
+    serialized = serialize(service)
+    restored = deserialize(serialized)
+    assert hasattr(restored, "lock")
+    assert hasattr(restored, "logger")
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -499,6 +535,11 @@ def run_all_tests():
     # Format tests
     runner.run_test("serialize format", test_serialize_format)
     runner.run_test("serialize multiple calls", test_serialize_multiple_calls)
+    
+    # docstring examples
+    runner.run_test("doc: serialize", test_doc_serialize_example)
+    runner.run_test("doc: deserialize", test_doc_deserialize_example)
+    runner.run_test("doc: serialize complex", test_doc_serialize_complex_example)
     
     return runner.print_results()
 

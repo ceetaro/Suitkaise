@@ -445,7 +445,6 @@ class _PoolUnorderedImapAsyncModifier:
 
 # Star Modifier
 
-
 class StarModifier:
     """
     Modifier returned by pool.star().
@@ -482,43 +481,65 @@ class Pool:
         from suitkaise.processing import Pool
         
         pool = Pool(workers=4)
-        results = pool.map(sum, [(1, 2), (3, 4)])
         
-        # Unordered results
-        for result in pool.unordered_imap(sum, [(1, 2), (3, 4)]):
+        # map: returns list, preserves order
+        results = pool.map(sum, [(1, 2), (3, 4)])
+        # each item is passed as a single argument (no tuple unpacking):
+        #   worker1 gets ((1, 2), nothing else)
+        #   worker2 gets ((3, 4), nothing else)
+
+        # star() modifier: tuple-unpacking into the function
+        results = pool.star().map(sum, [(1, 2), (3, 4)])
+        # each tuple is unpacked into positional args:
+        #   worker1 gets (1, 2)
+        #   worker2 gets (3, 4)
+        
+        # imap: iterator, preserves order
+        for result in pool.imap(sum, [(1, 2), (3, 4)]):
             print(result)
         
-        # Tuple-unpacking
-        results = pool.star().map(sum, [(1, 2), (3, 4)])
+        # unordered_imap: iterator, yields as completed (fastest)
+        for result in pool.unordered_imap(sum, [(1, 2), (3, 4)]):
+            print(result)
+
+        # star() works with map, imap, and unordered_imap
         ```
     ────────────────────────────────────────────────────────\n
 
     Pool for parallel batch processing.
+
+    Supports both functions and Skprocess-inheriting classes.
     
     Uses cerial for serialization, supporting complex objects that
-    pickle cannot handle. Also supports Skprocess-inheriting classes
-    for structured lifecycle management.
+    pickle and others cannot handle.
     
-    Usage:
-        pool = Pool(workers=8)
-        
-        # Simple function
-        results = pool.map(fn, items)
-        
-        # Skprocess class
-        results = pool.map(MyProcessClass, items)
-        
-        # With modifiers
+    ────────────────────────────────────────────────────────
+        ```python
+        # modifier usage (map / imap / unordered_imap)
+
+        # with timeout - raises TimeoutError if exceeded
         results = pool.map.timeout(30.0)(fn, items)
+
+        # background - returns Future immediately
         future = pool.map.background()(fn, items)
+        results = future.result()
+
+        # native async support
         results = await pool.map.asynced()(fn, items)
         
-        # Unordered (fastest)
-        for result in pool.unordered_imap(fn, items):
-            ...
+
+        for result in pool.imap.timeout(10.0)(fn, items):
+            print(result)
         
-        # Star modifier (unpack tuples)
-        results = pool.star().map(fn, [(1, 2), (3, 4)])
+        # returns a Future
+        future = pool.unordered_imap.background()(fn, items)
+        results = future.result() # is a list
+        
+        # star() modifier composes with other modifiers
+        results = pool.star().map.timeout(5.0)(fn, args_iter)
+        results = await pool.star().unordered_imap.asynced()(fn, args_iter)
+        ```
+    ────────────────────────────────────────────────────────\n
     """
     
     def __init__(self, workers: int | None = None):
@@ -552,8 +573,7 @@ class Pool:
         self.close()
     
 
-    # Modifier method
-
+    # star modifier method
     
     def star(self) -> StarModifier:
         """
@@ -566,20 +586,26 @@ class Pool:
         return StarModifier(self)
     
 
-    # Main methods with modifier support
 
+    # main methods with modifier support
     
     @property
     def map(self) -> _PoolMapModifier:
         """
         ────────────────────────────────────────────────────────
             ```python
-            # Sync - blocks until all complete
+            # sync - blocks until all complete
             results = pool.map(fn, items)
             
-            # With modifiers
+            # with timeout - raises TimeoutError if exceeded
             results = pool.map.timeout(30.0)(fn, items)
+            
+            # background - returns Future immediately
             future = pool.map.background()(fn, items)
+            results = future.result()
+            
+            # async - returns coroutine for await
+            coro = pool.map.asynced()
             results = await pool.map.asynced()(fn, items)
             ```
         ────────────────────────────────────────────────────────
@@ -608,20 +634,21 @@ class Pool:
         """
         ────────────────────────────────────────────────────────
             ```python
-            # Sync - iterator, blocks on each next()
+            # sync - iterator, blocks on each next()
             for result in pool.imap(fn, items):
-                process(result)
+                do_something_with(result)
             
-            # With timeout
+            # with timeout - raises TimeoutError if exceeded
             for result in pool.imap.timeout(30.0)(fn, items):
                 process(result)
             
-            # Background (collects to list)
+            # background (collects to list)
             future = pool.imap.background()(fn, items)
-            results = future.result()
+            results = future.result() # is a list
             
-            # Async (collects to list)
-            results = await pool.imap.asynced()(fn, items)
+            # async (collects to list)
+            coro = pool.imap.asynced()
+            results = await pool.imap.asynced()(fn, items) # is a list
             ```
         ────────────────────────────────────────────────────────
         
@@ -649,20 +676,20 @@ class Pool:
         """
         ────────────────────────────────────────────────────────
             ```python
-            # Sync - iterator, yields as results complete
+            # sync - iterator, yields as results complete
             for result in pool.unordered_imap(fn, items):
                 process(result)
             
-            # With timeout
+            # with timeout
             for result in pool.unordered_imap.timeout(30.0)(fn, items):
                 process(result)
             
-            # Background (collects to list)
+            # background (collects to list)
             future = pool.unordered_imap.background()(fn, items)
-            results = future.result()
+            results = future.result() # is a list
             
-            # Async (collects to list)
-            results = await pool.unordered_imap.asynced()(fn, items)
+            # async (collects to list)
+            results = await pool.unordered_imap.asynced()(fn, items) # is a list
             ```
         ────────────────────────────────────────────────────────
         
@@ -686,9 +713,9 @@ class Pool:
         return _PoolUnorderedImapModifier(self, is_star=False)
     
 
-    # Implementation
 
-    
+    # implementation
+
     def _spawn_worker(
         self,
         serialized_fn: bytes,

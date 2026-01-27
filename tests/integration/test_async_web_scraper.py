@@ -35,7 +35,8 @@ sys.path.insert(0, str(project_root))
 
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.timing import Sktimer, TimeThis, sleep, timethis
-from suitkaise.sk import Skfunction, sk, SkModifierError
+from suitkaise.sk import sk, SkModifierError
+from suitkaise.sk.api import Skfunction
 
 
 # =============================================================================

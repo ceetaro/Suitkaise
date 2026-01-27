@@ -1,11 +1,8 @@
 """
-────────────────────────────────────────────────────────
-    ```python
-    from suitkaise import sk, Skfunction, Skclass
-    ```
-────────────────────────────────────────────────────────\n
+Sk module API - @sk and @blocking decorators.
 
-Sk module API - Skclass, Skfunction, @sk, @blocking decorators.
+Internal wrappers:
+- Skclass, Skfunction (not public API; used internally for chaining)
 
 Provides automatic _shared_meta generation and .asynced() support for user classes.
 """
@@ -25,12 +22,22 @@ F = TypeVar('F', bound=Callable[..., Any])
 
 def blocking(func: F) -> F:
     """
+        ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sk, blocking
+        
+        @sk
+        @blocking
+        def heavy_computation():
+            return sum(range(10_000_000))
+        ```
     ────────────────────────────────────────────────────────
         ```python
         from suitkaise import sk, blocking
         
         @sk
         class Worker:
+
             @blocking
             def heavy_computation(self):
                 return sum(range(10_000_000))
@@ -42,8 +49,7 @@ def blocking(func: F) -> F:
     Use this when a method is CPU-intensive or blocking but doesn't contain
     detectable blocking calls (like time.sleep, file I/O, etc.).
     
-    This enables .background() and .asynced() for the method without
-    needing to add a fake timing.sleep() call.
+    This enables .background() and .asynced() for the method.
     
     Works on:
         - Methods in @sk-decorated classes
@@ -74,36 +80,11 @@ R = TypeVar('R')
 
 class Skclass(Generic[T]):
     """
-    ────────────────────────────────────────────────────────
-        ```python
-        from suitkaise import Skclass
-        
-        class Counter:
-            def __init__(self):
-                self.value = 0
-        
-        SkCounter = Skclass(Counter)
-        counter = SkCounter()
-        ```
-    ────────────────────────────────────────────────────────\n
-
     Wrapper for user classes that provides:
     - Auto-generated _shared_meta for Share compatibility
     - .asynced() for async version (if class has blocking calls)
     
-    Usage:
-        class Counter:
-            def __init__(self):
-                self.value = 0
-            
-            def increment(self):
-                self.value += 1
-            
-            def slow_increment(self):
-                time.sleep(1)
-                self.value += 1
-        
-        SkCounter = Skclass(Counter)
+
         
         # Regular usage
         counter = SkCounter()
@@ -702,67 +683,52 @@ def sk(cls_or_func):
         from suitkaise import sk
         
         @sk
-        class Counter:
-            def __init__(self):
-                self.value = 0
-        ```
-    ────────────────────────────────────────────────────────\n
+        class MyClass:
+            # ...
 
-    Decorator that attaches Sk functionality directly to a class or function.
+        @sk
+        def my_function():
+            # ...
+        ```
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sk
+        
+        my_class = sk(MyClass)
+        my_function = sk(my_function)
+        ```
+    ────────────────────────────────────────────────────────
+
+    Decorator or function that attaches sk functionality directly to a class or function.
+
+    Gives functions these extra features:
+    - .has_blocking_calls attribute
+    - .blocking_calls attribute
+    - .asynced() method (if blocking)
+    - .retry() method
+    - .timeout() method
+    - .background() method (if blocking)
     
-    For classes: Attaches to the original class:
-                 - _shared_meta for Share compatibility
-                 - .asynced() staticmethod for async version
-                 - .has_blocking_calls class attribute
-                 - .blocking_methods class attribute
+    Gives classes these extra features:
+    - precomputed _shared_meta for Share compatibility
+    - methods get all the same features as functions, including .asynced() and .background (if blocking)
     
-    For functions: Attaches to the original function:
-                 - .has_blocking_calls attribute
-                 - .blocking_calls attribute
-                 - .asynced() method
-                 - .retry() method
-                 - .timeout() method
-                 - .background() method
     
     The original class/function is returned - no wrapper objects.
     Skfunction/Skclass are used internally for chaining but not exposed.
-    
-    Usage:
-        @sk
-        class Counter:
-            def __init__(self):
-                self.value = 0
-            
-            def slow_increment(self):
-                time.sleep(1)
-                self.value += 1
-        
-        # Counter is still the original class
-        counter = Counter()
-        Counter.asynced()  # Get async version (if has blocking calls)
-        Counter.has_blocking_calls  # True
-        
-        @sk
-        def slow_fetch(url):
-            return requests.get(url).text
-        
-        # slow_fetch is still the original function
-        slow_fetch("https://example.com")  # Call directly
-        await slow_fetch.asynced()("https://example.com")  # Async
-        slow_fetch.retry(3).timeout(10)("https://example.com")  # Chain
     """
     if isinstance(cls_or_func, type):
-        # It's a class - attach methods directly to the class
+        # is a class - attach methods directly to the class
         cls = cls_or_func
         shared_meta, blocking_methods = analyze_class(cls)
         
-        # Attach metadata directly to the class
+        # attach metadata directly to the class
         cls._shared_meta = shared_meta
         cls._blocking_methods = blocking_methods
         cls.has_blocking_calls = len(blocking_methods) > 0
         cls.blocking_methods = blocking_methods
         
-        # Create asynced staticmethod
+        # create asynced staticmethod
         def asynced():
             """Get async version of this class. Raises SkModifierError if no blocking calls."""
             if not blocking_methods:
@@ -773,7 +739,7 @@ def sk(cls_or_func):
         
         cls.asynced = staticmethod(asynced)
 
-        # Attach modifiers to instance methods
+        # attach modifiers to instance methods
         for name, member in list(cls.__dict__.items()):
             if name.startswith("__"):
                 continue
@@ -807,20 +773,20 @@ def sk(cls_or_func):
                 ),
             )
         
-        # Return the original class
+        # return the original class
         return cls
         
     elif callable(cls_or_func):
-        # It's a function - attach methods directly to the function
+        # is a function - attach methods directly to the function
         func = cls_or_func
         
-        # Check for explicit @blocking decorator FIRST
-        # If found, skip AST analysis for blocking detection (performance)
+        # check for explicit @blocking decorator FIRST
+        # if found, skip AST analysis for blocking detection (performance)
         blocking_calls: List[str] = []
         if getattr(func, '_sk_blocking', False):
             blocking_calls.append('@blocking')
         else:
-            # No @blocking - detect blocking calls via AST analysis
+            # no @blocking - detect blocking calls via AST analysis
             import ast
             import textwrap
             
@@ -834,11 +800,11 @@ def sk(cls_or_func):
             except (OSError, TypeError, SyntaxError):
                 pass
         
-        # Attach attributes
+        # attach attributes
         func.has_blocking_calls = len(blocking_calls) > 0
         func.blocking_calls = blocking_calls
         
-        # Attach methods that use Skfunction internally for chaining
+        # attach methods that use Skfunction internally for chaining
         def asynced():
             """Get async version. Raises SkModifierError if no blocking calls."""
             if not blocking_calls:
@@ -867,7 +833,7 @@ def sk(cls_or_func):
         func.background = background
         func.rate_limit = rate_limit
         
-        # Return the original function
+        # return the original function
         return func
         
     else:
@@ -875,10 +841,9 @@ def sk(cls_or_func):
 
 
 __all__ = [
-    'Skclass',
-    'Skfunction',
     'AsyncSkfunction',
     'sk',
+    'blocking',
     'SkModifierError',
     'FunctionTimeoutError',
 ]

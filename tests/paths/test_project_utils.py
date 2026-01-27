@@ -412,6 +412,58 @@ def test_project_utils_deep_nesting():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_get_project_paths_examples():
+    """Docstring examples for get_project_paths()."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        src = root / "src"
+        build = root / "build"
+        dist = root / "dist"
+        src.mkdir()
+        build.mkdir()
+        dist.mkdir()
+        (src / "main.py").touch()
+        (build / "artifact.bin").touch()
+        
+        paths = get_project_paths(root=src, use_ignore_files=False)
+        assert len(paths) >= 1
+        
+        paths = get_project_paths(root=root, exclude=["build", "dist"], use_ignore_files=False)
+        assert all("build" not in str(p) and "dist" not in str(p) for p in paths)
+        
+        paths = get_project_paths(root=root, as_strings=True, use_ignore_files=False)
+        assert all(isinstance(p, str) for p in paths)
+        
+        paths = get_project_paths(root=root, use_ignore_files=False)
+        assert all(isinstance(p, Skpath) for p in paths)
+
+
+def test_doc_get_project_structure_example():
+    """Docstring example for get_project_structure()."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        (root / "src").mkdir()
+        (root / "src" / "main.py").touch()
+        structure = get_project_structure(root=root, use_ignore_files=False)
+        assert isinstance(structure, dict)
+        assert "src" in next(iter(structure.values()))
+
+
+def test_doc_get_formatted_project_tree_example():
+    """Docstring example for get_formatted_project_tree()."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        (root / "src").mkdir()
+        (root / "src" / "main.py").touch()
+        tree = get_formatted_project_tree(root=root, use_ignore_files=False)
+        assert "src" in tree
+        assert "main.py" in tree
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -444,6 +496,11 @@ def run_all_tests():
     runner.run_test("get_formatted_project_tree include_files", test_get_formatted_project_tree_include_files)
     runner.run_test("get_formatted_project_tree exclude", test_get_formatted_project_tree_exclude)
     runner.run_test("get_formatted_project_tree custom root", test_get_formatted_project_tree_custom_root)
+    
+    # docstring examples
+    runner.run_test("doc: get_project_paths", test_doc_get_project_paths_examples)
+    runner.run_test("doc: get_project_structure", test_doc_get_project_structure_example)
+    runner.run_test("doc: get_formatted_project_tree", test_doc_get_formatted_project_tree_example)
     
     # Edge cases
     runner.run_test("project utils empty directory", test_project_utils_empty_directory)

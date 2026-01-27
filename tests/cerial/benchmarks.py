@@ -78,7 +78,8 @@ from suitkaise.processing import (
     ProcessTimeoutError,
     ResultTimeoutError,
 )
-from suitkaise.sk import Skclass, Skfunction, SkModifierError, FunctionTimeoutError
+from suitkaise.sk import SkModifierError, FunctionTimeoutError
+from suitkaise.sk.api import Skclass, Skfunction
 from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
 from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
 from suitkaise.cerial._int.handlers.network_handler import (

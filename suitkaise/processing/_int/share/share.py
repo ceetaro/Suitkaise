@@ -1,67 +1,82 @@
 """
-Share - Main container for process-safe shared state.
-
-Share is the user-facing API for sharing data between processes.
-It wraps objects in proxies and manages the coordinator automatically.
-
-Usage:
-    from suitkaise.processing import Share
-    from suitkaise.timing import Sktimer
-    
-    share = Share()
-    share.timer = Sktimer()  # Auto-wrapped in proxy
-    share.counter = 0      # Wrapped as SharedCounter
-    share.results = {}     # Wrapped as SharedDict
-    
-    # Pass share to workers, they can access shared.timer, etc.
+Share api
 """
 
 from typing import Any, Dict, Optional
+import warnings
 from multiprocessing.managers import SyncManager
 
 from .coordinator import _Coordinator
 from .proxy import _ObjectProxy
 
-# import Skclass for auto-wrapping user objects
-from suitkaise.sk import Skclass
+# import Skclass for auto-wrapping user objects (internal API)
+from suitkaise.sk.api import Skclass
 
 
 class Share:
     """
     ────────────────────────────────────────────────────────
         ```python
-        from suitkaise.processing import Share
-        from suitkaise.timing import Sktimer
+        from suitkaise import Share, Sktimer, Skprocess, Pool
         
         share = Share()
-        share.timer = Sktimer()
+        share.timer = Sktimer() # complex objs work too
         share.counter = 0
+
+        class ProcessUsingShare(Skprocess):
+
+            def __init__(self, share: Share):
+
+                self.share = share
+                self.process_config.runs = 10
+
+            def __run__(self):
+
+                # ...
+
+            def __postrun__(self):
+
+                self.share.counter += 1
+
+        
+        pool = Pool(workers=2)
+        results = pool.map(ProcessUsingShare, [share] * 10)
+
+        assert share.counter == 100 # 10 processes, 10 runs each
         ```
     ────────────────────────────────────────────────────────\n
 
-    Container for process-safe shared state.
+    Container for shared memory across process boundaries.
     
-    Automatically manages:
-    - A coordinator process for handling writes
-    - Proxies for suitkaise objects (Sktimer, Circuit, etc.)
-    - Shared wrappers for primitives (int → SharedCounter, dict → SharedDict)
+    Uses a coordinator-proxy system to ensure that all reads
+    and writes happen in the order they are supposed to.
+
+    All you have to do is:
+    1. Create a Share instance
+    2. Add objects as Share attributes (share.counter = 0)
+    3. Pass the Share instance to whatever you want to share it with
+    4. update objects as normal
     
-    Objects with `_shared_meta` are detected and wrapped in proxies.
-    Other objects are stored directly in the source of truth.
-    
-    Usage:
-        share = Share()
-        share.timer = Sktimer()    # Has _shared_meta, gets proxied
-        share.counter = 0        # No _shared_meta, stored directly
-        share.results = {}       # No _shared_meta, stored directly
-        
-        share.start()  # Start the coordinator
-        
-        # In workers:
-        share.timer.add_time(2.5)  # Queued, non-blocking
-        print(share.timer.mean)    # Waits, then fetches
-        
-        share.stop()  # Stop the coordinator
+    This works by automatically calculating a `_shared_meta` for each
+    object as it gets added to the Share instance.
+
+    Share uses memory and resources to run.
+    To stop sharing, call `Share.stop()` or `Share.exit()`.
+
+    While stopped, changes are queued but will not take effect until sharing is started again.
+    A warning will be issued if you try to access or update, or add a new object to the Share instance
+    while it is not running.
+
+    To start sharing again, call `Share.start()`.
+
+    Context manager support:
+    ```python
+    with Share() as share:
+        # on entry, starts up Share
+        share.counter += 1
+
+    # on exit, stops Share
+    ```
     """
     
     # attrs that belong to Share itself, not shared objects
@@ -103,6 +118,14 @@ class Share:
             # internal attributes are stored directly on the Share instance
             object.__setattr__(self, name, value)
             return
+
+        if not object.__getattribute__(self, '_client_mode'):
+            if not object.__getattribute__(self, '_started'):
+                warnings.warn(
+                    "Share is stopped. Changes are queued but will not take "
+                    "effect until share.start() is called.",
+                    RuntimeWarning,
+                )
         
         # check if this is an object with _shared_meta (suitkaise or @sk wrapped)
         has_meta = hasattr(type(value), '_shared_meta')
@@ -196,9 +219,20 @@ class Share:
     
     def start(self) -> None:
         """
-        Start the coordinator process.
-        
-        Must be called before workers access shared objects.
+        ────────────────────────────────────────────────────────
+            ```python
+            # auto starts on creation
+            share = Share()
+
+            # is stopped
+            share.exit() # or share.stop()
+
+            # use start() to start sharing again
+            share.start()
+            ```
+        ────────────────────────────────────────────────────────\n
+
+        Start the coordinator process up again.
         """
         if object.__getattribute__(self, '_client_mode'):
             return
@@ -208,6 +242,15 @@ class Share:
     
     def stop(self, timeout: float = 5.0) -> bool:
         """
+        ────────────────────────────────────────────────────────
+            ```python
+            # auto starts on creation
+            share = Share()
+
+            # stop using stop()
+            share.stop(timeout=5.0) # or share.exit()
+            ```
+        ────────────────────────────────────────────────────────\n
         Stop the coordinator process.
         
         Args:

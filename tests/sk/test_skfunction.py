@@ -29,7 +29,8 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import Skfunction, SkModifierError, FunctionTimeoutError
+from suitkaise.sk import SkModifierError, FunctionTimeoutError
+from suitkaise.sk.api import Skfunction
 
 
 # =============================================================================
@@ -435,6 +436,49 @@ def test_skfunction_chain_retry_timeout():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_skfunction_basic_example():
+    """Docstring example: basic Skfunction usage."""
+    sk_add = Skfunction(fast_add)
+    result = sk_add(1, 2)
+    assert result == 3
+
+
+def test_doc_skfunction_retry_example():
+    """Docstring example: retry on flaky function."""
+    reset_flaky()
+    sk_func = Skfunction(flaky_function).retry(3)
+    result = sk_func()
+    assert result == "success"
+
+
+def test_doc_skfunction_timeout_example():
+    """Docstring example: timeout modifier."""
+    sk_func = Skfunction(slow_work).timeout(0.01)
+    try:
+        sk_func(0.02)
+        assert False, "Should have raised FunctionTimeoutError"
+    except FunctionTimeoutError:
+        pass
+
+
+def test_doc_skfunction_background_example():
+    """Docstring example: background modifier."""
+    sk_add = Skfunction(fast_add)
+    future = sk_add.background()(1, 2)
+    assert future.result(timeout=5) == 3
+
+
+def test_doc_skfunction_chained_example():
+    """Docstring example: chained modifiers."""
+    sk_func = Skfunction(slow_work).retry(2).timeout(0.1)
+    result = sk_func(0.01)
+    assert result == "done"
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -477,6 +521,13 @@ def run_all_tests():
     
     # Chaining tests
     runner.run_test("Skfunction chain retry+timeout", test_skfunction_chain_retry_timeout)
+    
+    # docstring examples
+    runner.run_test("doc: Skfunction basic", test_doc_skfunction_basic_example)
+    runner.run_test("doc: Skfunction retry", test_doc_skfunction_retry_example)
+    runner.run_test("doc: Skfunction timeout", test_doc_skfunction_timeout_example)
+    runner.run_test("doc: Skfunction background", test_doc_skfunction_background_example)
+    runner.run_test("doc: Skfunction chained", test_doc_skfunction_chained_example)
     
     return runner.print_results()
 

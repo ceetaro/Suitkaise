@@ -169,9 +169,15 @@ def get_project_paths(
             if isinstance(ex, Skpath):
                 exclude_set.add(normalize_separators(ex.ap))
             elif isinstance(ex, Path):
-                exclude_set.add(normalize_separators(str(ex.resolve())))
+                ex_path = ex
+                if not ex_path.is_absolute():
+                    ex_path = root_path / ex_path
+                exclude_set.add(normalize_separators(str(ex_path.resolve())))
             else:
-                exclude_set.add(normalize_separators(str(Path(ex).resolve())))
+                ex_path = Path(ex)
+                if not ex_path.is_absolute():
+                    ex_path = root_path / ex_path
+                exclude_set.add(normalize_separators(str(ex_path.resolve())))
     
     # get ignore patterns
     ignore_patterns: list[str] = []
@@ -201,8 +207,9 @@ def get_project_paths(
 
     def should_skip_entry(path: Path) -> bool:
         abs_path = normalize_separators(str(path))
-        if abs_path in exclude_set:
-            return True
+        for exclude_path in exclude_set:
+            if abs_path == exclude_path or abs_path.startswith(exclude_path + "/"):
+                return True
         if not use_ignore_files:
             return False
         try:

@@ -25,7 +25,9 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import Skclass, SkModifierError
+from suitkaise.sk import SkModifierError
+from suitkaise.sk.api import Skclass
+from suitkaise.processing import Share
 
 
 # =============================================================================
@@ -384,6 +386,58 @@ def test_skclass_forwards_docstring():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_skclass_basic_example():
+    """Docstring example: basic Skclass usage."""
+    class Counter:
+        def __init__(self):
+            self.value = 0
+        
+        def increment(self):
+            self.value += 1
+    
+    SkCounter = Skclass(Counter)
+    counter = SkCounter()
+    counter.increment()
+    assert counter.value == 1
+
+
+def test_doc_skclass_async_example():
+    """Docstring example: Skclass async usage."""
+    class Counter:
+        def __init__(self):
+            self.value = 0
+        
+        def slow_increment(self):
+            stdlib_time.sleep(0.005)
+            self.value += 1
+    
+    SkCounter = Skclass(Counter)
+    AsyncCounter = SkCounter.asynced()
+    async_counter = AsyncCounter()
+    asyncio.run(async_counter.slow_increment())
+    assert async_counter.value == 1
+
+
+def test_doc_skclass_share_example():
+    """Docstring example: Skclass with Share."""
+    class Counter:
+        def __init__(self):
+            self.value = 0
+    
+    SkCounter = Skclass(Counter)
+    share = Share()
+    try:
+        share.counter = SkCounter()
+        stored = share._coordinator.get_object("counter")
+        assert stored is not None
+    finally:
+        share.stop()
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -415,6 +469,11 @@ def run_all_tests():
     # Forward attributes tests
     runner.run_test("Skclass forwards class attrs", test_skclass_forwards_class_attrs)
     runner.run_test("Skclass forwards docstring", test_skclass_forwards_docstring)
+    
+    # docstring examples
+    runner.run_test("doc: Skclass basic", test_doc_skclass_basic_example)
+    runner.run_test("doc: Skclass async", test_doc_skclass_async_example)
+    runner.run_test("doc: Skclass Share", test_doc_skclass_share_example)
     
     return runner.print_results()
 

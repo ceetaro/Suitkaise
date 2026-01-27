@@ -483,6 +483,33 @@ def test_breaking_single_threshold():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_breaking_circuit_basic_example():
+    """Docstring example: basic BreakingCircuit usage."""
+    breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=0.0)
+    breaker.short()
+    breaker.short()
+    breaker.short()
+    assert breaker.broken is True
+    breaker.reset()
+    assert breaker.broken is False
+
+
+def test_doc_breaking_circuit_retry_loop_example():
+    """Docstring example: retry loop with breaker."""
+    breaker = BreakingCircuit(num_shorts_to_trip=2, sleep_time_after_trip=0.0)
+    attempts = 0
+    while attempts < 3:
+        attempts += 1
+        breaker.short()
+        if breaker.broken:
+            breaker.reset()
+    assert attempts == 3
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -531,6 +558,10 @@ def run_all_tests():
     # Edge cases
     runner.run_test("BreakingCircuit zero sleep", test_breaking_zero_sleep)
     runner.run_test("BreakingCircuit single threshold", test_breaking_single_threshold)
+    
+    # docstring examples
+    runner.run_test("doc: BreakingCircuit basic", test_doc_breaking_circuit_basic_example)
+    runner.run_test("doc: BreakingCircuit retry loop", test_doc_breaking_circuit_retry_loop_example)
     
     return runner.print_results()
 

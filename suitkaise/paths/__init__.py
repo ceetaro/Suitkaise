@@ -59,6 +59,7 @@ from .api import (
     # Path utilities
     is_valid_filename,
     streamline_path,
+    streamline_path_quick,
 )
 
 __all__ = [
@@ -97,4 +98,5 @@ __all__ = [
     # Path utilities
     "is_valid_filename",
     "streamline_path",
+    "streamline_path_quick",
 ]

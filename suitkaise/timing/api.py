@@ -1,20 +1,5 @@
 """
-────────────────────────────────────────────────────────
-    ```python
-    from suitkaise import Sktimer, TimeThis, timethis
-    ```
-────────────────────────────────────────────────────────\n
-
-sktime API - Smart Timing Operations for Suitkaise
-
-This module provides user-friendly timing functionality with statistical analysis,
-sophisticated timing classes, and convenient decorators for performance measurement.
-
-Key Features:
-- Simple timing functions (time, sleep, elapsed)
-- Sktimer for statistical timing analysis, pause and resume, context manager and decorator
-
-Philosophy: Make timing operations intuitive while providing powerful analysis capabilities.
+sktime api
 """
 
 import asyncio
@@ -106,7 +91,7 @@ def sleep(seconds: float) -> float:
         ```
     ────────────────────────────────────────────────────────
         ```python
-        # Async version
+        # native async support
         from suitkaise import timing
         
         end_time = await timing.sleep.asynced()(2)
@@ -155,22 +140,24 @@ def elapsed(time1: float, time2: Optional[float] = None) -> float:
         elapsed1 = timing.elapsed(start_time, end_time)  # |100 - 102| = 2
         elapsed2 = timing.elapsed(end_time, start_time)  # |102 - 100| = 2
         
-        elapsed3 = timing.elapsed(start_time)       # Uses current time as end
+        elapsed3 = timing.elapsed(start_time) # uses current time as end
+
+        # order doesn't matter, always returns positive elapsed time
         ```
     ────────────────────────────────────────────────────────\n
 
-    Order-independent elapsed time calculation with automatic precision.
-    
-    Order doesn't matter - always returns positive elapsed time.
-    If only one time is provided, calculates elapsed time from that time to when `elapsed()` is called.
-    Uses `math.fabs()` for best precision when calculating absolute value of floats.
+    Get the elapsed time.
+
+    If only one time is given, the current time is used as the end time.
+
+    Order doesn't matter, always returns positive elapsed time.
     
     Args:
         `time1`: First timestamp
         `time2`: Second timestamp (defaults to current time if `None`)
         
     Returns:
-        Absolute elapsed time in seconds as a float
+        Absolute value of elapsed time in seconds as a float
     
     """
     return _elapsed_time(time1, time2)
@@ -242,9 +229,7 @@ class TimeThis:
     
     ────────────────────────────────────────────────────────
         ```python
-        # Independent timing context
-
-        # Real example: File compression comparison
+        # one use timer example
         from suitkaise import timing
 
         large_dataset = get_large_dataset()
@@ -261,9 +246,7 @@ class TimeThis:
         ```
     ────────────────────────────────────────────────────────
         ```python
-        # Independent timing context
-
-        # Real example: Database query with user interaction
+        # one use timer example
         from suitkaise import timing
 
         exported = False
@@ -271,7 +254,7 @@ class TimeThis:
         with timing.TimeThis() as timer:
             results = database.query("SELECT * FROM users WHERE active=1")
             
-            # Pause timing while user reviews results
+            # pause timing while user reviews results
             timer.pause()
             user_wants_export = input(f"Found {len(results)} users. Export to CSV? (y/n): ")
 
@@ -287,15 +270,13 @@ class TimeThis:
         ```
     ────────────────────────────────────────────────────────
         ```python
-        # Explicit timer
-
-        # Real example: API call performance monitoring
+        # explicit (pre-created) timer example
         from suitkaise import timing
         import requests
 
         api_timer = timing.Sktimer()
         
-        # Time multiple API calls to build statistics
+        # time multiple API calls to build statistics
         with timing.TimeThis(api_timer) as timer:
             response = requests.get("https://api.github.com/users/octocat")
         
@@ -348,10 +329,103 @@ def timethis(
     max_times: Optional[int] = None,
 ) -> Callable:
     """
-    Create a timing decorator that accumulates statistics in a `Sktimer` instance.
+    ────────────────────────────────────────────────────────\n
+        ```python
+        from suitkaise import timing
+
+        @timing.timethis()  
+        def quick_function():
+            # ...
+        
+        # function is called
+        quick_function()
+        
+        # access the auto-created timer (directly on the function)
+        last_time = quick_function.timer.most_recent
+        
+        # calling multiple times builds statistics
+        for i in range(100):
+            quick_function()
+        
+        mean = quick_function.timer.mean
+        ```
+    ────────────────────────────────────────────────────────
+        ```python
+        # use a pre-created timer
+        from suitkaise import timing
+        import random
+
+        t = timing.Sktimer()
+        
+        @timing.timethis(t)
+        def multiply(a: int, b: int) -> int:
+            return a * b
+
+        @timing.timethis(t)
+        def divide(a: int, b: int) -> float:
+            return a / b
+
+        # fake number lists
+        set_a = []
+        set_b = []
+        for i in range(1000):
+            set_a.append(random.randint(1, 100))
+            set_b.append(random.randint(1, 100))
+
+        for a, b in zip(set_a, set_b):
+            multiply(a, b)
+            divide(a, b)
+
+        # all multiply() and divide() calls are timed and recorded in t
+        t_mean = t.mean
+        t_stdev = t.stdev
+        ```
+    ────────────────────────────────────────────────────────
+        ```python
+        # use a pre-created timer and a timer on the function it decorates
+        from suitkaise import timing
+        import random
+
+        perf_timer = timing.Sktimer()
+        
+        @timing.timethis()
+        @timing.timethis(perf_timer)
+        def multiply(a: int, b: int) -> int:
+            return a * b
+
+        @timing.timethis()
+        @timing.timethis(perf_timer)
+        def divide(a: int, b: int) -> float:
+            return a / b
+
+        # fake number lists
+        set_a = []
+        set_b = []
+        for i in range(1000):
+            set_a.append(random.randint(1, 100))
+            set_b.append(random.randint(1, 100))
+
+        for a, b in zip(set_a, set_b):
+            multiply(a, b)
+            divide(a, b)
+
+        # get stats from both function executions
+        perf_mean = perf_timer.mean
+
+        # get stats from only multiply()
+        multiply_mean = multiply.timer.mean
+
+        # get stats from only divide()
+        divide_mean = divide.timer.mean
+        ```
+    ────────────────────────────────────────────────────────\n
+    A decorator that times the execution of a function, recording
+    results in a `Sktimer` instance.
     
-    The `@timethis` decorator supports both explicit `Sktimer` instances and automatic 
-    global timer creation, providing the ultimate convenience.
+    Supports both explicit `Sktimer` instances and automatic timer creation
+    on the function it decorates.
+
+    Can be stacked on the same function to use multiple timers.
     
     Args:
         `timer`: `Sktimer` to accumulate timing data in. If `None`, creates
@@ -362,88 +436,17 @@ def timethis(
 
     Returns:
         Decorator function
-
-    ────────────────────────────────────────────────────────\n
-
-    Auto-created `Sktimer` (quickest way to use `Sktimer`):
-
-        ```python
-        from suitkaise import timing
-
-        # No timer argument - creates global Sktimer automatically
-        @timing.timethis()  
-        def quick_function():
-            # Code to time
-            pass
-        
-        # Call the function
-        quick_function()
-        
-        # Access the auto-created timer with super simple access
-        print(f"Last execution: {quick_function.timer.most_recent:.3f}s")
-        
-        # Call multiple times to build statistics
-        for i in range(100):
-            quick_function()
-        
-        print(f"Average: {quick_function.timer.mean:.3f}s")
-        ```
-    ────────────────────────────────────────────────────────\n
-
-    Explicit `Sktimer` (for gathering data from multiple functions):
-
-        ```python
-        from suitkaise import timing
-        import random
-
-        performance_timer = timing.Sktimer()
-        
-        @timing.timethis()
-        @timing.timethis(performance_timer)
-        def multiply(a: int, b: int) -> int:
-            return a * b
-
-        @timing.timethis()
-        @timing.timethis(performance_timer)
-        def divide(a: int, b: int) -> float:
-            return a / b
-
-        set_a = []
-        set_b = []
-        for i in range(1000):
-            set_a.append(random.randint(1, 100))
-            set_b.append(random.randint(1, 100))
-
-        # Build statistics over many calls
-        for a, b in zip(set_a, set_b):
-            multiply(a, b)
-            divide(a, b)
-
     
-        # Analyze performance for each function separately
-        print(f"Average execution: {multiply.timer.mean:.3f}s")
-        print(f"Slowest execution: {multiply.timer.slowest_time:.3f}s")
-
-        print(f"Average execution: {divide.timer.mean:.3f}s")
-        print(f"Slowest execution: {divide.timer.slowest_time:.3f}s")
-
-        # Analyze performance for both functions together
-        print(f"Average execution: {performance_timer.mean:.3f}s")
-        print(f"Slowest execution: {performance_timer.slowest_time:.3f}s")
-        ```
-    ────────────────────────────────────────────────────────\n
-    
-    Note:
-        Global `@timethis` timer naming convention (for debugging):
-        - Module-level functions: `module_function_timer`
-        - Class methods: `module_ClassName_method_timer`
+    NOTE 1:
+        - Module-level functions are named: `module_function_timer`
+        - Class methods are named: `module_ClassName_method_timer`
         - Each function gets its own dedicated timer
         - Zero runtime overhead looking up the timer (resolved at decoration time)
 
-    Note:
+    NOTE 2:
         `@timethis` decorator supports multiple decorators on the same function.
         The `timer` parameter is used to specify the timer to use.
-        If `None`, a global timer is created.
+        If `None`, a global timer is created on the function/method it decorates.
         
     """
     def decorator(func: Callable) -> Callable:
@@ -502,7 +505,19 @@ def timethis(
 
 
 def clear_global_timers() -> None:
-    """Clear all auto-created global timers used by the timethis decorator.
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import timing
+
+        # a lot of timethis decorators are used...
+ 
+        # clear data from auto-created timers (from @timethis() with no timer arg) to save resources
+        timing.clear_global_timers()
+        ```
+    ────────────────────────────────────────────────────────\n
+    
+    Clear all auto-created global timers used by the timethis decorator.
 
     This is useful for long-lived processes or test environments to release
     references and start fresh for subsequently decorated functions.

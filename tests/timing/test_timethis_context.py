@@ -378,6 +378,54 @@ def test_timethis_access_timer_inside():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_timethis_one_use_example():
+    """Docstring example: one-use timer."""
+    with TimeThis() as timer:
+        stdlib_time.sleep(0.005)
+    assert timer.most_recent >= 0
+
+
+def test_doc_timethis_existing_timer_example():
+    """Docstring example: context manager with existing timer."""
+    my_timer = Sktimer()
+    
+    with TimeThis(my_timer):
+        stdlib_time.sleep(0.005)
+    
+    with TimeThis(my_timer):
+        stdlib_time.sleep(0.005)
+    
+    assert my_timer.num_times == 2
+    assert my_timer.total_time > 0
+
+
+def test_doc_timethis_pause_resume_example():
+    """Docstring example: pause/resume within context."""
+    with TimeThis() as timer:
+        timer.pause()
+        stdlib_time.sleep(0.002)
+        timer.resume()
+        stdlib_time.sleep(0.005)
+    assert timer.most_recent >= 0
+
+
+def test_doc_timethis_explicit_timer_example():
+    """Docstring example: explicit pre-created timer."""
+    api_timer = Sktimer()
+    
+    with TimeThis(api_timer):
+        stdlib_time.sleep(0.005)
+    
+    with TimeThis(api_timer):
+        stdlib_time.sleep(0.005)
+    
+    assert api_timer.num_times == 2
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -420,6 +468,12 @@ def run_all_tests():
     runner.run_test("TimeThis empty block", test_timethis_empty_block)
     runner.run_test("TimeThis quick succession", test_timethis_quick_succession)
     runner.run_test("TimeThis access timer inside", test_timethis_access_timer_inside)
+    
+    # docstring examples
+    runner.run_test("doc: one-use timer", test_doc_timethis_one_use_example)
+    runner.run_test("doc: existing timer", test_doc_timethis_existing_timer_example)
+    runner.run_test("doc: pause/resume", test_doc_timethis_pause_resume_example)
+    runner.run_test("doc: explicit timer", test_doc_timethis_explicit_timer_example)
     
     return runner.print_results()
 

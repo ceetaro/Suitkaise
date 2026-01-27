@@ -34,7 +34,8 @@ from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.paths import Skpath, get_project_root
 from suitkaise.processing import Share, Skprocess, Pool
 from suitkaise.cerial import serialize, deserialize
-from suitkaise.sk import Skclass, Skfunction, sk
+from suitkaise.sk import sk
+from suitkaise.sk.api import Skclass, Skfunction
 
 Process = Skprocess
 

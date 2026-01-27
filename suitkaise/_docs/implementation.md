@@ -741,43 +741,47 @@ upload version to test pypi
 2 paragraph summary on how modules work and finish quick start guide
 
 ```text
+NOTE: If you see any double dashes ("--"), I wrote them. Not ChatGPT.
+
 Think of the printing press, an invention that made production of paper media faster, more standardized, and less prone to human error. People didn't have to write books by hand anymore, saving them a large amount of time and effort.
 
 The result: the world was flooded with books, and the "Information Age" began.
 
-There are many things in Python that need their own printing press to make using them faster, more standardized, and less prone to human error.
+There are many things in Python that need their own printing press to make using them faster, more standardized, and less prone to human error, just like the printing press did for paper media.
 
-Parallel processing, Python-to-Python serialization, file path handling, and more.
+Parallel processing, Python-to-Python serialization, file path handling, and more all need something to make people's lives easier when working with them in Python.
 
-`suitkaise` gives you these printing presses.
+`suitkaise` gives you the printing presses for these things.
 
 The name is inspired by "hacker laptops", where the user opens a briefcase and hacks some mainframe in 5 seconds.
 
 - `processing` - Unlocks the full potential of parallel programming in Python.
 
-60% of parallel processing is batch processing, where you process N number of items at once instead of just 1. `processing` gives you a `Pool` class that makes batch processing easy, with 3 standard pooling patterns.
+More than half of parallel processing is batch processing, where you process N number of items at once instead of just 1. `processing` gives you a `Pool` class that makes batch processing easy, with 3 standard pooling patterns.
 
-The other 40% is creating long-running, complex subprocesses that do more than just look up data or compute something. Creating these is generally a nightmare even for experienced developers. `processing` gives you a `Skprocess` class that makes creating these easy, with coded lifecycle methods to setup, run, cleanup, and more. These classes include timing, error handling, and run the process internally, so you don't have to worry about managing the process yourself.
+The other part is just as important: creating long-running, complex subprocesses that do more than just look up data or compute something. Creating these is generally a nightmare, even for experienced developers. `processing` gives you a `Skprocess` class that makes creating these easy, with coded lifecycle methods to setup, run, cleanup/teardown, and more. These classes include timing, error handling, and run the process internally, so you don't have to worry about managing the process yourself.
 
 Finally, `processing` gives you a `Share` class.
 
 Every developer knows how to create a class instance and add objects to it.
 
-And that's all you have to do with `Share`. Instantiate it, add objects to it, and pass it to your subprocesses. It ensures that everything syncs up and remains in sync for you. Even complex classes can be added and used just like you would use it normally.
+And that's all you have to do with `Share`. Instantiate it, add objects to it, and pass it to your subprocesses. It ensures that everything syncs up and remains in sync for you. Even complex classes can be added and used just like you would use it normally. When you need to change or add another object, Share makes sure that every other process using that Share gets in sync with the new update.
 
-How? `cerial`, the serialization engine that can handle a vast amount of things that `pickle`, `cloudpickle`, and `dill` cannot, including complex, user created class instances that would fail to serialize with the other options.
+How? `cerial`, the serialization engine that can handle a vast amount of things that `pickle`, `cloudpickle`, and `dill` cannot -- including complex, user created class instances that would fail to serialize with the other options. 
 
-- `cerial` - Serialize (almost) anything.
+- `cerial` - Serialize anything.
 
-`cerial` outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators, file handles, and more are all covered. Additionally, it has faster speed than `cloudpickle` and `dill` for many simple types, and is also faster in most cases for the more complex types as well.
+`cerial` outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators with state, file handles, and more are all covered. Additionally, it has faster speed than `cloudpickle` and `dill` for many simple types, and is also faster in most cases for the more complex types as well. It also handles circular references and can automatically reconnect live connections that underwent serialization. 
 
-Why is this awesome? You don't have to worry about errors anymore. You now have access to a custom class, the objects you want to use in it but couldn't before, and the ability to just share data between processes without thinking, all powered by this engine. You don't even have to use the other modules to get an upgrade. This is just simply better.
+Why is this awesome? You don't have to worry about errors anymore. You now have access to a custom class, the objects you want to use in it but couldn't before, and the ability to just share data between processes without thinking, all powered by this engine. You don't even have to use the other suitkaise modules to see an improvementin your quality of life. This is just simply better than all other serializers.
 
-- `paths` - everything path related is so much more simple
+- `paths` - everything path related is just so much more simple
 
 It includes `Skpath`, a path object that uses an auto-detected project root to normalize all of your paths for you. It is cross platform compatible. An `Skpath` made on Jeff's Mac will be the same as the same `Skpath` made on Sarah's Windows laptop.
 
 It also includes an `@autopath` decorator that can be used to automatically streamline all of your paths to a specific type.
+
+No more cross-platform compatibility issues. No more manual path conversion. And a simple file path can now do so much more for you.
 
 - `timing` - times your code with one line
 
@@ -804,7 +808,7 @@ Both of these allow you to time your code with one line, and have full control o
 ```
 
 
-### Real world example
+<!-- ### Real world example
 
 poker machine simulation
 
@@ -1149,9 +1153,9 @@ class MyProcess(Skprocess):
     def __run__(self):
         cursor = self.db.cursor()
         ...
-```
+``` -->
 
-# code review
+<!-- # code review
 
 review each modules code and streamline comments, checking that everything looks how it should.
 
@@ -1167,16 +1171,30 @@ review each modules code and streamline comments, checking that everything looks
 
 ## 2nd pass - focus on api docstrings
 
-- cerial - done
-- circuits - done
+all 6 done -->
 
 ## 3rd pass - focus on tests
 
+adding tests for api docstring examples and then running tests
+
+then, ensure all tests are passing on both mac and windows (and figure out how to test on linux if possible)
+
+then, check all tests and make sure they are testing accurately and thoroughly
+
+finally, retest on all platforms
+
 ## 4th pass - focus on _docs
 
-## 5th pass - focus on README and quick start guide
+ensure all _docs files are accurate and up to date following my writing style
+
+## 5th pass - focus on README, setup files, and quick start guide
+
+add quick start guide to README and update coverage and badges
+ensure all other setup files are good as well
 
 ## 6th pass - review examples and create more for each module
+
+
 
 ## 7th pass - rereview examples
 

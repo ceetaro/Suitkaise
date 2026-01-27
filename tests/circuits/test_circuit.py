@@ -443,6 +443,38 @@ def test_circuit_very_large_threshold():
 
 
 # =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_circuit_basic_example():
+    """Docstring example: basic Circuit usage."""
+    circ = Circuit(
+        num_shorts_to_trip=5,
+        sleep_time_after_trip=0.0,
+        backoff_factor=1.5,
+        max_sleep_time=10.0,
+        jitter=0.2,
+    )
+    for _ in range(5):
+        circ.short(custom_sleep=0.0)
+    assert circ.total_trips >= 1
+
+
+def test_doc_circuit_rate_limit_example():
+    """Docstring example: rate limiting with short()."""
+    rate_limiter = Circuit(
+        num_shorts_to_trip=10,
+        sleep_time_after_trip=0.0,
+        backoff_factor=1.5,
+        max_sleep_time=30.0,
+        jitter=0.1,
+    )
+    for _ in range(10):
+        rate_limiter.short(custom_sleep=0.0)
+    assert rate_limiter.total_trips >= 1
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -489,6 +521,10 @@ def run_all_tests():
     runner.run_test("Circuit zero sleep", test_circuit_zero_sleep)
     runner.run_test("Circuit single short threshold", test_circuit_single_short_threshold)
     runner.run_test("Circuit large threshold", test_circuit_very_large_threshold)
+    
+    # docstring examples
+    runner.run_test("doc: Circuit basic", test_doc_circuit_basic_example)
+    runner.run_test("doc: Circuit rate limit", test_doc_circuit_rate_limit_example)
     
     return runner.print_results()
 

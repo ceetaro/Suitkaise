@@ -301,6 +301,24 @@ def test_auto_reconnect_decorator_sets_flags():
     }
 
 
+def test_auto_reconnect_docstring_example():
+    """Docstring example should set auth mapping correctly."""
+    from suitkaise.processing import Skprocess, autoreconnect
+    
+    auth = {
+        "psycopg2.Connection": {"*": "secret"},
+        "redis.Redis": {"*": "redis_pass"},
+    }
+    
+    @autoreconnect(**auth)
+    class MyProcess(Skprocess):
+        def __run__(self):
+            pass
+    
+    assert MyProcess._auto_reconnect_enabled is True
+    assert MyProcess._auto_reconnect_kwargs == auth
+
+
 def test_auto_reconnect_empty():
     """@autoreconnect() with no args should enable reconnect with empty overrides."""
     from suitkaise.processing import Skprocess, autoreconnect
@@ -370,6 +388,7 @@ def run_all_tests():
     
     # autoreconnect decorator
     runner.run_test("autoreconnect sets flags", test_auto_reconnect_decorator_sets_flags)
+    runner.run_test("autoreconnect docstring example", test_auto_reconnect_docstring_example)
     runner.run_test("autoreconnect empty", test_auto_reconnect_empty)
     
     # Real DbReconnector

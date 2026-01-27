@@ -95,8 +95,6 @@ class Skpath:
     def __init__(
         self,
         path: str | Path | "Skpath" | None = None,
-        *,
-        _skip_frames: int = 0,
     ):
         """
         Initialize an Skpath.
@@ -108,7 +106,6 @@ class Skpath:
                 - Path: pathlib.Path object
                 - Skpath: Another Skpath (copies values)
                 
-            _skip_frames: Internal - additional stack frames to skip
         """
         self._path: Path
         self._root: Path | None = None
@@ -119,7 +116,7 @@ class Skpath:
         
         # handle None - use caller's path
         if path is None:
-            self._path = detect_caller_path(skip_frames=_skip_frames + 1)
+            self._path = detect_caller_path()
         
         # handle Skpath - copy values
         elif isinstance(path, Skpath):
@@ -136,14 +133,14 @@ class Skpath:
         
         # handle string
         elif isinstance(path, str):
-            self._path = self._resolve_string_path(path, _skip_frames + 1)
+            self._path = self._resolve_string_path(path)
         
         else:
             raise TypeError(
                 f"Skpath expects str, Path, Skpath, or None, got {type(path).__name__}"
             )
     
-    def _resolve_string_path(self, path_str: str, skip_frames: int) -> Path:
+    def _resolve_string_path(self, path_str: str) -> Path:
         """
         Resolve a string to a Path, trying both path and encoded ID interpretations.
         

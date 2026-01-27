@@ -31,7 +31,8 @@ sys.path.insert(0, str(project_root))
 from suitkaise.processing import Share
 from suitkaise.timing import Sktimer
 from suitkaise.circuits import Circuit
-from suitkaise.sk import Skclass, sk
+from suitkaise.sk import sk
+from suitkaise.sk.api import Skclass
 
 # Import test classes from separate module (required for multiprocessing)
 from tests.processing.test_classes import Counter, DataStore, NestedObject

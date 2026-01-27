@@ -21,6 +21,7 @@ sys.path.insert(0, str(project_root))
 from suitkaise.paths import (
     is_valid_filename,
     streamline_path,
+    streamline_path_quick,
     get_caller_path,
     get_current_dir,
     get_cwd,
@@ -187,6 +188,56 @@ def test_streamline_strip():
     result = streamline_path("  file.txt  ")
     
     assert result == result.strip()
+
+
+def test_streamline_path_quick_example():
+    """streamline_path_quick should match docstring example."""
+    result = streamline_path_quick("My File<1>файл.txt")
+    assert result == "My_File_1_____.txt"
+
+
+# =============================================================================
+# Docstring Examples
+# =============================================================================
+
+def test_doc_get_caller_path_example():
+    """Docstring example: get_caller_path equivalent to Skpath()."""
+    path = get_caller_path()
+    skpath = Skpath()
+    assert path.ap == skpath.ap
+
+
+def test_doc_get_current_dir_example():
+    """Docstring example: get_current_dir equivalent to Skpath().parent."""
+    current_dir = get_current_dir()
+    skpath_parent = Skpath().parent
+    assert current_dir.ap == skpath_parent.ap
+
+
+def test_doc_get_cwd_example():
+    """Docstring example: get_cwd returns current working directory."""
+    cwd = get_cwd()
+    assert cwd.ap == Skpath(Path.cwd()).ap
+
+
+def test_doc_streamline_path_examples():
+    """Docstring examples for streamline_path()."""
+    basic = streamline_path("My File<1>.txt", chars_to_replace=" ")
+    assert basic == "My_File_1_.txt"
+    
+    lowered = streamline_path(
+        "My Long Filename.txt",
+        max_len=10,
+        lowercase=True,
+        chars_to_replace=" ",
+    )
+    assert lowered == "my_long_fi.txt"
+    
+    replaced = streamline_path("file:name.txt", replacement_char="-")
+    assert replaced == "file-name.txt"
+    
+    ascii_only = streamline_path("файл.txt", allow_unicode=False)
+    assert ascii_only == "____.txt"
 
 
 # =============================================================================
@@ -378,6 +429,7 @@ def run_all_tests():
     runner.run_test("streamline_path invalid chars", test_streamline_invalid_chars)
     runner.run_test("streamline_path lowercase", test_streamline_lowercase)
     runner.run_test("streamline_path strip", test_streamline_strip)
+    runner.run_test("streamline_path_quick example", test_streamline_path_quick_example)
     
     # get_caller_path tests
     runner.run_test("get_caller_path", test_get_caller_path)
@@ -403,6 +455,12 @@ def run_all_tests():
     runner.run_test("PathDetectionError is Exception", test_path_detection_error_is_exception)
     runner.run_test("PathDetectionError can be raised", test_path_detection_error_can_be_raised)
     runner.run_test("PathDetectionError catchable", test_path_detection_error_catchable)
+    
+    # docstring examples
+    runner.run_test("doc: get_caller_path", test_doc_get_caller_path_example)
+    runner.run_test("doc: get_current_dir", test_doc_get_current_dir_example)
+    runner.run_test("doc: get_cwd", test_doc_get_cwd_example)
+    runner.run_test("doc: streamline_path", test_doc_streamline_path_examples)
     
     return runner.print_results()
 

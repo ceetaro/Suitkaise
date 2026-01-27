@@ -14,15 +14,9 @@
     ```
 ────────────────────────────────────────────────────────\n
 
-Suitkaise - A Python Toolkit for Robust Development
+suitkaise - 
 
-Suitkaise provides a collection of utilities for common development needs:
-- timing: Smart timing operations with statistical analysis
-- paths: Enhanced path operations with project root detection
-- circuits: Circuit breaker pattern for controlled failure handling
-- cerial: Serialization for unpicklable objects
-- processing: Subprocess-based task execution with pools
-- sk: Class/function decorators for async, retry, timeout, background execution
+
 """
 
 # ============================================================================
@@ -61,6 +55,7 @@ from .paths import (
     
     # Exceptions
     PathDetectionError,
+    NotAFileError,
     
     # Root management
     CustomRoot,
@@ -117,8 +112,8 @@ from .processing import (
     Pool,
     Share,
     
-    # Decorators
-    autoreconnect,
+    # Timers
+    ProcessTimers,
     
     # Errors
     ProcessError,
@@ -129,7 +124,11 @@ from .processing import (
     ResultError,
     ErrorHandlerError,
     ProcessTimeoutError,
+    ResultTimeoutError,
 )
+
+# Decorators
+from .processing.api import autoreconnect
 
 # ============================================================================
 # Sk Module Exports
@@ -162,6 +161,7 @@ __all__ = [
     "AnyPath",
     "autopath",
     "PathDetectionError",
+    "NotAFileError",
     "CustomRoot",
     "set_custom_root",
     "get_custom_root",
@@ -185,6 +185,7 @@ __all__ = [
     # Cerial
     "serialize",
     "deserialize",
+    "reconnect_all",
     "SerializationError",
     "DeserializationError",
     
@@ -193,6 +194,7 @@ __all__ = [
     "Pool",
     "Share",
     "autoreconnect",
+    "ProcessTimers",
     "ProcessError",
     "PreRunError",
     "RunError",
@@ -201,6 +203,7 @@ __all__ = [
     "ResultError",
     "ErrorHandlerError",
     "ProcessTimeoutError",
+    "ResultTimeoutError",
     
     # Sk
     "sk",

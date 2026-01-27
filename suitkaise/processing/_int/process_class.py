@@ -78,9 +78,9 @@ class Skprocess:
         ```
     ────────────────────────────────────────────────────────\n
 
-    Base class for subprocess-based process execution.
+    Base class for subprocess execution.
     
-    Inherit from this class and implement lifecycle methods.
+    Inherit from this class and implement the lifecycle methods.
 
     - __prerun__(): Called before each run iteration
     - __run__(): Main work (required) - called each iteration
@@ -414,7 +414,7 @@ class Skprocess:
         }
         
         for method_name, timer_name in method_to_timer.items():
-        # check if user defined this method on the subclass
+            # check if user defined this method on the subclass
             if method_name in cls.__dict__:
                 # get the actual method
                 method = getattr(instance, method_name)
@@ -462,6 +462,13 @@ class Skprocess:
     
     def start(self) -> None:
         """
+        ────────────────────────────────────────────────────────
+        ```python
+        process = MyProcess()
+        process.start()
+        ```
+        ────────────────────────────────────────────────────────\n
+
         Start the process in a new subprocess.
         
         Serializes this Skprocess object, spawns a subprocess, and runs
@@ -501,6 +508,13 @@ class Skprocess:
 
     def run(self) -> Any:
         """
+        ────────────────────────────────────────────────────────
+        ```python
+        process = MyProcess()
+        result = process.run()
+        ```
+        ────────────────────────────────────────────────────────\n
+        
         Start, wait, and return the result in one call.
         """
         self.start()
@@ -509,11 +523,21 @@ class Skprocess:
     
     def stop(self) -> None:
         """
+        ────────────────────────────────────────────────────────
+        ```python
+        process = MyProcess()
+        process.start()
+
+        # signal to stop (finishes current run)
+        process.stop()
+        ```
+        ────────────────────────────────────────────────────────\n
+        
         Signal the process to stop gracefully.
         
         Does NOT block - returns immediately after setting the stop signal.
         The process will finish its current section, run __onfinish__(),
-        and send its result back.
+        and send its result back via __result__() or __error__().
         
         Use wait() after stop() if you need to block until finished.
         """
@@ -522,10 +546,26 @@ class Skprocess:
     
     def kill(self) -> None:
         """
+        ────────────────────────────────────────────────────────
+        ```python
+        process = MyProcess()
+        process.start()
+
+        # if program has an issue...
+
+        # kill the process
+        process.kill()
+
+        # result will be None
+        ```
+        ────────────────────────────────────────────────────────\n
+        
         Forcefully terminate the process immediately.
         
         Bypasses the lives system - process is killed immediately.
         No cleanup, no __onfinish__, no result. The process is just killed.
+
+        Result will be None.
         """
         if self._subprocess is not None and self._subprocess.is_alive():
             self._subprocess.terminate()
@@ -580,14 +620,25 @@ class Skprocess:
     """
     ────────────────────────────────────────────────────────
         ```python
-        # Sync - blocks until finished
+        # sync - blocks until finished
         finished = process.wait()
+
+        # or with timeout
         finished = process.wait(timeout=10.0)
-        
-        # Async - await in async code
-        finished = await process.wait.asynced()()
         ```
     ────────────────────────────────────────────────────────
+        ```python
+        # async
+        finished = await process.wait.asynced()()
+
+        # with several concurrent processes
+        wait_coro1 = process1.wait.asynced()()
+        wait_coro2 = process2.wait.asynced()()
+
+        # wait for both to finish
+        finished1, finished2 = await asyncio.gather(wait_coro1, wait_coro2)
+        ```
+    ────────────────────────────────────────────────────────\n
     
     Wait for the process to finish.
     
@@ -693,18 +744,18 @@ class Skprocess:
     """
     ────────────────────────────────────────────────────────
         ```python
-        # Sync - blocks until result ready
+        # sync - blocks until result ready
         data = process.result()
         
-        # With timeout - raises ProcessTimeoutError if exceeded
+        # with timeout - raises ProcessTimeoutError if exceeded
         data = process.result.timeout(10.0)()
         
-        # Background - returns Future immediately
+        # background - returns Future immediately
         future = process.result.background()()
         # ... do other work ...
         data = future.result()
         
-        # Async - await in async code
+        # async - await in async code
         data = await process.result.asynced()()
         ```
     ────────────────────────────────────────────────────────
@@ -729,13 +780,51 @@ class Skprocess:
     
     def tell(self, data: Any) -> None:
         """
-        Send data to the subprocess.
+        ────────────────────────────────────────────────────────
+        ```python
+        # parent tells subprocess
         
-        If the subprocess calls listen(), it will receive this data.
+        p = MyProcess() # Skprocess instance
+        p.start()
+
+        data = get_new_data()
+        if data:
+            p.tell(new_data)
+
+        p.wait()
+
+        result = p.result()
+
+        print(result)
+        ```
+        ────────────────────────────────────────────────────────
+        ```python
+        # subprocess tells parent
+        from suitkaise import Skprocess
+
+        class MyProcess(Skprocess):
+
+            # ...
+
+            def __run__(self):
+
+                do_something()
+
+
+            def __postrun__(self):
+
+                if found_what_we_need:
+                    self.tell("hey, we found what we need")
+
+                self.stop()
+        ```
+        ────────────────────────────────────────────────────────\n
+        
+        Send data to the other side.
         This method is non-blocking - returns immediately after queuing the data.
         
         Args:
-            data: Any serializable data to send to the subprocess.
+            data: Any serializable data to send to the other side.
         """
         if self._tell_queue is None:
             raise RuntimeError("Cannot tell() - process not started")
@@ -754,15 +843,15 @@ class Skprocess:
     
     def _sync_listen(self, timeout: float | None = None) -> Any:
         """
-        Receive data from the subprocess.
+        Receive data from the other side.
         
-        Blocks until data is received from the subprocess via tell().
+        Blocks until data is received from the other side.
         
         Args:
             timeout: Maximum seconds to wait. None = wait forever.
         
         Returns:
-            The data sent by the subprocess, or None if timeout reached.
+            The data sent by the other side, or None if timeout reached.
         """
         if self._listen_queue is None:
             raise RuntimeError("Cannot listen() - process not started")
@@ -784,27 +873,55 @@ class Skprocess:
     """
     ────────────────────────────────────────────────────────
         ```python
-        # Sync - blocks until data received
+        # parent listening for data from subprocess
+
+        # sync - blocks until data received
         data = process.listen()
+
+        # with timeout - returns None if timeout reached
         data = process.listen(timeout=5.0)
         
-        # Background - returns Future immediately
-        future = process.listen.background()()
+        # background - returns Future immediately
+        future = process.listen.background()(timeout=a_timeout)
         
-        # Async - await in async code
+        # async - get coroutine or await in async code
+        listen_coro = process.listen.asynced()
         data = await process.listen.asynced()()
         ```
     ────────────────────────────────────────────────────────
+        ```python
+        # subprocess listening for data from parent
+        from suitkaise import Skprocess
+
+        class UIManager(Skprocess):
+
+            def __init__(self):
+                self.commands = []
+
+            def __prerun__(self):
+
+                commands = self.listen(timeout=1.0)
+
+                if commands:
+                    self.commands.append(commands)
+
+            def __run__(self):
+
+                for command in self.commands:
+                    process_command(command)
+                    self.commands.remove(command)
+        ```
+    ────────────────────────────────────────────────────────\n
     
-    Receive data from the subprocess.
+    Receive data from the other side.
     
-    Blocks until data is received from the subprocess via tell().
+    Blocks until data is received from the other side via tell().
     
     Args:
         timeout: Maximum seconds to wait. None = wait forever.
     
     Returns:
-        The data sent by the subprocess, or None if timeout reached.
+        The data sent by the other side, or None if timeout reached.
     
     Modifiers:
         .background(): Return Future immediately
