@@ -442,9 +442,9 @@ def test_streamline_path_removes_invalid():
 
 
 def test_streamline_path_max_length():
-    """streamline_path should respect max_length."""
+    """streamline_path should respect max_len."""
     long_name = "a" * 200
-    result = streamline_path(long_name, max_length=50)
+    result = streamline_path(long_name, max_len=50)
     
     assert len(result) <= 50, f"Should truncate to 50, got {len(result)}"
 
@@ -583,7 +583,7 @@ def test_code_analysis_workflow():
     output_name = streamline_path(
         "Analysis Report <2024>.txt",
         replacement_char="_",
-        max_length=50
+        max_len=50
     )
     
     assert is_valid_filename(output_name), f"Output name should be valid: {output_name}"

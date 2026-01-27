@@ -196,8 +196,8 @@ def benchmark_utilities():
     runner.bench("is_valid_filename('bad/file')", 50_000, is_valid_filename, "bad/file")
     
     runner.bench("streamline_path('My File.txt')", 10_000, streamline_path, "My File.txt")
-    runner.bench("streamline_path(long, max_length=50)", 10_000, 
-                 lambda: streamline_path("a" * 200, max_length=50))
+    runner.bench("streamline_path(long, max_len=50)", 10_000, 
+                 lambda: streamline_path("a" * 200, max_len=50))
     
     return runner
 

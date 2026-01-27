@@ -461,6 +461,7 @@ def is_valid_filename(filename: str) -> bool:
 
 def streamline_path(
     path: str,
+    *,
     max_len: int | None = None,
     replacement_char: str = "_",
     lowercase: bool = False,

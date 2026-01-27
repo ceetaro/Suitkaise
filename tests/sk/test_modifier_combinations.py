@@ -5,12 +5,14 @@ Tests that:
 1. Every combination of modifiers works in every order
 2. Sync functions execute immediately when called
 3. Async functions return coroutines when called
+4. Background modifier works with other modifiers
 """
 
 import sys
 import time as stdlib_time
 import asyncio
 import inspect
+from concurrent.futures import Future
 
 from pathlib import Path
 
@@ -55,13 +57,11 @@ class TestRunner:
         try:
             test_func()
             self.results.append(TestResult(name, True))
-            print(f"\033[32mTest:\033[0m PASSED")
         except AssertionError as e:
             self.results.append(TestResult(name, False, error=str(e)))
-            print(f"\033[31mTest:\033[0m FAILED - {e}")
         except Exception as e:
             self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
-            print(f"\033[31mTest:\033[0m FAILED - {type(e).__name__}: {e}")
+    
     
     def print_results(self):
         print(f"\n{self.BOLD}{self.CYAN}{'='*70}{self.RESET}")
@@ -201,11 +201,71 @@ def test_sync_background_returns_future():
     future = sk_func.background()(5)
     
     # Should be a Future, not immediate result
-    from concurrent.futures import Future
     assert isinstance(future, Future), f"Expected Future, got {type(future)}"
     
     result = future.result(timeout=5)
     assert result == 10, f"Expected 10, got {result}"
+
+
+def test_sync_retry_background_returns_future():
+    """.retry().background() should return Future and succeed."""
+    reset_flaky()
+    sk_func = Skfunction(flaky_func)
+    
+    future = sk_func.retry(times=5, delay=0.01).background()(5)
+    
+    assert isinstance(future, Future), f"Expected Future, got {type(future)}"
+    result = future.result(timeout=5)
+    assert result == 10, f"Expected 10, got {result}"
+
+
+def test_sync_timeout_background_returns_future():
+    """.timeout().background() should return Future and succeed."""
+    sk_func = Skfunction(simple_func)
+    
+    future = sk_func.timeout(5.0).background()(5)
+    
+    assert isinstance(future, Future), f"Expected Future, got {type(future)}"
+    result = future.result(timeout=5)
+    assert result == 10, f"Expected 10, got {result}"
+
+
+def test_sync_retry_timeout_background_returns_future():
+    """.retry().timeout().background() should return Future and succeed."""
+    sk_func = Skfunction(simple_func)
+    
+    future = sk_func.retry(3).timeout(5.0).background()(5)
+    
+    assert isinstance(future, Future), f"Expected Future, got {type(future)}"
+    result = future.result(timeout=5)
+    assert result == 10, f"Expected 10, got {result}"
+
+
+def test_sync_timeout_retry_background_returns_future():
+    """.timeout().retry().background() should return Future and succeed."""
+    sk_func = Skfunction(simple_func)
+    
+    future = sk_func.timeout(5.0).retry(3).background()(5)
+    
+    assert isinstance(future, Future), f"Expected Future, got {type(future)}"
+    result = future.result(timeout=5)
+    assert result == 10, f"Expected 10, got {result}"
+
+
+def test_sync_timeout_background_propagates_error():
+    """.timeout().background() should surface timeout errors."""
+    def very_slow(x):
+        stdlib_time.sleep(0.2)
+        return x
+    
+    sk_func = Skfunction(very_slow).timeout(0.01)
+    future = sk_func.background()(5)
+    
+    try:
+        future.result(timeout=5)
+        assert False, "Should have raised FunctionTimeoutError"
+    except FunctionTimeoutError:
+        pass  # expected
 
 
 # =============================================================================
@@ -398,6 +458,11 @@ def run_all_tests():
     runner.run_test("sync: .retry() executes immediately", test_sync_retry_executes_immediately)
     runner.run_test("sync: .timeout() executes immediately", test_sync_timeout_executes_immediately)
     runner.run_test("sync: .background() returns Future", test_sync_background_returns_future)
+    runner.run_test("sync: .retry().background() returns Future", test_sync_retry_background_returns_future)
+    runner.run_test("sync: .timeout().background() returns Future", test_sync_timeout_background_returns_future)
+    runner.run_test("sync: .retry().timeout().background() returns Future", test_sync_retry_timeout_background_returns_future)
+    runner.run_test("sync: .timeout().retry().background() returns Future", test_sync_timeout_retry_background_returns_future)
+    runner.run_test("sync: .timeout().background() propagates error", test_sync_timeout_background_propagates_error)
     
     # Sync combinations
     runner.run_test("sync: .retry().timeout() works", test_sync_retry_timeout)

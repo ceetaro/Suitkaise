@@ -89,9 +89,9 @@ Handlers are checked in order. Specialized handlers (locks, loggers, etc.) are c
 
 ---
 
-## Main Serializer (`Cerializer`)
+## Internal Serializer (`Cerializer`)
 
-Coordinates the entire serialization process.
+Coordinates the entire serialization process (internal implementation, not public API).
 
 ### Serialization Flow
 

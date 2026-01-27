@@ -442,7 +442,7 @@ def test_share_timer_add_time():
         share.timer.add_time(3.0)
         
         # Wait for writes to process
-        time.sleep(0.2)
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
         
         # Read back
         timer = share._coordinator.get_object('timer')
@@ -463,7 +463,7 @@ def test_share_counter_increment():
             share.counter.increment()
         
         # Wait for writes to process
-        time.sleep(0.2)
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
         
         # Read back
         counter = share._coordinator.get_object('counter')
@@ -485,7 +485,7 @@ def test_share_datastore_operations():
         share.store.set_meta("key", "value")
         
         # Wait for writes to process
-        time.sleep(0.2)
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
         
         # Read back
         store = share._coordinator.get_object('store')

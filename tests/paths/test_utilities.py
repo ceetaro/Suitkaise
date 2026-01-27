@@ -160,9 +160,9 @@ def test_streamline_basic():
 
 
 def test_streamline_long_path():
-    """streamline_path should handle max_length."""
+    """streamline_path should handle max_len."""
     long_name = "a" * 200
-    result = streamline_path(long_name, max_length=50)
+    result = streamline_path(long_name, max_len=50)
     
     assert len(result) <= 50
 

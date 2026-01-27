@@ -709,7 +709,7 @@ def test_concurrent_processes():
     elapsed = time.perf_counter() - start
     
     # Windows process startup is slower; allow a larger threshold there
-    max_elapsed = 1.0 if sys.platform == "win32" else 0.4
+    max_elapsed = 2.0 if sys.platform == "win32" else 0.4
     # Should complete in ~100-200ms (parallel), not 500ms (sequential)
     assert elapsed < max_elapsed, f"Concurrent should be ~100ms, got {elapsed}"
 
@@ -760,7 +760,7 @@ def test_stop_infinite_process():
     proc.start()
     
     # Let it run for a bit (longer to allow for subprocess startup)
-    time.sleep(0.3)
+    time.sleep(0.6 if sys.platform == "win32" else 0.3)
     
     # Stop it
     proc.stop()
@@ -779,7 +779,7 @@ def test_stop_limited_process():
     proc.start()
     
     # Let it run for a bit (200ms to allow for subprocess startup)
-    time.sleep(0.2)
+    time.sleep(0.5 if sys.platform == "win32" else 0.2)
     
     # Stop it early
     proc.stop()
@@ -799,7 +799,7 @@ def test_stop_returns_immediately():
     proc.start()
     
     # Let it run for a bit
-    time.sleep(0.05)
+    time.sleep(0.15 if sys.platform == "win32" else 0.05)
     
     # stop() should be non-blocking
     start = time.perf_counter()

@@ -29,6 +29,7 @@ def get_formatted_project_tree(*args: Any, **kwargs: Any) -> Any: ...
 def is_valid_filename(*args: Any, **kwargs: Any) -> bool: ...
 def streamline_path(
     path: str,
+    *,
     max_len: int | None = ...,
     replacement_char: str = ...,
     lowercase: bool = ...,
