@@ -21,7 +21,15 @@ _background_executor: ThreadPoolExecutor | None = None
 
 
 class SkModifierError(Exception):
-    """Raised when an unsupported sk modifier is accessed."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.sk import SkModifierError
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Raised when an unsupported sk modifier is accessed.
+    """
     pass
 
 def _get_executor() -> ThreadPoolExecutor:

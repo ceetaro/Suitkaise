@@ -1,10 +1,6 @@
 """
-Paths - Smart Path Operations for Suitkaise
-
-Enhanced path functionality with automatic project root detection,
-cross-platform path normalization, and powerful path utilities.
-
-Usage:
+────────────────────────────────────────────────────────
+    ```python
     from suitkaise import Skpath
     from suitkaise.paths import Skpath, AnyPath, autopath
     
@@ -18,6 +14,13 @@ Usage:
     @autopath()
     def process(path: AnyPath):
         return path.id
+    ```
+────────────────────────────────────────────────────────\n
+
+Paths - Smart Path Operations for Suitkaise
+
+Enhanced path functionality with automatic project root detection,
+cross-platform path normalization, and powerful path utilities.
 """
 
 from .api import (

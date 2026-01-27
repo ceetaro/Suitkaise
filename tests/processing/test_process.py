@@ -31,7 +31,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.processing import Skprocess, ProcessError, RunError, auto_reconnect
+from suitkaise.processing import Skprocess, ProcessError, RunError, autoreconnect
 from suitkaise.processing._int.process_class import Skprocess
 
 Process = Skprocess
@@ -155,7 +155,7 @@ class _DummyReconnector(Reconnector):
         return f"connected-{self.value}"
 
 
-@auto_reconnect()
+@autoreconnect()
 class AutoReconnectProcess(Process):
     """Process that auto-reconnects Reconnector fields on deserialize."""
     def __init__(self):
@@ -164,7 +164,7 @@ class AutoReconnectProcess(Process):
         self.process_config.runs = 1
 
 
-@auto_reconnect()
+@autoreconnect()
 class AutoReconnectProcessAll(Process):
     """Process that auto-reconnects multiple reconnector types."""
     def __init__(self):
@@ -488,7 +488,7 @@ def test_process_custom_serialize_deserialize_fallback():
 
 
 def test_process_auto_reconnect():
-    """auto_reconnect should run reconnect_all during deserialization."""
+    """autoreconnect should run reconnect_all during deserialization."""
     proc = AutoReconnectProcess()
     data = cerial.serialize(proc)
     restored = cerial.deserialize(data)
@@ -497,7 +497,7 @@ def test_process_auto_reconnect():
 
 
 def test_process_auto_reconnect_all_types():
-    """auto_reconnect should reconnect all reconnector types."""
+    """autoreconnect should reconnect all reconnector types."""
     proc = AutoReconnectProcessAll()
     data = cerial.serialize(proc)
     restored = cerial.deserialize(data)

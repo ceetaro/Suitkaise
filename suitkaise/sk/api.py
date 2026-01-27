@@ -1,4 +1,10 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import sk, Skfunction, Skclass
+    ```
+────────────────────────────────────────────────────────\n
+
 Sk module API - Skclass, Skfunction, @sk, @blocking decorators.
 
 Provides automatic _shared_meta generation and .asynced() support for user classes.
@@ -19,6 +25,18 @@ F = TypeVar('F', bound=Callable[..., Any])
 
 def blocking(func: F) -> F:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sk, blocking
+        
+        @sk
+        class Worker:
+            @blocking
+            def heavy_computation(self):
+                return sum(range(10_000_000))
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Explicitly mark a method or function as blocking.
     
     Use this when a method is CPU-intensive or blocking but doesn't contain
@@ -26,23 +44,6 @@ def blocking(func: F) -> F:
     
     This enables .background() and .asynced() for the method without
     needing to add a fake timing.sleep() call.
-    
-    Usage:
-        from suitkaise import sk, blocking
-        
-        @sk
-        class Worker:
-            @blocking
-            def heavy_computation(self):
-                # CPU-intensive work with no I/O
-                result = 0
-                for i in range(10_000_000):
-                    result += i
-                return result
-        
-        # Now .background() works:
-        future = worker.heavy_computation.background()()
-        result = future.result()
     
     Works on:
         - Methods in @sk-decorated classes
@@ -73,6 +74,19 @@ R = TypeVar('R')
 
 class Skclass(Generic[T]):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import Skclass
+        
+        class Counter:
+            def __init__(self):
+                self.value = 0
+        
+        SkCounter = Skclass(Counter)
+        counter = SkCounter()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Wrapper for user classes that provides:
     - Auto-generated _shared_meta for Share compatibility
     - .asynced() for async version (if class has blocking calls)
@@ -193,6 +207,18 @@ class Skclass(Generic[T]):
 
 class Skfunction(Generic[P, R]):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import Skfunction
+        
+        def slow_fetch(url):
+            return url
+        
+        sk_fetch = Skfunction(slow_fetch)
+        result = sk_fetch.timeout(2.0)("https://example.com")
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Wrapper for user functions that provides:
     - .asynced() for async version (if function has blocking calls)
     - .retry() for automatic retry with delay
@@ -486,6 +512,13 @@ class Skfunction(Generic[P, R]):
 
 class AsyncSkfunction(Generic[P, R]):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        sk_func = Skfunction(slow_fetch)
+        result = await sk_func.asynced().timeout(5.0)("https://api.com")
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Async version of Skfunction, returned by Skfunction.asynced().
     
     Supports chaining with .timeout(), .retry(), and .rate_limit() for async operations.
@@ -664,6 +697,17 @@ class AsyncSkfunction(Generic[P, R]):
 
 def sk(cls_or_func):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import sk
+        
+        @sk
+        class Counter:
+            def __init__(self):
+                self.value = 0
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Decorator that attaches Sk functionality directly to a class or function.
     
     For classes: Attaches to the original class:

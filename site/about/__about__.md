@@ -61,7 +61,7 @@ Supported Python versions: 3.11 and above
 
 Currently, `suitkaise` is version `0.2.4`.
 
-All files and code in this repository is licensed under the MIT License.
+All files and code in this repository is licensed under the Apache License 2.0.
 
 `suitkaise` contains the following modules:
 
@@ -101,29 +101,23 @@ You can also view more at [suitkaise.info](https://suitkaise.info).
 (end of dropdown section for the README)
 
 (this is a dropdown section for the licenses)
-#### `suitkaise` is licensed under the MIT License. View license here.
+#### `suitkaise` is licensed under the Apache License 2.0. View license here.
 
-MIT License
+Apache License 2.0
 
-Copyright (c) 2025 Casey Eddings
+Copyright 2025 Casey Eddings
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+http://www.apache.org/licenses/LICENSE-2.0
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 (end of dropdown section for the licenses)
 (end of dropdown section for technical info)

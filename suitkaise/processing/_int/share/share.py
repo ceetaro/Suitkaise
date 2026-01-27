@@ -28,6 +28,17 @@ from suitkaise.sk import Skclass
 
 class Share:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import Share
+        from suitkaise.timing import Sktimer
+        
+        share = Share()
+        share.timer = Sktimer()
+        share.counter = 0
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Container for process-safe shared state.
     
     Automatically manages:

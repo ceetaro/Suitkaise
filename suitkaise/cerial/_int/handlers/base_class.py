@@ -6,7 +6,7 @@ This structure is 100% created by me.
 
 The only changes AI made to this file was fixing docstr typos.
 
-Cheers (remember this is licensed under the MIT License)
+Cheers (remember this is licensed under the Apache License 2.0)
 """
 
 from typing import Any, Dict

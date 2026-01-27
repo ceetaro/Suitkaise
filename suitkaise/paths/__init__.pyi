@@ -27,6 +27,20 @@ def get_project_structure(*args: Any, **kwargs: Any) -> Any: ...
 def get_formatted_project_tree(*args: Any, **kwargs: Any) -> Any: ...
 
 def is_valid_filename(*args: Any, **kwargs: Any) -> bool: ...
-def streamline_path(*args: Any, **kwargs: Any) -> Any: ...
+def streamline_path(
+    path: str,
+    max_len: int | None = ...,
+    replacement_char: str = ...,
+    lowercase: bool = ...,
+    strip_whitespace: bool = ...,
+    chars_to_replace: str | list[str] | None = ...,
+    allow_unicode: bool = ...,
+) -> str: ...
+def streamline_path_quick(
+    path: str,
+    max_len: int | None = ...,
+    replacement_char: str = ...,
+    lowercase: bool = ...,
+) -> str: ...
 
 __all__: list[str]

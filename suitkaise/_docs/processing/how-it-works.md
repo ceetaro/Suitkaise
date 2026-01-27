@@ -846,7 +846,7 @@ Method calls are fire-and-forget; they queue a command and return immediately.
 
 ---
 
-## `auto_reconnect`
+## `autoreconnect`
 
 ### The Problem
 
@@ -854,9 +854,9 @@ When a `Skprocess` is serialized, resources like database connections cannot be 
 
 After deserialization in the subprocess, these placeholders need to be converted back into live connections.
 
-### How `@auto_reconnect` Works
+### How `@autoreconnect` Works
 
-The `@auto_reconnect(**kwargs)` decorator sets two class attributes:
+The `@autoreconnect(**kwargs)` decorator sets two class attributes:
 
 ```python
 cls._auto_reconnect_enabled = True

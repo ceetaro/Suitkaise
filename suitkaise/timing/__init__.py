@@ -1,12 +1,15 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import TimeThis
+    from suitkaise.timing import TimeThis, Sktimer
+    ```
+────────────────────────────────────────────────────────\n
+
 Timing - Smart Timing Operations for Suitkaise
 
 This module provides intuitive timing functionality with statistical analysis,
 sophisticated timing classes, and convenient decorators for performance measurement.
-
-Usage:
-    from suitkaise import TimeThis
-    from suitkaise.timing import TimeThis, Sktimer
 
 Key Features:
 - Simple timing functions (time, sleep, elapsed)

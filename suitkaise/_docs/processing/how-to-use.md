@@ -733,20 +733,20 @@ colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes
 
 ---
 
-## `auto_reconnect`
+## `autoreconnect`
 
 When a `Skprocess` is serialized to run in a subprocess, resources like database connections become `Reconnector` placeholders.
 
-The `@auto_reconnect` decorator automatically calls `reconnect_all()` after deserialization, restoring these resources.
+The `@autoreconnect` decorator automatically calls `reconnect_all()` after deserialization, restoring these resources.
 
 ### Basic usage (no credentials needed)
 
 For sockets, threads, pipes, sqlite files, etc.:
 
 ```python
-from suitkaise.processing import Skprocess, auto_reconnect
+from suitkaise.processing import Skprocess, autoreconnect
 
-@auto_reconnect()
+@autoreconnect()
 class MyProcess(Skprocess):
     def __init__(self):
         self.socket = socket.socket(...)  # becomes SocketReconnector
@@ -761,9 +761,9 @@ class MyProcess(Skprocess):
 Pass passwords (connection metadata like host/port/user is stored during serialization):
 
 ```python
-from suitkaise.processing import Skprocess, auto_reconnect
+from suitkaise.processing import Skprocess, autoreconnect
 
-@auto_reconnect(**{
+@autoreconnect(**{
     "psycopg2.Connection": {
         "*": "secret",
         "analytics_db": "other_pass",

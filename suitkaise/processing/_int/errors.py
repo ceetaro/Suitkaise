@@ -35,6 +35,17 @@ Accessing the original error:
 
 class ProcessError(Exception):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import ProcessError
+        
+        try:
+            result = process.result
+        except ProcessError as exc:
+            print(f"Process failed: {exc}")
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Base class for all Process-related errors.
     
     Catch this to handle any error from a Process lifecycle method.
@@ -54,7 +65,15 @@ class ProcessError(Exception):
 
 
 class PreRunError(ProcessError):
-    """Error raised when __prerun__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise PreRunError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __prerun__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -65,7 +84,15 @@ class PreRunError(ProcessError):
 
 
 class RunError(ProcessError):
-    """Error raised when __run__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise RunError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __run__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -76,7 +103,15 @@ class RunError(ProcessError):
 
 
 class PostRunError(ProcessError):
-    """Error raised when __postrun__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise PostRunError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __postrun__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -87,7 +122,15 @@ class PostRunError(ProcessError):
 
 
 class OnFinishError(ProcessError):
-    """Error raised when __onfinish__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise OnFinishError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __onfinish__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -98,7 +141,15 @@ class OnFinishError(ProcessError):
 
 
 class ResultError(ProcessError):
-    """Error raised when __result__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise ResultError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __result__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -109,7 +160,15 @@ class ResultError(ProcessError):
 
 
 class ErrorHandlerError(ProcessError):
-    """Error raised when __error__() fails."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise ErrorHandlerError(current_run, original_error)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when __error__() fails.
+    """
     
     def __init__(self, current_run: int, original_error: BaseException | None = None):
         super().__init__(
@@ -120,7 +179,15 @@ class ErrorHandlerError(ProcessError):
 
 
 class ProcessTimeoutError(ProcessError):
-    """Error raised when a lifecycle section times out."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise ProcessTimeoutError("run", 5.0, current_run)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when a lifecycle section times out.
+    """
     
     def __init__(self, section: str, timeout: float, current_run: int):
         self.section = section
@@ -133,14 +200,30 @@ class ProcessTimeoutError(ProcessError):
 
 
 class ResultTimeoutError(ProcessError):
-    """Error raised when result(), wait(), or listen() times out via .timeout() modifier."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise ResultTimeoutError("result() timed out")
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when result(), wait(), or listen() times out via .timeout() modifier.
+    """
     
     def __init__(self, message: str):
         super().__init__(message, current_run=0, original_error=None)
 
 
 class DuplicateTimeoutError(ProcessError):
-    """Error raised when timeout is specified both as parameter and via .timeout() modifier."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        raise DuplicateTimeoutError("result")
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Error raised when timeout is specified both as parameter and via .timeout() modifier.
+    """
     
     def __init__(self, method_name: str):
         super().__init__(

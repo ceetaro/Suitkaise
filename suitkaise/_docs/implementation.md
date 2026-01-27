@@ -1081,16 +1081,16 @@ Only secret details need to be passed - connection metadata (host, port, user, d
 
 ---
 
-# auto_reconnect (processing)
+# autoreconnect (processing)
 
-The `@auto_reconnect` decorator makes `Skprocess` automatically call `reconnect_all()` after deserialization in the child process.
+The `@autoreconnect` decorator makes `Skprocess` automatically call `reconnect_all()` after deserialization in the child process.
 
 ## Basic usage
 
 ```python
-from suitkaise.processing import Skprocess, auto_reconnect
+from suitkaise.processing import Skprocess, autoreconnect
 
-@auto_reconnect()
+@autoreconnect()
 class MyProcess(Skprocess):
     def __init__(self):
         self.socket = socket.socket(...)  # becomes SocketReconnector
@@ -1103,9 +1103,9 @@ class MyProcess(Skprocess):
 ## With credentials
 
 ```python
-from suitkaise.processing import Skprocess, auto_reconnect
+from suitkaise.processing import Skprocess, autoreconnect
 
-@auto_reconnect(**{
+@autoreconnect(**{
     "psycopg2.Connection": {
         "*": "secret",
         "analytics_db": "other_pass",
@@ -1162,7 +1162,24 @@ review each modules code and streamline comments, checking that everything looks
 - paths - done
 - processing - done
 - sk - done
-- timing
+- timing - done
 
 
-## 2nd pass - focus on docstrings
+## 2nd pass - focus on api docstrings
+
+- cerial - done
+- circuits - done
+
+## 3rd pass - focus on tests
+
+## 4th pass - focus on _docs
+
+## 5th pass - focus on README and quick start guide
+
+## 6th pass - review examples and create more for each module
+
+## 7th pass - rereview examples
+
+## 8th pass - final review of everything
+
+## bump version to 1.0.0, publish to PyPI, and release

@@ -13,6 +13,14 @@ if TYPE_CHECKING:
 
 class ProcessTimers:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import ProcessTimers
+        
+        timers = ProcessTimers()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Container for timing lifecycle sections of a Skprocess.
     
     Automatically created when Skprocess starts. Each section timer is populated

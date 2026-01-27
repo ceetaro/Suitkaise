@@ -16,7 +16,15 @@ R = TypeVar('R')
 
 
 class FunctionTimeoutError(Exception):
-    """Raised when a function exceeds its timeout."""
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.sk import FunctionTimeoutError
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Raised when a function exceeds its timeout.
+    """
     pass
 
 

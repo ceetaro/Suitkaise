@@ -1,15 +1,6 @@
 """
-Suitkaise - A Python Toolkit for Robust Development
-
-Suitkaise provides a collection of utilities for common development needs:
-- timing: Smart timing operations with statistical analysis
-- paths: Enhanced path operations with project root detection
-- circuits: Circuit breaker pattern for controlled failure handling
-- cerial: Serialization for unpicklable objects
-- processing: Subprocess-based task execution with pools
-- sk: Class/function decorators for async, retry, timeout, background execution
-
-Usage:
+────────────────────────────────────────────────────────
+    ```python
     # Direct imports from suitkaise
     from suitkaise import TimeThis, Sktimer, Skpath, Circuit, sk, blocking
     
@@ -20,6 +11,18 @@ Usage:
     from suitkaise.cerial import serialize, deserialize
     from suitkaise.processing import Skprocess, Pool
     from suitkaise.sk import sk, blocking
+    ```
+────────────────────────────────────────────────────────\n
+
+Suitkaise - A Python Toolkit for Robust Development
+
+Suitkaise provides a collection of utilities for common development needs:
+- timing: Smart timing operations with statistical analysis
+- paths: Enhanced path operations with project root detection
+- circuits: Circuit breaker pattern for controlled failure handling
+- cerial: Serialization for unpicklable objects
+- processing: Subprocess-based task execution with pools
+- sk: Class/function decorators for async, retry, timeout, background execution
 """
 
 # ============================================================================
@@ -115,7 +118,7 @@ from .processing import (
     Share,
     
     # Decorators
-    auto_reconnect,
+    autoreconnect,
     
     # Errors
     ProcessError,
@@ -189,7 +192,7 @@ __all__ = [
     "Skprocess",
     "Pool",
     "Share",
-    "auto_reconnect",
+    "autoreconnect",
     "ProcessError",
     "PreRunError",
     "RunError",

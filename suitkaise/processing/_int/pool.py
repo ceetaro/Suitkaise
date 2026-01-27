@@ -475,9 +475,24 @@ class StarModifier:
         # return unordered imap modifier configured for tuple unpacking
         return _PoolUnorderedImapModifier(self._pool, is_star=True)
 
-# DOCSTRING NEEDS UPDATE
 class Pool:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import Pool
+        
+        pool = Pool(workers=4)
+        results = pool.map(sum, [(1, 2), (3, 4)])
+        
+        # Unordered results
+        for result in pool.unordered_imap(sum, [(1, 2), (3, 4)]):
+            print(result)
+        
+        # Tuple-unpacking
+        results = pool.star().map(sum, [(1, 2), (3, 4)])
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Pool for parallel batch processing.
     
     Uses cerial for serialization, supporting complex objects that

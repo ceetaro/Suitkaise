@@ -1,4 +1,10 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import cerial
+    ```
+────────────────────────────────────────────────────────\n
+
 Cerial - Serialization for the Unpicklable
 
 This module provides serialization capabilities for objects that 

@@ -1,5 +1,5 @@
 """
-Tests for reconnect_all() with overrides and auto_reconnect decorator.
+Tests for reconnect_all() with overrides and autoreconnect decorator.
 """
 
 import sys
@@ -279,14 +279,14 @@ def test_reconnect_all_type_key_normalization():
 
 
 # =============================================================================
-# Tests: auto_reconnect decorator
+# Tests: autoreconnect decorator
 # =============================================================================
 
 def test_auto_reconnect_decorator_sets_flags():
-    """@auto_reconnect should set class attributes."""
-    from suitkaise.processing import Skprocess, auto_reconnect
+    """@autoreconnect should set class attributes."""
+    from suitkaise.processing import Skprocess, autoreconnect
     
-    @auto_reconnect(**{
+    @autoreconnect(**{
         "psycopg2.Connection": {"*": "test_password"}
     })
     class TestProcess(Skprocess):
@@ -302,10 +302,10 @@ def test_auto_reconnect_decorator_sets_flags():
 
 
 def test_auto_reconnect_empty():
-    """@auto_reconnect() with no args should enable reconnect with empty overrides."""
-    from suitkaise.processing import Skprocess, auto_reconnect
+    """@autoreconnect() with no args should enable reconnect with empty overrides."""
+    from suitkaise.processing import Skprocess, autoreconnect
     
-    @auto_reconnect()
+    @autoreconnect()
     class TestProcess(Skprocess):
         def __run__(self):
             pass
@@ -368,9 +368,9 @@ def run_all_tests():
     runner.run_test("password no match", test_reconnect_all_password_no_match)
     runner.run_test("type key normalization", test_reconnect_all_type_key_normalization)
     
-    # auto_reconnect decorator
-    runner.run_test("auto_reconnect sets flags", test_auto_reconnect_decorator_sets_flags)
-    runner.run_test("auto_reconnect empty", test_auto_reconnect_empty)
+    # autoreconnect decorator
+    runner.run_test("autoreconnect sets flags", test_auto_reconnect_decorator_sets_flags)
+    runner.run_test("autoreconnect empty", test_auto_reconnect_empty)
     
     # Real DbReconnector
     runner.run_test("real PostgresReconnector type key", test_real_db_reconnector_type_key)

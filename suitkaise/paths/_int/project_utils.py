@@ -299,7 +299,7 @@ def get_formatted_project_tree(
     root: str | Path | Skpath | None = None,
     exclude: str | Path | Skpath | list[str | Path | Skpath] | None = None,
     use_ignore_files: bool = True,
-    depth: int = 3,
+    depth: int | None = None,
     include_files: bool = True,
 ) -> str:
     """
@@ -311,7 +311,7 @@ def get_formatted_project_tree(
         root: Custom root directory (defaults to detected project root)
         exclude: Paths to exclude
         use_ignore_files: Respect .*ignore files (default True)
-        depth: Maximum depth to display (default 3)
+        depth: Maximum depth to display (default None) (None = no limit)
         include_files: Include files in the tree (default True)
         
     Returns:
@@ -382,7 +382,7 @@ def get_formatted_project_tree(
         prefix: str,
         current_depth: int,
     ) -> None:
-        if current_depth > depth:
+        if depth is not None and current_depth > depth:
             return
         items = list_filtered(dir_path)
         for i, item in enumerate(items):

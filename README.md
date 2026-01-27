@@ -16,7 +16,7 @@ Supported Python versions: 3.11 and above
 
 Currently, `suitkaise` is version `0.3.0`.
 
-All files and code in this repository is licensed under the MIT License.
+All files and code in this repository is licensed under the Apache License 2.0.
 
 `suitkaise` contains the following modules:
 

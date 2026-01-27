@@ -1,5 +1,20 @@
 """
-circuits API
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import Circuit, BreakingCircuit
+    ```
+────────────────────────────────────────────────────────\n
+
+API for the circuits module.
+
+Includes two circuits (Circuit and BreakingCircuit) that can be used to
+control failure and manage resources in loops.
+
+Circuit is auto-resetting, BreakingCircuit needs the user to manually reset it.
+
+Includes exponential backoff, with max sleep time and jitter options. 
+
+Additionally, supports native async usage with `.asynced()` methods.
 """
 
 import asyncio
@@ -20,13 +35,14 @@ class Circuit:
         circ = Circuit(
             num_shorts_to_trip=5, 
             sleep_time_after_trip=0.5,
-            backoff_factor=1.5,  # exponential backoff
+            backoff_factor=1.5,
             max_sleep_time=10.0
+            jitter=0.2
         )
         
-        while something:
+        while doing_this:
             if something_went_wrong():
-                circ.short()  # After 5 shorts, sleeps and auto-resets
+                circ.short()  # after 5 shorts, sleeps and auto-resets
             else:
                 do_work()
         ```
@@ -43,6 +59,7 @@ class Circuit:
         backoff_factor: Exponential backoff multiplier (default 1 = no backoff)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
         jitter: Random +/- percent of sleep_time to prevent thundering herd
+            - expects a decimal (0.2), NOT a percentage (20)
         
     Attributes:
         times_shorted: Number of shorts since last trip
@@ -50,24 +67,25 @@ class Circuit:
         current_sleep_time: Current sleep duration (after backoff applied)
     
     _shared_meta:
-        Metadata for Share - declares which attributes each method/property
-        reads from or writes to. Used by the Share for synchronization.
+        metadata for `Share` - declares which attributes each method/property
+        reads from or writes to. Used by `Share` instances for synchronization.
     
     ────────────────────────────────────────────────────────
         ```python
-        # Real use case: Rate limiting with exponential backoff
+        # rate limit w/ exponential backoff and jitter
         from suitkaise import Circuit
         
         rate_limiter = Circuit(
             num_shorts_to_trip=10,
             sleep_time_after_trip=1.0,
             backoff_factor=1.5,
-            max_sleep_time=30.0
+            max_sleep_time=30.0,
+            jitter=0.1
         )
         
         for request in requests:
             if is_rate_limited():
-                rate_limiter.short()  # Sleeps with increasing delay
+                rate_limiter.short()
             else:
                 process(request)
         ```
@@ -188,13 +206,13 @@ class Circuit:
     """
     ────────────────────────────────────────────────────────
         ```python
-        circ.short()  # Count a failure
+        circ.short()  # count a failure
         
-        # Returns True if sleep occurred
+        # returns True if sleep occurred
         if circ.short():
             print("Circuit tripped and slept")
         
-        # Async version
+        # async version
         await circ.short.asynced()()
         ```
     ────────────────────────────────────────────────────────\n
@@ -221,14 +239,14 @@ class Circuit:
     """
     ────────────────────────────────────────────────────────
         ```python
-        circ.trip()  # Immediately trip the circuit
+        circ.trip()  # immediately trip the circuit
         
-        # Async version
+        # async version
         await circ.trip.asynced()()
         ```
     ────────────────────────────────────────────────────────\n
 
-    Immediately trip the circuit, bypassing short counting.
+    Immediately trip the circuit, bypassing the short counter.
     
     Supports `.asynced()` for async usage with `asyncio.sleep`.
     
@@ -277,7 +295,7 @@ class Circuit:
         """
         ────────────────────────────────────────────────────────
             ```python
-            circ.reset_backoff()  # Reset sleep time to original
+            circ.reset_backoff()  # reset sleep time to original
             ```
         ────────────────────────────────────────────────────────\n
 
@@ -298,25 +316,27 @@ class BreakingCircuit:
             sleep_time_after_trip=0.5,
             backoff_factor=1.1,
             max_sleep_time=10.0
+            jitter=0.2
         )
         
         while not circ.broken:
             try:
-                result = risky_operation()
+                result = something_that_might_fail()
             except SomeError:
-                circ.short()  # Trip after 5 failures
+                circ.short()  # trip after 5 failures
         
         if circ.broken:
             print("Circuit broken, resetting")
-            circ.reset()  # Manual reset, applies backoff
+            circ.reset()  # manual reset, applies backoff
         ```
     ────────────────────────────────────────────────────────\n
 
-    Breaking circuit for controlled failure handling.
+    Breaking circuit that allows you to control failure handling.
     
     Unlike Circuit (which auto-resets), BreakingCircuit stays broken until
-    manually reset. Use this for failure limits where you want to stop
-    processing after a threshold is reached.
+    manually reset. 
+    
+    Use this for things like stopping processing after a threshold is reached.
     
     Args:
         num_shorts_to_trip: Maximum number of shorts before circuit trips
@@ -324,6 +344,7 @@ class BreakingCircuit:
         backoff_factor: Exponential backoff multiplier applied on reset (default 1)
         max_sleep_time: Maximum sleep duration cap (default 10.0)
         jitter: Random +/- percent of sleep_time to prevent thundering herd
+            - expects a decimal (0.2), NOT a percentage (20)
         
     Attributes:
         broken: True if circuit has tripped
@@ -332,20 +353,21 @@ class BreakingCircuit:
         current_sleep_time: Current sleep duration (after backoff applied)
     
     _shared_meta:
-        Metadata for Share - declares which attributes each method/property
-        reads from or writes to. Used by the Share for synchronization.
+        metadata for `Share` - declares which attributes each method/property
+        reads from or writes to. Used by `Share` instances for synchronization.
     
     ────────────────────────────────────────────────────────
         ```python
-        # Real use case: Retry loop with circuit breaker
+        # retry loop with circuit breaker
         from suitkaise import BreakingCircuit
         import requests
         
-        api_circuit = BreakingCircuit(
+        api_circ = BreakingCircuit(
             num_shorts_to_trip=3, 
             sleep_time_after_trip=1.0,
             backoff_factor=2.0,
             max_sleep_time=30.0
+            jitter=0.1
         )
         
         def fetch_with_retry(url):
@@ -355,9 +377,9 @@ class BreakingCircuit:
                     response.raise_for_status()
                     return response.json()
                 except requests.RequestException:
-                    api_circuit.short()  # Trip after 3 failures
+                    api_circuit.short()  # trip after 3 failures
             
-            return None  # Circuit broken, give up
+            return None  # circuit broken, give up
         ```
     ────────────────────────────────────────────────────────
     """
@@ -482,11 +504,11 @@ class BreakingCircuit:
     """
     ────────────────────────────────────────────────────────
         ```python
-        breaker.short()  # Count a failure
+        breaker.short()  # count a failure
         
-        breaker.short(custom_sleep=2.0)  # Custom sleep if trips
+        breaker.short(custom_sleep=2.0)  # custom sleep if trips
         
-        # Async version
+        # async version
         await breaker.short.asynced()()
         ```
     ────────────────────────────────────────────────────────\n
@@ -509,11 +531,11 @@ class BreakingCircuit:
     """
     ────────────────────────────────────────────────────────
         ```python
-        breaker.trip()  # Immediately trip the circuit
+        breaker.trip()  # immediately trip the circuit
         
-        breaker.trip(custom_sleep=5.0)  # Trip with custom sleep
+        breaker.trip(custom_sleep=5.0)  # trip with custom sleep
         
-        # Async version
+        # async version
         await breaker.trip.asynced()()
         ```
     ────────────────────────────────────────────────────────\n
@@ -530,13 +552,13 @@ class BreakingCircuit:
         """
         ────────────────────────────────────────────────────────
             ```python
-            breaker.reset()  # Reset to operational, apply backoff
+            breaker.reset()  # reset to operational, apply backoff
             ```
         ────────────────────────────────────────────────────────\n
 
         Reset the circuit to operational state.
         
-        Clears the broken flag, resets the short counter,
+        Clears the `broken` flag, resets the short counter,
         and applies exponential backoff factor to sleep time.
         """
         with self._lock:
@@ -554,7 +576,7 @@ class BreakingCircuit:
         """
         ────────────────────────────────────────────────────────
             ```python
-            breaker.reset_backoff()  # Reset sleep time to original
+            breaker.reset_backoff()  # reset sleep time to original
             ```
         ────────────────────────────────────────────────────────\n
 

@@ -235,44 +235,18 @@ def _convert_iterable(
     except (TypeError, ValueError):
         return value
 
-# DOCSTRING NEEDS UPDATE
 def autopath(
     use_caller: bool = False,
     debug: bool = False,
     only: str | list[str] | None = None,
 ) -> Callable[[F], F]:
     """
-    Decorator that automatically converts path parameters based on type annotations.
-    
-    All path-like inputs are normalized through Skpath before conversion to the
-    target type. This ensures:
-    - Resolved absolute paths
-    - Normalized separators (always /)
-    - Cross-platform consistency
-    
-    Converts inputs to match the declared type:
-    - Parameters annotated as AnyPath or Skpath → converted to Skpath
-    - Parameters annotated as Path → normalized through Skpath, then to Path
-    - Parameters annotated as str → normalized through Skpath, returns absolute path string
-    
-    Also handles iterables: list[AnyPath], tuple[Path, ...], set[Skpath], etc.
-    
-    Args:
-        use_caller: If True, parameters that accept Skpath or Path will use
-                   the caller's file path if no value was provided
-        debug: If True, print messages when conversions occur
-        only: Restrict normalization to specific parameters. If None (default),
-              all path-like parameters are normalized. If a string or list of
-              strings, only parameters with matching names are normalized.
-              Use this for performance when you have str/list[str] params
-              that aren't actually file paths.
-        
-    Returns:
-        Decorated function
-        
-    Usage:
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+
         @autopath()
-        def process(path: AnyPath):
+        def process(path: AnyPath):  
             # path is guaranteed to be an Skpath
             return path.id
             
@@ -289,9 +263,46 @@ def autopath(
         
         @autopath(only="file_path")
         def process_with_data(file_path: str, names: list[str], ids: list[str]):
-            # Only file_path is normalized, names and ids are left unchanged
-            # This is much faster when names/ids contain thousands of items
+
+            # only file_path is normalized, names and ids are left unchanged
+            # much faster when names/ids contain thousands of items
             return file_path
+
+        # also works with iterables
+        @paths.autopath()
+        def batch(paths: list[paths.AnyPath]):
+            return [p.ap for p in paths]
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Decorator that automatically converts path parameters based on type annotations.
+    
+    All path-like inputs are normalized through Skpath before conversion to the
+    target type. This ensures:
+    - Resolved absolute paths
+    - Normalized separators (always /)
+    - Cross-platform consistency
+    
+    Converts inputs to match the declared type:
+    - Parameters annotated as AnyPath or Skpath → converted to Skpath
+    - Parameters annotated as Path → normalized through Skpath, then to Path
+    - Parameters annotated as str → normalized through Skpath, returns absolute path string
+    
+    Also handles iterables: list[AnyPath], tuple[Path, ...], set[Skpath], etc.
+    
+    Args:
+        use_caller: If True, parameters that accept Skpath or Path will use the caller's file path 
+        if no value was provided\n
+
+        debug: If True, print messages when conversions occur\n
+
+        only: Only apply autopath to specific params. If None, all path-like params
+        are normalized (strs, Paths, Skpaths). If a param accepts str or list[str] and
+        is listed in only, autopath will apply. If only is not None AND a param is not listed in only,
+        autopath will not be applied to values being passed into that param.
+        
+    Returns:
+        Decorated function
     """
     # normalize 'only' to a set for O(1) lookup
     if only is None:

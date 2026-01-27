@@ -1,4 +1,18 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import cerial
+    ```
+────────────────────────────────────────────────────────\n
+
+API for the cerial module.
+
+Includes functions for serialization and deserialization,
+as well as options to convert to an intermediate representation (IR)
+and also an option to convert to JSON.
+
+Additionally, includes a function to reconnect all live objects that need to 
+be reauthenticated or reinitialized after serialization.
 """
 
 from ._int.serializer import Cerializer, SerializationError
@@ -31,7 +45,7 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
     This is what we do:
 
     1. try to keep the exact object intact
-    2. recreate an exact copy of the object
+    2. recreate an exact copy of the object using the object's state at serialization time
     3. give a placeholder object that can be used to recreate an exact copy of the object
     4. give info on the object's state pre-serialization
     
@@ -141,16 +155,16 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     
     ────────────────────────────────────────────────────────
         ```python
-        # Round-trip example
+        # round-trip
         original = ComplexService()
         
-        # Serialize
+        # serialize
         serialized = cerial.serialize(original)
         
-        # Deserialize
+        # deserialize
         restored = cerial.deserialize(serialized)
         
-        # State is preserved
+        # state is preserved
         with restored.lock: # will work
 
         # once reconnected, conn will work
@@ -166,32 +180,49 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
 
 def reconnect_all(obj, **auth):
     """
-    Recursively reconnect Reconnector objects inside a structure.
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import cerial
+        
+        auth = {
+            "psycopg2.Connection": {"*": "secret"},
+            "redis.Redis": {"*": "redis_pass"},
+        }
+        
+        cerial.reconnect_all(obj, **auth)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Recursively reconnect `Reconnector` objects inside a structure.
     
     This walks lists, tuples, sets, dict keys/values, object __dict__ values,
-    and __slots__ when available. If a Reconnector is found, its reconnect()
+    and __slots__ when available. If a `Reconnector` is found, its `reconnect()`
     method is called and the result is placed back into the structure.
     
     Args:
         obj: Object or container to traverse.
-        **auth: Credentials keyed by type. Simplified dict[str, str] pattern:
-            reconnect_all(obj, **{
+        **auth: Credentials keyed by type. dict[str, str] pattern
+            ```python 
+            auth = {
                 "psycopg2.Connection": {
                     "*": "secret",           # default auth
                     "analytics_db": "other", # specific attr auth
                 },
                 "redis.Redis": {
-                    "*": "redis_pass",
+                    "*": "your_redis_password",
                 },
             })
-            The "*" key provides default auth for all instances of that type.
+
+            reconnect_all(obj, **auth)
+            ```
+            The `"*"` key provides default auth for all instances of that type.
             Specific attr names override the default.
     """
     visited: set[int] = set()
     
     def _get_reconnector_type_key(reconnector: Reconnector) -> str | None:
         """Get the type key for looking up kwargs."""
-        # Map specific reconnector classes to user-friendly type keys
+        # map specific reconnector classes to user-friendly type keys
         class_name = type(reconnector).__name__
         type_key_map = {
             "PostgresReconnector": "psycopg2.Connection",
@@ -214,7 +245,7 @@ def reconnect_all(obj, **auth):
         if class_name in type_key_map:
             return type_key_map[class_name]
         
-        # Fallback: check for module/class_name attributes (for mocks/custom reconnectors)
+        # fallback: check for module/class_name attributes (for mocks/custom reconnectors)
         module = getattr(reconnector, 'module', None)
         orig_class_name = getattr(reconnector, 'class_name', None)
         if module and orig_class_name:
@@ -283,7 +314,7 @@ def reconnect_all(obj, **auth):
             changed = False
             for key, value in item.items():
                 new_key = _recurse(key, None)
-                # Use dict key as attr_name for reconnector lookup
+                # use dict key as attr_name for reconnector lookup
                 new_value = _recurse(value, key if isinstance(key, str) else None)
                 if new_key is not key or new_value is not value:
                     changed = True
@@ -368,6 +399,8 @@ def to_jsonable(obj, debug: bool = False, verbose: bool = False):
     ────────────────────────────────────────────────────────\n
 
     Serialize an object to IR and return a JSON-serializable structure.
+
+    This is just like calling `serialize_ir()` and then `ir_to_jsonable()`.
     """
     ir = serialize_ir(obj, debug=debug, verbose=verbose)
     return _ir_to_jsonable(ir)
@@ -391,6 +424,8 @@ def to_json(
     ────────────────────────────────────────────────────────\n
 
     Serialize an object to IR and return JSON text.
+
+    This is just like calling `serialize_ir()` and then `ir_to_json()`.
     """
     ir = serialize_ir(obj, debug=debug, verbose=verbose)
     return _ir_to_json(ir, indent=indent, sort_keys=sort_keys)
@@ -401,7 +436,7 @@ def to_json(
 # ============================================================================
 
 __all__ = [
-    # Main functions
+    # main functions
     'serialize',
     'serialize_ir',
     'deserialize',
@@ -411,11 +446,7 @@ __all__ = [
     'to_jsonable',
     'to_json',
     
-    # Classes for advanced usage
-    'Cerializer',
-    'Decerializer',
-    
-    # Exceptions
+    # exceptions
     'SerializationError',
     'DeserializationError',
 ]

@@ -32,6 +32,25 @@ _skpath_lock = threading.RLock()
 
 class Skpath:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.paths import Skpath
+
+        # create an Skpath from caller file path
+        path = Skpath()
+        
+        # create an Skpath from a string
+        path = Skpath("myproject/feature/file.txt")
+
+        # create an Skpath from a Path object
+        path = Path("myproject/feature/file.txt")
+        path = Skpath(path)
+
+        # create an Skpath from an encoded ID
+        path = Skpath("L215YWN0b3J5L2ZlYXR1cmUvZmlsZS50eHQ")
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Enhanced path object with project-aware normalization.
     
     Skpath automatically detects your project root and provides:

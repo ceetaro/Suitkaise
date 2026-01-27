@@ -1,12 +1,15 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import Circuit
+    from suitkaise.circuits import Circuit
+    ```
+────────────────────────────────────────────────────────\n
+
 Circuits - Circuit Breaker for Controlled Failure Handling
 
 This module provides a circuit breaker pattern implementation for 
 controlled failure handling and resource management in loops.
-
-Usage:
-    from suitkaise import Circuit
-    from suitkaise.circuits import Circuit
 
 Philosophy: Prevent runaway processes and provide graceful degradation.
 """

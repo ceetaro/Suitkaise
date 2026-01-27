@@ -1,12 +1,18 @@
 """
-processing api
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise.processing import Skprocess, Pool, Share
+    ```
+────────────────────────────────────────────────────────\n
+
+Api for processing.
 """
 
-# Import internal components
+# import internal components
 from ._int.process_class import Skprocess
-# ProcessConfig is internal - not exported
 from ._int.timers import ProcessTimers
 from ._int.pool import Pool
+from ._int.share import Share
 from ._int.errors import (
     ProcessError,
     PreRunError,
@@ -20,11 +26,26 @@ from ._int.errors import (
 )
 
 
-def auto_reconnect(**auth):
+def autoreconnect(**auth):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import Skprocess, autoreconnect
+        
+        auth = {
+            "psycopg2.Connection": {"*": "secret"},
+            "redis.Redis": {"*": "redis_pass"},
+        }
+        @autoreconnect(**auth)
+        class MyProcess(Skprocess):
+            def __run__(self):
+                ...
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Class decorator to enable automatic reconnects after deserialization.
     
-    When a Skprocess decorated with @auto_reconnect is deserialized in the
+    When a Skprocess decorated with @autoreconnect is deserialized in the
     child process, reconnect_all() is called automatically to restore any
     Reconnector objects (database connections, sockets, etc.).
     
@@ -33,7 +54,7 @@ def auto_reconnect(**auth):
             Use "*" as the attr key for defaults that apply to all instances.
     
     Example:
-        @auto_reconnect(**{
+        @autoreconnect(**{
             "psycopg2.Connection": {
                 "*": {"host": "localhost", "password": "secret"},
                 "analytics_db": {"password": "other_pass"},
@@ -65,9 +86,10 @@ __all__ = [
     # Main classes
     'Skprocess',
     'Pool',
+    'Share',
     
     # Decorators
-    'auto_reconnect',
+    'autoreconnect',
     
     # Timers
     'ProcessTimers',

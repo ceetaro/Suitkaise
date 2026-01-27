@@ -7,6 +7,12 @@ Custom exceptions for path detection and handling operations.
 
 class PathDetectionError(Exception):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.paths import PathDetectionError
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Raised when path or project root detection fails.
     
     This exception is raised when:
@@ -20,6 +26,12 @@ class PathDetectionError(Exception):
 
 class NotAFileError(IsADirectoryError):
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.paths import NotAFileError
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Raised when a file operation is attempted on a directory.
     
     Inherits from IsADirectoryError for compatibility with standard

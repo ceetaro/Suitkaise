@@ -1,4 +1,11 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import paths
+    ```
+────────────────────────────────────────────────────────\n
+
+Api for the paths module.
 """
 
 from __future__ import annotations
@@ -65,6 +72,7 @@ def get_project_root(expected_name: str | None = None) -> Skpath:
         ```
     ────────────────────────────────────────────────────────
         ```python
+        # same as this
         from suitkaise.paths import Skpath
         
         root = Skpath().root
@@ -104,6 +112,7 @@ def get_caller_path() -> Skpath:
         ```
     ────────────────────────────────────────────────────────
         ```python
+        # same as this
         from suitkaise.paths import Skpath
         
         caller = Skpath()
@@ -132,6 +141,7 @@ def get_current_dir() -> Skpath:
         ```
     ────────────────────────────────────────────────────────
         ```python
+        # same as this
         from suitkaise.paths import Skpath
         
         current_dir = Skpath().parent
@@ -210,6 +220,7 @@ def get_id(
         ```
     ────────────────────────────────────────────────────────
         ```python
+        # same as this
         from suitkaise.paths import Skpath
         
         path_id = Skpath("myproject/feature/file.txt").id
@@ -245,23 +256,27 @@ def get_project_paths(
         ```python
         from suitkaise import paths
         
-        # Get all paths in project
+        # get all paths in project
         paths = paths.get_project_paths()
+
+        # use a custom root
+        paths = paths.get_project_paths(root="src")
         
-        # Get paths as strings for memory efficiency
-        paths = paths.get_project_paths(as_strings=True)
-        
-        # Exclude specific paths
+        # exclude specific paths
         paths = paths.get_project_paths(exclude=["build", "dist"])
         
-        # Use custom root
-        paths = paths.get_project_paths(root="src")
+        # get paths as strings for memory efficiency
+        paths = paths.get_project_paths(as_strings=True)
+
+        # automatically respects .*ignore files
+        # to disable this, set use_ignore_files=False   
+        paths = paths.get_project_paths(use_ignore_files=False)    
         ```
     ────────────────────────────────────────────────────────\n
 
     Get all paths in the project.
     
-    Automatically respects .*ignore files (.gitignore, .cursorignore, etc.).
+    Automatically respects .*ignore files (.gitignore, .cursorignore, ...)
     
     Args:
         root: Custom root directory (defaults to detected project root)
@@ -294,7 +309,7 @@ def get_project_structure(
         from suitkaise import paths
         
         structure = paths.get_project_structure()
-        # Returns:
+
         # {
         #     "myproject": {
         #         "src": {
@@ -307,7 +322,9 @@ def get_project_structure(
         ```
     ────────────────────────────────────────────────────────\n
 
-    Get a hierarchical dict representation of the project structure.
+    Get a nested dict representing the project structure.
+
+    Automatically respects .*ignore files (.gitignore, .cursorignore, ...)
     
     Args:
         root: Custom root directory (defaults to detected project root)
@@ -331,7 +348,7 @@ def get_formatted_project_tree(
     root: str | Path | "Skpath" | None = None,
     exclude: str | Path | "Skpath" | list[str | Path | "Skpath"] | None = None,
     use_ignore_files: bool = True,
-    depth: int = 3,
+    depth: int | None = None,
     include_files: bool = True,
 ) -> str:
     """
@@ -342,7 +359,6 @@ def get_formatted_project_tree(
         tree = paths.get_formatted_project_tree()
         print(tree)
         
-        # Output:
         # myproject/
         # ├── src/
         # │   ├── main.py
@@ -360,7 +376,7 @@ def get_formatted_project_tree(
         root: Custom root directory (defaults to detected project root)
         exclude: Paths to exclude
         use_ignore_files: Respect .*ignore files (default True)
-        depth: Maximum depth to display (default 3)
+        depth: Maximum depth to display (default None) (None = no limit)
         include_files: Include files in the tree (default True)
         
     Returns:
@@ -445,10 +461,11 @@ def is_valid_filename(filename: str) -> bool:
 
 def streamline_path(
     path: str,
-    max_length: int | None = None,
+    max_len: int | None = None,
     replacement_char: str = "_",
     lowercase: bool = False,
     strip_whitespace: bool = True,
+    chars_to_replace: str | list[str] | None = None,
     allow_unicode: bool = True,
 ) -> str:
     """
@@ -456,32 +473,35 @@ def streamline_path(
         ```python
         from suitkaise.paths import streamline_path
         
-        # Basic cleanup
-        streamline_path("My File<1>.txt")
-        # "My File_1_.txt"
+        # basic cleanup
+        path = streamline_path("My File<1>.txt", chars_to_replace=" ")
+        # "My_File_1_.txt"
         
-        # Lowercase and limit length
-        streamline_path("My Long Filename.txt", max_length=10, lowercase=True)
-        # "my long fi"
+        # lowercase and limit len
+        path = streamline_path("My Long Filename.txt", max_len=10, lowercase=True, chars_to_replace=" ")
+        # "my_long_fi.txt"
         
-        # Replace invalid chars with custom character
-        streamline_path("file:name.txt", replacement_char="-")
+        # replace invalid chars with custom character
+        path = streamline_path("file:name.txt", replacement_char="-")
         # "file-name.txt"
         
         # ASCII only (no unicode)
-        streamline_path("файл.txt", allow_unicode=False)
+        path = streamline_path("файл.txt", allow_unicode=False)
         # "____.txt"
         ```
     ────────────────────────────────────────────────────────\n
 
     Sanitize a path or filename by removing/replacing invalid characters.
+
+    This includes `'\\t'`, `'\\n'`, `'\\r'`, and other problematic characters.
     
     Args:
         path: The path or filename to sanitize
-        max_length: Maximum length to truncate to (None = no limit)
+        max_len: Maximum length to truncate to (None = no limit)
         replacement_char: Character to replace invalid chars with (default "_")
         lowercase: Convert to lowercase (default False)
         strip_whitespace: Strip leading/trailing whitespace (default True)
+        chars_to_replace: Extra characters to replace (default None)
         allow_unicode: Allow unicode characters (default True)
         
     Returns:
@@ -492,6 +512,14 @@ def streamline_path(
     # strip whitespace first
     if strip_whitespace:
         result = result.strip()
+
+    # replace any explicitly specified characters
+    if chars_to_replace:
+        if isinstance(chars_to_replace, str):
+            chars_to_replace = [chars_to_replace]
+        for char in chars_to_replace:
+            if len(char) == 1:
+                result = result.replace(char, replacement_char)
     
     # replace invalid characters
     for char in _INVALID_FILENAME_CHARS:
@@ -513,15 +541,63 @@ def streamline_path(
     if lowercase:
         result = result.lower()
     
-    # truncate to max length
-    if max_length is not None and len(result) > max_length:
-        result = result[:max_length]
+    # truncate to max len (preserve suffix)
+    if max_len is not None and len(result) > max_len:
+        dot_index = result.rfind(".")
+        if dot_index > 0:
+            suffix = result[dot_index:]
+            stem = result[:dot_index]
+            stem_max = max(0, max_len - len(suffix))
+            result = f"{stem[:stem_max]}{suffix}"
+        else:
+            result = result[:max_len]
     
     # clean up trailing spaces/periods that may have been introduced
     result = result.rstrip(' .')
     
     return result
 
+
+def streamline_path_quick(
+    path: str,
+    max_len: int | None = None,
+    replacement_char: str = "_",
+    lowercase: bool = False
+) -> str:
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+
+        path = paths.streamline_path_quick("My File<1>файл.txt")
+
+        # "my_file_1_____.txt"
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Simple version of streamline_path.
+
+    This version replaces all invalid and unicode characters with a replacement character.
+    It also strips whitespace and replaces all whitespace inside the path name.
+
+    Args:
+        path: The path or filename to sanitize
+        max_len: Maximum length to truncate to (None = no limit)
+        replacement_char: Character to replace invalid chars with (default "_")
+        lowercase: Convert to lowercase (default False)
+
+    Returns:
+        Sanitized path string
+    """
+    return streamline_path(
+        path,
+        max_len=max_len,
+        replacement_char=replacement_char,
+        lowercase=lowercase,
+        strip_whitespace=True,
+        chars_to_replace=" ",
+        allow_unicode=False,
+    )
 
 # module exports
 
@@ -561,4 +637,5 @@ __all__ = [
     # path utilities
     "is_valid_filename",
     "streamline_path",
+    "streamline_path_quick",
 ]

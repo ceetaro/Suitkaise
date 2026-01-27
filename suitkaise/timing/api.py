@@ -1,4 +1,10 @@
 """
+────────────────────────────────────────────────────────
+    ```python
+    from suitkaise import Sktimer, TimeThis, timethis
+    ```
+────────────────────────────────────────────────────────\n
+
 sktime API - Smart Timing Operations for Suitkaise
 
 This module provides user-friendly timing functionality with statistical analysis,

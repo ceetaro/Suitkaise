@@ -53,17 +53,10 @@ class TimedMethod:
 
 class Skprocess:
     """
-    Base class for subprocess-based process execution.
-    
-    Inherit from this class and implement lifecycle methods:
-    - __prerun__(): Called before each run iteration
-    - __run__(): Main work (required) - called each iteration
-    - __postrun__(): Called after each run iteration  
-    - __onfinish__(): Called when process ends (stop/limit reached)
-    - __result__(): Return data when process completes
-    - __error__(): Handle errors when all lives exhausted
-    
-    Usage:
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise.processing import Skprocess
+        
         class MyProcess(Skprocess):
             def __init__(self):
                 self.counter = 0
@@ -79,9 +72,24 @@ class Skprocess:
         process.start()
         process.wait()
         result = process.result
-        
-        # Access timing (automatic for any lifecycle method you define)
+
+        # access timing (automatic for any lifecycle method you define)
         print(process.__run__.timer.mean)
+        ```
+    ────────────────────────────────────────────────────────\n
+
+    Base class for subprocess-based process execution.
+    
+    Inherit from this class and implement lifecycle methods.
+
+    - __prerun__(): Called before each run iteration
+    - __run__(): Main work (required) - called each iteration
+    - __postrun__(): Called after each run iteration  
+    - __onfinish__(): Called when process ends (stop/limit reached)
+    - __result__(): Return data when process completes
+    - __error__(): Handle errors when all lives exhausted
+
+    Your Skprocess inheriting class will not return a result unless you define the __result__ method.
     """
     
     # class-level attribute declarations for type checking
@@ -144,7 +152,7 @@ class Skprocess:
             
             cls.__init__ = default_init
         
-        # handle serialization methods for cerial compatibility.
+        # handle serialization methods for cerial compatibility
         #   cerial requires these to be in the class's own __dict__ (not inherited)
         #   for locally-defined classes.
 
@@ -326,7 +334,7 @@ class Skprocess:
                     if key not in obj.__dict__:
                         obj.__dict__[key] = value
         
-        # auto-reconnect if enabled via @auto_reconnect decorator
+        # auto-reconnect if enabled via @autoreconnect decorator
         if getattr(new_class, '_auto_reconnect_enabled', False):
             try:
                 from suitkaise.cerial.api import reconnect_all
@@ -416,9 +424,9 @@ class Skprocess:
                 setattr(instance, method_name, wrapper)
     
 
+
     # lifecycle methods (override these in subclass)
 
-    
     def __prerun__(self) -> None:
         """Called before each __run__() iteration. Override in subclass."""
         pass

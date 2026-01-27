@@ -71,6 +71,14 @@ REQUIREMENTS_PATTERNS = frozenset({
 
 def set_custom_root(path: str | Path) -> None:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+        
+        paths.set_custom_root("/my/project")
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Set a custom project root, overriding automatic detection.
     
     Thread-safe operation.
@@ -100,6 +108,14 @@ def set_custom_root(path: str | Path) -> None:
 
 def get_custom_root() -> str | None:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+        
+        current = paths.get_custom_root()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Get the currently set custom root, if any.
     
     Returns:
@@ -113,6 +129,14 @@ def get_custom_root() -> str | None:
 
 def clear_custom_root() -> None:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+        
+        paths.clear_custom_root()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Clear the custom project root, reverting to automatic detection.
     
     Thread-safe operation.
@@ -125,6 +149,17 @@ def clear_custom_root() -> None:
 
 class CustomRoot:
     """
+    ────────────────────────────────────────────────────────
+        ```python
+        from suitkaise import paths
+        
+        with paths.CustomRoot("/my/project"):
+
+            # root will be an Skpath for "/my/project"
+            root = paths.get_project_root()
+        ```
+    ────────────────────────────────────────────────────────\n
+
     Context manager for temporarily setting a custom project root.
     
     Thread-safe - uses RLock so can be nested from same thread.
