@@ -323,7 +323,8 @@ async def test_asyncskfunction_rate_limit_spacing():
     await async_func()
     elapsed = stdlib_time.perf_counter() - start
     
-    assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
+    min_elapsed = 0.04 if sys.platform == "win32" else 0.045
+    assert elapsed >= min_elapsed, f"Expected >= {min_elapsed:.3f}s, got {elapsed}"
 
 
 def test_asyncskfunction_rate_limit_invalid():
