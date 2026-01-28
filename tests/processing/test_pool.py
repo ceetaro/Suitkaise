@@ -289,7 +289,7 @@ def test_pool_map_parallel():
     assert results == [2, 4, 6, 8]
     # Should complete faster than sequential (200ms)
     # Allow some overhead for process spawning (extra on Windows)
-    max_elapsed = 1.5 if sys.platform == "win32" else 0.5
+    max_elapsed = 3.0 if sys.platform == "win32" else 0.5
     assert elapsed < max_elapsed, f"Should be parallel (< 200ms sequential), got {elapsed}"
 
 

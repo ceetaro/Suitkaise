@@ -344,7 +344,38 @@ class FileDescriptorHandler(Handler):
         
         # Windows and other platforms: no reliable way to get path from fd
         # Try to capture flags and position where possible (POSIX).
-        if sys.platform != 'win32':
+        if sys.platform == 'win32':
+            # Attempt to resolve path via Win32 API
+            try:
+                import msvcrt
+                import ctypes
+                from ctypes import wintypes
+
+                handle = msvcrt.get_osfhandle(obj)
+                GetFinalPathNameByHandleW = ctypes.windll.kernel32.GetFinalPathNameByHandleW
+                GetFinalPathNameByHandleW.argtypes = [
+                    wintypes.HANDLE,
+                    wintypes.LPWSTR,
+                    wintypes.DWORD,
+                    wintypes.DWORD,
+                ]
+                GetFinalPathNameByHandleW.restype = wintypes.DWORD
+
+                buffer_len = 512
+                while True:
+                    buf = ctypes.create_unicode_buffer(buffer_len)
+                    result = GetFinalPathNameByHandleW(handle, buf, buffer_len, 0)
+                    if result == 0:
+                        break
+                    if result < buffer_len:
+                        path = buf.value
+                        if path.startswith('\\\\?\\'):
+                            path = path[4:]
+                        break
+                    buffer_len = result + 1
+            except Exception:
+                pass
+        else:
             try:
                 import fcntl
                 flags = fcntl.fcntl(obj, fcntl.F_GETFL)

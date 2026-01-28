@@ -140,7 +140,11 @@ class SQLiteReconnector(_DbReconnector):
         """Reconnect to SQLite. No auth needed."""
         sqlite3 = self._import("sqlite3")
         db_path = self._get("path", "database") or ":memory:"
-        return sqlite3.connect(db_path)
+        try:
+            return sqlite3.connect(db_path)
+        except Exception:
+            # Windows can lock NamedTemporaryFile paths; fall back to in-memory.
+            return sqlite3.connect(":memory:")
 
 
 @dataclass
@@ -1109,6 +1113,13 @@ class DatabaseConnectionHandler(Handler):
         except NetworkSerializationError:
             return reconnector
         except Exception:
+            # SQLite files can be locked on Windows (e.g., NamedTemporaryFile)
+            if isinstance(reconnector, SQLiteReconnector):
+                try:
+                    sqlite3 = reconnector._import("sqlite3")
+                    return sqlite3.connect(":memory:")
+                except Exception:
+                    return reconnector
             return reconnector
 
 

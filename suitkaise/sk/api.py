@@ -303,13 +303,20 @@ class Skfunction(Generic[P, R]):
             if timeout_config:
                 seconds = timeout_config['seconds']
                 with ThreadPoolExecutor(max_workers=1) as executor:
+                    start_time = time_module.perf_counter()
                     future = executor.submit(func, *args, **kwargs)
                     try:
-                        return future.result(timeout=seconds)
+                        result = future.result(timeout=seconds)
                     except concurrent.futures.TimeoutError:
                         raise FunctionTimeoutError(
                             f"{func.__name__} timed out after {seconds} seconds"
                         )
+                    elapsed = time_module.perf_counter() - start_time
+                    if elapsed > seconds:
+                        raise FunctionTimeoutError(
+                            f"{func.__name__} timed out after {seconds} seconds"
+                        )
+                    return result
             else:
                 return func(*args, **kwargs)
         

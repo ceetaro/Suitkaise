@@ -1151,8 +1151,10 @@ def test_db_connection_handler_reconstruct_reconnector():
 def test_db_connection_handler_reconstruct_sqlite():
     """DatabaseConnectionHandler should auto-connect when details are sufficient."""
     handler = DatabaseConnectionHandler()
-    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
-        conn = sqlite3.connect(tmp.name)
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = sqlite3.connect(path)
         try:
             state = handler.extract_state(conn)
         finally:
@@ -1160,6 +1162,11 @@ def test_db_connection_handler_reconstruct_sqlite():
         restored = handler.reconstruct(state)
         assert isinstance(restored, sqlite3.Connection)
         restored.close()
+    finally:
+        try:
+            os.unlink(path)
+        except Exception:
+            pass
 
 
 # =============================================================================

@@ -551,6 +551,9 @@ class Pool:
         """
         self._workers = workers or multiprocessing.cpu_count()
         self._active_processes: list[multiprocessing.Process] = []
+        self._mp_pool: multiprocessing.pool.Pool | None = multiprocessing.Pool(
+            processes=self._workers
+        )
     
     def close(self) -> None:
         """Wait for all active processes to finish."""
@@ -558,6 +561,10 @@ class Pool:
             if p.is_alive():
                 p.join()
         self._active_processes.clear()
+        if self._mp_pool is not None:
+            self._mp_pool.close()
+            self._mp_pool.join()
+            self._mp_pool = None
     
     def terminate(self) -> None:
         """Forcefully terminate all active processes."""
@@ -565,6 +572,10 @@ class Pool:
             if p.is_alive():
                 p.terminate()
         self._active_processes.clear()
+        if self._mp_pool is not None:
+            self._mp_pool.terminate()
+            self._mp_pool.join()
+            self._mp_pool = None
     
     def __enter__(self) -> "Pool":
         return self
@@ -749,13 +760,27 @@ class Pool:
         
         # serialize the function or Skprocess class once for reuse
         serialized_fn = cerial.serialize(fn_or_process)
+
+        # results preserves input order for map
+        results = [None] * len(items)
+
+        if timeout is None and self._mp_pool is not None:
+            args = [
+                (serialized_fn, cerial.serialize(item), is_star)
+                for item in items
+            ]
+            messages = self._mp_pool.map(_pool_worker_bytes_args, args)
+            for idx, message in enumerate(messages):
+                if message["type"] == "error":
+                    error = cerial.deserialize(message["data"])
+                    raise error
+                results[idx] = cerial.deserialize(message["data"])
+            return results
         
         max_workers = self._workers
         if max_workers is None:
             max_workers = len(items)
         
-        # results preserves input order for map
-        results = [None] * len(items)
         active: list[tuple[int, multiprocessing.Queue, multiprocessing.Process]] = []
         next_index = 0
         
@@ -779,7 +804,7 @@ class Pool:
                 
                 try:
                     # read one message per worker and decode result or error
-                    message = q.get(timeout=1.0)
+                    message = q.get()
                     if message["type"] == "error":
                         error = cerial.deserialize(message["data"])
                         raise error
@@ -811,6 +836,19 @@ class Pool:
         
         # serialize the function or Skprocess class once for reuse
         serialized_fn = cerial.serialize(fn_or_process)
+        if timeout is None and self._mp_pool is not None:
+            args = [
+                (serialized_fn, cerial.serialize(item), is_star)
+                for item in items
+            ]
+            def iterator() -> Iterator:
+                for message in self._mp_pool.imap(_pool_worker_bytes_args, args):
+                    if message["type"] == "error":
+                        error = cerial.deserialize(message["data"])
+                        raise error
+                    yield cerial.deserialize(message["data"])
+            return iterator()
+
         max_workers = self._workers
         if max_workers is None:
             max_workers = len(items)
@@ -844,7 +882,7 @@ class Pool:
                 
                 try:
                     # decode the next result in order
-                    message = q.get(timeout=1.0)
+                    message = q.get()
                     if message["type"] == "error":
                         error = cerial.deserialize(message["data"])
                         raise error
@@ -877,6 +915,19 @@ class Pool:
         
         # serialize the function or Skprocess class once for reuse
         serialized_fn = cerial.serialize(fn_or_process)
+        if timeout is None and self._mp_pool is not None:
+            args = [
+                (serialized_fn, cerial.serialize(item), is_star)
+                for item in items
+            ]
+            def iterator() -> Iterator:
+                for message in self._mp_pool.imap_unordered(_pool_worker_bytes_args, args):
+                    if message["type"] == "error":
+                        error = cerial.deserialize(message["data"])
+                        raise error
+                    yield cerial.deserialize(message["data"])
+            return iterator()
+
         max_workers = self._workers
         if max_workers is None:
             max_workers = len(items)
@@ -904,7 +955,7 @@ class Pool:
                     w.join(timeout=0)
                     try:
                         # decode next completed result as soon as it is ready
-                        message = q.get(timeout=1.0)
+                        message = q.get()
                         if message["type"] == "error":
                             error = cerial.deserialize(message["data"])
                             raise error
@@ -949,7 +1000,7 @@ def _ordered_results(
         
         try:
             # decode the result or error message
-            message = q.get(timeout=1.0)
+            message = q.get()
             if message["type"] == "error":
                 error = cerial.deserialize(message["data"])
                 raise error
@@ -993,7 +1044,7 @@ def _unordered_results(
             if not w.is_alive():
                 # Worker finished, get result
                 try:
-                    message = q.get(timeout=0.1)
+                    message = q.get()
                     if message["type"] == "error":
                         error = cerial.deserialize(message["data"])
                         raise error
@@ -1078,6 +1129,51 @@ def _pool_worker(
                 "type": "error",
                 "data": cerial.serialize(RuntimeError(error_msg))
             })
+
+
+def _pool_worker_bytes(
+    serialized_fn: bytes,
+    serialized_item: bytes,
+    is_star: bool,
+) -> dict:
+    """
+    Worker for multiprocessing.Pool that returns serialized result/error.
+    """
+    from suitkaise import cerial
+
+    try:
+        fn_or_process = cerial.deserialize(serialized_fn)
+        item = cerial.deserialize(serialized_item)
+
+        if is_star:
+            if isinstance(item, tuple):
+                args = item
+            else:
+                args = (item,)
+        else:
+            args = (item,)
+
+        from .process_class import Skprocess
+
+        if isinstance(fn_or_process, type) and issubclass(fn_or_process, Skprocess):
+            process_instance = fn_or_process(*args)
+            result = _run_process_inline(process_instance)
+        else:
+            result = fn_or_process(*args) if is_star else fn_or_process(item)
+
+        return {"type": "result", "data": cerial.serialize(result)}
+    except Exception as e:
+        try:
+            return {"type": "error", "data": cerial.serialize(e)}
+        except Exception:
+            import traceback
+            error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+            return {"type": "error", "data": cerial.serialize(RuntimeError(error_msg))}
+
+
+def _pool_worker_bytes_args(args: tuple[bytes, bytes, bool]) -> dict:
+    """Unpack args for Pool.imap/imap_unordered."""
+    return _pool_worker_bytes(*args)
 
 
 def _run_process_inline(process: "Skprocess") -> Any:

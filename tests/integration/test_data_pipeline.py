@@ -303,12 +303,17 @@ def test_share_with_progress_tracking():
             share.timer.add_time(float(i) * 0.1)
             share.progress.add_file(1000 * (i + 1))
         
-        # Wait for writes to process
-        time.sleep(0.3)
-        
-        # Read back from coordinator
-        timer = share._coordinator.get_object('timer')
-        progress = share._coordinator.get_object('progress')
+        # Wait for writes to process (coordinator can be slow on Windows)
+        timer = None
+        progress = None
+        deadline = time.perf_counter() + 2.0
+        while time.perf_counter() < deadline:
+            timer = share._coordinator.get_object('timer')
+            progress = share._coordinator.get_object('progress')
+            if timer is not None and progress is not None:
+                if len(timer.times) >= 5 and progress.files_processed >= 5:
+                    break
+            time.sleep(0.05)
         
         assert timer is not None, "Sktimer should be stored in Share"
         assert progress is not None, "Progress should be stored in Share"

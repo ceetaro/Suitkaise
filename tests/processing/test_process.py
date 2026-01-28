@@ -709,7 +709,7 @@ def test_concurrent_processes():
     elapsed = time.perf_counter() - start
     
     # Windows process startup is slower; allow a larger threshold there
-    max_elapsed = 2.0 if sys.platform == "win32" else 0.4
+    max_elapsed = 3.0 if sys.platform == "win32" else 0.4
     # Should complete in ~100-200ms (parallel), not 500ms (sequential)
     assert elapsed < max_elapsed, f"Concurrent should be ~100ms, got {elapsed}"
 

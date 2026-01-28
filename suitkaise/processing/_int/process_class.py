@@ -607,6 +607,7 @@ class Skprocess:
         self._drain_result_queue()
         
         self._subprocess.join(timeout=timeout)
+        self._drain_result_queue()
         return not self._subprocess.is_alive()
     
     wait = _ModifiableMethod(
@@ -671,8 +672,15 @@ class Skprocess:
         import queue as queue_module
         
         try:
-            # use short timeout for polling - subprocess may still be producing
-            message = self._result_queue.get(timeout=1.0)
+            # non-blocking read; subprocess may still be producing
+            get_nowait = getattr(self._result_queue, "get_nowait", None)
+            if get_nowait is not None:
+                try:
+                    message = get_nowait()
+                except queue_module.Empty:
+                    message = self._result_queue.get(timeout=0.5)
+            else:
+                message = self._result_queue.get(timeout=0.5)
             
             # update timers from subprocess
             if 'timers' in message and message['timers'] is not None:
