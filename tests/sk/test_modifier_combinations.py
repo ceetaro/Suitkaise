@@ -12,6 +12,7 @@ import sys
 import time as stdlib_time
 import asyncio
 import inspect
+import itertools
 from concurrent.futures import Future
 
 from pathlib import Path
@@ -138,6 +139,31 @@ def flaky_func(x):
 def reset_flaky():
     global fail_count
     fail_count = 0
+
+
+def _apply_modifiers(sk_func, chain):
+    for name in chain:
+        if name == "retry":
+            sk_func = sk_func.retry(times=2, delay=0.0)
+        elif name == "timeout":
+            sk_func = sk_func.timeout(1.0)
+        elif name == "rate_limit":
+            sk_func = sk_func.rate_limit(1000.0)
+        elif name == "asynced":
+            sk_func = sk_func.asynced()
+        elif name == "background":
+            sk_func = sk_func.background()
+        else:
+            raise AssertionError(f"Unknown modifier: {name}")
+    return sk_func
+
+
+def _modifier_permutations(items):
+    combos = []
+    for r in range(len(items) + 1):
+        for perm in itertools.permutations(items, r):
+            combos.append(perm)
+    return combos
 
 
 # =============================================================================
@@ -403,6 +429,114 @@ def test_async_order_does_not_matter():
 
 
 # =============================================================================
+# Exhaustive Modifier Combinations
+# =============================================================================
+
+def test_all_sync_modifier_combinations():
+    """Every valid sync combination should work (retry/timeout/rate_limit)."""
+    base_mods = ["retry", "timeout", "rate_limit"]
+    combos = _modifier_permutations(base_mods)
+    
+    for chain in combos:
+        sk_func = Skfunction(simple_func)
+        wrapped = _apply_modifiers(sk_func, chain)
+        result = wrapped(5)
+        assert result == 10, f"Chain {chain} returned {result}"
+
+
+def test_all_sync_combinations_with_background():
+    """Every sync chain should work with background()."""
+    base_mods = ["retry", "timeout", "rate_limit"]
+    combos = _modifier_permutations(base_mods)
+    
+    for chain in combos:
+        sk_func = Skfunction(simple_func)
+        wrapped = _apply_modifiers(sk_func, chain + ("background",))
+        future = wrapped(5)
+        assert isinstance(future, Future)
+        result = future.result(timeout=5)
+        assert result == 10, f"Chain {chain}+background returned {result}"
+
+
+def test_all_async_modifier_combinations():
+    """Every valid async combination should work (asynced + retry/timeout/rate_limit)."""
+    mods = ["asynced", "retry", "timeout", "rate_limit"]
+    combos = []
+    for r in range(1, len(mods) + 1):
+        for perm in itertools.permutations(mods, r):
+            if "asynced" in perm:
+                combos.append(perm)
+    
+    for chain in combos:
+        sk_func = Skfunction(slow_func)
+        wrapped = _apply_modifiers(sk_func, chain)
+        coro = wrapped(5)
+        assert inspect.iscoroutine(coro), f"Chain {chain} should return coroutine"
+        result = asyncio.run(coro)
+        assert result == 10, f"Chain {chain} returned {result}"
+
+
+def test_all_sync_combinations_on_sk_function():
+    """Every sync combination should work on @sk functions."""
+    from suitkaise.sk import sk
+    
+    @sk
+    def decorated(x):
+        return x * 2
+    
+    base_mods = ["retry", "timeout", "rate_limit"]
+    combos = _modifier_permutations(base_mods)
+    
+    for chain in combos:
+        wrapped = _apply_modifiers(decorated, chain)
+        result = wrapped(5)
+        assert result == 10, f"@sk chain {chain} returned {result}"
+
+
+def test_all_sync_combinations_on_sk_function_background():
+    """Every sync combination should work with background() on @sk functions."""
+    from suitkaise.sk import sk
+    
+    @sk
+    def decorated(x):
+        return x * 2
+    
+    base_mods = ["retry", "timeout", "rate_limit"]
+    combos = _modifier_permutations(base_mods)
+    
+    for chain in combos:
+        wrapped = _apply_modifiers(decorated, chain + ("background",))
+        future = wrapped(5)
+        assert isinstance(future, Future)
+        result = future.result(timeout=5)
+        assert result == 10, f"@sk chain {chain}+background returned {result}"
+
+
+def test_all_async_combinations_on_sk_function():
+    """Every async combination should work on @sk functions."""
+    from suitkaise.sk import sk
+    
+    @sk
+    def decorated(x):
+        stdlib_time.sleep(0.001)
+        return x * 2
+    
+    mods = ["asynced", "retry", "timeout", "rate_limit"]
+    combos = []
+    for r in range(1, len(mods) + 1):
+        for perm in itertools.permutations(mods, r):
+            if "asynced" in perm:
+                combos.append(perm)
+    
+    for chain in combos:
+        wrapped = _apply_modifiers(decorated, chain)
+        coro = wrapped(5)
+        assert inspect.iscoroutine(coro), f"@sk chain {chain} should return coroutine"
+        result = asyncio.run(coro)
+        assert result == 10, f"@sk chain {chain} returned {result}"
+
+
+# =============================================================================
 # SYNC vs ASYNC BEHAVIOR COMPARISON
 # =============================================================================
 
@@ -483,6 +617,14 @@ def run_all_tests():
     # Behavior comparison
     runner.run_test("sync: does NOT return coroutine", test_sync_does_not_return_coroutine)
     runner.run_test("async: ALWAYS returns coroutine", test_async_always_returns_coroutine)
+    
+    # Exhaustive combinations
+    runner.run_test("sync: all modifier combos", test_all_sync_modifier_combinations)
+    runner.run_test("sync: all combos + background", test_all_sync_combinations_with_background)
+    runner.run_test("async: all modifier combos", test_all_async_modifier_combinations)
+    runner.run_test("sync: all combos on @sk", test_all_sync_combinations_on_sk_function)
+    runner.run_test("sync: @sk combos + background", test_all_sync_combinations_on_sk_function_background)
+    runner.run_test("async: all combos on @sk", test_all_async_combinations_on_sk_function)
     
     return runner.print_results()
 

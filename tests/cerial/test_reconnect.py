@@ -18,7 +18,25 @@ sys.path.insert(0, str(project_root))
 from suitkaise import cerial
 from suitkaise.cerial import reconnect_all
 from suitkaise.cerial._int.handlers.reconnector import Reconnector
-from suitkaise.cerial._int.handlers.network_handler import DbReconnector, PostgresReconnector
+from suitkaise.cerial._int.handlers.network_handler import (
+    DbReconnector,
+    PostgresReconnector,
+    MySQLReconnector,
+    SQLiteReconnector,
+    MongoReconnector,
+    RedisReconnector,
+    SQLAlchemyReconnector,
+    CassandraReconnector,
+    ElasticsearchReconnector,
+    Neo4jReconnector,
+    InfluxDBReconnector,
+    ODBCReconnector,
+    ClickHouseReconnector,
+    MSSQLReconnector,
+    OracleReconnector,
+    SnowflakeReconnector,
+    DuckDBReconnector,
+)
 
 
 # =============================================================================
@@ -101,15 +119,15 @@ class TestRunner:
 
 class MockDbReconnector(Reconnector):
     """Mock DbReconnector that captures password."""
-    def __init__(self, module: str, class_name: str, details: dict = None):
+    def __init__(self, module: str, class_name: str, details: dict | None = None):
         self.module = module
         self.class_name = class_name
         self.details = details or {}
-        self.last_password = None
+        self.last_password: str | None = None
     
-    def reconnect(self, password: str = None):
-        self.last_password = password
-        return f"connected:{self.module}.{self.class_name}:{password}"
+    def reconnect(self, auth: str | None = None, **kwargs):
+        self.last_password = auth
+        return f"connected:{self.module}.{self.class_name}:{auth}"
 
 
 class SimpleReconnector(Reconnector):
@@ -117,7 +135,7 @@ class SimpleReconnector(Reconnector):
     def __init__(self, value):
         self.value = value
     
-    def reconnect(self, password: str = None):
+    def reconnect(self, auth: str | None = None, **kwargs):
         return f"reconnected-{self.value}"
 
 
@@ -284,7 +302,7 @@ def test_reconnect_all_type_key_normalization():
 
 def test_auto_reconnect_decorator_sets_flags():
     """@autoreconnect should set class attributes."""
-    from suitkaise.processing import Skprocess, autoreconnect
+    from suitkaise.processing import Skprocess, autoreconnect  # type: ignore[attr-defined]
     
     @autoreconnect(**{
         "psycopg2.Connection": {"*": "test_password"}
@@ -293,17 +311,15 @@ def test_auto_reconnect_decorator_sets_flags():
         def __run__(self):
             pass
     
-    assert hasattr(TestProcess, '_auto_reconnect_enabled')
-    assert TestProcess._auto_reconnect_enabled is True
-    assert hasattr(TestProcess, '_auto_reconnect_kwargs')
-    assert TestProcess._auto_reconnect_kwargs == {
+    assert getattr(TestProcess, "_auto_reconnect_enabled", False) is True
+    assert getattr(TestProcess, "_auto_reconnect_kwargs", None) == {
         "psycopg2.Connection": {"*": "test_password"}
     }
 
 
 def test_auto_reconnect_docstring_example():
     """Docstring example should set auth mapping correctly."""
-    from suitkaise.processing import Skprocess, autoreconnect
+    from suitkaise.processing import Skprocess, autoreconnect  # type: ignore[attr-defined]
     
     auth = {
         "psycopg2.Connection": {"*": "secret"},
@@ -315,21 +331,21 @@ def test_auto_reconnect_docstring_example():
         def __run__(self):
             pass
     
-    assert MyProcess._auto_reconnect_enabled is True
-    assert MyProcess._auto_reconnect_kwargs == auth
+    assert getattr(MyProcess, "_auto_reconnect_enabled", False) is True
+    assert getattr(MyProcess, "_auto_reconnect_kwargs", None) == auth
 
 
 def test_auto_reconnect_empty():
     """@autoreconnect() with no args should enable reconnect with empty overrides."""
-    from suitkaise.processing import Skprocess, autoreconnect
+    from suitkaise.processing import Skprocess, autoreconnect  # type: ignore[attr-defined]
     
     @autoreconnect()
     class TestProcess(Skprocess):
         def __run__(self):
             pass
     
-    assert TestProcess._auto_reconnect_enabled is True
-    assert TestProcess._auto_reconnect_kwargs == {}
+    assert getattr(TestProcess, "_auto_reconnect_enabled", False) is True
+    assert getattr(TestProcess, "_auto_reconnect_kwargs", None) == {}
 
 
 # =============================================================================
@@ -349,8 +365,8 @@ def test_real_db_reconnector_type_key():
     
     # Mock the reconnect to capture what's passed
     captured_password = [None]
-    def mock_reconnect(password=None):
-        captured_password[0] = password
+    def mock_reconnect(auth=None, **kwargs):
+        captured_password[0] = auth
         return "mocked"
     rec.reconnect = mock_reconnect
     
@@ -364,6 +380,83 @@ def test_real_db_reconnector_type_key():
     
     assert captured_password[0] == "testpass", \
         f"Expected 'testpass', got {captured_password[0]}"
+
+
+def test_reconnect_all_db_reconnector_type_keys():
+    """All DbReconnector subclasses should match type keys."""
+    reconnectors = [
+        (PostgresReconnector, "psycopg2.Connection", {"host": "localhost"}),
+        (MySQLReconnector, "pymysql.Connection", {"host": "localhost"}),
+        (SQLiteReconnector, "sqlite3.Connection", {"path": ":memory:"}),
+        (MongoReconnector, "pymongo.MongoClient", {"host": "localhost"}),
+        (RedisReconnector, "redis.Redis", {"host": "localhost"}),
+        (SQLAlchemyReconnector, "sqlalchemy.Engine", {"url": "sqlite://"}),
+        (CassandraReconnector, "cassandra.Cluster", {"hosts": ["localhost"]}),
+        (ElasticsearchReconnector, "elasticsearch.Elasticsearch", {"hosts": ["localhost"]}),
+        (Neo4jReconnector, "neo4j.Driver", {"uri": "bolt://localhost"}),
+        (InfluxDBReconnector, "influxdb_client.InfluxDBClient", {"url": "http://localhost"}),
+        (ODBCReconnector, "pyodbc.Connection", {"dsn": "db"}),
+        (ClickHouseReconnector, "clickhouse_driver.Client", {"host": "localhost"}),
+        (MSSQLReconnector, "pymssql.Connection", {"host": "localhost"}),
+        (OracleReconnector, "oracledb.Connection", {"host": "localhost"}),
+        (SnowflakeReconnector, "snowflake.Connection", {"account": "acct"}),
+        (DuckDBReconnector, "duckdb.Connection", {"path": ":memory:"}),
+    ]
+    
+    for cls, type_key, details in reconnectors:
+        rec = cls(details=details)
+        captured = {"auth": None}
+        
+        def reconnect(auth=None, **kwargs):
+            captured["auth"] = auth
+            return "ok"
+        
+        rec.reconnect = reconnect
+        obj = {"db": rec}
+        passwords = {type_key: {"*": "pw"}}
+        reconnect_all(obj, **passwords)
+        assert captured["auth"] == "pw", f"{cls.__name__} did not receive auth"
+
+
+def test_reconnect_all_attr_specific_dict_key():
+    """Dict keys should be used as attr_name for auth lookup."""
+    rec = MockDbReconnector("psycopg2.extensions", "connection")
+    obj = {"analytics_db": rec}
+    passwords = {
+        "psycopg2.Connection": {
+            "*": "default",
+            "analytics_db": "special",
+        }
+    }
+    reconnect_all(obj, **passwords)
+    assert rec.last_password == "special"
+
+
+def test_reconnect_all_handles_failures():
+    """reconnect_all should leave items when reconnect fails."""
+    class FailingReconnector(Reconnector):
+        def reconnect(self, **kwargs):
+            raise RuntimeError("fail")
+    
+    rec = FailingReconnector()
+    result = reconnect_all(rec)
+    assert result is rec
+
+
+def test_reconnect_all_handles_sets_and_cycles():
+    """reconnect_all should handle sets and cycles."""
+    rec1 = SimpleReconnector("a")
+    rec2 = SimpleReconnector("b")
+    payload = {rec1, rec2}
+    restored = reconnect_all(payload)
+    assert "reconnected-a" in restored
+    assert "reconnected-b" in restored
+    
+    cycle = []
+    cycle.append(cycle)
+    cycle.append(SimpleReconnector("cycle"))
+    reconnect_all(cycle)
+    assert cycle[1] == "reconnected-cycle"
 
 
 # =============================================================================
@@ -393,6 +486,10 @@ def run_all_tests():
     
     # Real DbReconnector
     runner.run_test("real PostgresReconnector type key", test_real_db_reconnector_type_key)
+    runner.run_test("all DbReconnector type keys", test_reconnect_all_db_reconnector_type_keys)
+    runner.run_test("attr-specific dict key", test_reconnect_all_attr_specific_dict_key)
+    runner.run_test("reconnect_all handles failures", test_reconnect_all_handles_failures)
+    runner.run_test("reconnect_all sets/cycles", test_reconnect_all_handles_sets_and_cycles)
     
     return runner.print_results()
 

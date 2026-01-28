@@ -191,6 +191,30 @@ def test_atomic_registry_register_and_wait():
     registry.reset()
 
 
+def test_atomic_registry_multiple_keys_wait():
+    """Atomic registry should wait for multiple keys."""
+    registry = _AtomicCounterRegistry()
+    registry.register_keys("obj", {"a", "b"})
+    registry.increment_pending("obj.a")
+    registry.increment_pending("obj.b")
+    
+    registry.update_after_write("obj.a")
+    registry.update_after_write("obj.b")
+    assert registry.wait_for_read(["obj.a", "obj.b"], timeout=0.1) is True
+    registry.reset()
+
+
+def test_atomic_registry_remove_object():
+    """Atomic registry should remove object counters."""
+    registry = _AtomicCounterRegistry()
+    registry.register_keys("obj", {"a", "b"})
+    keys_before = registry.keys_for_object("obj")
+    assert keys_before
+    registry.remove_object("obj")
+    assert registry.keys_for_object("obj") == []
+    registry.reset()
+
+
 # =============================================================================
 # _CommandQueue Tests
 # =============================================================================
@@ -240,6 +264,8 @@ def run_all_tests():
     runner.run_test("CounterRegistry basic", test_counter_registry_basic)
     runner.run_test("CounterRegistry wait", test_counter_registry_wait)
     runner.run_test("Atomic registry register/wait", test_atomic_registry_register_and_wait)
+    runner.run_test("Atomic registry multi-key wait", test_atomic_registry_multiple_keys_wait)
+    runner.run_test("Atomic registry remove object", test_atomic_registry_remove_object)
     runner.run_test("CommandQueue roundtrip", test_command_queue_roundtrip)
     runner.run_test("SourceOfTruth basic", test_source_of_truth_basic)
 

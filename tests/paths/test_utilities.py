@@ -28,6 +28,7 @@ from suitkaise.paths import (
     get_module_path,
     CustomRoot,
     PathDetectionError,
+    NotAFileError,
     Skpath,
 )
 
@@ -408,6 +409,33 @@ def test_path_detection_error_catchable():
 
 
 # =============================================================================
+# NotAFileError Tests
+# =============================================================================
+
+def test_not_a_file_error_is_exception():
+    """NotAFileError should be an Exception."""
+    assert issubclass(NotAFileError, Exception)
+
+
+def test_not_a_file_error_can_be_raised():
+    """NotAFileError should be raisable with message."""
+    try:
+        raise NotAFileError("Not a file")
+    except NotAFileError as e:
+        assert "Not a file" in str(e)
+
+
+def test_not_a_file_error_catchable():
+    """NotAFileError should be catchable."""
+    caught = False
+    try:
+        raise NotAFileError("not a file")
+    except NotAFileError:
+        caught = True
+    assert caught
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -455,6 +483,11 @@ def run_all_tests():
     runner.run_test("PathDetectionError is Exception", test_path_detection_error_is_exception)
     runner.run_test("PathDetectionError can be raised", test_path_detection_error_can_be_raised)
     runner.run_test("PathDetectionError catchable", test_path_detection_error_catchable)
+    
+    # NotAFileError tests
+    runner.run_test("NotAFileError is Exception", test_not_a_file_error_is_exception)
+    runner.run_test("NotAFileError can be raised", test_not_a_file_error_can_be_raised)
+    runner.run_test("NotAFileError catchable", test_not_a_file_error_catchable)
     
     # docstring examples
     runner.run_test("doc: get_caller_path", test_doc_get_caller_path_example)

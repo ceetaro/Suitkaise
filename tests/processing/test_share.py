@@ -14,6 +14,8 @@ Tests Share functionality:
 import sys
 import time
 import signal
+import threading
+import warnings
 
 from pathlib import Path
 
@@ -399,6 +401,61 @@ def test_share_set_multiple_objects():
         share.exit()
 
 
+def test_share_warns_when_stopped_setattr():
+    """Share should warn when setting attrs while stopped."""
+    share = Share()
+    try:
+        share.stop()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            share.count = 1
+        assert any(issubclass(w.category, RuntimeWarning) for w in caught)
+    finally:
+        share.exit()
+
+
+def test_share_stop_queue_then_start():
+    """Queued commands while stopped should apply after start()."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        share.stop()
+        share.counter.increment()
+        share.start()
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
+        counter = share._coordinator.get_object('counter')
+        assert counter is not None
+        assert counter.value == 1
+    finally:
+        share.exit()
+
+
+def test_share_concurrent_increments():
+    """Concurrent increments should serialize correctly."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        num_threads = 5
+        increments_per_thread = 50
+        
+        def worker():
+            for _ in range(increments_per_thread):
+                share.counter.increment()
+        
+        threads = [threading.Thread(target=worker) for _ in range(num_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
+        counter = share._coordinator.get_object('counter')
+        assert counter is not None
+        assert counter.value == num_threads * increments_per_thread
+    finally:
+        share.exit()
+
+
 # =============================================================================
 # Share Deletion Tests
 # =============================================================================
@@ -577,6 +634,44 @@ def test_share_nested_object_serializes():
         share.exit()
 
 
+def test_share_serialize_live_and_snapshot_modes():
+    """Share.__serialize__ should reflect live vs snapshot mode."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        live_state = share.__serialize__()
+        assert live_state["mode"] == "live"
+        assert live_state["coordinator_state"] is not None
+        
+        share.stop()
+        snapshot_state = share.__serialize__()
+        assert snapshot_state["mode"] == "snapshot"
+        assert snapshot_state["coordinator_state"] is None
+    finally:
+        share.exit()
+
+
+def test_share_deserialize_from_snapshot():
+    """Share.__deserialize__ should restore objects from snapshot."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        share.counter.increment()
+        time.sleep(0.6 if sys.platform == "win32" else 0.2)
+        share.stop()
+        snapshot_state = share.__serialize__()
+    finally:
+        share.exit()
+    
+    restored = Share.__deserialize__(snapshot_state)
+    try:
+        counter = restored._coordinator.get_object('counter')
+        assert counter is not None
+        assert counter.value >= 1
+    finally:
+        restored.exit()
+
+
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -620,6 +715,9 @@ def run_all_tests():
     runner.run_test("Share set Circuit", test_share_set_circuit, timeout=10)
     runner.run_test("Share set user class", test_share_set_user_class, timeout=10)
     runner.run_test("Share set multiple objects", test_share_set_multiple_objects, timeout=10)
+    runner.run_test("Share warns when stopped setattr", test_share_warns_when_stopped_setattr, timeout=10)
+    runner.run_test("Share stop->queue->start", test_share_stop_queue_then_start, timeout=15)
+    runner.run_test("Share concurrent increments", test_share_concurrent_increments, timeout=20)
     runner.run_test("Share clear", test_share_clear, timeout=10)
     runner.run_test("Share delete object cleans state", test_share_delete_object_cleans_state, timeout=10)
     
@@ -633,6 +731,8 @@ def run_all_tests():
     runner.run_test("Share Circuit serializes", test_share_circuit_serializes, timeout=15)
     runner.run_test("Share user class serializes", test_share_user_class_serializes, timeout=15)
     runner.run_test("Share nested object serializes", test_share_nested_object_serializes, timeout=15)
+    runner.run_test("Share serialize live/snapshot", test_share_serialize_live_and_snapshot_modes, timeout=10)
+    runner.run_test("Share deserialize snapshot", test_share_deserialize_from_snapshot, timeout=15)
     
     return runner.print_results()
 

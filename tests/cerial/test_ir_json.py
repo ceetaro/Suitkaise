@@ -155,6 +155,25 @@ def test_ir_to_jsonable_contains_markers():
         "Should represent complex numbers in JSON output"
 
 
+def test_serialize_ir_debug_verbose():
+    """serialize_ir should support debug+verbose together."""
+    ir = cerial.serialize_ir({"a": 1}, debug=True, verbose=True)
+    assert isinstance(ir, dict)
+
+
+def test_to_json_debug_verbose():
+    """to_json should support debug+verbose together."""
+    json_text = cerial.to_json({"a": 1}, debug=True, verbose=True)
+    parsed = json.loads(json_text)
+    assert isinstance(parsed, dict)
+
+
+def test_to_jsonable_debug_verbose():
+    """to_jsonable should support debug+verbose together."""
+    jsonable = cerial.to_jsonable({"a": 1}, debug=True, verbose=True)
+    assert isinstance(jsonable, (dict, list))
+
+
 # =============================================================================
 # Docstring Examples
 # =============================================================================
@@ -202,6 +221,9 @@ def run_all_tests():
     runner.run_test("JSON output is valid", test_ir_to_json_output_is_valid)
     runner.run_test("to_json output is valid", test_to_json_matches_ir_path)
     runner.run_test("JSON markers present", test_ir_to_jsonable_contains_markers)
+    runner.run_test("serialize_ir debug+verbose", test_serialize_ir_debug_verbose)
+    runner.run_test("to_json debug+verbose", test_to_json_debug_verbose)
+    runner.run_test("to_jsonable debug+verbose", test_to_jsonable_debug_verbose)
     runner.run_test("doc: serialize_ir", test_doc_serialize_ir_example)
     runner.run_test("doc: ir_to_jsonable", test_doc_ir_to_jsonable_example)
     runner.run_test("doc: ir_to_json", test_doc_ir_to_json_example)

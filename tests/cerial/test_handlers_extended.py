@@ -24,6 +24,9 @@ import threading
 import functools
 import contextlib
 import re
+import logging
+import inspect
+import contextvars
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from collections import namedtuple
 from typing import NamedTuple
@@ -64,6 +67,7 @@ from suitkaise.cerial._int.handlers.memory_handler import (
     MMapHandler,
     SharedMemoryHandler,
     FileDescriptorHandler,
+    MemoryViewHandler,
     MemorySerializationError,
 )
 from suitkaise.cerial._int.handlers.function_handler import (
@@ -91,7 +95,11 @@ from suitkaise.cerial._int.handlers.weakref_handler import (
     WeakKeyDictionaryHandler,
 )
 from suitkaise.cerial._int.handlers.namedtuple_handler import NamedTupleHandler, TypedDictHandler
-from suitkaise.cerial._int.handlers.regex_handler import MatchObjectHandler, MatchReconnector
+from suitkaise.cerial._int.handlers.regex_handler import (
+    MatchObjectHandler,
+    MatchReconnector,
+    RegexPatternHandler,
+)
 from suitkaise.cerial._int.handlers.queue_handler import (
     QueueHandler,
     MultiprocessingQueueHandler,
@@ -120,11 +128,37 @@ from suitkaise.cerial._int.handlers.threading_handler import (
     ThreadLocalHandler,
     ThreadReconnector,
 )
+from suitkaise.cerial._int.handlers.lock_handler import (
+    LockHandler,
+    SemaphoreHandler,
+    BarrierHandler,
+    ConditionHandler,
+)
 from suitkaise.cerial._int.handlers.iterator_handler import (
     IteratorHandler,
     RangeHandler,
     EnumerateHandler,
     ZipHandler,
+)
+from suitkaise.cerial._int.handlers.logging_handler import (
+    LoggerHandler,
+    StreamHandlerHandler,
+    FileHandlerHandler,
+    FormatterHandler,
+)
+from suitkaise.cerial._int.handlers.contextvar_handler import (
+    ContextVarHandler,
+    TokenHandler,
+)
+from suitkaise.cerial._int.handlers.advanced_py_handler import (
+    CodeObjectHandler,
+    FrameObjectHandler,
+    FrameInfo,
+    PropertyHandler,
+    DescriptorHandler,
+)
+from suitkaise.cerial._int.handlers.generator_handler import (
+    GeneratorHandler,
 )
 from suitkaise.cerial._int.handlers.async_handler import (
     CoroutineHandler,
@@ -302,6 +336,81 @@ def test_module_handler_dynamic_module():
     assert isinstance(restored, types.ModuleType)
     assert restored.value == 123
     assert hasattr(restored, "math_ref")
+
+
+# =============================================================================
+# Logging Handler Tests
+# =============================================================================
+
+def test_logging_formatter_roundtrip():
+    """FormatterHandler should recreate formatter settings."""
+    handler = FormatterHandler()
+    fmt = logging.Formatter(fmt="{levelname}:{message}", style="{")
+    state = handler.extract_state(fmt)
+    restored = handler.reconstruct(state)
+    assert restored._fmt == fmt._fmt
+    assert restored.datefmt == fmt.datefmt
+
+
+def test_logging_stream_handler_roundtrip():
+    """StreamHandlerHandler should reconstruct stream handlers."""
+    handler = StreamHandlerHandler()
+    formatter = logging.Formatter("%(message)s")
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.ERROR)
+    stream_handler.setFormatter(formatter)
+    state = handler.extract_state(stream_handler)
+    restored = handler.reconstruct(state)
+    assert isinstance(restored, logging.StreamHandler)
+    assert restored.level == logging.ERROR
+    assert isinstance(restored.formatter, logging.Formatter)
+
+
+def test_logging_file_handler_roundtrip():
+    """FileHandlerHandler should reconstruct file handlers."""
+    handler = FileHandlerHandler()
+    formatter = logging.Formatter("%(levelname)s:%(message)s")
+    with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tmp:
+        path = tmp.name
+    restored = None
+    file_handler = None
+    try:
+        file_handler = logging.FileHandler(path, mode="w")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        state = handler.extract_state(file_handler)
+        restored = handler.reconstruct(state)
+        assert isinstance(restored, logging.FileHandler)
+        assert os.path.basename(restored.baseFilename) == os.path.basename(path)
+        assert restored.level == logging.INFO
+        assert isinstance(restored.formatter, logging.Formatter)
+    finally:
+        if file_handler is not None:
+            file_handler.close()
+        if restored is not None:
+            restored.close()
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+
+
+def test_logger_handler_roundtrip_with_handlers():
+    """LoggerHandler should restore logger configuration with handlers."""
+    handler = LoggerHandler()
+    logger_name = "suitkaise.test.logger"
+    logger = logging.getLogger(logger_name)
+    logger.handlers = []
+    logger.setLevel(logging.WARNING)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.WARNING)
+    logger.addHandler(stream_handler)
+    state = handler.extract_state(logger)
+    restored = handler.reconstruct(state)
+    assert restored.name == logger_name
+    assert restored.level == logging.WARNING
+    assert len(restored.handlers) == 1
+    restored.handlers = []
 
 
 # =============================================================================
@@ -604,6 +713,16 @@ def test_regex_match_reconnector_roundtrip():
     assert restored.group(1) == "b"
 
 
+def test_regex_pattern_roundtrip():
+    """RegexPatternHandler should reconstruct compiled patterns."""
+    handler = RegexPatternHandler()
+    pattern = re.compile(r"\d+", re.IGNORECASE | re.MULTILINE)
+    state = handler.extract_state(pattern)
+    restored = handler.reconstruct(state)
+    assert restored.pattern == pattern.pattern
+    assert restored.flags == pattern.flags
+
+
 def test_thread_local_handler_roundtrip():
     """ThreadLocalHandler should restore thread-local values."""
     handler = ThreadLocalHandler()
@@ -612,6 +731,59 @@ def test_thread_local_handler_roundtrip():
     state = handler.extract_state(local)
     restored = handler.reconstruct(state)
     assert restored.value == 9
+
+
+def test_lock_handler_roundtrip():
+    """LockHandler should preserve locked state."""
+    handler = LockHandler()
+    lock = threading.Lock()
+    lock.acquire()
+    state = handler.extract_state(lock)
+    restored = handler.reconstruct(state)
+    assert restored.locked() is True
+    restored.release()
+    lock.release()
+    
+    rlock = threading.RLock()
+    rlock.acquire()
+    state = handler.extract_state(rlock)
+    restored = handler.reconstruct(state)
+    acquired = restored.acquire(blocking=False)
+    assert acquired is True
+    restored.release()
+    rlock.release()
+
+
+def test_semaphore_handler_roundtrip():
+    """SemaphoreHandler should preserve semaphore count."""
+    handler = SemaphoreHandler()
+    sem = threading.Semaphore(2)
+    sem.acquire()
+    state = handler.extract_state(sem)
+    restored = handler.reconstruct(state)
+    assert restored.acquire(blocking=False) is True
+    assert restored.acquire(blocking=False) is False
+
+
+def test_barrier_handler_roundtrip():
+    """BarrierHandler should preserve parties and timeout."""
+    handler = BarrierHandler()
+    barrier = threading.Barrier(2, timeout=0.5)
+    state = handler.extract_state(barrier)
+    restored = handler.reconstruct(state)
+    assert restored.parties == 2
+    assert getattr(restored, "timeout", restored._timeout) == 0.5
+
+
+def test_condition_handler_roundtrip():
+    """ConditionHandler should reconstruct condition with lock."""
+    handler = ConditionHandler()
+    condition = threading.Condition()
+    state = handler.extract_state(condition)
+    restored = handler.reconstruct(state)
+    assert isinstance(restored, threading.Condition)
+    restored.acquire()
+    restored.release()
 
 
 # =============================================================================
@@ -701,6 +873,114 @@ def test_task_handler_placeholder_result():
 
 
 # =============================================================================
+# ContextVar & Token Handler Tests
+# =============================================================================
+
+def test_contextvar_handler_roundtrip():
+    """ContextVarHandler should preserve name and current value."""
+    handler = ContextVarHandler()
+    var = contextvars.ContextVar("test_var", default="default")
+    var.set("current")
+    state = handler.extract_state(var)
+    restored = handler.reconstruct(state)
+    assert restored.name == "test_var"
+    assert restored.get() == "current"
+
+
+def test_token_handler_roundtrip():
+    """TokenHandler should return metadata for tokens."""
+    handler = TokenHandler()
+    var = contextvars.ContextVar("token_var")
+    token = var.set("value")
+    state = handler.extract_state(token)
+    restored = handler.reconstruct(state)
+    assert restored.get("__cerial_dead_token__") is True
+    assert restored.get("var_name") == "token_var"
+
+
+# =============================================================================
+# Advanced Python Handler Tests
+# =============================================================================
+
+def test_code_object_roundtrip():
+    """CodeObjectHandler should reconstruct code objects."""
+    handler = CodeObjectHandler()
+    code = (lambda x: x + 1).__code__
+    state = handler.extract_state(code)
+    restored = handler.reconstruct(state)
+    assert isinstance(restored, types.CodeType)
+    assert restored.co_name == code.co_name
+    assert restored.co_argcount == code.co_argcount
+
+
+def test_frame_object_roundtrip():
+    """FrameObjectHandler should reconstruct FrameInfo."""
+    handler = FrameObjectHandler()
+    
+    def _frame_source():
+        frame = inspect.currentframe()
+        state = handler.extract_state(frame, include_parent=False)
+        restored = handler.reconstruct(state)
+        return restored
+    
+    restored = _frame_source()
+    assert isinstance(restored, FrameInfo)
+    assert restored.function_name == "_frame_source"
+
+
+def test_property_handler_roundtrip():
+    """PropertyHandler should reconstruct properties."""
+    handler = PropertyHandler()
+    
+    def get_x(self):
+        return self._x
+    
+    def set_x(self, value):
+        self._x = value
+    
+    prop = property(get_x, set_x, doc="x property")
+    state = handler.extract_state(prop)
+    restored = handler.reconstruct(state)
+    
+    class Holder:
+        def __init__(self):
+            self._x = 0
+    
+    Holder.x = restored
+    obj = Holder()
+    obj.x = 5
+    assert obj.x == 5
+    assert Holder.x.__doc__ == "x property"
+
+
+def test_descriptor_handler_roundtrip():
+    """DescriptorHandler should reconstruct custom descriptors."""
+    handler = DescriptorHandler()
+    desc = DemoDescriptor(default=3)
+    state = handler.extract_state(desc)
+    restored = handler.reconstruct(state)
+    assert isinstance(restored, DemoDescriptor)
+    assert restored.default == 3
+
+
+# =============================================================================
+# Generator Handler Tests
+# =============================================================================
+
+def test_generator_handler_roundtrip():
+    """GeneratorHandler should preserve remaining values."""
+    handler = GeneratorHandler()
+    def gen():
+        for i in range(4):
+            yield i
+    g = gen()
+    next(g)
+    state = handler.extract_state(g)
+    restored = handler.reconstruct(state)
+    assert list(restored) == [1, 2, 3]
+
+
+# =============================================================================
 # SQLite Handler Tests
 # =============================================================================
 
@@ -762,6 +1042,16 @@ def test_mmap_roundtrip():
             mm.close()
     finally:
         os.unlink(path)
+
+
+def test_memoryview_roundtrip():
+    """MemoryViewHandler should reconstruct memoryview content."""
+    handler = MemoryViewHandler()
+    data = bytearray(b"abc")
+    view = memoryview(data)
+    state = handler.extract_state(view)
+    restored = handler.reconstruct(state)
+    assert bytes(restored) == b"abc"
 
 
 def test_mmap_closed_raises():
@@ -1337,6 +1627,17 @@ class Tools:
         return cls.__name__
 
 
+class DemoDescriptor:
+    def __init__(self, default=0):
+        self.default = default
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return instance.__dict__.get("value", self.default)
+    def __set__(self, instance, value):
+        instance.__dict__["value"] = value
+
+
 def test_namedtuple_roundtrip():
     """NamedTupleHandler should reconstruct namedtuple instances."""
     handler = NamedTupleHandler()
@@ -1836,6 +2137,10 @@ def run_all_tests():
 
     runner.run_test("Module handler static", test_module_handler_static_module)
     runner.run_test("Module handler dynamic", test_module_handler_dynamic_module)
+    runner.run_test("Logging formatter roundtrip", test_logging_formatter_roundtrip)
+    runner.run_test("Logging stream handler roundtrip", test_logging_stream_handler_roundtrip)
+    runner.run_test("Logging file handler roundtrip", test_logging_file_handler_roundtrip)
+    runner.run_test("Logger handler roundtrip", test_logger_handler_roundtrip_with_handlers)
     runner.run_test("Class instance custom serialize", test_class_instance_custom_serialize)
     runner.run_test("Class instance custom serialize local", test_class_instance_custom_serialize_local)
     runner.run_test("Class instance to_dict", test_class_instance_to_dict)
@@ -1848,7 +2153,12 @@ def run_all_tests():
     runner.run_test("Thread handler roundtrip", test_thread_handler_roundtrip)
     runner.run_test("Executor handlers roundtrip", test_executor_handlers_roundtrip)
     runner.run_test("Regex match reconnector", test_regex_match_reconnector_roundtrip)
+    runner.run_test("Regex pattern roundtrip", test_regex_pattern_roundtrip)
     runner.run_test("Thread local handler roundtrip", test_thread_local_handler_roundtrip)
+    runner.run_test("Lock handler roundtrip", test_lock_handler_roundtrip)
+    runner.run_test("Semaphore handler roundtrip", test_semaphore_handler_roundtrip)
+    runner.run_test("Barrier handler roundtrip", test_barrier_handler_roundtrip)
+    runner.run_test("Condition handler roundtrip", test_condition_handler_roundtrip)
     runner.run_test("Iterator handler enumerate", test_iterator_handler_enumerate)
     runner.run_test("Iterator handler rejects generator", test_iterator_handler_rejects_generator)
     runner.run_test("Range/Enumerate/Zip handlers", test_range_enumerate_zip_handlers)
@@ -1860,6 +2170,13 @@ def run_all_tests():
     runner.run_test("Coroutine handler await raises", test_coroutine_handler_await_raises)
     runner.run_test("Async generator handler aiter raises", test_async_generator_handler_aiter_raises)
     runner.run_test("Task handler placeholder", test_task_handler_placeholder_result)
+    runner.run_test("ContextVar handler roundtrip", test_contextvar_handler_roundtrip)
+    runner.run_test("Token handler roundtrip", test_token_handler_roundtrip)
+    runner.run_test("Code object roundtrip", test_code_object_roundtrip)
+    runner.run_test("Frame object roundtrip", test_frame_object_roundtrip)
+    runner.run_test("Property handler roundtrip", test_property_handler_roundtrip)
+    runner.run_test("Descriptor handler roundtrip", test_descriptor_handler_roundtrip)
+    runner.run_test("Generator handler roundtrip", test_generator_handler_roundtrip)
 
     runner.run_test("SQLite connection roundtrip", test_sqlite_connection_roundtrip)
     runner.run_test("SQLite cursor roundtrip", test_sqlite_cursor_roundtrip)
@@ -1930,6 +2247,7 @@ def run_all_tests():
     runner.run_test("Multiprocessing manager roundtrip", test_mp_manager_roundtrip)
 
     runner.run_test("mmap roundtrip", test_mmap_roundtrip)
+    runner.run_test("memoryview roundtrip", test_memoryview_roundtrip)
     runner.run_test("shared memory roundtrip", test_shared_memory_roundtrip)
     runner.run_test("Shared memory attach existing", test_shared_memory_attach_existing)
     runner.run_test("mmap closed raises", test_mmap_closed_raises)

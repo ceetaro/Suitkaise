@@ -326,6 +326,21 @@ async def test_asyncskfunction_rate_limit_spacing():
     assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
 
 
+def test_asyncskfunction_rate_limit_invalid():
+    """rate_limit() should reject non-positive rates."""
+    sk_func = Skfunction(blocking_return_42)
+    try:
+        sk_func.asynced().rate_limit(0)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+    try:
+        sk_func.asynced().rate_limit(-1)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+
 # =============================================================================
 # Docstring Examples
 # =============================================================================
@@ -494,6 +509,7 @@ def run_all_tests():
     # Concurrent tests
     runner.run_test("AsyncSkfunction concurrent", test_asyncskfunction_concurrent)
     runner.run_test("AsyncSkfunction rate limit spacing", test_asyncskfunction_rate_limit_spacing)
+    runner.run_test("AsyncSkfunction rate limit invalid", test_asyncskfunction_rate_limit_invalid)
     
     # Error handling tests
     runner.run_test("AsyncSkfunction propagates error", test_asyncskfunction_propagates_error)

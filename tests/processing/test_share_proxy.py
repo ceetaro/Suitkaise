@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import sys
 import time
+import threading
+import warnings
 
 from pathlib import Path
 
@@ -132,6 +134,32 @@ class Counter:
         self.value += amount
 
 
+class MultiAttr:
+    _shared_meta = {
+        "methods": {
+            "set_a": {"writes": ["a"]},
+            "set_b": {"writes": ["b"]},
+        },
+        "properties": {
+            "total": {"reads": ["a", "b"]},
+        },
+    }
+    
+    def __init__(self):
+        self.a = 0
+        self.b = 0
+    
+    def set_a(self, value: int) -> None:
+        self.a = value
+    
+    def set_b(self, value: int) -> None:
+        self.b = value
+    
+    @property
+    def total(self) -> int:
+        return self.a + self.b
+
+
 # =============================================================================
 # Proxy Tests
 # =============================================================================
@@ -161,6 +189,21 @@ def test_share_proxy_setattr():
         share.stop()
 
 
+def test_share_proxy_warns_when_stopped():
+    """Proxy should warn when coordinator is stopped."""
+    share = Share()
+    try:
+        share.counter = Counter()
+        share.stop()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            share.counter.inc(1)
+            share.counter.note = "stopped"
+        assert any(issubclass(w.category, RuntimeWarning) for w in caught)
+    finally:
+        share.stop()
+
+
 def test_share_non_proxy_value():
     """Non-proxy values should be stored directly."""
     share = Share()
@@ -169,6 +212,51 @@ def test_share_non_proxy_value():
         assert share.count == 5
         share.count = 7
         assert share.count == 7
+    finally:
+        share.stop()
+
+
+def test_share_proxy_read_barrier_multiple_attrs():
+    """Proxy should wait for all read deps before property access."""
+    share = Share()
+    try:
+        share.obj = MultiAttr()
+        share.obj.set_a(2)
+        share.obj.set_b(3)
+        time.sleep(0.1)
+        assert share.obj.total == 5
+    finally:
+        share.stop()
+
+
+def test_share_proxy_concurrent_reads_and_writes():
+    """Concurrent reads should not error during writes."""
+    share = Share()
+    try:
+        share.obj = MultiAttr()
+        errors = []
+        
+        def writer():
+            for i in range(20):
+                share.obj.set_a(i)
+                share.obj.set_b(i)
+        
+        def reader():
+            for _ in range(20):
+                try:
+                    _ = share.obj.total
+                except Exception as e:
+                    errors.append(e)
+        
+        threads = [threading.Thread(target=writer)] + [threading.Thread(target=reader) for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        
+        time.sleep(0.1)
+        assert errors == []
+        assert share.obj.total >= 0
     finally:
         share.stop()
 
@@ -231,7 +319,10 @@ def run_all_tests():
 
     runner.run_test("Proxy method/property", test_share_proxy_method_and_property)
     runner.run_test("Proxy setattr", test_share_proxy_setattr)
+    runner.run_test("Proxy warns when stopped", test_share_proxy_warns_when_stopped)
     runner.run_test("Non-proxy value", test_share_non_proxy_value)
+    runner.run_test("Proxy read barrier multi-attrs", test_share_proxy_read_barrier_multiple_attrs)
+    runner.run_test("Proxy concurrent reads/writes", test_share_proxy_concurrent_reads_and_writes)
     runner.run_test("Share clear/repr", test_share_clear_and_repr)
     runner.run_test("Share serialize/deserialize", test_share_serialize_deserialize)
     runner.run_test("Proxy fallback attr", test_object_proxy_fallback_attr)

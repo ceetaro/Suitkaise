@@ -23,6 +23,7 @@ from suitkaise.paths import (
     clear_custom_root,
     PathDetectionError,
 )
+from suitkaise.paths._int.root_detection import detect_project_root, clear_root_cache
 
 
 # =============================================================================
@@ -135,6 +136,32 @@ def test_project_root_has_indicators():
     assert found_any, f"Root {root} should have project indicators"
 
 
+def test_get_project_root_expected_name_mismatch():
+    """get_project_root() should raise when expected_name does not match."""
+    clear_custom_root()
+    try:
+        get_project_root(expected_name="not_the_root_name")
+        assert False, "Should have raised PathDetectionError"
+    except PathDetectionError:
+        pass
+
+
+def test_detect_project_root_from_path():
+    """detect_project_root should accept from_path."""
+    clear_custom_root()
+    root = detect_project_root(from_path=Path(__file__).resolve())
+    assert root.name == get_project_root().name
+
+
+def test_clear_root_cache_does_not_break_detection():
+    """clear_root_cache should reset cache safely."""
+    clear_custom_root()
+    detect_project_root(from_path=Path(__file__).resolve())
+    clear_root_cache()
+    root_after_clear = detect_project_root(from_path=Path(__file__).resolve())
+    assert root_after_clear.is_dir()
+
+
 # =============================================================================
 # Docstring Examples
 # =============================================================================
@@ -153,6 +180,27 @@ def test_doc_get_project_root_example():
 def test_set_custom_root():
     """set_custom_root() should set custom root."""
     clear_custom_root()
+
+
+def test_set_custom_root_invalid_path():
+    """set_custom_root should raise when path does not exist."""
+    clear_custom_root()
+    try:
+        set_custom_root("/path/does/not/exist")
+        assert False, "Should have raised PathDetectionError"
+    except PathDetectionError:
+        pass
+
+
+def test_set_custom_root_not_directory():
+    """set_custom_root should raise when path is not a directory."""
+    clear_custom_root()
+    with tempfile.NamedTemporaryFile() as temp_file:
+        try:
+            set_custom_root(temp_file.name)
+            assert False, "Should have raised PathDetectionError"
+        except PathDetectionError:
+            pass
     
     # Use temp directory that exists on all platforms
     custom = tempfile.gettempdir()
@@ -244,9 +292,14 @@ def run_all_tests():
     # Default detection tests
     runner.run_test("get_project_root()", test_get_project_root)
     runner.run_test("Project root has indicators", test_project_root_has_indicators)
+    runner.run_test("get_project_root expected_name mismatch", test_get_project_root_expected_name_mismatch)
+    runner.run_test("detect_project_root from_path", test_detect_project_root_from_path)
+    runner.run_test("clear_root_cache safe", test_clear_root_cache_does_not_break_detection)
     
     # Custom root tests
     runner.run_test("set_custom_root()", test_set_custom_root)
+    runner.run_test("set_custom_root invalid path", test_set_custom_root_invalid_path)
+    runner.run_test("set_custom_root not directory", test_set_custom_root_not_directory)
     runner.run_test("get_custom_root() when not set", test_get_custom_root_none)
     runner.run_test("clear_custom_root()", test_clear_custom_root)
     runner.run_test("Custom root priority", test_custom_root_priority)

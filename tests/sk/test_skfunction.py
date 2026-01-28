@@ -405,6 +405,21 @@ def test_skfunction_rate_limit_spacing():
     assert elapsed >= 0.045, f"Expected >= 0.045s, got {elapsed}"
 
 
+def test_skfunction_rate_limit_invalid():
+    """rate_limit() should reject non-positive rates."""
+    sk_slow = Skfunction(slow_work)
+    try:
+        sk_slow.rate_limit(0)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+    try:
+        sk_slow.rate_limit(-1)
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass
+
+
 # =============================================================================
 # Chaining Tests
 # =============================================================================
@@ -518,6 +533,7 @@ def run_all_tests():
     
     # rate_limit() tests
     runner.run_test("Skfunction rate limit spacing", test_skfunction_rate_limit_spacing)
+    runner.run_test("Skfunction rate limit invalid", test_skfunction_rate_limit_invalid)
     
     # Chaining tests
     runner.run_test("Skfunction chain retry+timeout", test_skfunction_chain_retry_timeout)

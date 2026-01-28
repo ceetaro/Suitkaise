@@ -1175,9 +1175,9 @@ all 6 done -->
 
 ## 3rd pass - focus on tests
 
-adding tests for api docstring examples and then running tests
+adding tests for api docstring examples and then running tests - done
 
-then, ensure all tests are passing on both mac and windows (and figure out how to test on linux if possible)
+then, ensure all tests are passing on both mac and windows (and figure out how to test on linux if possible) - done
 
 then, check all tests and make sure they are testing accurately and thoroughly
 
@@ -1193,8 +1193,6 @@ add quick start guide to README and update coverage and badges
 ensure all other setup files are good as well
 
 ## 6th pass - review examples and create more for each module
-
-
 
 ## 7th pass - rereview examples
 

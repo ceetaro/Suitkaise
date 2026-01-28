@@ -1,9 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on Keep a Changelog, and this project adheres to
-Semantic Versioning once published.
+All notable changes to this project will be documented in this file. (to the best of my ability)
 
 ## Overview
 
@@ -43,7 +40,7 @@ As of version 0.3.0, the project is still unreleased.
 - All DbReconnector implementations now use consistent dict-based parameter passing for authentication.
 - License updated to Apache License 2.0.
 
-## [0.3.0] - 2026-01-16
+## [0.3.0] - 2026-01-16 - 2026-01-27
 
 ### Added
 - Initial release contents for Suitkaise modules.
@@ -81,5 +78,12 @@ As of version 0.3.0, the project is still unreleased.
 - `NotAFileError` exception (inherits `IsADirectoryError`) raised by `Skpath.unlink()` when path is a directory.
 
 - Share now serializes into a live client that reuses the parent coordinator when passed to Pool workers, avoiding duplicate Manager startup and enabling safe cross-process usage.
+
+1/27/26
+
+- updated processing module to correctly work on Windows
+  - Pool now uses multiprocessing.Pool instead of creating multiple processes manually (optimization, nothing changes for users)
+- updated tests to work on Windows
+- updated all api to be streamlined and tested all examples in api docstrs
 
 
