@@ -1,3 +1,8 @@
+# The `WorstPossibleObject`
+
+Feast your eyes on this, everyone.
+
+```python
 # each level will have all cerial-supported objects (primitives and complex objects that handlers can handle) as attributes
 # outside of collections
 
@@ -268,8 +273,7 @@ class WorstPossibleObject:
         self.fraction_from_float = Fraction(0.5)
         self._track_init('primitives', 'fraction_value/from_float', self.fraction_value)
         
-        # Use random-based UUID for deterministic tests across processes.
-        self.uuid_value = uuid.UUID(int=random.getrandbits(128))
+        self.uuid_value = uuid.uuid4()
         self.uuid_fixed = uuid.UUID('12345678-1234-5678-1234-567812345678')
         self._track_init('primitives', 'uuid_value/fixed', self.uuid_value)
         
@@ -417,15 +421,14 @@ class WorstPossibleObject:
         
         self._log("  [INIT] Loggers")
         
-        logger_suffix = random.randint(1, 10**10)
-        self.logger = logging.getLogger(f"test_logger_{logger_suffix}")
+        self.logger = logging.getLogger(f"test_logger_{id(self)}")
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
         self._track_init('complex', 'logger', self.logger)
         
-        self.logger_warning = logging.getLogger(f"warning_logger_{logger_suffix}")
+        self.logger_warning = logging.getLogger(f"warning_logger_{id(self)}")
         self.logger_warning.setLevel(logging.WARNING)
         self._track_init('complex', 'logger_warning', self.logger_warning)
     
@@ -1682,4 +1685,4 @@ class WorstPossibleObject:
                     def __init__(self):
                         super().__init__()
                         
-                        
+```

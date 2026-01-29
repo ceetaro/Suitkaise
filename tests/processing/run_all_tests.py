@@ -48,6 +48,7 @@ def run_all_tests():
     from tests.processing.test_pool_share import run_all_tests as run_pool_share_tests
     from tests.processing.test_coordinator import run_all_tests as run_coordinator_tests
     from tests.processing.test_modifiers import run_all_tests as run_modifiers_tests
+    from tests.processing.test_pipe import run_all_tests as run_pipe_tests
     
     results = []
     
@@ -95,6 +96,9 @@ def run_all_tests():
 
     print(f"\n{CYAN}Running Process & Pool Modifier tests...{RESET}")
     results.append(("Modifiers", run_modifiers_tests()))
+
+    print(f"\n{CYAN}Running Pipe tests...{RESET}")
+    results.append(("Pipe", run_pipe_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

@@ -3,6 +3,7 @@ Tests for reconnect_all() with overrides and autoreconnect decorator.
 """
 
 import sys
+import threading
 from pathlib import Path
 
 # Add project root to path
@@ -37,6 +38,8 @@ from suitkaise.cerial._int.handlers.network_handler import (
     SnowflakeReconnector,
     DuckDBReconnector,
 )
+from suitkaise.cerial._int.handlers.threading_handler import ThreadReconnector
+from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
 
 
 # =============================================================================
@@ -139,6 +142,29 @@ class SimpleReconnector(Reconnector):
         return f"reconnected-{self.value}"
 
 
+def test_pipe_reconnector_reconnect_peer_pair():
+    """PipeReconnector should provide reconnect, peer, and pair endpoints."""
+    from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
+    
+    rec = PipeReconnector(duplex=True, preferred_end="either", readable=True, writable=True)
+    end1 = rec.reconnect()
+    end2 = rec.peer()
+    assert end1 is not end2
+    
+    pair1, pair2 = rec.pair()
+    assert pair1 is end1
+    assert pair2 is end2
+
+
+class ThreadReturningReconnector(Reconnector):
+    """Reconnector that returns a thread instance."""
+    def __init__(self, event: threading.Event):
+        self.event = event
+    
+    def reconnect(self, auth: str | None = None, **kwargs):
+        return threading.Thread(target=self.event.set)
+
+
 # =============================================================================
 # Tests: reconnect_all basic functionality
 # =============================================================================
@@ -175,6 +201,49 @@ def test_reconnect_all_in_object_dict():
     obj = Container()
     result = reconnect_all(obj)
     assert result.conn == "reconnected-attr"
+
+
+def test_reconnect_all_start_threads():
+    """reconnect_all(start_threads=True) should start returned threads."""
+    evt = threading.Event()
+    rec = ThreadReturningReconnector(evt)
+    thread = reconnect_all(rec, start_threads=True)
+    assert isinstance(thread, threading.Thread)
+    assert evt.wait(1.0), "Thread did not start and set event"
+    thread.join(timeout=1.0)
+
+
+def test_thread_reconnector_start_param():
+    """ThreadReconnector.reconnect(start=True) should auto-start thread."""
+    evt = threading.Event()
+    state = {
+        "name": "test-thread",
+        "daemon": True,
+        "target": evt.set,
+        "args": (),
+        "kwargs": {},
+        "is_alive": False,
+    }
+    rec = ThreadReconnector(state=state)
+    thread = rec.reconnect(start=True)
+    assert isinstance(thread, threading.Thread)
+    assert evt.wait(1.0), "Thread did not start and set event"
+    thread.join(timeout=1.0)
+
+
+def test_pipe_reconnector_endpoint_flags():
+    """PipeReconnector should expose endpoint metadata."""
+    rec_read = PipeReconnector(preferred_end="read", readable=True, writable=False)
+    assert rec_read.has_endpoint is True
+    assert rec_read.endpoint == "read"
+    
+    rec_write = PipeReconnector(preferred_end="write", readable=False, writable=True)
+    assert rec_write.has_endpoint is True
+    assert rec_write.endpoint == "write"
+    
+    rec_either = PipeReconnector(preferred_end="either", readable=True, writable=True)
+    assert rec_either.has_endpoint is False
+    assert rec_either.endpoint is None
 
 
 # =============================================================================
@@ -348,6 +417,18 @@ def test_auto_reconnect_empty():
     assert getattr(TestProcess, "_auto_reconnect_kwargs", None) == {}
 
 
+def test_auto_reconnect_start_threads_flag():
+    """@autoreconnect(start_threads=True) should set flag."""
+    from suitkaise.processing import Skprocess, autoreconnect  # type: ignore[attr-defined]
+    
+    @autoreconnect(start_threads=True)
+    class TestProcess(Skprocess):
+        def __run__(self):
+            pass
+    
+    assert getattr(TestProcess, "_auto_reconnect_start_threads", False) is True
+
+
 # =============================================================================
 # Tests: Real DbReconnector type key matching
 # =============================================================================
@@ -471,6 +552,9 @@ def run_all_tests():
     runner.run_test("reconnect_all in dict", test_reconnect_all_in_dict)
     runner.run_test("reconnect_all in list", test_reconnect_all_in_list)
     runner.run_test("reconnect_all in object dict", test_reconnect_all_in_object_dict)
+    runner.run_test("reconnect_all start_threads", test_reconnect_all_start_threads)
+    runner.run_test("thread reconnector start param", test_thread_reconnector_start_param)
+    runner.run_test("pipe reconnector endpoint flags", test_pipe_reconnector_endpoint_flags)
     
     # Passwords
     runner.run_test("password type key lookup", test_reconnect_all_password_type_key)
@@ -483,6 +567,7 @@ def run_all_tests():
     runner.run_test("autoreconnect sets flags", test_auto_reconnect_decorator_sets_flags)
     runner.run_test("autoreconnect docstring example", test_auto_reconnect_docstring_example)
     runner.run_test("autoreconnect empty", test_auto_reconnect_empty)
+    runner.run_test("autoreconnect start_threads flag", test_auto_reconnect_start_threads_flag)
     
     # Real DbReconnector
     runner.run_test("real PostgresReconnector type key", test_real_db_reconnector_type_key)
@@ -490,6 +575,7 @@ def run_all_tests():
     runner.run_test("attr-specific dict key", test_reconnect_all_attr_specific_dict_key)
     runner.run_test("reconnect_all handles failures", test_reconnect_all_handles_failures)
     runner.run_test("reconnect_all sets/cycles", test_reconnect_all_handles_sets_and_cycles)
+    runner.run_test("pipe reconnector endpoints", test_pipe_reconnector_reconnect_peer_pair)
     
     return runner.print_results()
 

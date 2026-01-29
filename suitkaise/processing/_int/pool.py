@@ -554,6 +554,32 @@ class Pool:
         self._mp_pool: multiprocessing.pool.Pool | None = multiprocessing.Pool(
             processes=self._workers
         )
+
+    def __serialize__(self) -> dict:
+        """
+        Serialize Pool without multiprocessing internals.
+        
+        Avoids serializing locks/queues inside multiprocessing.Pool.
+        """
+        return {
+            "workers": self._workers,
+            "closed": self._mp_pool is None,
+        }
+
+    @classmethod
+    def __deserialize__(cls, state: dict) -> "Pool":
+        """
+        Reconstruct Pool from serialized state.
+        """
+        obj = cls.__new__(cls)
+        workers = state.get("workers") or multiprocessing.cpu_count()
+        obj._workers = workers
+        obj._active_processes = []
+        if state.get("closed"):
+            obj._mp_pool = None
+        else:
+            obj._mp_pool = multiprocessing.Pool(processes=workers)
+        return obj
     
     def close(self) -> None:
         """Wait for all active processes to finish."""

@@ -3,7 +3,7 @@
 This guide covers all public APIs in `suitkaise.processing`.
 
 ```python
-from suitkaise.processing import Skprocess, Pool, Share, Pipe, autoreconnect
+from suitkaise.processing import Skprocess, Pool, Share, autoreconnect
 ```
 
 ## `Skprocess`
@@ -128,23 +128,6 @@ Objects assigned to `Share` become proxied. Reads wait for pending writes; write
 - Prefer simple objects (numbers, dicts, lists)
 - For custom classes, decorate with `@sk` for `_shared_meta`
 
-## `Pipe`
-
-`Pipe` is a fast, explicit parent/child communication channel. It uses
-`multiprocessing.Pipe` underneath and `cerial` for payloads.
-
-```python
-from suitkaise.processing import Pipe
-
-anchor, point = Pipe.pair()
-# anchor stays in parent, point is passed at process start
-```
-
-Notes:
-- The anchor endpoint is always locked in the parent.
-- The point endpoint must be passed at process start (no post-init reattachment).
-- Pipe endpoints cannot be sent to `Share`.
-
 ## `ProcessTimers`
 
 `ProcessTimers` is a container of `Sktimer` instances used by `Skprocess`:
@@ -174,17 +157,6 @@ class DBProcess(Skprocess):
 ```
 
 Connections are replaced with live resources before `__run__()` executes.
-
-### `start_threads`
-
-```python
-@autoreconnect(start_threads=True, **auth)
-class MyProcess(Skprocess):
-    ...
-```
-
-If `start_threads=True`, any reconstructed `threading.Thread` objects are started
-automatically after reconnect.
 
 ## Errors
 

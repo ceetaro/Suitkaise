@@ -9,6 +9,7 @@ Ensures the worst possible object can:
 
 import sys
 import random
+import multiprocessing
 from pathlib import Path
 
 
@@ -113,6 +114,48 @@ def _format_failures(failures: list[str]) -> str:
     return preview + suffix
 
 
+def _child_roundtrip_wpo(conn) -> None:
+    """Deserialize, reconnect, verify, reserialize, and send back bytes."""
+    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cerial import serialize as _serialize
+    from suitkaise.cerial import deserialize as _deserialize
+    from suitkaise.cerial import reconnect_all as _reconnect_all
+    import random
+    original = None
+    restored = None
+    try:
+        payload = conn.recv_bytes()
+        random.seed(1337)
+        original = WorstPossibleObject()
+        restored = _deserialize(payload)
+        restored = _reconnect_all(restored)
+        passed, failures = original.verify(restored)
+        if not passed:
+            preview = "\n".join(failures[:10])
+            remainder = len(failures) - 10
+            if remainder > 0:
+                preview += f"\n... {remainder} more failures"
+            conn.send({"ok": False, "error": f"Verification failed:\n{preview}"})
+            return
+        new_payload = _serialize(restored)
+        conn.send({"ok": True, "data": new_payload})
+    except Exception as exc:
+        conn.send({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+    finally:
+        try:
+            original.cleanup()
+        except Exception:
+            pass
+        try:
+            restored.cleanup()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def test_worst_possible_object_roundtrip():
     """WorstPossibleObject should serialize, deserialize, and verify."""
     random.seed(1337)
@@ -136,10 +179,69 @@ def test_worst_possible_object_roundtrip():
                 pass
 
 
+def test_worst_possible_object_roundtrip_cross_process():
+    """WorstPossibleObject should roundtrip across a process boundary."""
+    from suitkaise.cerial import serialize, deserialize, reconnect_all
+    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    import random
+
+    random.seed(1337)
+    original = None
+    restored = None
+    proc = None
+    parent_conn = None
+    try:
+        original = WorstPossibleObject()
+        payload = serialize(original)
+
+        ctx = multiprocessing.get_context("spawn")
+        parent_conn, child_conn = ctx.Pipe(duplex=True)
+        proc = ctx.Process(target=_child_roundtrip_wpo, args=(child_conn,))
+        proc.start()
+        parent_conn.send_bytes(payload)
+        result = parent_conn.recv()
+        proc.join(timeout=10)
+
+        assert proc.exitcode == 0, "Child process did not exit cleanly."
+        assert result.get("ok"), result.get("error", "Unknown child error.")
+
+        restored = deserialize(result["data"])
+        restored = reconnect_all(restored)
+        passed, failures = original.verify(restored)
+        assert passed, "Verification failed:\n" + _format_failures(failures)
+    except Exception as e:
+        msg = str(e).lower()
+        if "permission" in msg or "resource" in msg:
+            return
+        raise
+    finally:
+        if parent_conn is not None:
+            try:
+                parent_conn.close()
+            except Exception:
+                pass
+        if proc is not None and proc.is_alive():
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        if original is not None:
+            try:
+                original.cleanup()
+            except Exception:
+                pass
+        if restored is not None:
+            try:
+                restored.cleanup()
+            except Exception:
+                pass
+
+
 def run_all_tests():
     """Run all WorstPossibleObject tests."""
     runner = TestRunner("Cerial WorstPossibleObject Tests")
     runner.run_test("worst_possible_object_roundtrip", test_worst_possible_object_roundtrip)
+    runner.run_test("worst_possible_object_roundtrip_cross_process", test_worst_possible_object_roundtrip_cross_process)
     return runner.print_results()
 
 

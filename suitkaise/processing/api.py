@@ -13,6 +13,7 @@ from ._int.process_class import Skprocess
 from ._int.timers import ProcessTimers
 from ._int.pool import Pool
 from ._int.share import Share
+from ._int.pipe import Pipe
 from ._int.errors import (
     ProcessError,
     PreRunError,
@@ -26,7 +27,7 @@ from ._int.errors import (
 )
 
 
-def autoreconnect(**auth):
+def autoreconnect(*, start_threads: bool = False, **auth):
     """
     ────────────────────────────────────────────────────────
         ```python
@@ -50,6 +51,7 @@ def autoreconnect(**auth):
     Reconnector objects (database connections, sockets, etc.).
     
     Args:
+        start_threads: If True, auto-start any deserialized ThreadReconnector threads.
         **auth: Reconnection parameters keyed by type, then by attr name.
             Use "*" as the attr key for defaults that apply to all instances.
     
@@ -81,6 +83,7 @@ def autoreconnect(**auth):
         cls._auto_reconnect_enabled = True
         # store reconnect options by type and attribute name
         cls._auto_reconnect_kwargs = dict(auth) if auth else {}
+        cls._auto_reconnect_start_threads = bool(start_threads)
         return cls
     return decorator
 
@@ -90,6 +93,7 @@ __all__ = [
     'Skprocess',
     'Pool',
     'Share',
+    'Pipe',
     
     # Decorators
     'autoreconnect',

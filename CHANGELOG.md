@@ -85,5 +85,3 @@ As of version 0.3.0, the project is still unreleased.
   - Pool now uses multiprocessing.Pool instead of creating multiple processes manually (optimization, nothing changes for users)
 - updated tests to work on Windows
 - updated all api to be streamlined and tested all examples in api docstrs
-
-

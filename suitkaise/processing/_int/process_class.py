@@ -338,8 +338,64 @@ class Skprocess:
         if getattr(new_class, '_auto_reconnect_enabled', False):
             try:
                 from suitkaise.cerial.api import reconnect_all
+                import threading
                 reconnect_kwargs = getattr(new_class, '_auto_reconnect_kwargs', {})
+                start_threads = getattr(new_class, '_auto_reconnect_start_threads', False)
                 obj = reconnect_all(obj, **reconnect_kwargs)
+                if start_threads:
+                    visited: set[int] = set()
+                    
+                    def _start_threads(item):
+                        item_id = id(item)
+                        if item_id in visited:
+                            return
+                        visited.add(item_id)
+                        
+                        if isinstance(item, threading.Thread):
+                            if not item.is_alive():
+                                started_evt = getattr(item, "_started", None)
+                                already_started = bool(getattr(started_evt, "is_set", lambda: False)())
+                                if not already_started:
+                                    try:
+                                        item.start()
+                                    except RuntimeError:
+                                        pass
+                            return
+                        
+                        if isinstance(item, list):
+                            for value in item:
+                                _start_threads(value)
+                            return
+                        if isinstance(item, tuple):
+                            for value in item:
+                                _start_threads(value)
+                            return
+                        if isinstance(item, set):
+                            for value in item:
+                                _start_threads(value)
+                            return
+                        if isinstance(item, dict):
+                            for key, value in item.items():
+                                _start_threads(key)
+                                _start_threads(value)
+                            return
+                        
+                        if hasattr(item, "__dict__"):
+                            for value in list(item.__dict__.values()):
+                                _start_threads(value)
+                        
+                        slots = getattr(item, "__slots__", None)
+                        if slots:
+                            if isinstance(slots, str):
+                                slots = (slots,)
+                            for slot in slots:
+                                try:
+                                    value = getattr(item, slot)
+                                except AttributeError:
+                                    continue
+                                _start_threads(value)
+                    
+                    _start_threads(obj)
             except Exception:
                 pass
         

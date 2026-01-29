@@ -6,6 +6,7 @@ from .api import (
     Skprocess,
     Pool,
     Share,
+    Pipe,
     
     # Decorators
     autoreconnect,
@@ -29,6 +30,7 @@ __all__ = [
     'Skprocess',
     'Pool',
     'Share',
+    'Pipe',
     'autoreconnect',
     'ProcessTimers',
     'ProcessError',

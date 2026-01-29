@@ -89,7 +89,7 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
         return serializer.serialize(obj)
     return _default_serializer.serialize(obj)
 
-# NOTE: CHECK DOCSTRING FOR ACCURACY
+
 def serialize_ir(obj, debug: bool = False, verbose: bool = False):
     """
     ────────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     return _default_deserializer.deserialize(data)
 
 
-def reconnect_all(obj, **auth):
+def reconnect_all(obj, *, start_threads: bool = False, **auth):
     """
     ────────────────────────────────────────────────────────
         ```python
@@ -201,6 +201,7 @@ def reconnect_all(obj, **auth):
     
     Args:
         obj: Object or container to traverse.
+        start_threads: If True, auto-start any reconnected threads.
         **auth: Credentials keyed by type. dict[str, str] pattern
             ```python 
             auth = {
@@ -218,6 +219,8 @@ def reconnect_all(obj, **auth):
             The `"*"` key provides default auth for all instances of that type.
             Specific attr names override the default.
     """
+    import threading
+    
     visited: set[int] = set()
     
     def _get_reconnector_type_key(reconnector: Reconnector) -> str | None:
@@ -275,14 +278,22 @@ def reconnect_all(obj, **auth):
             try:
                 auth_value = _get_auth_for(item, attr_name)
                 if auth_value is None:
-                    return item.reconnect()
-                try:
-                    return item.reconnect(auth_value)
-                except TypeError:
+                    result = item.reconnect()
+                else:
                     try:
-                        return item.reconnect(auth=auth_value)
+                        result = item.reconnect(auth_value)
                     except TypeError:
-                        return item.reconnect(password=auth_value)
+                        try:
+                            result = item.reconnect(auth=auth_value)
+                        except TypeError:
+                            result = item.reconnect(password=auth_value)
+                if start_threads and isinstance(result, threading.Thread):
+                    try:
+                        if not result.is_alive():
+                            result.start()
+                    except RuntimeError:
+                        pass
+                return result
             except Exception:
                 return item
         

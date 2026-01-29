@@ -27,14 +27,20 @@ class ThreadReconnector(Reconnector):
     """
     state: Dict[str, Any]
     
-    def reconnect(self) -> threading.Thread:
-        return threading.Thread(
+    def reconnect(self, start: bool = False) -> threading.Thread:
+        thread = threading.Thread(
             name=self.state["name"],
             target=self.state["target"],
             args=self.state["args"],
             kwargs=self.state["kwargs"],
             daemon=self.state["daemon"],
         )
+        if start:
+            try:
+                thread.start()
+            except RuntimeError:
+                pass
+        return thread
 
 
 

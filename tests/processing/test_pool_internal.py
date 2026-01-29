@@ -25,7 +25,7 @@ sys.path.insert(0, str(project_root))
 
 from suitkaise import cerial
 from suitkaise.processing._int.pool import _pool_worker, _run_process_inline, _ordered_results, _unordered_results
-from suitkaise.processing import Skprocess
+from suitkaise.processing import Skprocess, Pool
 
 Process = Skprocess
 from suitkaise.processing._int.errors import RunError, ProcessTimeoutError
@@ -243,6 +243,24 @@ def test_pool_worker_process_class():
     _pool_worker(cerial.serialize(DoubleProcess), cerial.serialize(3), False, q)
     msg = q.get(timeout=1)
     assert cerial.deserialize(msg["data"]) == 6
+
+
+def test_pool_serialize_roundtrip_functionality():
+    """Serialized Pool should behave like the original after restore."""
+    def add_one(x):
+        return x + 1
+
+    pool = Pool(workers=1)
+    restored = None
+    try:
+        restored = cerial.deserialize(cerial.serialize(pool))
+        original_results = pool.map(add_one, [1, 2, 3])
+        restored_results = restored.map(add_one, [1, 2, 3])
+        assert original_results == restored_results == [2, 3, 4]
+    finally:
+        pool.close()
+        if restored is not None:
+            restored.close()
 
 
 def test_ordered_results():

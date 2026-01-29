@@ -30,7 +30,17 @@ class PipeReconnector(Reconnector):
     preferred_end: str = "either"
     readable: bool = True
     writable: bool = True
+    has_endpoint: bool = False
+    endpoint: str | None = None
     _pipe_pair: Optional[Tuple[Any, Any]] = field(default=None, init=False, repr=False)
+    
+    def __post_init__(self) -> None:
+        if self.endpoint in ("read", "write"):
+            self.has_endpoint = True
+            return
+        if self.preferred_end in ("read", "write"):
+            self.endpoint = self.preferred_end
+            self.has_endpoint = True
     
     def reconnect(self) -> Any:
         """

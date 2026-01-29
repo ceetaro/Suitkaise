@@ -1,293 +1,181 @@
-# How to use `cerial`
+# cerial: How to Use
 
-`cerial` is a serialization engine that handles complex Python objects that `pickle`, `cloudpickle`, and `dill` cannot.
+This guide covers every public function in the `cerial` API and explains typical usage patterns.
 
-Meant for internal, cross-process communication, not for external or cross-language serialization.
-
-It contains a few core API functions.
-
-- `cerial.serialize(obj)` - serialize an object to bytes
-- `cerial.deserialize(bytes)` - deserialize bytes back to an object
-- `cerial.serialize_ir(obj)` - build the intermediate representation (IR)
-- `cerial.to_json(obj)` - serialize to IR and return JSON text
+Import options:
 
 ```python
 from suitkaise import cerial
-
-obj = MyClass()
-
-bytes = cerial.serialize(obj)
-
-my_class = cerial.deserialize(bytes)
+# or
+from suitkaise.cerial import serialize, deserialize
 ```
 
-## IR + JSON output
+## `serialize(obj, debug=False, verbose=False) -> bytes`
 
-If you want to inspect the IR or emit JSON for debugging/logging, use the IR helpers.
+Serializes any Python object to bytes using cerial's IR.
 
 ```python
-from suitkaise import cerial
+data = cerial.serialize(obj)
+```
 
-obj = MyClass()
+### Parameters
 
-# get a python IR
+- `obj`: Any Python object.
+- `debug`: Enables deep error context and path reporting.
+- `verbose`: Prints progress and handler selection information.
+
+### Returns
+
+- `bytes`: Pickled IR payload.
+
+### When to use
+
+- For inter-process communication.
+- For disk persistence when `pickle` fails.
+- For sharing complex objects (locks, queues, sockets, etc.).
+
+## `serialize_ir(obj, debug=False, verbose=False) -> Any`
+
+Returns the intermediate representation (IR) without converting to bytes.
+
+```python
 ir = cerial.serialize_ir(obj)
+```
 
-# 
+### When to use
+
+- For debugging serialization.
+- For inspection or custom tooling.
+
+## `deserialize(data, debug=False, verbose=False) -> Any`
+
+Reconstructs Python objects from bytes created by `serialize`.
+
+```python
+restored = cerial.deserialize(data)
+```
+
+### Notes
+
+- Circular references are restored.
+- Reconnectors are returned for live resources (see below).
+- Use `debug=True` if you need detailed error context.
+
+## `reconnect_all(obj, *, start_threads=False, **auth) -> Any`
+
+Replaces any `Reconnector` objects inside `obj` with live resources by calling `reconnect()`.
+
+```python
+auth = {
+    "psycopg2.Connection": {"*": "secret"},
+    "redis.Redis": {"*": "redis_pass"},
+}
+restored = cerial.deserialize(data)
+restored = cerial.reconnect_all(restored, **auth)
+```
+
+### How auth mapping works
+
+- Keys are `"module.ClassName"` strings.
+- `*` provides defaults for all attributes.
+- Attribute names override the default.
+
+```python
+auth = {
+    "psycopg2.Connection": {
+        "*": "default_password",
+        "analytics_db": "analytics_password",
+    }
+}
+```
+
+If no auth is provided for a reconnector, `reconnect()` is called with no arguments.
+
+### `start_threads`
+
+If `start_threads=True`, any `threading.Thread` objects returned by reconnectors
+are started automatically.
+
+## `ir_to_jsonable(ir) -> Any`
+
+Converts IR into a JSON-serializable structure for inspection.
+
+```python
+jsonable = cerial.ir_to_jsonable(ir)
+```
+
+### Note
+
+This conversion is not round-trip safe. It is intended for debugging and logging.
+
+## `ir_to_json(ir, indent=2, sort_keys=True) -> str`
+
+Returns a JSON string from IR.
+
+```python
+json_text = cerial.ir_to_json(ir)
+```
+
+## `to_jsonable(obj, debug=False, verbose=False) -> Any`
+
+Convenience: `serialize_ir()` + `ir_to_jsonable()`.
+
+```python
+jsonable = cerial.to_jsonable(obj)
+```
+
+## `to_json(obj, indent=2, sort_keys=True, debug=False, verbose=False) -> str`
+
+Convenience: `serialize_ir()` + `ir_to_json()`.
+
+```python
 json_text = cerial.to_json(obj)
 ```
 
-## Custom serialization and deserialization
+## Exceptions
 
-Sometimes, `cerial` might not be able to serialize/deserialize an object correctly.
+All errors are raised with detailed context:
 
-If this happens, you can override the default behavior.
+- `SerializationError`: When `serialize` or `serialize_ir` fails.
+- `DeserializationError`: When `deserialize` fails.
 
-Use `__serialize__` and `__deserialize__` methods in your classes to override the default behavior.
+## Practical usage patterns
 
-In order for `__serialize__` to work, data must be reduced down to a `dict` with only native `pickle` types. Do not convert to bytes, `cerial` will do that for you.
-
-`__deserialize__` needs to take this representation and reconstruct the object.
-
-```python
-from suitkaise import cerial
-
-class MyClass:
-
-    def __serialize__(self):
-        return {"custom": "state"}
-    
-    @classmethod
-    def __deserialize__(cls, state):
-        obj = cls.__new__(cls)
-        obj.custom = state["custom"]
-        # custom reconstruction logic...
-        return obj
-```
-
-## Debugging
-
-The `serialize` and `deserialize` functions have 2 optional params.
-
-- `debug` - when True, provides detailed error messages showing exactly where serialization/deserialization failed, including path trails
-- `verbose` - when True, prints color-coded progress as it walks through nested structures
+### 1) Basic round trip
 
 ```python
-data = cerial.serialize(obj, debug=True, verbose=True)
-
-obj = cerial.deserialize(data, debug=True, verbose=True)
-```
-
-### `verbose` output
-
-When `verbose=True`, cerial prints the path it's taking through your object, color-coded by depth:
-
-```
-  [1] MyService (red)
-    [2] MyService → config (orange)
-      [3] MyService → config → dict (yellow)
-        [4] ... → config → dict → database (green)
-        [4] ... → config → dict → api_keys (green)
-    [2] MyService → lock (orange)
-    [2] MyService → logger (orange)
-```
-
-This helps you see exactly which attributes are being serialized.
-
-### `debug` error example
-
-When something goes wrong and `debug=True`, cerial shows you where it happened:
-
-```
-======================================================================
-DESERIALIZATION ERROR
-======================================================================
-
-Error: AttributeError: type object 'MyClass' has no attribute 'from_state'
-
-Path: MyService → config → handler
-
-Type: custom_object
-Handler: CustomObjectHandler
-
-IR Data: {'__cerial_type__': 'custom_object', '__module__': 'myapp.handlers', ...}
-======================================================================
-```
-
-The path tells you exactly where in your nested object the failure occurred.
-
-## Printing a serialized nested `dict` for a complex object
-
-To see what cerial's intermediate representation looks like, serialize the object with `cerial` and deserialize it with `pickle`.
-
-This is useful for understanding how cerial transforms your objects.
-
-```python
-from suitkaise import cerial
-import pickle
-
-class GameState:
-    def __init__(self):
-        self.player = "Gurphy"
-        self.score = 100
-        self.items = ["sword", "shield"]
-
-obj = GameState()
-
-# serialize with cerial
 data = cerial.serialize(obj)
-
-# deserialize with pickle to see the intermediate representation
-ir = pickle.loads(data)
-print(ir)
-```
-
-Output (simplified):
-
-```python
-{
-    '__cerial_type__': 'class_instance',
-    '__handler__': 'ClassInstanceHandler',
-    '__object_id__': 4371208656,
-    'state': {
-        '__cerial_type__': 'dict',
-        'items': [
-            ('module', '__main__'),
-            ('qualname', 'GameState'),
-            ('strategy', 'dict'),
-            ('instance_dict', {
-                '__cerial_type__': 'dict',
-                'items': [
-                    ('player', 'Gurphy'),
-                    ('score', 100),
-                    ('items', {
-                        '__cerial_type__': 'list',
-                        'items': ['sword', 'shield']
-                    })
-                ]
-            })
-        ]
-    }
-}
-```
-
-The representation includes:
-- `__cerial_type__` - the type of object (class_instance, dict, list, lock, logger, etc.)
-- `__handler__` - which handler serialized/deserializes this object
-- `__object_id__` - unique ID for handling circular references
-- `state` or `items` - the actual data
-
-For objects with locks, loggers, or other unpicklables, you'll see how cerial represents them in a pickle-safe format.
-
-Simple class instances and functions may look slightly different, as they are not subjected to the entire process.
-
----
-
-## `Reconnectors`
-
-When `cerial` serializes objects, some resources cannot be directly pickled.
-- Database connections (sockets to remote servers)
-- Network sockets
-- File handles and pipes
-- Threads
-- Compiled regex matches
-
-Instead of giving you nothing, `cerial` replaces these with `Reconnector` objects.
-
-Use `reconnect_all()` to reconnect all `Reconnector` objects in a structure.
-
-### Using `reconnect_all()`
-
-```python
-from suitkaise import cerial
-
-data = cerial.serialize(my_object)
 restored = cerial.deserialize(data)
+```
 
-# reconnect all - just passwords (host/port/user stored during serialization)
+### 2) Debugging a failure
+
+```python
+try:
+    data = cerial.serialize(obj, debug=True)
+except cerial.SerializationError as exc:
+    print(exc)
+```
+
+### 3) Reconnecting resources
+
+```python
+restored = cerial.deserialize(data)
 restored = cerial.reconnect_all(restored, **{
-    "psycopg2.Connection": {
-        "*": "secret",
-    },
-    "redis.Redis": {
-        "*": "redis_pass",
-    },
+    "psycopg2.Connection": {"*": "secret"},
+    "redis.Redis": {"*": "redis_pass"},
 })
 ```
 
-### Password structure
+### 4) Inspecting IR
 
 ```python
-{
-    "TypeKey": {
-        "*": "password",           # default password for all instances
-        "attr_name": "password",   # specific password for attr named "attr_name"
-    }
-}
+ir = cerial.serialize_ir(obj)
+print(cerial.ir_to_json(ir))
 ```
 
-- **Type keys** are `"module.ClassName"` (e.g., `"psycopg2.Connection"`, `"redis.Redis"`)
-- **`"*"`** provides default password for all instances of that type
-- **Specific attr names** override the default
-- Connection metadata (host, port, user, database) is stored during serialization
-
-### Multiple connections of same type
+### 5) JSON export for debugging
 
 ```python
-restored = cerial.reconnect_all(restored, **{
-    "psycopg2.Connection": {
-        "*": "default_pass",
-        "analytics_db": "analytics_pass",  # override for self.analytics_db
-    },
-})
-```
-
-### No password needed
-
-For resources without auth (sockets, threads, pipes, sqlite, duckdb, regex matches), just call with no args:
-
-```python
-restored = cerial.reconnect_all(restored)
-```
-
-### Note on special types
-
-- **Elasticsearch**: `password` is the api_key if no user was stored
-- **InfluxDB v2**: `password` represents the token
-
----
-
-JSON Output (Simplified)
-
-```json
-{
-  "__cerial_type__": "class_instance",
-  "__handler__": "ClassInstanceHandler",
-  "__object_id__": 4371208656,
-  "state": {
-    "__cerial_type__": "dict",
-    "items": {
-      "__cerial_json__": "dict",
-      "items": [
-        ["module", "__main__"],
-        ["qualname", "GameState"],
-        ["strategy", "dict"],
-        ["instance_dict", {
-          "__cerial_type__": "dict",
-          "items": {
-            "__cerial_json__": "dict",
-            "items": [
-              ["player", "Gurphy"],
-              ["score", 100],
-              ["items", {
-                "__cerial_type__": "list",
-                "items": ["sword", "shield"]
-              }]
-            ]
-          }
-        }]
-      ]
-    }
-  }
-}
+json_text = cerial.to_json(obj, indent=2)
 ```
