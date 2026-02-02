@@ -1,5 +1,17 @@
 # Why you would use `cucumber`
 
+## TLDR
+
+- **Serialize anything** - No more `PicklingError` ever again
+- **Handles types others can't** - threads, queues, sockets, generators, asyncio, sqlite, regex matches, and more
+- **Faster than alternatives** - multiple times faster than `cloudpickle` and `dill` for many types
+- **Classes in `__main__`** - Multiprocessing just works, even in one-file scripts or tests
+- **Circular references** - All handled automatically
+- **Live resource reconnection** - Database connections, sockets, threads reconnect safely with your manual permission
+- **Debug-friendly** - `debug=True` and `verbose=True` show exactly what's happening
+
+---
+
 `cucumber` is a serialization engine.
 
 It allows you to serialize and deserialize objects across `Python` processes.

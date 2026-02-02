@@ -1,5 +1,25 @@
 # Why you would use `paths`
 
+## TLDR
+
+`paths` exists because path handling in Python is:
+
+1. **Inconsistent** — `\` vs `/`, absolute vs relative, string vs Path
+2. **Manual** — find root, resolve, normalize, convert, repeat
+3. **Error-prone** — works on your machine, breaks on theirs
+4. **Tedious** — same boilerplate in every project
+
+`paths` makes it:
+
+1. **Consistent** — normalized slashes, project-relative paths, cross-platform by default
+2. **Automatic** — root detection, type conversion, caller detection
+3. **Reliable** — same `rp` on every machine, every OS
+4. **Simple** — one line instead of thirteen
+
+Stop fighting with paths. Start using them.
+
+---
+
 File paths are a pain to work with.
 
 Sometimes pure hell, even.
@@ -622,21 +642,3 @@ len(seen) # no duplicates
 `Skpath` objects hash and compare using their normalized path (`rp`), so different representations of the same file are recognized as equal.
 
 Works in sets, works as dict keys, no extra effort.
-
-## TLDR
-
-`paths` exists because path handling in Python is:
-
-1. **Inconsistent** — `\` vs `/`, absolute vs relative, string vs Path
-2. **Manual** — find root, resolve, normalize, convert, repeat
-3. **Error-prone** — works on your machine, breaks on theirs
-4. **Tedious** — same boilerplate in every project
-
-`paths` makes it:
-
-1. **Consistent** — normalized slashes, project-relative paths, cross-platform by default
-2. **Automatic** — root detection, type conversion, caller detection
-3. **Reliable** — same `rp` on every machine, every OS
-4. **Simple** — one line instead of thirteen
-
-Stop fighting with paths. Start using them.
