@@ -6,6 +6,7 @@ Use it to work with paths relative to your project root, regardless of where you
 
 - `Skpath`
 Enhanced path object that detects your project root. Cross-platform compatible.
+
 - `autopath`
 Decorator for automatic path type conversion. Smack it on all of your functions that work with paths, and no more type mismatches will ever happen again.
 
@@ -155,7 +156,7 @@ data_file = root / "data" / "file.txt"
 
 ### Methods
 
-#### #### `iterdir()`
+#### `iterdir()`
 
 Iterate over directory contents.
 
