@@ -41,7 +41,7 @@ Current sleep duration after backoff is applied. Starts at `sleep_time_after_tri
 `_lock: threading.RLock`
 Reentrant lock for thread-safe state access.
 
-## Properties
+### Properties
 
 `num_shorts_to_trip`: Number of shorts required before the circuit trips.
 - `int`
@@ -71,32 +71,35 @@ If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
 2. Increments `_times_shorted` by 1
 3. Checks if `_times_shorted` >= `num_shorts_to_trip`
 4. Releases `self._lock`
-5. If `_times_shorted` >= `num_shorts_to_trip`:
+5. If `_times_shorted` >= `num_shorts_to_trip`, calls `_trip_circuit()`:
    - Acquires `self._lock`
+   - Captures `sleep_duration` (`custom_sleep` or `_current_sleep_time`)
    - Increments `_total_trips` by 1
    - Resets `_times_shorted` to 0
+   - Applies backoff factor to `_current_sleep_time` (if `backoff_factor` != 1.0)
    - Releases `self._lock`
-   - Applies jitter to sleep duration
-   - Sleeps for `_current_sleep_time` or `custom_sleep` if provided
-   - Applies backoff factor to `_current_sleep_time`
+   - Applies jitter to `sleep_duration`
+   - Sleeps for `sleep_duration`
 6. Returns `True` if slept, `False` otherwise
 
-### `trip(custom_sleep: float | None = None) -> None`
+#### `trip(custom_sleep: float | None = None) -> bool`
 
 `trip()` immediately triggers the circuit, bypassing the short counter.
 
 If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
 
-1. Acquires `self._lock`
-2. Increments `_total_trips` by 1
-3. Resets `_times_shorted` to 0
-4. Releases `self._lock`
-5. Applies jitter to sleep duration
-6. Sleeps for `_current_sleep_time` or `custom_sleep` if provided
-7. Applies backoff factor to `_current_sleep_time`
-8. Returns `None`
+1. Calls `_trip_circuit()`:
+   - Acquires `self._lock`
+   - Captures `sleep_duration` (`custom_sleep` or `_current_sleep_time`)
+   - Increments `_total_trips` by 1
+   - Resets `_times_shorted` to 0
+   - Applies backoff factor to `_current_sleep_time` (if `backoff_factor` != 1.0)
+   - Releases `self._lock`
+   - Applies jitter to `sleep_duration`
+   - Sleeps for `sleep_duration`
+2. Returns `True` (always sleeps)
 
-### `reset_backoff() -> None`
+#### `reset_backoff() -> None`
 
 Restores the original sleep time to `sleep_time_after_trip`.
 
@@ -258,101 +261,147 @@ Breaking circuit that stops when the failure threshold is reached.
 
 Unlike `Circuit`, it stays broken until you manually reset it. Use this for stopping after a threshold is reached and deciding what to do next.
 
-### State Tracking
+When the short counter reaches the `num_shorts_to_trip` threshold, the circuit breaks.
 
-`BreakingCircuit` tracks internal state using private attributes protected by a reentrant lock (`threading.RLock`).
+```
+short() -> increment counter -> if shorts >= num_shorts_to_trip? -> break -> sleep (but stay broken)
+```
+
+`BreakingCircuit` uses a `threading.RLock` to ensure that internal state is thread-safe.
+
+### Tracking state
 
 `_num_shorts_to_trip: int`
-
 Number of shorts required before the circuit breaks. Set at initialization.
 
-`_broken: bool`
-
-Whether the circuit is currently broken. Set to `True` when tripped, must be manually reset to `False`.
-
 `_times_shorted: int`
-
-Counter tracking shorts since the last trip/reset. Resets to 0 when circuit breaks.
+Counter tracking shorts since the last trip/reset. Resets to 0 after each trip or reset.
 
 `_total_trips: int`
-
-Lifetime count of all trips. Never resets.
+Lifetime count of all trips. Incremented on every `short()` call, never resets.
 
 `_current_sleep_time: float`
+Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `reset()`.
 
-Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows on each `reset()`.
+`_broken: bool`
+Whether the circuit is currently broken. Set to `True` on trip, cleared by `reset()`.
 
 `_lock: threading.RLock`
-
 Reentrant lock for thread-safe state access.
 
-### The `short()` Flow
+### Properties
 
-`short()` is the primary method for counting failures.
+`num_shorts_to_trip`: Number of shorts required before the circuit breaks.
+- `int`
+- read-only
 
-```
-1. Acquire lock
-2. Increment _times_shorted
-3. Increment _total_trips
-4. Check if _times_shorted >= num_shorts_to_trip
-5. Release lock
-6. If threshold reached:
-   a. Acquire lock
-   b. Set _broken = True
-   c. Reset _times_shorted to 0
-   d. Release lock
-   e. Apply jitter to sleep duration
-   f. Sleep for the duration
-```
+`broken`: Whether the circuit is currently broken.
+- `bool`
+- read-only
 
-Key differences from `Circuit.short()`:
-- Does not return a value (`None` instead of `bool`)
-- Sets `_broken = True` and stays broken
-- Increments `_total_trips` on every short (not just trips)
+`times_shorted`: Counter tracking shorts since the last trip/reset. Resets to 0 after each trip or reset.
+- `int`
+- read-only
 
-### The `trip()` Method
+`total_trips`: Lifetime count of all trips. Never resets.
+- `int`
+- read-only
+
+`current_sleep_time`: Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `reset()`.
+- `float`
+- read-only
+
+### Methods
+
+#### `short(custom_sleep: float | None = None) -> None`
+
+Increments `_times_shorted` and `_total_trips` by 1, calling `_break_circuit()` if the `num_shorts_to_trip` threshold is reached.
+
+If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
+
+1. Captures `sleep_duration` (`custom_sleep` or `_current_sleep_time`)
+2. Acquires `self._lock`
+3. Increments `_times_shorted` by 1
+4. Increments `_total_trips` by 1
+5. Checks if `_times_shorted` >= `num_shorts_to_trip`
+6. Releases `self._lock`
+7. If `_times_shorted` >= `num_shorts_to_trip`, calls `_break_circuit()`:
+   - Acquires `self._lock`
+   - Sets `_broken` to `True`
+   - Resets `_times_shorted` to 0
+   - Releases `self._lock`
+   - Applies jitter to `sleep_duration`
+   - Sleeps for `sleep_duration`
+8. Returns `None`
+
+Note: Unlike `Circuit`, `BreakingCircuit` increments `_total_trips` on every `short()` call, not just when the circuit trips.
+
+#### `trip(custom_sleep: float | None = None) -> None`
 
 `trip()` immediately breaks the circuit, bypassing the short counter.
 
-Useful for critical failures that should immediately stop processing.
+If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
 
-```python
-breaker.trip()  # immediately break, don't wait for threshold
-breaker.trip(custom_sleep=5.0)  # break with custom sleep duration
-```
+1. Acquires `self._lock`
+2. Increments `_total_trips` by 1
+3. Releases `self._lock`
+4. Captures `sleep_duration` (`custom_sleep` or `_current_sleep_time`)
+5. Calls `_break_circuit(sleep_duration)`:
+   - Acquires `self._lock`
+   - Sets `_broken` to `True`
+   - Resets `_times_shorted` to 0
+   - Releases `self._lock`
+   - Applies jitter to `sleep_duration`
+   - Sleeps for `sleep_duration`
+6. Returns `None`
 
-Internally, `trip()` calls the same `_break_circuit()` method that `short()` uses when threshold is reached.
+#### `reset() -> None`
 
-### The `reset()` Method
+Resets the circuit to operational state and applies exponential backoff.
 
-`reset()` restores the circuit to operational state.
+1. Acquires `self._lock`
+2. Sets `_broken` to `False`
+3. Resets `_times_shorted` to 0
+4. If `backoff_factor` != 1.0:
+   - Sets `_current_sleep_time` to `min(_current_sleep_time * backoff_factor, max_sleep_time)`
+5. Releases `self._lock`
+6. Returns `None`
 
-```python
-breaker.reset()
-```
+Note: Unlike `Circuit` which applies backoff on trip, `BreakingCircuit` applies backoff on `reset()`. This means the next trip will use the increased sleep time.
 
-This:
-- Sets `_broken` back to `False`
-- Resets `_times_shorted` to 0
-- Applies the backoff factor to `_current_sleep_time`
+#### `reset_backoff() -> None`
 
-Note: backoff is applied on `reset()`, not when the circuit breaks. This is because the circuit stays broken until you decide to continue, so the next sleep time only matters after you reset.
+Restores the original sleep time to `sleep_time_after_trip`.
+
+1. Acquires `self._lock`
+2. Sets `_current_sleep_time` to `sleep_time_after_trip`
+3. Releases `self._lock`
+4. Returns `None`
+
+Note: Does NOT reset the broken state - use `reset()` for that.
 
 ### Exponential Backoff
 
-`BreakingCircuit` supports exponential backoff to progressively increase sleep time after repeated break/reset cycles.
+`BreakingCircuit` supports exponential backoff to progressively increase sleep time after repeated resets.
 
 ```python
-breaker = BreakingCircuit(
-    num_shorts_to_trip=3,
-    sleep_time_after_trip=1.0,  # initial sleep: 1 second
-    backoff_factor=2.0,         # double sleep time each reset
-    max_sleep_time=30.0         # cap at 30 seconds
+circ = BreakingCircuit(
+    num_shorts_to_trip=5,
+    sleep_time_after_trip=1.0,  # initial sleep time == 1.0s
+    backoff_factor=2.0,         # double it each time reset() is called
+    max_sleep_time=30.0         # sleep time is capped at 30s
 )
 ```
 
-When `reset()` is called, the formula is:
+With the above parameters:
+- Trip 1: sleep 1.0s
+- Reset 1: backoff applied, next sleep will be 2.0s
+- Trip 2: sleep 2.0s
+- Reset 2: backoff applied, next sleep will be 4.0s
+- Trip 3: sleep 4.0s
+- ...
 
+Formula for calculating the next sleep time (applied on `reset()`):
 ```python
 _current_sleep_time = min(
     _current_sleep_time * backoff_factor,
@@ -360,80 +409,27 @@ _current_sleep_time = min(
 )
 ```
 
-Example progression with `backoff_factor=2.0`:
-- Break 1: sleep 1.0s, reset → next sleep becomes 2.0s
-- Break 2: sleep 2.0s, reset → next sleep becomes 4.0s
-- Break 3: sleep 4.0s, reset → next sleep becomes 8.0s
-- And so on...
+#### Jitter and max sleep time
 
-Unlike `Circuit`, backoff is applied on `reset()`, not when the circuit breaks. This makes sense because you control when to reset, so the next sleep time matters for the next break cycle.
+Jitter adds randomness to sleep durations.
 
-`reset_backoff()` restores the original sleep time without resetting the `broken` state:
-
-```python
-breaker.reset_backoff()  # _current_sleep_time = sleep_time_after_trip
-```
-
-### Jitter
-
-Jitter adds randomness to sleep durations to prevent the "thundering herd" problem.
-
-When multiple processes break their circuits at the same time, they would all wake up at the same time and potentially overload the system again. Jitter spreads out the wake-up times.
-
-```python
-breaker = BreakingCircuit(
-    num_shorts_to_trip=3,
-    sleep_time_after_trip=1.0,
-    jitter=0.2  # +/- 20% randomization
-)
-```
+When multiple processes trip their circuits at the same time, they all wake up at the same time, which puts pressure on the system. Jitter spreads out the wake-up times to prevent this.
 
 The `jitter` parameter is a decimal (0.2), not a percentage (20).
 
 Values are clamped to `[0.0, 1.0]`.
 
-The jitter calculation:
-
-```python
-def _apply_jitter(self, sleep_duration: float) -> float:
-    if sleep_duration <= 0:
-        return sleep_duration
-    jitter_fraction = abs(self.jitter)
-    if jitter_fraction <= 0:
-        return sleep_duration
-    delta = sleep_duration * jitter_fraction
-    return max(0.0, sleep_duration + random.uniform(-delta, delta))
-```
-
-With `jitter=0.2` and `sleep_duration=1.0`:
-- `delta = 1.0 * 0.2 = 0.2`
-- Final sleep: random value in range `[0.8, 1.2]`
-
-The result is always at least 0.0 (no negative sleeps).
+For a `jitter` of 0.2 and a `sleep_duration` of 1.0, the range is `[0.8, 1.2]`.
 
 ### Thread Safety
 
 All state access is protected by a reentrant lock (`threading.RLock`).
 
-A reentrant lock allows the same thread to acquire the lock multiple times without deadlocking. This is needed because methods like `_break_circuit()` may be called from `short()`, and both need lock access.
+A reentrant lock is needed because `_break_circuit()` may be called from `short()` and `trip()` and both need lock access.
 
-```python
-with self._lock:
-    # read or modify state
-    self._times_shorted += 1
-    self._total_trips += 1
-    if self._times_shorted >= self.num_shorts_to_trip:
-        should_trip = True
+The sleep operation itself happens outside the lock to avoid blocking other threads during the sleep.
 
-# sleep happens OUTSIDE the lock
-if should_trip:
-    self._break_circuit(sleep_duration)
-```
-
-Important: sleep operations happen outside the lock to avoid blocking other threads during the sleep.
-
-All public properties acquire the lock for reads:
-
+All public properties acquire the lock for reads.
 ```python
 @property
 def broken(self) -> bool:
@@ -441,13 +437,13 @@ def broken(self) -> bool:
         return self._broken
 ```
 
-This ensures consistent reads even while another thread is modifying state.
+This ensures that all reads are consistent and thread-safe.
 
 ### Async Support
 
 `BreakingCircuit` supports async usage via the `_AsyncableMethod` pattern from `suitkaise.sk`.
 
-`_AsyncableMethod` wraps a sync method and an async method into a single attribute that can be called either way:
+`_AsyncableMethod` wraps a sync method and an async method into a single attribute that can be called either way.
 
 ```python
 short = _AsyncableMethod(_sync_short, _async_short)
@@ -456,10 +452,10 @@ short = _AsyncableMethod(_sync_short, _async_short)
 Usage:
 ```python
 # sync usage
-breaker.short()
+circ.short()
 
 # async usage
-await breaker.short.asynced()()
+await circ.short.asynced()()
 ```
 
 The async versions use `asyncio.sleep()` instead of blocking `time.sleep()`:
@@ -506,7 +502,7 @@ _shared_meta = {
 }
 ```
 
-This allows a `Share` instance to wrap a circuit and automatically synchronize state across multiple processes. When one process breaks the circuit, all processes see `broken=True`.
+This allows a `Share` instance to wrap a circuit and automatically synchronize state across multiple processes.
 
 ### Sleep Implementation
 
@@ -520,4 +516,3 @@ timing.sleep(sleep_duration)
 ```
 
 This uses the timing module's sleep implementation, which provides consistent behavior across different environments.
-
