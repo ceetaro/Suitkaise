@@ -562,20 +562,74 @@ class Skprocess:
         )
         self._subprocess.start()
 
-    def run(self) -> Any:
-        """
-        ────────────────────────────────────────────────────────
-        ```python
-        process = MyProcess()
-        result = process.run()
-        ```
-        ────────────────────────────────────────────────────────\n
+    # async run implementation for modifiers
+    
+    async def _async_run(self) -> Any:
+        """Async implementation of run()."""
+        self.start()
+        await asyncio.to_thread(self._sync_wait)
         
+        if self._has_result:
+            if isinstance(self._result, BaseException):
+                raise self._result
+            return self._result
+        
+        return None
+    
+    def _sync_run(self) -> Any:
+        """
         Start, wait, and return the result in one call.
+        
+        Returns:
+            Whatever __result__() returned.
+        
+        Raises:
+            ProcessError: If the process failed (after exhausting lives).
         """
         self.start()
         self.wait()
         return self.result()
+    
+    run = _ModifiableMethod(
+        _sync_run,
+        _async_run,
+        timeout_error=ResultTimeoutError,
+        has_retry_modifier=False,
+    )
+    """
+    ────────────────────────────────────────────────────────
+        ```python
+        # sync - blocks until result ready
+        result = process.run()
+        
+        # with timeout - raises ResultTimeoutError if exceeded
+        result = process.run.timeout(30.0)()
+        
+        # background - returns Future immediately
+        future = process.run.background()()
+        # ... do other work ...
+        result = future.result()
+        
+        # async - await in async code
+        result = await process.run.asynced()()
+        ```
+    ────────────────────────────────────────────────────────
+    
+    Start, wait, and return the result in one call.
+    
+    Equivalent to calling start(), wait(), and result() in sequence.
+    
+    Returns:
+        Whatever __result__() returned.
+    
+    Raises:
+        ProcessError: If the process failed (after exhausting lives).
+    
+    Modifiers:
+        .timeout(seconds): Raise ResultTimeoutError if exceeded
+        .background(): Return Future immediately
+        .asynced(): Return coroutine for await
+    """
     
     def stop(self) -> None:
         """

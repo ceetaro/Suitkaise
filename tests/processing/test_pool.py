@@ -183,6 +183,14 @@ def test_pool_has_star():
     assert callable(pool.star)
 
 
+def test_pool_has_unordered_map():
+    """Pool should have unordered_map property."""
+    pool = Pool()
+    
+    assert hasattr(pool, 'unordered_map')
+    assert callable(pool.unordered_map)
+
+
 def test_pool_has_close():
     """Pool should have close() method."""
     pool = Pool()
@@ -455,6 +463,71 @@ def test_pool_unordered_imap_asynced():
     assert sorted(result) == [4, 6]
 
 
+# =============================================================================
+# Pool.unordered_map Tests
+# =============================================================================
+
+def test_pool_unordered_map_basic():
+    """Pool.unordered_map should return list in completion order."""
+    pool = Pool(workers=2)
+    results = pool.unordered_map(_double, [1, 2, 3])
+    # results are a list (not iterator) but may be in any order
+    assert isinstance(results, list)
+    assert sorted(results) == [2, 4, 6]
+
+
+def test_pool_unordered_map_empty():
+    """Pool.unordered_map with empty input should return empty list."""
+    pool = Pool(workers=2)
+    results = pool.unordered_map(_double, [])
+    assert results == []
+
+
+def test_pool_unordered_map_single():
+    """Pool.unordered_map with single input should work."""
+    pool = Pool(workers=2)
+    results = pool.unordered_map(_double, [42])
+    assert results == [84]
+
+
+def test_pool_unordered_map_timeout():
+    """Pool.unordered_map timeout should raise TimeoutError."""
+    pool = Pool(workers=1)
+    try:
+        pool.unordered_map.timeout(0.1)(_slow_double, [1])
+        assert False, "Expected TimeoutError"
+    except TimeoutError:
+        pass
+
+
+def test_pool_unordered_map_background():
+    """Pool.unordered_map background should return Future with list."""
+    pool = Pool(workers=2)
+    future = pool.unordered_map.background()(_double, [1, 2, 3])
+    results = future.result(timeout=5)
+    assert isinstance(results, list)
+    assert sorted(results) == [2, 4, 6]
+
+
+def test_pool_unordered_map_asynced():
+    """Pool.unordered_map asynced should return coroutine with list."""
+    async def run():
+        return await pool.unordered_map.asynced()(_double, [2, 3, 4])
+
+    pool = Pool(workers=2)
+    result = asyncio.run(run())
+    assert isinstance(result, list)
+    assert sorted(result) == [4, 6, 8]
+
+
+def test_pool_star_unordered_map():
+    """Pool.star().unordered_map should unpack args."""
+    pool = Pool(workers=2)
+    results = pool.star().unordered_map(_add, [(1, 2), (3, 4), (5, 6)])
+    assert isinstance(results, list)
+    assert sorted(results) == [3, 7, 11]
+
+
 def test_pool_context_manager():
     """Pool should support context manager usage."""
     with Pool(workers=1) as pool:
@@ -492,6 +565,7 @@ def run_all_tests():
     runner.run_test("Pool with workers", test_pool_with_workers)
     runner.run_test("Pool has map()", test_pool_has_map)
     runner.run_test("Pool has star()", test_pool_has_star)
+    runner.run_test("Pool has unordered_map()", test_pool_has_unordered_map)
     runner.run_test("Pool has close()", test_pool_has_close)
     runner.run_test("Pool has join()", test_pool_has_join)
     
@@ -526,6 +600,16 @@ def run_all_tests():
     runner.run_test("Pool.unordered_imap timeout", test_pool_unordered_imap_timeout, timeout=10)
     runner.run_test("Pool.unordered_imap background", test_pool_unordered_imap_background, timeout=10)
     runner.run_test("Pool.unordered_imap asynced", test_pool_unordered_imap_asynced, timeout=10)
+    
+    # Pool.unordered_map tests
+    runner.run_test("Pool.unordered_map basic", test_pool_unordered_map_basic, timeout=10)
+    runner.run_test("Pool.unordered_map empty", test_pool_unordered_map_empty, timeout=10)
+    runner.run_test("Pool.unordered_map single", test_pool_unordered_map_single, timeout=10)
+    runner.run_test("Pool.unordered_map timeout", test_pool_unordered_map_timeout, timeout=10)
+    runner.run_test("Pool.unordered_map background", test_pool_unordered_map_background, timeout=10)
+    runner.run_test("Pool.unordered_map asynced", test_pool_unordered_map_asynced, timeout=10)
+    runner.run_test("Pool.star().unordered_map", test_pool_star_unordered_map, timeout=10)
+    
     runner.run_test("Pool context manager", test_pool_context_manager, timeout=10)
     
     # Error handling

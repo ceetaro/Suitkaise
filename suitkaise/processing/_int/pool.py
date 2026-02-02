@@ -443,6 +443,169 @@ class _PoolUnorderedImapAsyncModifier:
 
 
 
+# Unordered Map Modifiers (returns list in completion order)
+
+
+class _PoolUnorderedMapModifier:
+    """
+    Bound method wrapper for Pool.unordered_map with modifier support.
+    
+    Usage:
+        pool.unordered_map(fn, items)                    # sync, blocks, returns list
+        pool.unordered_map.timeout(30)(fn, items)        # sync with timeout
+        pool.unordered_map.background()(fn, items)       # returns Future
+        await pool.unordered_map.asynced()(fn, items)    # async
+    """
+    
+    def __init__(self, pool: "Pool", is_star: bool = False):
+        # store pool reference and star flag
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(
+        self,
+        fn_or_process: Union[Callable, type],
+        iterable: Iterable,
+    ) -> list:
+        """Apply function/Skprocess to each item, return list in completion order."""
+        # collect unordered results into list
+        return list(self._pool._unordered_imap_impl(fn_or_process, iterable, is_star=self._is_star))
+    
+    def timeout(self, seconds: float) -> "_PoolUnorderedMapTimeoutModifier":
+        """Add timeout to unordered_map - raises if exceeded."""
+        # return modifier that injects timeout
+        return _PoolUnorderedMapTimeoutModifier(self._pool, self._is_star, seconds)
+    
+    def background(self) -> "_PoolUnorderedMapBackgroundModifier":
+        """Run unordered_map in background thread, return Future."""
+        # return background modifier
+        return _PoolUnorderedMapBackgroundModifier(self._pool, self._is_star)
+    
+    def asynced(self) -> "_PoolUnorderedMapAsyncModifier":
+        """Get async version of unordered_map."""
+        # return async modifier
+        return _PoolUnorderedMapAsyncModifier(self._pool, self._is_star)
+
+
+class _PoolUnorderedMapTimeoutModifier:
+    """Timeout modifier for Pool.unordered_map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        # store pool and timeout config
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute unordered_map with timeout."""
+        # collect unordered results with timeout
+        return list(self._pool._unordered_imap_impl(
+            fn_or_process, iterable, is_star=self._is_star, timeout=self._timeout
+        ))
+    
+    def background(self) -> "_PoolUnorderedMapTimeoutBackgroundModifier":
+        """Run unordered_map with timeout in background thread."""
+        # return background modifier that preserves timeout
+        return _PoolUnorderedMapTimeoutBackgroundModifier(self._pool, self._is_star, self._timeout)
+    
+    def asynced(self) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        timeout = self._timeout
+        
+        async def async_unordered_map_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            # collect unordered results and apply asyncio timeout
+            def collect():
+                return list(pool._unordered_imap_impl(fn_or_process, iterable, is_star, timeout))
+            
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(collect), timeout=timeout)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.unordered_map timed out after {timeout}s")
+        
+        return async_unordered_map_with_timeout
+
+
+class _PoolUnorderedMapTimeoutBackgroundModifier:
+    """Background modifier for Pool.unordered_map with timeout."""
+    
+    def __init__(self, pool: "Pool", is_star: bool, timeout_seconds: float):
+        # store pool and timeout config
+        self._pool = pool
+        self._is_star = is_star
+        self._timeout = timeout_seconds
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute unordered_map with timeout in background, return Future."""
+        # submit to thread pool for background execution
+        def collect():
+            return list(self._pool._unordered_imap_impl(
+                fn_or_process, iterable, self._is_star, self._timeout
+            ))
+        
+        executor = _get_pool_executor()
+        return executor.submit(collect)
+
+
+class _PoolUnorderedMapBackgroundModifier:
+    """Background modifier for Pool.unordered_map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        # store pool reference and star flag
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> Future:
+        """Execute unordered_map in background, return Future."""
+        # submit to thread pool for background execution
+        def collect():
+            return list(self._pool._unordered_imap_impl(fn_or_process, iterable, self._is_star, None))
+        
+        executor = _get_pool_executor()
+        return executor.submit(collect)
+    
+    def timeout(self, seconds: float) -> "_PoolUnorderedMapTimeoutBackgroundModifier":
+        """Add timeout to background unordered_map."""
+        # return timeout version of background modifier
+        return _PoolUnorderedMapTimeoutBackgroundModifier(self._pool, self._is_star, seconds)
+
+
+class _PoolUnorderedMapAsyncModifier:
+    """Async modifier for Pool.unordered_map."""
+    
+    def __init__(self, pool: "Pool", is_star: bool):
+        # store pool reference and star flag
+        self._pool = pool
+        self._is_star = is_star
+    
+    async def __call__(self, fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+        """Execute unordered_map asynchronously."""
+        # collect unordered results in a thread to avoid blocking event loop
+        def collect():
+            return list(self._pool._unordered_imap_impl(fn_or_process, iterable, self._is_star, None))
+        
+        return await asyncio.to_thread(collect)
+    
+    def timeout(self, seconds: float) -> Callable:
+        """Get async version with timeout."""
+        pool = self._pool
+        is_star = self._is_star
+        
+        async def async_unordered_map_with_timeout(fn_or_process: Union[Callable, type], iterable: Iterable) -> list:
+            # collect unordered results and apply asyncio timeout
+            def collect():
+                return list(pool._unordered_imap_impl(fn_or_process, iterable, is_star, None))
+            
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(collect), timeout=seconds)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Pool.unordered_map timed out after {seconds}s")
+        
+        return async_unordered_map_with_timeout
+
+
+
 # Star Modifier
 
 class StarModifier:
@@ -473,6 +636,12 @@ class StarModifier:
         """Get unordered_imap method with tuple unpacking and modifier support."""
         # return unordered imap modifier configured for tuple unpacking
         return _PoolUnorderedImapModifier(self._pool, is_star=True)
+    
+    @property
+    def unordered_map(self) -> _PoolUnorderedMapModifier:
+        """Get unordered_map method with tuple unpacking and modifier support."""
+        # return unordered map modifier configured for tuple unpacking
+        return _PoolUnorderedMapModifier(self._pool, is_star=True)
 
 class Pool:
     """
@@ -501,8 +670,11 @@ class Pool:
         # unordered_imap: iterator, yields as completed (fastest)
         for result in pool.unordered_imap(sum, [(1, 2), (3, 4)]):
             print(result)
+        
+        # unordered_map: list, in completion order (fastest list)
+        results = pool.unordered_map(sum, [(1, 2), (3, 4)])
 
-        # star() works with map, imap, and unordered_imap
+        # star() works with map, imap, unordered_imap, and unordered_map
         ```
     ────────────────────────────────────────────────────────\n
 
@@ -619,6 +791,7 @@ class Pool:
         star().map() unpacks tuples as function arguments.
         star().imap() unpacks tuples as function arguments.
         star().unordered_imap() unpacks tuples as function arguments.
+        star().unordered_map() unpacks tuples as function arguments.
         """
         return StarModifier(self)
     
@@ -748,6 +921,47 @@ class Pool:
             .asynced(): Return coroutine for list
         """
         return _PoolUnorderedImapModifier(self, is_star=False)
+    
+    @property
+    def unordered_map(self) -> _PoolUnorderedMapModifier:
+        """
+        ────────────────────────────────────────────────────────
+            ```python
+            # sync - blocks until all complete, returns list in completion order
+            results = pool.unordered_map(fn, items)
+            
+            # with timeout - raises TimeoutError if exceeded
+            results = pool.unordered_map.timeout(30.0)(fn, items)
+            
+            # background - returns Future immediately
+            future = pool.unordered_map.background()(fn, items)
+            results = future.result()
+            
+            # async - returns coroutine for await
+            results = await pool.unordered_map.asynced()(fn, items)
+            ```
+        ────────────────────────────────────────────────────────
+        
+        Apply function/Skprocess to each item, return list in completion order.
+        
+        Like map(), returns a list. Like unordered_imap(), results are in
+        completion order (fastest items first), not input order.
+        
+        Fastest when you need all results as a list but don't care about order.
+        
+        Args:
+            fn_or_process: Function or Skprocess class to apply.
+            iterable: Items to process.
+        
+        Returns:
+            List of results in completion order.
+        
+        Modifiers:
+            .timeout(seconds): Raise TimeoutError if exceeded
+            .background(): Return Future immediately
+            .asynced(): Return coroutine for await
+        """
+        return _PoolUnorderedMapModifier(self, is_star=False)
     
 
 

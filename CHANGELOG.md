@@ -15,6 +15,8 @@ All further changes will be changes to 0.3.0 (or the most recent version once 0.
 As of version 0.3.0, the project is still unreleased.
 
 ### Added
+- `Pool.unordered_map()` method that returns a list in completion order (like `unordered_imap` but returns list instead of iterator).
+- `Skprocess.run()` now supports `.timeout()`, `.background()`, and `.asynced()` modifiers for async and background execution.
 - Expanded blocking call detection for common sync libraries (boto3, redis, pymongo, Kafka, Elasticsearch, etc.) with broader IO-aware heuristics.
 - Best-effort socket auto-reconnect that attempts bind/connect using saved local/remote addresses.
 - Base `Reconnector` class with consistent `.reconnect()` API for reconnection helpers.
