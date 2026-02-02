@@ -26,7 +26,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise import cerial
+from suitkaise import cucumber
 from suitkaise.processing._int.share.coordinator import _Coordinator, _coordinator_main
 from suitkaise.processing._int.share.primitives import _AtomicCounterRegistry
 
@@ -185,7 +185,7 @@ def test_coordinator_main_loop_in_process():
     registry.register_keys("counter", {"value"})
 
     obj = Counter()
-    source_store["counter"] = cerial.serialize(obj)
+    source_store["counter"] = cucumber.serialize(obj)
 
     def _run():
         with contextlib.redirect_stderr(io.StringIO()):
@@ -211,14 +211,14 @@ def test_coordinator_main_loop_in_process():
     )
     thread.start()
 
-    command_queue.put(("counter", "inc", cerial.serialize((3,)), cerial.serialize({}), ["value"]))
+    command_queue.put(("counter", "inc", cucumber.serialize((3,)), cucumber.serialize({}), ["value"]))
     command_queue.put(("__clear__", None, None, None, None))
-    command_queue.put(("missing", "inc", cerial.serialize((1,)), cerial.serialize({}), ["value"]))
+    command_queue.put(("missing", "inc", cucumber.serialize((1,)), cucumber.serialize({}), ["value"]))
     time.sleep(0.2)
     stop_event.set()
     thread.join(timeout=2)
 
-    updated = cerial.deserialize(source_store["counter"])
+    updated = cucumber.deserialize(source_store["counter"])
     assert updated.value == 3
     registry.reset()
     manager.shutdown()

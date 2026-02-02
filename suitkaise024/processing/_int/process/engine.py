@@ -32,7 +32,7 @@ def _engine_main(
     - Sending results back to parent
     
     Args:
-        serialized_process: Process object serialized with cerial
+        serialized_process: Process object serialized with cucumber
         stop_event: Event to check for stop signal from parent
         result_queue: Queue to send results/errors back to parent
         original_state: Original serialized state for retries (lives system)
@@ -54,10 +54,10 @@ def _engine_main(
         
         # Try to send error back through queue
         try:
-            from suitkaise import cerial
+            from suitkaise import cucumber
             result_queue.put({
                 "type": "error", 
-                "data": cerial.serialize(e),
+                "data": cucumber.serialize(e),
                 "timers": None
             })
         except Exception as send_err:
@@ -82,7 +82,7 @@ def _engine_main_inner(
     listen_queue: "Queue[Any]" = None
 ) -> None:
     """Inner engine implementation."""
-    from suitkaise import cerial, sktime
+    from suitkaise import cucumber, sktime
     from .errors import (
         PreRunError, RunError, PostRunError, 
         OnFinishError, ResultError, ProcessTimeoutError
@@ -91,7 +91,7 @@ def _engine_main_inner(
     from .timers import ProcessTimers
     
     # Deserialize the process
-    process = cerial.deserialize(serialized_process)
+    process = cucumber.deserialize(serialized_process)
     
     # Ensure timers exist
     if process.timers is None:
@@ -267,7 +267,7 @@ def _run_finish_sequence(
     """
     Run __onfinish__ and __result__, send result back to parent.
     """
-    from suitkaise import cerial
+    from suitkaise import cucumber
     from .errors import OnFinishError, ResultError, ProcessTimeoutError
     from .timeout import run_with_timeout
     
@@ -340,8 +340,8 @@ def _run_finish_sequence(
     
     # Send successful result with timers
     try:
-        serialized_result = cerial.serialize(result)
-        serialized_timers = cerial.serialize(process.timers) if process.timers else None
+        serialized_result = cucumber.serialize(result)
+        serialized_timers = cucumber.serialize(process.timers) if process.timers else None
         result_queue.put({
             "type": "result", 
             "data": serialized_result,
@@ -360,7 +360,7 @@ def _send_error(
     """
     Call __error__ and send error result back to parent.
     """
-    from suitkaise import cerial
+    from suitkaise import cucumber
     from .errors import ErrorError
     from .timeout import run_with_timeout
     
@@ -397,8 +397,8 @@ def _send_error(
             error_timer.stop()
     
     # Serialize and send with timers
-    serialized_error = cerial.serialize(error_result)
-    serialized_timers = cerial.serialize(process.timers) if process.timers else None
+    serialized_error = cucumber.serialize(error_result)
+    serialized_timers = cucumber.serialize(process.timers) if process.timers else None
     result_queue.put({
         "type": "error", 
         "data": serialized_error,

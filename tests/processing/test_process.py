@@ -36,13 +36,13 @@ from suitkaise.processing._int.process_class import Skprocess
 
 Process = Skprocess
 from suitkaise.processing._int.timers import ProcessTimers
-from suitkaise import cerial
-from suitkaise.cerial._int.handlers.reconnector import Reconnector
-from suitkaise.cerial._int.handlers.network_handler import DbReconnector, SocketReconnector
-from suitkaise.cerial._int.handlers.pipe_handler import PipeReconnector
-from suitkaise.cerial._int.handlers.threading_handler import ThreadReconnector
-from suitkaise.cerial._int.handlers.subprocess_handler import SubprocessReconnector
-from suitkaise.cerial._int.handlers.regex_handler import MatchReconnector, MatchObjectHandler
+from suitkaise import cucumber
+from suitkaise.cucumber._int.handlers.reconnector import Reconnector
+from suitkaise.cucumber._int.handlers.network_handler import DbReconnector, SocketReconnector
+from suitkaise.cucumber._int.handlers.pipe_handler import PipeReconnector
+from suitkaise.cucumber._int.handlers.threading_handler import ThreadReconnector
+from suitkaise.cucumber._int.handlers.subprocess_handler import SubprocessReconnector
+from suitkaise.cucumber._int.handlers.regex_handler import MatchReconnector, MatchObjectHandler
 
 # Import test classes from separate module for multiprocessing compatibility
 from tests.processing.test_process_classes import (
@@ -464,8 +464,8 @@ def test_process_default_init_wrapper():
 def test_process_custom_serialize_deserialize_classmethod():
     """Custom classmethod deserialize should restore user state."""
     proc = UserStateProcess()
-    data = cerial.serialize(proc)
-    restored = cerial.deserialize(data)
+    data = cucumber.serialize(proc)
+    restored = cucumber.deserialize(data)
     assert isinstance(restored, Skprocess)
     assert restored.user_flag == "user"
     assert restored.value == 2
@@ -474,24 +474,24 @@ def test_process_custom_serialize_deserialize_classmethod():
 def test_process_custom_serialize_deserialize_staticmethod():
     """Custom staticmethod deserialize should restore user state."""
     proc = StaticUserStateProcess()
-    data = cerial.serialize(proc)
-    restored = cerial.deserialize(data)
+    data = cucumber.serialize(proc)
+    restored = cucumber.deserialize(data)
     assert restored.static_flag == "static"
 
 
 def test_process_custom_serialize_deserialize_fallback():
     """Fallback deserialize signature should still work."""
     proc = BadSignatureDeserializeProcess()
-    data = cerial.serialize(proc)
-    restored = cerial.deserialize(data)
+    data = cucumber.serialize(proc)
+    restored = cucumber.deserialize(data)
     assert restored.fallback_flag == "fallback"
 
 
 def test_process_auto_reconnect():
     """autoreconnect should run reconnect_all during deserialization."""
     proc = AutoReconnectProcess()
-    data = cerial.serialize(proc)
-    restored = cerial.deserialize(data)
+    data = cucumber.serialize(proc)
+    restored = cucumber.deserialize(data)
     assert restored.resource == "connected-alpha"
     assert restored.nested["item"] == "connected-beta"
 
@@ -499,8 +499,8 @@ def test_process_auto_reconnect():
 def test_process_auto_reconnect_all_types():
     """autoreconnect should reconnect all reconnector types."""
     proc = AutoReconnectProcessAll()
-    data = cerial.serialize(proc)
-    restored = cerial.deserialize(data)
+    data = cucumber.serialize(proc)
+    restored = cucumber.deserialize(data)
     rec = restored.reconnectors
     assert hasattr(rec["pipe"], "send")
     assert isinstance(rec["socket"], socket.socket)
@@ -531,7 +531,7 @@ def test_process_drain_result_queue_error_non_exception():
     proc._has_result = False
     message = {
         "type": "error",
-        "data": cerial.serialize("oops"),
+        "data": cucumber.serialize("oops"),
         "timers": None,
     }
     proc._result_queue.put(message)

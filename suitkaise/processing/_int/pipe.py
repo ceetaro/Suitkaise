@@ -4,7 +4,7 @@ Pipe wrapper for fast, direct, and rigid parent/child communication.
 Design goals:
 - Keep pipes fast (uses multiprocessing.Pipe under the hood)
 - Provide explicit lock semantics (anchor endpoint stays in parent)
-- Use cerial for send/recv payloads
+- Use cucumber for send/recv payloads
 - No post-init reattachment
 - ensure OH is minimal
 """
@@ -16,7 +16,7 @@ import multiprocessing
 import pickle
 from typing import Any, Optional, Tuple
 
-from suitkaise import cerial
+from suitkaise import cucumber
 
 
 class PipeEndpointError(RuntimeError):
@@ -49,15 +49,15 @@ class _PipeEndpoint:
         return self._conn
 
     def send(self, obj: Any) -> None:
-        """Serialize with cerial and send through the pipe."""
+        """Serialize with cucumber and send through the pipe."""
         conn = self._ensure_conn()
-        conn.send_bytes(cerial.serialize(obj))
+        conn.send_bytes(cucumber.serialize(obj))
 
     def recv(self) -> Any:
-        """Receive from the pipe and deserialize with cerial."""
+        """Receive from the pipe and deserialize with cucumber."""
         conn = self._ensure_conn()
         data = conn.recv_bytes()
-        return cerial.deserialize(data)
+        return cucumber.deserialize(data)
 
     def close(self) -> None:
         """Close the underlying connection if present."""
@@ -83,7 +83,7 @@ class _PipeEndpoint:
 
     def __serialize__(self) -> dict:
         """
-        Custom cerial serialization.
+        Custom cucumber serialization.
 
         We store a pickled handle so multiprocessing can rebuild it
         when deserialized in a child process.

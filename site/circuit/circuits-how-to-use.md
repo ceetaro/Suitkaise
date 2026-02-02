@@ -91,7 +91,7 @@ while program.running:
         if current_mem_usage > recc_mem_threshold:
             # will sleep execution for 0.05 seconds instead of default 0.1 if this short causes a trip
             circ.short(custom_sleep=0.05)
-            print(f"Shorted circuit {circ.times_shorted} times. Total failures: {circ.total_failures}")
+            print(f"Shorted circuit {circ.times_shorted} times. Total trips: {circ.total_trips}")
 
         # if circ.broken
         if circ.broken:

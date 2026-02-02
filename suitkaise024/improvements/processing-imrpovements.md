@@ -5,7 +5,7 @@
 - [ ] Add shared state patterns (shared memory, Manager() equivalent, etc)
 - [ ] Add easy shared memory usage
 - [ ] Document `Pool` better
-- [ ] Ensure that `tell()` serializes data with cerial before putting it in the queue
+- [ ] Ensure that `tell()` serializes data with cucumber before putting it in the queue
 - [ ] How do we handle Ctrl+C?
 
 ---
@@ -54,7 +54,7 @@ The `Process` class abstracts away queues beautifully with `tell()`/`listen()`, 
 
 1. **Simple API** — As easy as using regular Python objects
 2. **Automatic synchronization** — No manual locking for common operations
-3. **Cerial integration** — Complex objects work out of the box
+3. **Cucumber integration** — Complex objects work out of the box
 4. **Thread/process safe** — Works across multiple workers
 5. **Minimal overhead** — Fast path for primitives, managed path for complex types
 
@@ -117,7 +117,7 @@ print(f"All results: {shared.results}")
 SharedState - Process-safe shared state container.
 
 Provides a simple interface for sharing data between processes
-with automatic synchronization and cerial integration.
+with automatic synchronization and cucumber integration.
 """
 
 import multiprocessing
@@ -231,7 +231,7 @@ class SharedDict(Generic[T]):
     """
     Process-safe dictionary with automatic locking.
     
-    All operations are atomic. Supports cerial-serializable values.
+    All operations are atomic. Supports cucumber-serializable values.
     
     Usage:
         d = SharedDict()
@@ -317,7 +317,7 @@ class SharedList(Generic[T]):
     """
     Process-safe list with automatic locking.
     
-    All operations are atomic. Supports cerial-serializable values.
+    All operations are atomic. Supports cucumber-serializable values.
     
     Usage:
         lst = SharedList()
@@ -434,8 +434,8 @@ class SharedState:
                 # Already a shared type
                 self._attrs[name] = value
             else:
-                # For other types, use a Manager.Value with cerial serialization
-                # This is slower but handles any cerial-serializable type
+                # For other types, use a Manager.Value with cucumber serialization
+                # This is slower but handles any cucumber-serializable type
                 self._attrs[name] = self._create_shared_value(value)
     
     def __getattr__(self, name: str) -> Any:
@@ -448,14 +448,14 @@ class SharedState:
             raise AttributeError(f"SharedState has no attribute '{name}'")
     
     def _create_shared_value(self, value: Any) -> Any:
-        """Create a shared wrapper for arbitrary cerial-serializable values."""
+        """Create a shared wrapper for arbitrary cucumber-serializable values."""
         # Use a dict to store arbitrary values (slower but flexible)
         wrapper = SharedDict({'value': value}, self._manager)
         return _SharedValue(wrapper)
     
     def __serialize__(self) -> dict:
         """Serialize for passing to subprocess."""
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         state = {}
         for name, shared_obj in self._attrs.items():
@@ -468,14 +468,14 @@ class SharedState:
             elif isinstance(shared_obj, SharedList):
                 state[name] = {'type': 'list', 'value': shared_obj.to_list()}
             else:
-                state[name] = {'type': 'value', 'value': cerial.serialize(shared_obj)}
+                state[name] = {'type': 'value', 'value': cucumber.serialize(shared_obj)}
         
         return state
     
     @classmethod
     def __deserialize__(cls, state: dict) -> "SharedState":
         """Deserialize in subprocess."""
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         obj = cls()
         for name, data in state.items():
@@ -488,7 +488,7 @@ class SharedState:
             elif data['type'] == 'list':
                 obj._attrs[name] = SharedList(data['value'], obj._manager)
             else:
-                obj._attrs[name] = cerial.deserialize(data['value'])
+                obj._attrs[name] = cucumber.deserialize(data['value'])
         
         return obj
 
@@ -525,7 +525,7 @@ class Process:
     
     def start(self) -> None:
         """Start the process in a new subprocess."""
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         # Serialize shared state separately for proper manager handling
         shared_attrs = {}
@@ -727,7 +727,7 @@ worker.wait()
    - Test basic operations (get, set, delete)
    - Test batch operations (update, extend)
    - Test concurrent modifications
-   - Test with cerial-serializable complex values
+   - Test with cucumber-serializable complex values
 
 3. **Integration tests**
    - Test SharedState with Process class
@@ -758,7 +758,7 @@ Add async/await support for I/O-bound workloads. The current `Process` class is 
 ### Design Goals
 
 1. Mirror the existing `Process` API as closely as possible
-2. Reuse existing infrastructure (config, timers, errors, cerial)
+2. Reuse existing infrastructure (config, timers, errors, cucumber)
 3. Keep it simple—don't over-engineer
 4. Let users choose sync or async based on workload
 
@@ -1088,12 +1088,12 @@ class AsyncProcess:
     def start(self) -> None:
         """Start the async process in a new subprocess."""
         from .async_engine import _async_engine_main
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         if self.timers is None:
             self.timers = ProcessTimers()
         
-        serialized = cerial.serialize(self)
+        serialized = cucumber.serialize(self)
         original_state = serialized
         
         self._stop_event = multiprocessing.Event()
@@ -1137,24 +1137,24 @@ class AsyncProcess:
         if self._has_result or self._result_queue is None:
             return
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         try:
             message = self._result_queue.get(timeout=timeout if timeout else 1.0)
             
             if 'timers' in message and message['timers'] is not None:
-                self.timers = cerial.deserialize(message['timers'])
+                self.timers = cucumber.deserialize(message['timers'])
                 AsyncProcess._setup_timed_methods(self)
             
             if message["type"] == "error":
-                error_data = cerial.deserialize(message["data"])
+                error_data = cucumber.deserialize(message["data"])
                 if isinstance(error_data, BaseException):
                     self._result = error_data
                 else:
                     from .errors import ProcessError
                     self._result = ProcessError(f"Process failed: {error_data}")
             else:
-                self._result = cerial.deserialize(message["data"])
+                self._result = cucumber.deserialize(message["data"])
             
             self._has_result = True
         except queue_module.Empty:
@@ -1176,8 +1176,8 @@ class AsyncProcess:
         if self._tell_queue is None:
             raise RuntimeError("Cannot tell() - process not started")
         
-        from suitkaise import cerial
-        serialized = cerial.serialize(data)
+        from suitkaise import cucumber
+        serialized = cucumber.serialize(data)
         self._tell_queue.put(serialized)
     
     def listen(self, timeout: float | None = None) -> Any:
@@ -1185,11 +1185,11 @@ class AsyncProcess:
         if self._listen_queue is None:
             raise RuntimeError("Cannot listen() - process not started")
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         try:
             serialized = self._listen_queue.get(timeout=timeout)
-            return cerial.deserialize(serialized)
+            return cucumber.deserialize(serialized)
         except queue_module.Empty:
             return None
     
@@ -1199,10 +1199,10 @@ class AsyncProcess:
         if self._listen_queue is None:
             raise RuntimeError("Cannot tell() - queues not set up")
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         import asyncio
         
-        serialized = cerial.serialize(data)
+        serialized = cucumber.serialize(data)
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, self._listen_queue.put, serialized)
     
@@ -1211,7 +1211,7 @@ class AsyncProcess:
         if self._tell_queue is None:
             raise RuntimeError("Cannot listen() - queues not set up")
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         import asyncio
         
         loop = asyncio.get_event_loop()
@@ -1225,7 +1225,7 @@ class AsyncProcess:
         serialized = await loop.run_in_executor(None, blocking_get)
         if serialized is None:
             return None
-        return cerial.deserialize(serialized)
+        return cucumber.deserialize(serialized)
     
     @property
     def timer(self) -> "Timer | None":
@@ -1424,10 +1424,10 @@ def _async_engine_main(serialized, stop_event, result_queue, original_state, tel
     
     Creates an event loop and runs the async engine.
     """
-    from suitkaise import cerial
+    from suitkaise import cucumber
     
     # Deserialize the process
-    process = cerial.deserialize(serialized)
+    process = cucumber.deserialize(serialized)
     
     # Attach communication primitives
     process._stop_event = stop_event
@@ -1447,8 +1447,8 @@ def _async_engine_main(serialized, stop_event, result_queue, original_state, tel
         # Send result back
         result_queue.put({
             "type": result_type,
-            "data": cerial.serialize(result_data),
-            "timers": cerial.serialize(process.timers),
+            "data": cucumber.serialize(result_data),
+            "timers": cucumber.serialize(process.timers),
         })
     
     except Exception as e:
@@ -1456,8 +1456,8 @@ def _async_engine_main(serialized, stop_event, result_queue, original_state, tel
         from .errors import ProcessError
         result_queue.put({
             "type": "error",
-            "data": cerial.serialize(ProcessError(f"Engine failure: {e}")),
-            "timers": cerial.serialize(process.timers) if process.timers else None,
+            "data": cucumber.serialize(ProcessError(f"Engine failure: {e}")),
+            "timers": cucumber.serialize(process.timers) if process.timers else None,
         })
     
     finally:
@@ -1710,11 +1710,11 @@ __all__ = [
 
 ---
 
-### Phase 4: Cerial Handlers for Async Objects
+### Phase 4: Cucumber Handlers for Async Objects
 
-Extend cerial to handle common async objects.
+Extend cucumber to handle common async objects.
 
-#### File: `suitkaise/cerial/_int/handlers/async_handler.py` (update existing)
+#### File: `suitkaise/cucumber/_int/handlers/async_handler.py` (update existing)
 
 Add handlers for:
 - `asyncio.Semaphore` — Recreate with same value
@@ -1737,7 +1737,7 @@ class AsyncioSemaphoreHandler(BaseHandler):
     def serialize(self, obj: asyncio.Semaphore, path: str) -> dict:
         # Semaphore._value is the current value
         return {
-            "__cerial_type__": self.type_name,
+            "__cucumber_type__": self.type_name,
             "state": {
                 "value": obj._value,
             }
@@ -1858,7 +1858,7 @@ with AsyncPoolContext(max_concurrent=50) as ctx:
 
 4. **Performance tests**
    - Compare AsyncProcess vs Process for I/O-bound work
-   - Measure overhead of cerial serialization for async objects
+   - Measure overhead of cucumber serialization for async objects
    - Test with 1000+ concurrent operations
 
 ---
@@ -2031,20 +2031,20 @@ __all__ = [
 
 ---
 
-### cerial Async Variants
+### cucumber Async Variants
 
 For very large objects, serialization can block the event loop. Async variants run serialization in a thread pool.
 
 #### `async_serialize()` and `async_deserialize()`
 
 ```python
-# In suitkaise/cerial/api.py
+# In suitkaise/cucumber/api.py
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 # Shared thread pool for serialization work
-_serialization_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cerial_async")
+_serialization_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cucumber_async")
 
 
 async def async_serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
@@ -2066,7 +2066,7 @@ async def async_serialize(obj, debug: bool = False, verbose: bool = False) -> by
         large_data = load_huge_dataset()
         
         # Non-blocking - other async tasks can run
-        serialized = await cerial.async_serialize(large_data)
+        serialized = await cucumber.async_serialize(large_data)
     """
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
@@ -2092,7 +2092,7 @@ async def async_deserialize(data: bytes, debug: bool = False, verbose: bool = Fa
     
     Usage:
         # Non-blocking - other async tasks can run
-        obj = await cerial.async_deserialize(data)
+        obj = await cucumber.async_deserialize(data)
     """
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
@@ -2104,7 +2104,7 @@ async def async_deserialize(data: bytes, debug: bool = False, verbose: bool = Fa
 #### Use Case: Web Server with Large Objects
 
 ```python
-from suitkaise import cerial
+from suitkaise import cucumber
 from aiohttp import web
 
 async def handle_upload(request):
@@ -2112,13 +2112,13 @@ async def handle_upload(request):
     data = await request.read()
     
     # Deserialize in background - doesn't block event loop
-    obj = await cerial.async_deserialize(data)
+    obj = await cucumber.async_deserialize(data)
     
     # Process object...
     result = process(obj)
     
     # Serialize response in background
-    response_data = await cerial.async_serialize(result)
+    response_data = await cucumber.async_serialize(result)
     
     return web.Response(body=response_data)
 ```
@@ -2126,7 +2126,7 @@ async def handle_upload(request):
 #### Exports Update
 
 ```python
-# Add to suitkaise/cerial/__init__.py
+# Add to suitkaise/cucumber/__init__.py
 
 __all__ = [
     # Existing
@@ -2335,8 +2335,8 @@ __all__ = [
 | sktime | `async_sleep()` | Low | Medium | High |
 | sktime | `AsyncTimeThis` | Low | Medium | High |
 | sktime | `@async_timethis` | Low | High | High |
-| cerial | `async_serialize()` | Low | Medium | Medium |
-| cerial | `async_deserialize()` | Low | Medium | Medium |
+| cucumber | `async_serialize()` | Low | Medium | Medium |
+| cucumber | `async_deserialize()` | Low | Medium | Medium |
 | circuit | `AsyncCircuit` | Medium | Medium | Medium |
 
 The sktime async variants are highest priority because:

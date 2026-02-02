@@ -113,7 +113,7 @@ class Process:
         This means users don't need to call super().__init__() - it happens
         automatically before their __init__ runs.
         
-        Also handles serialization for cerial:
+        Also handles serialization for cucumber:
         - If user defined __serialize__/__deserialize__, we wrap them to include
           Process internals (lifecycle methods, class attrs) while preserving
           user's custom state.
@@ -142,15 +142,15 @@ class Process:
             
             cls.__init__ = default_init
         
-        # Handle serialization methods for cerial compatibility.
-        # cerial requires these to be in the class's own __dict__ (not inherited)
+        # Handle serialization methods for cucumber compatibility.
+        # cucumber requires these to be in the class's own __dict__ (not inherited)
         # for locally-defined classes.
         #
-        # IMPORTANT: cerial handles locally-defined vs module-level classes differently:
+        # IMPORTANT: cucumber handles locally-defined vs module-level classes differently:
         # - Locally-defined (has <locals> in qualname): requires staticmethod with (cls, state) signature
-        #   cerial calls: deserialize_func(cls, state["custom_state"])
+        #   cucumber calls: deserialize_func(cls, state["custom_state"])
         # - Module-level: expects classmethod with (state) signature (cls is implicit)
-        #   cerial calls: cls.__deserialize__(state["custom_state"])
+        #   cucumber calls: cls.__deserialize__(state["custom_state"])
         #
         # If user defined their own __serialize__/__deserialize__, we capture them
         # and wrap to include Process internals alongside user's custom state.
@@ -171,7 +171,7 @@ class Process:
         
         if is_local:
             # For locally-defined classes: staticmethod with (cls, state) signature
-            # cerial calls: deserialize_func(cls, state["custom_state"])
+            # cucumber calls: deserialize_func(cls, state["custom_state"])
             def make_deserialize_static(user_deser):
                 def __deserialize__(reconstructed_cls, state):
                     return Process._deserialize_with_user(reconstructed_cls, state, user_deser)
@@ -180,7 +180,7 @@ class Process:
             cls.__deserialize__ = make_deserialize_static(user_deserialize)
         else:
             # For module-level classes: classmethod with (state) signature (cls is implicit)
-            # cerial calls: cls.__deserialize__(state["custom_state"])
+            # cucumber calls: cls.__deserialize__(state["custom_state"])
             def make_deserialize_classmethod(user_deser):
                 @classmethod
                 def __deserialize__(inner_cls, state):
@@ -190,7 +190,7 @@ class Process:
             cls.__deserialize__ = make_deserialize_classmethod(user_deserialize)
     
     # =========================================================================
-    # Serialization support for cerial
+    # Serialization support for cucumber
     # =========================================================================
     
     # Lifecycle method names that need to be captured during serialization
@@ -202,7 +202,7 @@ class Process:
     @staticmethod
     def _serialize_with_user(instance: "Process", user_serialize=None) -> dict:
         """
-        Serialize this Process instance for cerial.
+        Serialize this Process instance for cucumber.
         
         Captures:
         - Instance __dict__ (all instance attributes)
@@ -258,10 +258,10 @@ class Process:
     @staticmethod
     def _deserialize_with_user(reconstructed_cls: type, state: dict, user_deserialize=None) -> "Process":
         """
-        Deserialize a Process instance from cerial state.
+        Deserialize a Process instance from cucumber state.
         
         Args:
-            reconstructed_cls: The class cerial reconstructed (we ignore this and build our own)
+            reconstructed_cls: The class cucumber reconstructed (we ignore this and build our own)
             state: The serialized state dict
             user_deserialize: User's __deserialize__ method (if they defined one)
         
@@ -449,14 +449,14 @@ class Process:
         """
         # Import here to avoid circular imports
         from .engine import _engine_main
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         # Ensure timers exist
         if self.timers is None:
             self.timers = ProcessTimers()
         
         # Serialize current state
-        serialized = cerial.serialize(self)
+        serialized = cucumber.serialize(self)
         
         # Save original state for retries (lives system)
         original_state = serialized
@@ -543,7 +543,7 @@ class Process:
         if self._has_result or self._result_queue is None:
             return
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         import queue as queue_module
         
         try:
@@ -552,11 +552,11 @@ class Process:
             
             # Update timers from subprocess
             if 'timers' in message and message['timers'] is not None:
-                self.timers = cerial.deserialize(message['timers'])
+                self.timers = cucumber.deserialize(message['timers'])
                 Process._setup_timed_methods(self)
             
             if message["type"] == "error":
-                error_data = cerial.deserialize(message["data"])
+                error_data = cucumber.deserialize(message["data"])
                 # If __error__() returned a non-exception, wrap it
                 if isinstance(error_data, BaseException):
                     self._result = error_data
@@ -565,7 +565,7 @@ class Process:
                     from .errors import ProcessError
                     self._result = ProcessError(f"Process failed: {error_data}")
             else:
-                self._result = cerial.deserialize(message["data"])
+                self._result = cucumber.deserialize(message["data"])
             
             self._has_result = True
         except queue_module.Empty:
@@ -610,8 +610,8 @@ class Process:
         if self._tell_queue is None:
             raise RuntimeError("Cannot tell() - process not started")
         
-        from suitkaise import cerial
-        serialized = cerial.serialize(data)
+        from suitkaise import cucumber
+        serialized = cucumber.serialize(data)
         self._tell_queue.put(serialized)
     
     def listen(self, timeout: float | None = None) -> Any:
@@ -629,11 +629,11 @@ class Process:
         if self._listen_queue is None:
             raise RuntimeError("Cannot listen() - process not started")
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         try:
             serialized = self._listen_queue.get(timeout=timeout)
-            return cerial.deserialize(serialized)
+            return cucumber.deserialize(serialized)
         except queue_module.Empty:
             return None
     

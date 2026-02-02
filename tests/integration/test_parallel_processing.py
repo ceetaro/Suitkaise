@@ -5,13 +5,13 @@ Real-world scenario: A parallel job processor that:
 1. Uses Process with full lifecycle hooks (__prerun__, __run__, __postrun__, etc.)
 2. Uses Pool for batch processing
 3. Uses Share for cross-process state coordination
-4. Uses cerial for serializing complex objects across process boundaries
+4. Uses cucumber for serializing complex objects across process boundaries
 5. Uses Sktimer for performance tracking in each subprocess
 6. Uses Circuit for failure handling in workers
 
 This tests the full subprocess integration of:
 - processing: Process lifecycle, Pool, Share
-- cerial: Cross-process serialization of locks, loggers, Sktimer, Circuit
+- cucumber: Cross-process serialization of locks, loggers, Sktimer, Circuit
 - timing: Sktimer in subprocesses
 - circuits: Circuit in workers
 - sk: @sk classes for Share compatibility
@@ -41,7 +41,7 @@ sys.path.insert(0, str(project_root))
 from suitkaise.processing import Skprocess, Pool, ProcessError
 from suitkaise.timing import Sktimer, TimeThis
 from suitkaise.circuits import Circuit, BreakingCircuit
-from suitkaise.cerial import serialize, deserialize
+from suitkaise.cucumber import serialize, deserialize
 from suitkaise.sk import sk
 
 Process = Skprocess
@@ -239,7 +239,7 @@ class CircuitProcess(Process):
             "task_id": self.task_id,
             "result": self._result_value,
             "broken": self.circuit.broken,
-            "failures": self.circuit.total_failures,
+            "failures": self.circuit.total_trips,
         }
 
 
@@ -374,7 +374,7 @@ def test_process_with_circuit():
 
 
 def test_process_with_complex_state():
-    """Test Process with locks, loggers, timers (serialized via cerial)."""
+    """Test Process with locks, loggers, timers (serialized via cucumber)."""
     data = {"input": "test_value", "count": 42}
     proc = ComplexStateProcess("worker_1", data)
     proc.start()
@@ -429,7 +429,7 @@ def test_pool_parallel_execution():
     assert results == expected
 
 
-def test_cerial_complex_process_state():
+def test_cucumber_complex_process_state():
     """Test that complex Process state serializes correctly."""
     # Create a process with complex state
     data = {"values": [1, 2, 3], "config": {"active": True}}
@@ -634,7 +634,7 @@ def run_all_tests():
     run_scenario(
         "Cross-Process Serialization",
         "Serializing complex objects between main and workers",
-        test_cerial_complex_process_state, 15, results
+        test_cucumber_complex_process_state, 15, results
     )
     
     run_scenario(

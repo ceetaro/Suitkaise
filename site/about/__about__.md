@@ -65,7 +65,7 @@ All files and code in this repository is licensed under the Apache License 2.0.
 
 `suitkaise` contains the following modules:
 
-- cerial: serialization engine
+- cucumber: serialization engine
 
 - circuit: flow control
 
@@ -272,7 +272,7 @@ Your loggers don't pickle.
 
 Your class objects don't pickle.
 
-Solution: use `cerial` to serialize your objects.
+Solution: use `cucumber` to serialize your objects.
 
 I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.
     
@@ -298,11 +298,11 @@ Once the engine won, I felt confident that I could serialize anything.
 
 But even if I can't, I have written a special way for you to.
 
-`__serialize__()` and `__deserialize__()` methods in your classes will be used first by `cerial`, before it uses the default handling.
+`__serialize__()` and `__deserialize__()` methods in your classes will be used first by `cucumber`, before it uses the default handling.
 
 You can use them to override the default serialization and deserialization behavior for your own objects.
 
-As a bonus, `cerial` processes dataclasses 2x faster than `cloudpickle`, the fastest serializer for dataclasses.
+As a bonus, `cucumber` processes dataclasses 2x faster than `cloudpickle`, the fastest serializer for dataclasses.
 
 
 (button)

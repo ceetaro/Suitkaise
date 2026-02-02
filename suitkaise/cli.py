@@ -11,7 +11,7 @@ import suitkaise
 
 
 def _module_names() -> list[str]:
-    return ["timing", "paths", "circuits", "cerial", "processing", "sk"]
+    return ["timing", "paths", "circuits", "cucumber", "processing", "sk"]
 
 
 def _format_info() -> str:

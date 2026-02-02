@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'timing',
             'paths',
             'circuits',
-            'cerial',
+            'cucumber',
             'processing',
             'sk',
             'docs',
@@ -177,8 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'Sktimer', 'TimeThis',
             // circuits
             'Circuit', 'BreakingCircuit',
-            // cerial
-            'Cerializer', 'Decerializer', 'SerializationError', 'DeserializationError',
+            // cucumber
+            'Serializer', 'Deserializer', 'SerializationError', 'DeserializationError',
             // processing
             'Skprocess', 'Process', 'Pool', 'Share', 'ProcessTimers',
             'ProcessError', 'PreRunError', 'RunError', 'PostRunError', 'OnFinishError',
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
             'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
             'is_valid_filename', 'streamline_path',
-            // cerial
+            // cucumber
             'serialize', 'deserialize',
             // sk
             'sk',
@@ -232,10 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Find variable assignments like: varname = sktime.Timer()
             const assignmentPatterns = [
-                /(\w+)\s*=\s*(?:suitkaise|timing|paths|circuits|cerial|processing|sk)\.\w+/g,
+                /(\w+)\s*=\s*(?:suitkaise|timing|paths|circuits|cucumber|processing|sk)\.\w+/g,
                 new RegExp(`(\\w+)\\s*=\\s*(?:${classesPattern})\\s*\\(`, 'g'),
                 new RegExp(`(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
-                /with\s+(?:suitkaise|timing|paths|circuits|cerial|processing|sk)\.\w+[^:]*\s+as\s+(\w+)/g,
+                /with\s+(?:suitkaise|timing|paths|circuits|cucumber|processing|sk)\.\w+[^:]*\s+as\s+(\w+)/g,
             ];
             
             assignmentPatterns.forEach(pattern => {
@@ -785,8 +785,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'about',
         // Processing
         'processing', 'processing-how-it-works', 'processing-examples', 'processing-why',
-        // Cerial
-        'cerial', 'cerial-how-it-works', 'cerial-examples', 'cerial-why', 'cerial-supported-types', 'cerial-learn',
+        // Cucumber
+        'cucumber', 'cucumber-how-it-works', 'cucumber-examples', 'cucumber-why', 'cucumber-supported-types', 'cucumber-learn',
         // Sktime
         'sktime', 'sktime-how-it-works', 'sktime-examples', 'sktime-why',
         // Skpath
@@ -840,9 +840,9 @@ document.addEventListener('DOMContentLoaded', () => {
         'processing-videos': async () => await fetchPage('processing-videos'),
         'processing-tests': async () => await fetchPage('processing-tests'),
         
-        // Cerial
-        'cerial-videos': async () => await fetchPage('cerial-videos'),
-        'cerial-tests': async () => await fetchPage('cerial-tests'),
+        // Cucumber
+        'cucumber-videos': async () => await fetchPage('cucumber-videos'),
+        'cucumber-tests': async () => await fetchPage('cucumber-tests'),
         
         // Sktime
         'sktime-videos': async () => await fetchPage('sktime-videos'),
@@ -1105,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const noNavPages = ['password', 'error'];
     
     // Module names for scroll position memory
-    const moduleNames = ['skpath', 'sktime', 'circuit', 'cerial', 'processing'];
+    const moduleNames = ['skpath', 'sktime', 'circuit', 'cucumber', 'processing'];
     
     // Store scroll positions per module
     const moduleScrollPositions = {};

@@ -20,7 +20,7 @@ All files and code in this repository is licensed under the Apache License 2.0.
 
 `suitkaise` contains the following modules:
 
-- cerial: serialization engine
+- cucumber: serialization engine
 
 - circuits: flow control with the Circuit and BreakingCircuit classes.
 

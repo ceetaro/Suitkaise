@@ -70,9 +70,9 @@ processing
 - `Pool.unordered_imap` to run multiple `Dealer` instances in parallel
 - Use `tell()` and `listen()` for per process status updates and critical feedback
 
-cerial
+cucumber
 - Serializes everything we are doing
-- we will be using a lot of complex types that can only be serialized with `cerial`
+- we will be using a lot of complex types that can only be serialized with `cucumber`
 
 sk
 - Decorate agent and simulator with `@sk` to get modifiers.

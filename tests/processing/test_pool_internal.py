@@ -23,7 +23,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise import cerial
+from suitkaise import cucumber
 from suitkaise.processing._int.pool import _pool_worker, _run_process_inline, _ordered_results, _unordered_results
 from suitkaise.processing import Skprocess, Pool
 
@@ -153,16 +153,16 @@ class InlineTimeoutProcess(Process):
 
 
 def _result_worker(q, value):
-    q.put({"type": "result", "data": cerial.serialize(value)})
+    q.put({"type": "result", "data": cucumber.serialize(value)})
 
 
 def _delayed_result_worker(q, delay, value):
     time.sleep(delay)
-    q.put({"type": "result", "data": cerial.serialize(value)})
+    q.put({"type": "result", "data": cucumber.serialize(value)})
 
 
 def _error_worker(q):
-    q.put({"type": "error", "data": cerial.serialize(RuntimeError("boom"))})
+    q.put({"type": "error", "data": cucumber.serialize(RuntimeError("boom"))})
 
 
 class DoubleProcess(Process):
@@ -184,10 +184,10 @@ class DoubleProcess(Process):
 def test_pool_worker_function():
     """_pool_worker should serialize result for function."""
     q = multiprocessing.Queue()
-    _pool_worker(cerial.serialize(lambda x: x + 1), cerial.serialize(2), False, q)
+    _pool_worker(cucumber.serialize(lambda x: x + 1), cucumber.serialize(2), False, q)
     msg = q.get(timeout=1)
     assert msg["type"] == "result"
-    assert cerial.deserialize(msg["data"]) == 3
+    assert cucumber.deserialize(msg["data"]) == 3
 
 
 def test_pool_worker_error():
@@ -195,7 +195,7 @@ def test_pool_worker_error():
     q = multiprocessing.Queue()
     def boom(_):
         raise RuntimeError("boom")
-    _pool_worker(cerial.serialize(boom), cerial.serialize(1), False, q)
+    _pool_worker(cucumber.serialize(boom), cucumber.serialize(1), False, q)
     msg = q.get(timeout=1)
     assert msg["type"] == "error"
 
@@ -232,17 +232,17 @@ def test_pool_worker_star():
     q = multiprocessing.Queue()
     def add(a, b):
         return a + b
-    _pool_worker(cerial.serialize(add), cerial.serialize((2, 3)), True, q)
+    _pool_worker(cucumber.serialize(add), cucumber.serialize((2, 3)), True, q)
     msg = q.get(timeout=1)
-    assert cerial.deserialize(msg["data"]) == 5
+    assert cucumber.deserialize(msg["data"]) == 5
 
 
 def test_pool_worker_process_class():
     """_pool_worker should handle Skprocess classes."""
     q = multiprocessing.Queue()
-    _pool_worker(cerial.serialize(DoubleProcess), cerial.serialize(3), False, q)
+    _pool_worker(cucumber.serialize(DoubleProcess), cucumber.serialize(3), False, q)
     msg = q.get(timeout=1)
-    assert cerial.deserialize(msg["data"]) == 6
+    assert cucumber.deserialize(msg["data"]) == 6
 
 
 def test_pool_serialize_roundtrip_functionality():
@@ -253,7 +253,7 @@ def test_pool_serialize_roundtrip_functionality():
     pool = Pool(workers=1)
     restored = None
     try:
-        restored = cerial.deserialize(cerial.serialize(pool))
+        restored = cucumber.deserialize(cucumber.serialize(pool))
         original_results = pool.map(add_one, [1, 2, 3])
         restored_results = restored.map(add_one, [1, 2, 3])
         assert original_results == restored_results == [2, 3, 4]

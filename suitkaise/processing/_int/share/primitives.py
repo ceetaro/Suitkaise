@@ -5,7 +5,7 @@ This module provides the core primitives used by the Share system:
 - WriteCounter: Atomic counter for tracking pending writes
 - CounterRegistry: Manages counters per object.attr key
 - CommandQueue: Queue for coordinator commands
-- SourceOfTruth: Manager dict with cerial serialization
+- SourceOfTruth: Manager dict with cucumber serialization
 """
 
 import ctypes
@@ -267,12 +267,12 @@ class _AtomicCounterRegistry:
         self._owned_names = set()
 
     def __serialize__(self) -> dict:
-        """Custom cerial hook to avoid serializing Manager internals."""
+        """Custom cucumber hook to avoid serializing Manager internals."""
         return self.__getstate__()
 
     @staticmethod
     def __deserialize__(state: dict) -> "_AtomicCounterRegistry":
-        """Custom cerial hook to rebuild from minimal state."""
+        """Custom cucumber hook to rebuild from minimal state."""
         obj = _AtomicCounterRegistry.__new__(_AtomicCounterRegistry)
         obj.__setstate__(state)
         return obj
@@ -556,7 +556,7 @@ class _SourceOfTruth:
     Only the coordinator writes to this.
     Workers read from this (after passing read barriers).
     
-    Values are stored as cerial-serialized bytes for cross-process safety.
+    Values are stored as cucumber-serialized bytes for cross-process safety.
     """
     
     def __init__(self, manager: Optional[SyncManager] = None):
@@ -574,23 +574,23 @@ class _SourceOfTruth:
         """
         Store an object's state.
         
-        Serializes the object with cerial before storing.
+        Serializes the object with cucumber before storing.
         
         Args:
             object_name: Name of the shared object.
             obj: The object to store.
         """
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         with self._lock:
-            serialized = cerial.serialize(obj)
+            serialized = cucumber.serialize(obj)
             self._store[object_name] = serialized
     
     def get(self, object_name: str) -> Optional[Any]:
         """
         Retrieve an object's state.
         
-        Deserializes with cerial after retrieving.
+        Deserializes with cucumber after retrieving.
         
         Args:
             object_name: Name of the shared object.
@@ -598,13 +598,13 @@ class _SourceOfTruth:
         Returns:
             The deserialized object, or None if not found.
         """
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         with self._lock:
             serialized = self._store.get(object_name)
             if serialized is None:
                 return None
-            return cerial.deserialize(serialized)
+            return cucumber.deserialize(serialized)
     
     def get_raw(self, object_name: str) -> Optional[bytes]:
         """

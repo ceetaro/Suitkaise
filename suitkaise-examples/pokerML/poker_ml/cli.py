@@ -6,7 +6,7 @@ import json
 import random
 
 # SUITKAISE IMPORTS
-from suitkaise import cerial, paths
+from suitkaise import cucumber, paths
 
 # example-specific imports
 from .cards import Deck, format_cards, Card
@@ -275,7 +275,7 @@ def print_intro() -> None:
     print("  • Skprocess - Process lifecycle management")
     print("  • timing - Easy performance measurement")
     print("  • @sk.blocking - Async/background method wrappers")
-    print("  • cerial - Serialization for saving state")
+    print("  • cucumber - Serialization for saving state")
     print("")
     print("Target: ~80% accuracy (human-level). This is a demo, not a poker solver.")
     print("Higher accuracy is limited by state bucketing, not suitkaise.")
@@ -347,7 +347,7 @@ def find_best_run_dir() -> Optional[str]:
         if state_path.exists:  # type: ignore[attr-defined]
             try:
                 with open(state_path.platform, "rb") as f:
-                    run_state: RunState = cerial.deserialize(f.read())
+                    run_state: RunState = cucumber.deserialize(f.read())
                 return float(run_state.stats.get("best_policy_score", 0.0))
             except Exception:
                 pass
@@ -377,7 +377,7 @@ def load_run_state(run_dir: Any) -> RunState:
     path = run_path / "state.bin"  # type: ignore[operator]
 
     with open(path.platform, "rb") as f:
-        return cerial.deserialize(f.read())
+        return cucumber.deserialize(f.read())
 
 
 # play the best model

@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from suitkaise import skpath
 
 
-MODULES = ["cerial", "circuit", "sktime", "skpath", "processing"]
+MODULES = ["cucumber", "circuit", "sktime", "skpath", "processing"]
 
 _downloads_permission: ContextVar[bool] = ContextVar("_downloads_permission", default=False)
 

@@ -64,14 +64,14 @@ def run_unit_tests():
         print(f"    {RED}Error: {e}{RESET}")
         results.append(("paths", False))
     
-    # 4. Cerial
-    print(f"  {CYAN}▸ cerial{RESET}")
+    # 4. Cucumber
+    print(f"  {CYAN}▸ cucumber{RESET}")
     try:
-        from tests.cerial.run_all_tests import run_all_tests as run_cerial
-        results.append(("cerial", run_cerial()))
+        from tests.cucumber.run_all_tests import run_all_tests as run_cucumber
+        results.append(("cucumber", run_cucumber()))
     except Exception as e:
         print(f"    {RED}Error: {e}{RESET}")
-        results.append(("cerial", False))
+        results.append(("cucumber", False))
     
     # 5. Processing
     print(f"  {CYAN}▸ processing{RESET}")

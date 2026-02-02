@@ -52,7 +52,7 @@ command queue
 source of truth
 - multiprocessing Manager dict
 - keyed by object name
-- values are cerial-serialized object state
+- values are cucumber-serialized object state
 - only coordinator writes to this
 - all processes can read from it (coordinator reads from itself)
 

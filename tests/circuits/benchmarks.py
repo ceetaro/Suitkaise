@@ -88,7 +88,7 @@ def benchmark_circuit_creation():
     runner = BenchmarkRunner("Circuit Creation Benchmarks")
     
     runner.bench("Circuit(5)", 100_000, Circuit, 5)
-    runner.bench("Circuit(5, 0.1, 1.5, 10.0)", 100_000, 
+    runner.bench("Circuit(5, sleep_time_after_trip=0.1, backoff_factor=1.5, max_sleep_time=10.0)", 100_000, 
                  lambda: Circuit(5, sleep_time_after_trip=0.1, backoff_factor=1.5, max_sleep_time=10.0))
     runner.bench("BreakingCircuit(5)", 100_000, BreakingCircuit, 5)
     
@@ -147,7 +147,7 @@ def benchmark_circuit_properties():
     
     runner.bench("BreakingCircuit.broken", 100_000, lambda: breaking.broken)
     runner.bench("BreakingCircuit.times_shorted", 100_000, lambda: breaking.times_shorted)
-    runner.bench("BreakingCircuit.total_failures", 100_000, lambda: breaking.total_failures)
+    runner.bench("BreakingCircuit.total_trips", 100_000, lambda: breaking.total_trips)
     runner.bench("BreakingCircuit.current_sleep_time", 100_000, lambda: breaking.current_sleep_time)
     
     return runner

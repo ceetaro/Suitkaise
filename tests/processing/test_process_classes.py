@@ -2,9 +2,9 @@
 Test Process classes for multiprocessing tests.
 
 These classes are defined in a separate module so they can be properly
-serialized/deserialized by cerial across processes.
+serialized/deserialized by cucumber across processes.
 
-Note: cerial now includes __main__ class definitions for reconstruction,
+Note: cucumber now includes __main__ class definitions for reconstruction,
 but module-level classes remain the recommended pattern for stability.
 """
 

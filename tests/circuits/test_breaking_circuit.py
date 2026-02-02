@@ -118,7 +118,7 @@ def test_breaking_circuit_creation():
     assert circ.sleep_time_after_trip == 0.1
     assert circ.broken == False
     assert circ.times_shorted == 0
-    assert circ.total_failures == 0
+    assert circ.total_trips == 0
     assert circ.current_sleep_time == 0.1
 
 
@@ -130,6 +130,16 @@ def test_breaking_circuit_defaults():
     assert circ.backoff_factor == 1.0
     assert circ.max_sleep_time == 10.0
     assert circ.jitter == 0.0
+
+
+def test_breaking_circuit_requires_num_shorts_to_trip():
+    """BreakingCircuit should require num_shorts_to_trip."""
+    try:
+        BreakingCircuit(0)
+    except ValueError:
+        pass
+    else:
+        assert False, "Expected ValueError when num_shorts_to_trip is falsy"
 
 
 # =============================================================================
@@ -145,7 +155,7 @@ def test_breaking_short_counting():
     circ.short()
     
     assert circ.times_shorted == 3
-    assert circ.total_failures == 3  # Each short is a failure
+    assert circ.total_trips == 3  # Each short is a failure
 
 
 def test_breaking_short_no_return():
@@ -210,7 +220,7 @@ def test_breaking_trip_direct():
     circ.trip()
     
     assert circ.broken == True
-    assert circ.total_failures == 1
+    assert circ.total_trips == 1
 
 
 def test_breaking_trip_sleeps():
@@ -377,8 +387,8 @@ def test_breaking_broken_property():
     assert circ.broken == False
 
 
-def test_breaking_total_failures_property():
-    """total_failures should count all failures."""
+def test_breaking_total_trips_property():
+    """total_trips should count all failures."""
     circ = BreakingCircuit(2, sleep_time_after_trip=0.0)
     
     circ.short()  # 1
@@ -387,7 +397,7 @@ def test_breaking_total_failures_property():
     circ.short()  # 3
     circ.trip()   # 4 (breaks)
     
-    assert circ.total_failures == 4
+    assert circ.total_trips == 4
 
 
 # =============================================================================
@@ -479,7 +489,7 @@ def test_breaking_single_threshold():
     circ.short()
     
     assert circ.broken == True
-    assert circ.total_failures == 1
+    assert circ.total_trips == 1
 
 
 # =============================================================================
@@ -546,7 +556,7 @@ def run_all_tests():
     
     # Property tests
     runner.run_test("BreakingCircuit broken property", test_breaking_broken_property)
-    runner.run_test("BreakingCircuit total_failures property", test_breaking_total_failures_property)
+    runner.run_test("BreakingCircuit total_trips property", test_breaking_total_trips_property)
     
     # Loop pattern tests
     runner.run_test("BreakingCircuit loop pattern", test_breaking_loop_pattern)

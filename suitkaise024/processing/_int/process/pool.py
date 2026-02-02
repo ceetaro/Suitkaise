@@ -3,7 +3,7 @@ Pool class for parallel batch processing.
 
 Provides map, imap, async_map, and unordered_imap operations with star() modifier.
 Supports both regular functions and Process-inheriting classes.
-Uses cerial for serialization, avoiding pickle limitations.
+Uses cucumber for serialization, avoiding pickle limitations.
 """
 
 import multiprocessing
@@ -58,17 +58,17 @@ class AsyncResult(Generic[T]):
         if self._results is not None:
             return self._results
         
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         results = []
         for q in self._result_queues:
             try:
                 message = q.get(timeout=timeout)
                 if message["type"] == "error":
-                    error = cerial.deserialize(message["data"])
+                    error = cucumber.deserialize(message["data"])
                     raise error
                 else:
-                    results.append(cerial.deserialize(message["data"]))
+                    results.append(cucumber.deserialize(message["data"]))
             except queue_module.Empty:
                 raise TimeoutError("Timeout waiting for result")
         
@@ -108,7 +108,7 @@ class Pool:
     """
     Pool for parallel batch processing.
     
-    Uses cerial for serialization, supporting complex objects that
+    Uses cucumber for serialization, supporting complex objects that
     pickle cannot handle. Also supports Process-inheriting classes
     for structured lifecycle management.
     
@@ -257,7 +257,7 @@ class Pool:
         is_star: bool
     ) -> tuple[list[multiprocessing.Queue], list[multiprocessing.Process]]:
         """Spawn worker processes for all items."""
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         items = list(iterable)
         
@@ -265,7 +265,7 @@ class Pool:
             return [], []
         
         # Serialize the function/Process class once
-        serialized_fn = cerial.serialize(fn_or_process)
+        serialized_fn = cucumber.serialize(fn_or_process)
         
         # Spawn workers for each item
         result_queues = []
@@ -273,7 +273,7 @@ class Pool:
         
         for item in items:
             result_queue = multiprocessing.Queue()
-            serialized_item = cerial.serialize(item)
+            serialized_item = cucumber.serialize(item)
             
             worker = multiprocessing.Process(
                 target=_pool_worker,
@@ -294,7 +294,7 @@ class Pool:
         is_star: bool
     ) -> list:
         """Internal blocking map implementation."""
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         result_queues, workers = self._spawn_workers(fn_or_process, iterable, is_star)
         
@@ -308,10 +308,10 @@ class Pool:
             try:
                 message = q.get(timeout=1.0)
                 if message["type"] == "error":
-                    error = cerial.deserialize(message["data"])
+                    error = cucumber.deserialize(message["data"])
                     raise error
                 else:
-                    results.append(cerial.deserialize(message["data"]))
+                    results.append(cucumber.deserialize(message["data"]))
             except queue_module.Empty:
                 results.append(None)
         
@@ -367,17 +367,17 @@ def _ordered_results(
     active_processes: list
 ) -> Iterator:
     """Yield results in submission order."""
-    from suitkaise import cerial
+    from suitkaise import cucumber
     
     for q, w in zip(result_queues, workers):
         w.join()
         try:
             message = q.get(timeout=1.0)
             if message["type"] == "error":
-                error = cerial.deserialize(message["data"])
+                error = cucumber.deserialize(message["data"])
                 raise error
             else:
-                yield cerial.deserialize(message["data"])
+                yield cucumber.deserialize(message["data"])
         except queue_module.Empty:
             yield None
         finally:
@@ -391,7 +391,7 @@ def _unordered_results(
     active_processes: list
 ) -> Iterator:
     """Yield results as they complete."""
-    from suitkaise import cerial
+    from suitkaise import cucumber
     
     remaining = list(zip(result_queues, workers))
     
@@ -402,10 +402,10 @@ def _unordered_results(
                 try:
                     message = q.get(timeout=0.1)
                     if message["type"] == "error":
-                        error = cerial.deserialize(message["data"])
+                        error = cucumber.deserialize(message["data"])
                         raise error
                     else:
-                        yield cerial.deserialize(message["data"])
+                        yield cucumber.deserialize(message["data"])
                 except queue_module.Empty:
                     yield None
                 finally:
@@ -428,15 +428,15 @@ def _pool_worker(
     """
     Worker function that runs in subprocess.
     
-    Uses cerial to deserialize function and arguments.
+    Uses cucumber to deserialize function and arguments.
     Handles both regular functions and Process classes.
     """
-    from suitkaise import cerial
+    from suitkaise import cucumber
     
     try:
-        # Deserialize using cerial
-        fn_or_process = cerial.deserialize(serialized_fn)
-        item = cerial.deserialize(serialized_item)
+        # Deserialize using cucumber
+        fn_or_process = cucumber.deserialize(serialized_fn)
+        item = cucumber.deserialize(serialized_item)
         
         # Unpack args if star mode
         if is_star:
@@ -464,7 +464,7 @@ def _pool_worker(
                 result = fn_or_process(item)
         
         # Serialize and send result
-        serialized_result = cerial.serialize(result)
+        serialized_result = cucumber.serialize(result)
         result_queue.put({
             "type": "result",
             "data": serialized_result
@@ -473,7 +473,7 @@ def _pool_worker(
     except Exception as e:
         # Serialize and send error
         try:
-            serialized_error = cerial.serialize(e)
+            serialized_error = cucumber.serialize(e)
             result_queue.put({
                 "type": "error",
                 "data": serialized_error
@@ -484,7 +484,7 @@ def _pool_worker(
             error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
             result_queue.put({
                 "type": "error",
-                "data": cerial.serialize(RuntimeError(error_msg))
+                "data": cucumber.serialize(RuntimeError(error_msg))
             })
 
 

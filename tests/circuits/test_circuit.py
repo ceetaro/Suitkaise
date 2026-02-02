@@ -132,6 +132,16 @@ def test_circuit_default_values():
     assert circ.jitter == 0.0
 
 
+def test_circuit_requires_num_shorts_to_trip():
+    """Circuit should require num_shorts_to_trip."""
+    try:
+        Circuit(0)
+    except ValueError:
+        pass
+    else:
+        assert False, "Expected ValueError when num_shorts_to_trip is falsy"
+
+
 # =============================================================================
 # Short Counting Tests
 # =============================================================================

@@ -1,7 +1,7 @@
 """
 State dataclasses for serializing training runs.
 
-These are saved to disk via cerial.serialize() so training
+These are saved to disk via cucumber.serialize() so training
 can be resumed or best policies can be loaded for play mode.
 """
 from __future__ import annotations

@@ -45,8 +45,8 @@ result = proc.result()
 - `kill()` force terminates
 - `wait(timeout=None)` waits for completion
 - `result()` returns final result or raises error
-- `tell(data)` sends data to the subprocess
-- `listen(timeout=None)` receives data from the subprocess
+- `tell(data)` sends data to the other side
+- `listen(timeout=None)` receives data from the other side
 
 ### Timers
 
@@ -119,6 +119,19 @@ Each item is passed to the process constructor.
 share = Share()
 share.counter = 0
 share.data = {}
+share.worst_possible_object = WorstPossibleObject()
+
+class MyProcess(Skprocess):
+    def __init__(self, share: Share):
+        self.share = share
+        self.process_config.runs = 10
+
+    def __run__(self):
+        self.share.counter += 1
+
+results = pool.map(MyProcess, [share] * 10)
+
+assert share.counter == 100 # 10 processes, 10 runs each
 ```
 
 Objects assigned to `Share` become proxied. Reads wait for pending writes; writes are serialized through a coordinator process.
@@ -131,7 +144,7 @@ Objects assigned to `Share` become proxied. Reads wait for pending writes; write
 ## `Pipe`
 
 `Pipe` is a fast, explicit parent/child communication channel. It uses
-`multiprocessing.Pipe` underneath and `cerial` for payloads.
+`multiprocessing.Pipe` underneath and `cucumber` for payloads.
 
 ```python
 from suitkaise.processing import Pipe

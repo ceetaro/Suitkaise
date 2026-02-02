@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from suitkaise import timing, cerial
+from suitkaise import timing, cucumber
 
 # Add project root to path (auto-detect by marker files)
 
@@ -128,8 +128,8 @@ def test_share_serialization_roundtrip():
     share = Share()
     try:
         share.stats = {"hands": 1, "wins": 0, "total_reward": 0.5}
-        data = cerial.serialize(share)
-        restored = cerial.deserialize(data)
+        data = cucumber.serialize(share)
+        restored = cucumber.deserialize(data)
         stats = restored.stats
         assert stats["hands"] == 1, f"Expected hands=1, got {stats}"
     finally:
@@ -143,8 +143,8 @@ def test_share_coordinator_state_roundtrip():
         share.stats = {"hands": 0, "wins": 0, "total_reward": 0.0}
         state = share._coordinator.get_state()
         try:
-            encoded = cerial.serialize(state)
-            decoded = cerial.deserialize(encoded)
+            encoded = cucumber.serialize(state)
+            decoded = cucumber.deserialize(encoded)
             rebuilt = _Coordinator.from_state(decoded)
             assert rebuilt is not None, "Coordinator should rebuild from state"
         except Exception as e:

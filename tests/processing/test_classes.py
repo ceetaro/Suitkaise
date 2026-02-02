@@ -2,7 +2,7 @@
 Test classes for Share tests.
 
 These classes are defined in a separate module so they can be properly
-serialized/deserialized by cerial across processes.
+serialized/deserialized by cucumber across processes.
 
 Classes defined in __main__ cannot be deserialized in subprocess because
 the subprocess has a different __main__ module.

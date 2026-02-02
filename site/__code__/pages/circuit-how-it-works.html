@@ -38,7 +38,7 @@ breaker = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.5)</code></pre>
         <li>Stores <code>sleep_time_after_trip</code> as the default sleep duration</li>
         <li>Sets <code>broken</code> to <code>False</code> (circuit starts operational)</li>
         <li>Sets <code>times_shorted</code> to <code>0</code> (no failures yet)</li>
-        <li>Sets <code>total_failures</code> to <code>0</code> (lifetime failure counter)</li>
+        <li>Sets <code>total_trips</code> to <code>0</code> (lifetime trip counter)</li>
         <li>Creates <code>_lock</code> as a <code>threading.RLock()</code> for thread safety</li>
     </ol>
     <p>The circuit is now ready to track failures.</p>
@@ -62,7 +62,7 @@ while not breaker.broken:
     <p>Integer counter tracking how many times <code>short()</code> has been called since last reset.</p>
     <p>Resets to <code>0</code> when the circuit trips or when <code>reset()</code> is called.</p>
 
-    <h3><code>Circuit.total_failures</code></h3>
+    <h3><code>Circuit.total_trips</code></h3>
     <p>Integer counter tracking the total number of failures over the lifetime of the circuit.</p>
     <p>Incremented by:</p>
     <ul>
@@ -84,7 +84,7 @@ while not breaker.broken:
     <p><strong>Returns:</strong> <code>None</code></p>
     <ol>
         <li>Increments <code>times_shorted</code> by 1</li>
-        <li>Increments <code>total_failures</code> by 1</li>
+        <li>Increments <code>total_trips</code> by 1</li>
         <li>Checks if <code>times_shorted >= num_shorts_to_trip</code>:
             <ul>
                 <li><strong>If True:</strong> Calls <code>_break_circuit()</code> with the sleep duration (uses <code>custom_sleep</code> if provided, otherwise uses <code>sleep_time_after_trip</code>)</li>
@@ -95,9 +95,9 @@ while not breaker.broken:
 
 <pre><code class="language-python">breaker = circuit.Circuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-breaker.short()  # times_shorted = 1, total_failures = 1, broken = False
-breaker.short()  # times_shorted = 2, total_failures = 2, broken = False
-breaker.short()  # times_shorted = 3 -> 0, total_failures = 3, broken = True, sleeps 1.0s</code></pre>
+breaker.short()  # times_shorted = 1, total_trips = 1, broken = False
+breaker.short()  # times_shorted = 2, total_trips = 2, broken = False
+breaker.short()  # times_shorted = 3 -> 0, total_trips = 3, broken = True, sleeps 1.0s</code></pre>
 
     <h3><code>Circuit.trip()</code></h3>
     <p>Immediately trips the circuit, bypassing short counting.</p>
@@ -107,7 +107,7 @@ breaker.short()  # times_shorted = 3 -> 0, total_failures = 3, broken = True, sl
     </ul>
     <p><strong>Returns:</strong> <code>None</code></p>
     <ol>
-        <li>Increments <code>total_failures</code> by 1</li>
+        <li>Increments <code>total_trips</code> by 1</li>
         <li>Calls <code>_break_circuit()</code> immediately</li>
         <li>Uses <code>custom_sleep</code> if provided, otherwise uses <code>sleep_time_after_trip</code></li>
     </ol>
@@ -141,7 +141,7 @@ while not breaker.broken:
 # Reset for next batch
 breaker.reset()
 
-# Second batch of operations (total_failures persists)
+# Second batch of operations (total_trips persists)
 while not breaker.broken:
     # ...</code></pre>
 
@@ -185,7 +185,7 @@ while not breaker.broken:
     <hr>
 
     <p>When the circuit breaks, <code>times_shorted</code> is reset to 0.</p>
-    <p>Use <code>total_failures</code> to track lifetime failures across resets.</p>
+    <p>Use <code>total_trips</code> to track lifetime trips across resets.</p>
 
     <hr>
 
@@ -257,7 +257,7 @@ for t in threads:
         <li><code>sleep_time_after_trip</code> (float) — ~24 bytes</li>
         <li><code>_broken</code> (bool) — ~28 bytes</li>
         <li><code>_times_shorted</code> (int) — ~28 bytes</li>
-        <li><code>_total_failures</code> (int) — ~28 bytes</li>
+        <li><code>_total_trips</code> (int) — ~28 bytes</li>
         <li><code>_lock</code> (RLock) — ~56 bytes</li>
     </ul>
     <p>Total: ~192 bytes per instance. (very lightweight)</p>

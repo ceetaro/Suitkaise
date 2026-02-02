@@ -107,23 +107,34 @@ class Circuit:
 
     def __init__(
         self, 
-        num_shorts_to_trip: int, 
+        num_shorts_to_trip: int,
+        *,
         sleep_time_after_trip: float = 0.0,
         backoff_factor: float = 1.0,
         max_sleep_time: float = 10.0,
         jitter: float = 0.0
     ):
-        self.num_shorts_to_trip = num_shorts_to_trip
+
+        if not num_shorts_to_trip:
+            raise ValueError("num_shorts_to_trip is required")
+
+        self._num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
         self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
-        self.jitter = jitter
+        self.jitter = max(0.0, min(1.0, jitter))
         
         self._times_shorted = 0
         self._total_trips = 0
         self._current_sleep_time = sleep_time_after_trip
         self._lock = threading.RLock()
     
+    @property
+    def num_shorts_to_trip(self) -> int:
+        """Number of shorts before trip."""
+        with self._lock:
+            return self._num_shorts_to_trip
+
     @property
     def times_shorted(self) -> int:
         """Number of times shorted since last trip."""
@@ -349,7 +360,7 @@ class BreakingCircuit:
     Attributes:
         broken: True if circuit has tripped
         times_shorted: Number of shorts since last trip/reset
-        total_failures: Lifetime count of all failures
+        total_trips: Lifetime count of all trips
         current_sleep_time: Current sleep duration (after backoff applied)
     
     _shared_meta:
@@ -386,39 +397,50 @@ class BreakingCircuit:
     
     _shared_meta = {
         'methods': {
-            'short': {'writes': ['_times_shorted', '_total_failures', '_broken']},
-            'trip': {'writes': ['_total_failures', '_broken', '_times_shorted']},
+            'short': {'writes': ['_times_shorted', '_total_trips', '_broken']},
+            'trip': {'writes': ['_total_trips', '_broken', '_times_shorted']},
             'reset': {'writes': ['_broken', '_times_shorted', '_current_sleep_time']},
             'reset_backoff': {'writes': ['_current_sleep_time']},
         },
         'properties': {
             'broken': {'reads': ['_broken']},
             'times_shorted': {'reads': ['_times_shorted']},
-            'total_failures': {'reads': ['_total_failures']},
+            'total_trips': {'reads': ['_total_trips']},
             'current_sleep_time': {'reads': ['_current_sleep_time']},
         }
     }
 
     def __init__(
         self, 
-        num_shorts_to_trip: int, 
+        num_shorts_to_trip: int,
+        *,
         sleep_time_after_trip: float = 0.0,
         backoff_factor: float = 1.0,
         max_sleep_time: float = 10.0,
         jitter: float = 0.0
-    ):
-        self.num_shorts_to_trip = num_shorts_to_trip
+    ):   
+
+        if not num_shorts_to_trip:
+            raise ValueError("num_shorts_to_trip is required")
+
+        self._num_shorts_to_trip = num_shorts_to_trip
         self.sleep_time_after_trip = sleep_time_after_trip
         self.backoff_factor = backoff_factor
         self.max_sleep_time = max_sleep_time
-        self.jitter = jitter
+        self.jitter = max(0.0, min(1.0, jitter))
         
         self._broken = False
         self._times_shorted = 0
-        self._total_failures = 0
+        self._total_trips = 0
         self._current_sleep_time = sleep_time_after_trip
         self._lock = threading.RLock()
     
+    @property
+    def num_shorts_to_trip(self) -> int:
+        """Maximum number of shorts before break."""
+        with self._lock:
+            return self._num_shorts_to_trip
+
     @property
     def broken(self) -> bool:
         """Whether the circuit has tripped."""
@@ -432,10 +454,10 @@ class BreakingCircuit:
             return self._times_shorted
     
     @property
-    def total_failures(self) -> int:
-        """Lifetime count of all failures."""
+    def total_trips(self) -> int:
+        """Lifetime count of all trips."""
         with self._lock:
-            return self._total_failures
+            return self._total_trips
     
     @property
     def current_sleep_time(self) -> float:
@@ -465,7 +487,7 @@ class BreakingCircuit:
         
         with self._lock:
             self._times_shorted += 1
-            self._total_failures += 1
+            self._total_trips += 1
             
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
@@ -476,7 +498,7 @@ class BreakingCircuit:
     async def _async_trip(self, custom_sleep: float | None = None) -> None:
         """Async version of trip()."""
         with self._lock:
-            self._total_failures += 1
+            self._total_trips += 1
         await self._async_break_circuit(
             custom_sleep if custom_sleep is not None else self._current_sleep_time
         )
@@ -492,7 +514,7 @@ class BreakingCircuit:
         
         with self._lock:
             self._times_shorted += 1
-            self._total_failures += 1
+            self._total_trips += 1
             
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
@@ -524,7 +546,7 @@ class BreakingCircuit:
     def _sync_trip(self, custom_sleep: float | None = None) -> None:
         """Sync implementation of trip()."""
         with self._lock:
-            self._total_failures += 1
+            self._total_trips += 1
         self._break_circuit(custom_sleep if custom_sleep is not None else self._current_sleep_time)
     
     trip = _AsyncableMethod(_sync_trip, _async_trip)

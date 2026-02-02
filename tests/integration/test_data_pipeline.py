@@ -7,14 +7,14 @@ Real-world scenario: A data pipeline that:
 3. Uses Share to coordinate progress tracking across workers
 4. Uses Circuit for rate limiting
 5. Uses Sktimer to track performance
-6. Uses cerial to serialize state between processes
+6. Uses cucumber to serialize state between processes
 
 This tests the full integration of:
 - skpath: Project path utilities, file discovery
 - processing: Process, Pool, Share
 - circuits: Circuit for backoff on failures
 - timing: Sktimer, TimeThis, @timethis
-- cerial: Cross-process serialization
+- cucumber: Cross-process serialization
 - sk: @sk decorated classes for Share compatibility
 """
 
@@ -41,7 +41,7 @@ from suitkaise.paths import Skpath, get_project_root, get_project_paths
 from suitkaise.processing import Skprocess, Pool, Share
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.timing import Sktimer, TimeThis, timethis
-from suitkaise.cerial import serialize, deserialize
+from suitkaise.cucumber import serialize, deserialize
 from suitkaise.sk import sk
 
 Process = Skprocess
@@ -243,8 +243,8 @@ def test_circuit_with_timer():
     assert circuit.total_trips >= 1, f"Should have tripped at least once, got {circuit.total_trips}"
 
 
-def test_cerial_with_complex_objects():
-    """Test cerial serializes complex objects for cross-process communication."""
+def test_cucumber_with_complex_objects():
+    """Test cucumber serializes complex objects for cross-process communication."""
     import threading
     import logging
     
@@ -254,7 +254,7 @@ def test_cerial_with_complex_objects():
             self.lock = threading.Lock()
             self.logger = logging.getLogger("test")
             self.timer = Sktimer()
-            self.circuit = Circuit(5, 0.01)
+            self.circuit = Circuit(5, sleep_time_after_trip=0.01)
             self.progress = ProgressTracker()
     
     state = ComplexState()
@@ -460,7 +460,7 @@ def run_all_tests():
     run_scenario(
         "Cross-Process Serialization",
         "Serializing complex objects (locks, loggers, timers) for worker processes",
-        test_cerial_with_complex_objects, 10, results
+        test_cucumber_with_complex_objects, 10, results
     )
     
     run_scenario(

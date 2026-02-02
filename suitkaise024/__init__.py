@@ -8,7 +8,7 @@ Philosophy: "Grand ideas, little coding experience" - enabling anyone with
 great ideas to build complex, production-ready applications.
 
 Core Modules:
-- cerial: Serialization for the unpicklable (locks, loggers, file handles)
+- cucumber: Serialization for the unpicklable (locks, loggers, file handles)
 - circuit: Circuit breaker pattern for controlled failure handling
 - processing: Subprocess-based task execution with lifecycle management
 - skpath: Smart path operations with dual-path architecture
@@ -16,10 +16,10 @@ Core Modules:
 
 Import Usage Examples:
     ```python
-    from suitkaise import cerial, circuit, skpath, sktime
+    from suitkaise import cucumber, circuit, skpath, sktime
     
     # Serialize objects with locks and loggers
-    data = cerial.serialize(complex_object)
+    data = cucumber.serialize(complex_object)
     
     # Circuit breaker for retry loops
     breaker = circuit.Circuit(shorts=3)
@@ -34,11 +34,11 @@ Import Usage Examples:
 
 # Import core modules for direct access
 try:
-    from . import cerial
-    _cerial_available = True
+    from . import cucumber
+    _cucumber_available = True
 except ImportError:
-    cerial = None
-    _cerial_available = False
+    cucumber = None
+    _cucumber_available = False
 
 try:
     from . import circuit
@@ -78,8 +78,8 @@ __url__ = "https://github.com/caseyeddings/suitkaise"
 __all__ = []
 
 # Add available modules to __all__
-if _cerial_available:
-    __all__.append('cerial')
+if _cucumber_available:
+    __all__.append('cucumber')
 if _circuit_available:
     __all__.append('circuit')
 if _processing_available:
@@ -101,10 +101,10 @@ if _skpath_available:
     except ImportError:
         pass  # Graceful degradation
 
-# Cerial convenience imports (when available)
-if _cerial_available:
+# Cucumber convenience imports (when available)
+if _cucumber_available:
     try:
-        from .cerial import serialize, deserialize
+        from .cucumber import serialize, deserialize
         __all__.extend(['serialize', 'deserialize'])
     except ImportError:
         pass  # Graceful degradation
@@ -130,17 +130,17 @@ def get_available_modules():
     """
     modules = {}
     
-    if _cerial_available:
+    if _cucumber_available:
         try:
-            modules['cerial'] = {
+            modules['cucumber'] = {
                 'available': True,
-                'version': cerial.__version__ if hasattr(cerial, '__version__') else __version__,
+                'version': cucumber.__version__ if hasattr(cucumber, '__version__') else __version__,
                 'description': 'Serialization for the unpicklable'
             }
         except:
-            modules['cerial'] = {'available': True, 'version': 'unknown', 'description': 'Serialization for the unpicklable'}
+            modules['cucumber'] = {'available': True, 'version': 'unknown', 'description': 'Serialization for the unpicklable'}
     else:
-        modules['cerial'] = {'available': False, 'description': 'Serialization for the unpicklable'}
+        modules['cucumber'] = {'available': False, 'description': 'Serialization for the unpicklable'}
     
     if _circuit_available:
         try:
@@ -211,8 +211,8 @@ def show_status():
         print(f"{module_name:12} {status:15} {version:10} - {info['description']}")
     
     print("\nCommon imports:")
-    print("  from suitkaise import cerial, circuit, processing, skpath, sktime")
-    print("  from suitkaise import serialize, deserialize  # cerial shortcuts")
+    print("  from suitkaise import cucumber, circuit, processing, skpath, sktime")
+    print("  from suitkaise import serialize, deserialize  # cucumber shortcuts")
     print("  from suitkaise.processing import Process, timesection  # processing")
     
     print(f"\nFor more information: {__url__}")
@@ -224,8 +224,8 @@ def show_status():
 
 # Show a helpful message if someone tries to access unavailable modules
 def __getattr__(name):
-    if name == 'cerial' and not _cerial_available:
-        raise ImportError("cerial module is not available. Check installation.")
+    if name == 'cucumber' and not _cucumber_available:
+        raise ImportError("cucumber module is not available. Check installation.")
     elif name == 'circuit' and not _circuit_available:
         raise ImportError("circuit module is not available. Check installation.")
     elif name == 'processing' and not _processing_available:

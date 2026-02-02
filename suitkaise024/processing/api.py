@@ -7,7 +7,7 @@ Also provides Pool for batch parallel processing.
 
 Key Features:
 - Lifecycle methods: __prerun__, __run__, __postrun__, __onfinish__, __result__, __error__
-- Automatic subprocess management with cerial serialization
+- Automatic subprocess management with cucumber serialization
 - Configurable timeouts, run limits, and retry (lives) system
 - Automatic timing for any lifecycle method you define
 - Inter-process communication via tell() and listen()

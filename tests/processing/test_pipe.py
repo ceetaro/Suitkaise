@@ -18,7 +18,7 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.processing import Pipe
-from suitkaise.cerial import serialize, deserialize, SerializationError
+from suitkaise.cucumber import serialize, deserialize, SerializationError
 from suitkaise.processing._int.pipe import PipeEndpointError
 
 
@@ -110,7 +110,7 @@ def test_point_serialize_deserialize_round_trip():
         anchor.close()
 
 
-def test_point_cerial_round_trip():
+def test_point_cucumber_round_trip():
     anchor, point = Pipe.pair()
     restored = None
     try:
@@ -193,7 +193,7 @@ def run_all_tests():
     runner = TestRunner("Pipe Tests")
     runner.run_test("anchor locked always", test_anchor_locked_always)
     runner.run_test("point serialize/deserialize", test_point_serialize_deserialize_round_trip)
-    runner.run_test("point cerial round trip", test_point_cerial_round_trip)
+    runner.run_test("point cucumber round trip", test_point_cucumber_round_trip)
     runner.run_test("locked point serialize raises", test_locked_point_serialize_raises)
     runner.run_test("anchor serialize raises", test_anchor_serialize_raises)
     runner.run_test("anchor pickle raises", test_anchor_pickle_raises)

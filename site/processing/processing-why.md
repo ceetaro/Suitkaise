@@ -36,15 +36,15 @@ Even if you use serializers like `cloudpickle` or `dill`, you still have to deal
 
 So you either have to tiptoe around them and not use them, or manually serialize and deserialize them. Neither are fun.
 
-With `processing`, you don't have to deal with any of that. `cerial` handles all of that for you, opening up the road to making complex multi-process code.
+With `processing`, you don't have to deal with any of that. `cucumber` handles all of that for you, opening up the road to making complex multi-process code.
 
-### What is `cerial`?
+### What is `cucumber`?
 
-`cerial` is a serialization engine, and another module in the `suitkaise` library.
+`cucumber` is a serialization engine, and another module in the `suitkaise` library.
 
 It is built off of base `pickle`, with specialized handlers for essentially all of the complex objects that other serializers cannot handle.
 
-To learn more, navigate to the `cerial` module page using the sidebar.
+To learn more, navigate to the `cucumber` module page using the sidebar.
 
 (end of dropdown)
 

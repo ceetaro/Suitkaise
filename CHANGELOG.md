@@ -24,12 +24,12 @@ As of version 0.3.0, the project is still unreleased.
 - SubprocessReconnector helper to restart Popen commands or inspect snapshots.
 - ThreadReconnector helper to rebuild threads from serialized metadata.
 - MatchReconnector helper to recreate regex Match objects when possible.
-- `cerial.reconnect_all(obj, **kwargs)` to recursively reconnect structures with optional credentials.
+- `cucumber.reconnect_all(obj, **kwargs)` to recursively reconnect structures with optional credentials.
 - Robust database connection metadata extraction for common libraries (Postgres/MySQL/SQLite/Redis/Mongo/SQLAlchemy/ODBC and more).
 - `@autoreconnect(**kwargs)` decorator for Skprocess to automatically reconnect resources after deserialization.
 - kwargs structure for `reconnect_all()` and `@autoreconnect`: type-keyed dict with `"*"` defaults and attr-specific overrides.
 - Full auth/credential support in DbReconnector for MongoDB, Cassandra, Elasticsearch, OpenSearch, SQLAlchemy, ODBC, Neo4j, and InfluxDB v2.
-- Documentation for Reconnectors in `cerial` how-to-use and how-it-works.
+- Documentation for Reconnectors in `cucumber` how-to-use and how-it-works.
 - Documentation for `@autoreconnect` in `processing` how-to-use and how-it-works.
 
 ### Changed
@@ -67,7 +67,7 @@ As of version 0.3.0, the project is still unreleased.
 
 - Rolling window support in `Sktimer` (`max_times`) and `@timethis(max_times=...)`.
 
-- Cerial IR helpers: `serialize_ir`, `ir_to_jsonable`, `ir_to_json`, `to_jsonable`, `to_json`.
+- Cucumber IR helpers: `serialize_ir`, `ir_to_jsonable`, `ir_to_json`, `to_jsonable`, `to_json`.
 
 - `@blocking` decorator in `suitkaise.sk` to explicitly mark methods/functions as blocking. This enables `.background()` and `.asynced()` for CPU-heavy code that doesn't contain auto-detectable I/O calls (like `timing.sleep`).
 
@@ -85,3 +85,8 @@ As of version 0.3.0, the project is still unreleased.
   - Pool now uses multiprocessing.Pool instead of creating multiple processes manually (optimization, nothing changes for users)
 - updated tests to work on Windows
 - updated all api to be streamlined and tested all examples in api docstrs
+
+1/28/26
+
+- added processing.Pipe as another inter-process communication option (tests pass)
+- slightly updated cucumber and worst possible object (no changes to functionality)

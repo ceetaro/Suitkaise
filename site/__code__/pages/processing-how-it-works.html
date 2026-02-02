@@ -16,7 +16,7 @@
 
     <ul>
         <li>uses Python's <code>multiprocessing</code> module for subprocess spawning</li>
-        <li>uses <code>suitkaise.cerial</code> for serialization of complex objects between processes</li>
+        <li>uses <code>suitkaise.cucumber</code> for serialization of complex objects between processes</li>
         <li>all lifecycle methods are timed using <code>suitkaise.sktime.Timer</code></li>
         <li>communication between parent and subprocess happens via <code>multiprocessing.Queue</code> and <code>multiprocessing.Event</code></li>
     </ul>
@@ -87,9 +87,9 @@ cleanup queues and exit</code></pre>
 
     <h2>Serialization</h2>
 
-    <h3>How <code>cerial</code> is used</h3>
+    <h3>How <code>cucumber</code> is used</h3>
 
-    <p><code>processing</code> uses another <code>suitkaise</code> module, <code>cerial</code>, to serialize the entire <code>Process</code> instance.</p>
+    <p><code>processing</code> uses another <code>suitkaise</code> module, <code>cucumber</code>, to serialize the entire <code>Process</code> instance.</p>
 
     <p>Serializes:</p>
     <ul>
@@ -103,14 +103,14 @@ cleanup queues and exit</code></pre>
     <h3>Flow</h3>
 
     <ol>
-        <li><strong>Before start()</strong> — <code>cerial.serialize()</code> captures the entire Process instance.
+        <li><strong>Before start()</strong> — <code>cucumber.serialize()</code> captures the entire Process instance.
             <ul>
                 <li><code>instance.__dict__</code> (all attributes)</li>
                 <li>Class name and lifecycle methods</li>
                 <li>User's custom <code>__serialize__</code> if defined</li>
             </ul>
         </li>
-        <li><strong>Subprocess</strong> — <code>cerial.deserialize()</code> reconstructs.
+        <li><strong>Subprocess</strong> — <code>cucumber.deserialize()</code> reconstructs.
             <ul>
                 <li>Creates new instance via class reconstruction</li>
                 <li>Restores all attributes from serialized state</li>
@@ -371,8 +371,8 @@ except Exception as e:
 <pre><code class="language-python"># Subprocess sends result:
 result_queue.put({
     'type': 'result',       # or 'error'
-    'data': serialized,     # cerial-serialized result
-    'timers': timer_bytes,  # cerial-serialized ProcessTimers
+    'data': serialized,     # cucumber-serialized result
+    'timers': timer_bytes,  # cucumber-serialized ProcessTimers
 })</code></pre>
 
     <h3>tell() and listen()</h3>
@@ -422,16 +422,16 @@ def _drain_result_queue(self, timeout=None):
         
         # Update timers from subprocess
         if message.get('timers'):
-            self.timers = cerial.deserialize(message['timers'])
+            self.timers = cucumber.deserialize(message['timers'])
         
         if message["type"] == "error":
-            error_data = cerial.deserialize(message["data"])
+            error_data = cucumber.deserialize(message["data"])
             if isinstance(error_data, BaseException):
                 self._result = error_data
             else:
                 self._result = ProcessError(f"Process failed: {error_data}")
         else:
-            self._result = cerial.deserialize(message["data"])
+            self._result = cucumber.deserialize(message["data"])
         
         self._has_result = True
     except queue.Empty:
@@ -471,7 +471,7 @@ for q in [tell_queue, listen_queue]:
 
     <ol>
         <li>Validates process not already started</li>
-        <li>Serializes process instance with <code>cerial</code></li>
+        <li>Serializes process instance with <code>cucumber</code></li>
         <li>Creates <code>multiprocessing.Event</code> for stop signaling</li>
         <li>Creates <code>multiprocessing.Queue</code> for results</li>
         <li>Creates <code>multiprocessing.Queue</code> for tell (parent → subprocess)</li>
@@ -575,7 +575,7 @@ for q in [tell_queue, listen_queue]:
 
     <p>The <code>Pool</code> class provides batch parallel processing using multiple worker subprocesses.</p>
 
-    <p>Like <code>Process</code>, it uses <code>cerial</code> for serialization, allowing complex objects and <code>Process</code> classes.</p>
+    <p>Like <code>Process</code>, it uses <code>cucumber</code> for serialization, allowing complex objects and <code>Process</code> classes.</p>
 
     <h3>Methods</h3>
 
@@ -599,7 +599,7 @@ results = pool.map(fc, [1, 2, 3, 4])</code></pre>
     <p>Internally, Pool:</p>
     <ol>
         <li>Creates worker subprocesses</li>
-        <li>Serializes function and arguments with <code>cerial</code></li>
+        <li>Serializes function and arguments with <code>cucumber</code></li>
         <li>Distributes work across workers</li>
         <li>Collects and deserializes results</li>
         <li>Returns results in the same order as input</li>

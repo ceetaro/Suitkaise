@@ -27,10 +27,10 @@ list item that links to the processing module page.
 */
 
 
-# 3.1 = site/home/nav-bar/sidebar/cerial-list-item.md
+# 3.1 = site/home/nav-bar/sidebar/cucumber-list-item.md
 
 /*
-list item that links to the cerial module page.
+list item that links to the cucumber module page.
 */
 
 

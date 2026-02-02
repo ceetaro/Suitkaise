@@ -25,7 +25,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise import cerial
+from suitkaise import cucumber
 from suitkaise.processing import Skprocess
 from suitkaise.processing._int.engine import (
     _engine_main,
@@ -204,7 +204,7 @@ class EngineErrorHandlerProcess(Process):
 def test_engine_success_flow():
     """Engine should run full lifecycle and return result."""
     proc = EngineSuccessProcess()
-    serialized = cerial.serialize(proc)
+    serialized = cucumber.serialize(proc)
     stop_event = multiprocessing.Event()
     result_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -212,13 +212,13 @@ def test_engine_success_flow():
     result = result_queue.get(timeout=2.0)
 
     assert result["type"] == "result"
-    assert cerial.deserialize(result["data"]) == 10
+    assert cucumber.deserialize(result["data"]) == 10
 
 
 def test_engine_retry_on_failure():
     """Engine should retry when lives remain."""
     proc = EngineFailOnceProcess()
-    serialized = cerial.serialize(proc)
+    serialized = cucumber.serialize(proc)
     stop_event = multiprocessing.Event()
     result_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -226,7 +226,7 @@ def test_engine_retry_on_failure():
     result = result_queue.get(timeout=2.0)
 
     assert result["type"] == "result"
-    assert cerial.deserialize(result["data"]) == 2
+    assert cucumber.deserialize(result["data"]) == 2
 
 
 def test_run_finish_sequence_result_error():
@@ -240,7 +240,7 @@ def test_run_finish_sequence_result_error():
     result = result_queue.get(timeout=2.0)
 
     assert result["type"] == "error"
-    err = cerial.deserialize(result["data"])
+    err = cucumber.deserialize(result["data"])
     assert isinstance(err, (Exception, ResultError))
 
 
@@ -254,7 +254,7 @@ def test_send_error_fallback():
     result = result_queue.get(timeout=2.0)
 
     assert result["type"] == "error"
-    err = cerial.deserialize(result["data"])
+    err = cucumber.deserialize(result["data"])
     assert isinstance(err, Exception)
 
 

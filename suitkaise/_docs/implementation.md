@@ -12,9 +12,9 @@ When I start this new dir, I will apply module name changes.
 
 <!-- ## Before Creation of a New `suitkaise` Directory
 
-### 1. Improve `cerial` function serialization speed using references when possible
+### 1. Improve `cucumber` function serialization speed using references when possible
 
-function serialization (cerial improvement):
+function serialization (cucumber improvement):
 
 reference vs full serialization
 - goal: serialize functions faster by using references when possible
@@ -49,7 +49,7 @@ implementation
 - if can_use_reference() fails, fall back to full
 - deserialize by importing module and walking qualname
 
-### 2. Improve `cerial` simple instance serialization speed
+### 2. Improve `cucumber` simple instance serialization speed
 
 problem
 - simple class instances produce heavily nested IR
@@ -59,17 +59,17 @@ problem
 current flow for simple instance
 ```python
 {
-    "__cerial_type__": "class_instance",
+    "__cucumber_type__": "class_instance",
     "__handler__": "ClassInstanceHandler",
     "__object_id__": 123456,
     "state": {
-        "__cerial_type__": "dict",
+        "__cucumber_type__": "dict",
         "items": [
             ("module", "__main__"),
             ("qualname", "Point"),
             ("strategy", "dict"),
             ("instance_dict", {
-                "__cerial_type__": "dict",
+                "__cucumber_type__": "dict",
                 "items": [("x", 1), ("y", 2)]
             }),
         ]
@@ -94,7 +94,7 @@ solution: fast path for simple instances
 fast path IR
 ```python
 {
-    "__cerial_type__": "simple_class_instance",
+    "__cucumber_type__": "simple_class_instance",
     "module": "__main__",
     "qualname": "Point",
     "attrs": {"x": 1, "y": 2}  # direct, no wrapping
@@ -187,7 +187,7 @@ combined with simple instance fast path
 
 `sktime` -> `timing`
 
-`cerial` -> `cerial` (no change)
+`cucumber` -> `cucumber` (no change)
 
 `circuit` -> `circuits`
 
@@ -470,7 +470,7 @@ tests/
     run_all_tests.py
     run_all_benchmarks.py
   
-  cerial/
+  cucumber/
     test_primitives.py      # Primitive serialization tests
     test_complex.py         # Complex object serialization tests
     test_edge_cases.py      # Edge cases and error handling
@@ -534,7 +534,7 @@ tests/
 - Root detection: find project root, custom root
 - Utilities: is_valid_filename, streamline_path, get_caller_path
 
-#### cerial
+#### cucumber
 - Primitives: int, float, str, bytes, bool, None
 - Collections: list, dict, tuple, set
 - Complex: class instances, nested objects, circular references
@@ -565,7 +565,7 @@ tests/
 - Circuit.short() throughput
 - Backoff calculation overhead
 
-#### cerial
+#### cucumber
 - Primitive serialization speed
 - Complex object serialization speed
 - Large object handling
@@ -623,7 +623,7 @@ python tests/run_all_benchmarks.py
 
 Here is the current progress on the docs:
 
-cerial:
+cucumber:
 
 - [ done ] how-to-use.md
 - [ done ] how-it-works.md
@@ -719,20 +719,20 @@ print(t.mean)
 
 ```
 
-add a JSON output converter for cerial IRs
+add a JSON output converter for cucumber IRs
 
 ```python
-from suitkaise import cerial
+from suitkaise import cucumber
 
 # serializes to python dict IR and then converts to JSON
-cerial.to_json(obj)
+cucumber.to_json(obj)
 ``` -->
 
 retest new implementation on window
 
-find a way to advertise cerial when people look up "cant pickle X"
+find a way to advertise cucumber when people look up "cant pickle X"
 
-update cerial benchmarks in docs and supported types to reflect improvements
+update cucumber benchmarks in docs and supported types to reflect improvements
 
 refactor site to have a more interactive home page that shows off things more
 
@@ -767,11 +767,11 @@ Every developer knows how to create a class instance and add objects to it.
 
 And that's all you have to do with `Share`. Instantiate it, add objects to it, and pass it to your subprocesses. It ensures that everything syncs up and remains in sync for you. Even complex classes can be added and used just like you would use it normally. When you need to change or add another object, Share makes sure that every other process using that Share gets in sync with the new update.
 
-How? `cerial`, the serialization engine that can handle a vast amount of things that `pickle`, `cloudpickle`, and `dill` cannot -- including complex, user created class instances that would fail to serialize with the other options. 
+How? `cucumber`, the serialization engine that can handle a vast amount of things that `pickle`, `cloudpickle`, and `dill` cannot -- including complex, user created class instances that would fail to serialize with the other options. 
 
-- `cerial` - Serialize anything.
+- `cucumber` - Serialize anything.
 
-`cerial` outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators with state, file handles, and more are all covered. Additionally, it has faster speed than `cloudpickle` and `dill` for many simple types, and is also faster in most cases for the more complex types as well. It also handles circular references and can automatically reconnect live connections that underwent serialization. 
+`cucumber` outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators with state, file handles, and more are all covered. Additionally, it has faster speed than `cloudpickle` and `dill` for many simple types, and is also faster in most cases for the more complex types as well. It also handles circular references and can automatically reconnect live connections that underwent serialization. 
 
 Why is this awesome? You don't have to worry about errors anymore. You now have access to a custom class, the objects you want to use in it but couldn't before, and the ability to just share data between processes without thinking, all powered by this engine. You don't even have to use the other suitkaise modules to see an improvementin your quality of life. This is just simply better than all other serializers.
 
@@ -827,20 +827,20 @@ creating a language app based on the most common words
 
 ## What are Reconnectors?
 
-When `cerial` serializes objects, some resources cannot be directly pickled:
+When `cucumber` serializes objects, some resources cannot be directly pickled:
 - Database connections (sockets to remote servers)
 - Network sockets
 - File handles and pipes
 - Threads
 - Compiled regex matches
 
-Instead of failing, `cerial` replaces these with **Reconnector** placeholder objects that store enough metadata to recreate the resource later.
+Instead of failing, `cucumber` replaces these with **Reconnector** placeholder objects that store enough metadata to recreate the resource later.
 
 ```
 Original Object ──serialize──> Reconnector Placeholder ──reconnect()──> New Live Resource
 ```
 
-### Reconnector types in cerial
+### Reconnector types in cucumber
 
 | Reconnector | Original Type | Stored Metadata |
 |-------------|--------------|-----------------|
@@ -862,18 +862,18 @@ Each Reconnector has a `reconnect()` method that creates a new live resource.
 These reconnect with no args (`reconnect()`):
 
 ```python
-from suitkaise import cerial
+from suitkaise import cucumber
 
 # Serialize object with sockets, pipes, threads, sqlite, duckdb, etc.
-data = cerial.serialize(my_object)
-restored = cerial.deserialize(data)
+data = cucumber.serialize(my_object)
+restored = cucumber.deserialize(data)
 
 # restored.socket is a SocketReconnector, not a socket
 # Call reconnect() to get a live socket
 restored.socket = restored.socket.reconnect()
 
 # Or reconnect everything at once
-restored = cerial.reconnect_all(restored)
+restored = cucumber.reconnect_all(restored)
 ```
 
 ### Resources that need auth/credentials
@@ -882,7 +882,7 @@ Only password needs to be passed - connection metadata (host, port, user, databa
 
 ```python
 # Deserialize - db connection becomes PostgresReconnector
-restored = cerial.deserialize(data)
+restored = cucumber.deserialize(data)
 
 # restored.db has stored host, port, user, database
 # Only password needs to be provided
@@ -899,13 +899,13 @@ For InfluxDB v2, `password` represents the token.
 Instead of calling `.reconnect()` on each Reconnector individually, use `reconnect_all()` to traverse an object and reconnect everything:
 
 ```python
-from suitkaise import cerial
+from suitkaise import cucumber
 
-data = cerial.serialize(my_object)
-restored = cerial.deserialize(data)
+data = cucumber.serialize(my_object)
+restored = cucumber.deserialize(data)
 
 # Reconnect all - just passwords, connection metadata is stored
-restored = cerial.reconnect_all(restored, **{
+restored = cucumber.reconnect_all(restored, **{
     "psycopg2.Connection": {
         "*": "secret",
     },
@@ -934,7 +934,7 @@ restored = cerial.reconnect_all(restored, **{
 ### Multiple connections of same type
 
 ```python
-restored = cerial.reconnect_all(restored, **{
+restored = cucumber.reconnect_all(restored, **{
     "psycopg2.Connection": {
         "*": "default_pass",
         "analytics_db": "analytics_pass",  # override for self.analytics_db
@@ -948,7 +948,7 @@ For resources without auth, just call with no args:
 
 ```python
 # Sockets, threads, pipes, sqlite, duckdb, regex matches, etc.
-restored = cerial.reconnect_all(restored)
+restored = cucumber.reconnect_all(restored)
 ```
 
 ---
@@ -1136,7 +1136,7 @@ If you need dynamic credentials (e.g., from env vars), use `reconnect_all()` dir
 
 ```python
 from suitkaise.processing import Skprocess
-from suitkaise.cerial import reconnect_all
+from suitkaise.cucumber import reconnect_all
 import os
 
 class MyProcess(Skprocess):
@@ -1161,7 +1161,7 @@ review each modules code and streamline comments, checking that everything looks
 
 ## 1st pass - focus on code
 
-- cerial - done
+- cucumber - done
 - circuits - done
 - paths - done
 - processing - done
@@ -1216,11 +1216,11 @@ Pipes are just paired handles created together. There is no address or lookup fo
 
 - Make pipes simple, fast, and predictable, with a seamless UX.
 - Don’t reinvent the wheel: pipe limitations exist because they trade speed for flexibility.
-- Directly pass endpoint handles when serializing with `cerial`.
+- Directly pass endpoint handles when serializing with `cucumber`.
 - Do NOT allow pipe endpoints to be sent to `Share`.
 - Pipes only work correctly when passed to a process at start; if endpoints are not paired, raise a clear error.
 - Ensure all suitkaise modules (especially `Skprocess`) work with this wrapper.
-- Pipe endpoints implement `__serialize__/__deserialize__` so cerial preserves the handle via pickle.
+- Pipe endpoints implement `__serialize__/__deserialize__` so cucumber preserves the handle via pickle.
 
 ```python
 from suitkaise.processing import Pipe
@@ -1258,8 +1258,8 @@ class MyProcess(Skprocess):
 
 ## 4th pass - focus on _docs
 
-- cerial/how-it-works.md - done
-- cerial/how-to-use.md - WIP
+- cucumber - done
+
 
 ensure all _docs files are accurate and up to date following my writing style
 

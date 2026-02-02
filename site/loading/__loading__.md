@@ -61,8 +61,8 @@ __code__/
 └── pages/
     ├── processing-videos.html
     ├── processing-tests.html
-    ├── cerial-videos.html
-    ├── cerial-tests.html
+    ├── cucumber-videos.html
+    ├── cucumber-tests.html
     ├── sktime-videos.html
     ├── sktime-tests.html
     ├── skpath-videos.html

@@ -43,7 +43,7 @@ breaker = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.5)
 2. Stores `sleep_time_after_trip` as the default sleep duration
 3. Sets `broken` to `False` (circuit starts operational)
 4. Sets `times_shorted` to `0` (no failures yet)
-5. Sets `total_failures` to `0` (lifetime failure counter)
+5. Sets `total_trips` to `0` (lifetime trip counter)
 6. Creates `_lock` as a `threading.RLock()` for thread safety
 
 The circuit is now ready to track failures.
@@ -72,7 +72,7 @@ Integer counter tracking how many times `short()` has been called since last res
 
 Resets to `0` when the circuit trips or when `reset()` is called.
 
-### `Circuit.total_failures`
+### `Circuit.total_trips`
 
 Integer counter tracking the total number of failures over the lifetime of the circuit.
 
@@ -97,7 +97,7 @@ Returns:
 - None
 
 1. Increments `times_shorted` by 1
-2. Increments `total_failures` by 1
+2. Increments `total_trips` by 1
 3. Checks if `times_shorted >= num_shorts_to_trip`:
    - *If True:*
      - Calls `_break_circuit()` with the sleep duration
@@ -108,9 +108,9 @@ Returns:
 ```python
 breaker = circuit.Circuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-breaker.short()  # times_shorted = 1, total_failures = 1, broken = False
-breaker.short()  # times_shorted = 2, total_failures = 2, broken = False
-breaker.short()  # times_shorted = 3 -> 0, total_failures = 4, broken = True, sleeps 1.0s
+breaker.short()  # times_shorted = 1, total_trips = 1, broken = False
+breaker.short()  # times_shorted = 2, total_trips = 2, broken = False
+breaker.short()  # times_shorted = 3 -> 0, total_trips = 4, broken = True, sleeps 1.0s
 ```
 
 ### `Circuit.trip()`
@@ -123,7 +123,7 @@ Arguments:
 Returns:
 - None
 
-1. Increments `total_failures` by 1
+1. Increments `total_trips` by 1
 2. Calls `_break_circuit()` immediately
 3. Uses `custom_sleep` if provided, otherwise uses `sleep_time_after_trip`
 
@@ -165,7 +165,7 @@ while not breaker.broken:
 # Reset for next batch
 breaker.reset()
 
-# Second batch of operations (total_failures persists)
+# Second batch of operations (total_trips persists)
 while not breaker.broken:
     # ...
 ```
@@ -211,7 +211,7 @@ The circuit has two states:
 
 When the circuit breaks, `times_shorted` is reset to 0.
 
-Use `total_failures` to track lifetime failures across resets.
+Use `total_trips` to track lifetime trips across resets.
 
 ---
 
@@ -291,7 +291,7 @@ Each `Circuit` instance stores 6 values:
 - `sleep_time_after_trip` (float) — ~24 bytes
 - `_broken` (bool) — ~28 bytes
 - `_times_shorted` (int) — ~28 bytes
-- `_total_failures` (int) — ~28 bytes
+- `_total_trips` (int) — ~28 bytes
 - `_lock` (RLock) — ~56 bytes
 
 Total: ~192 bytes per instance. (very lightweight)

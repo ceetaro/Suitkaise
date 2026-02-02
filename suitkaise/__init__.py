@@ -8,7 +8,7 @@
     from suitkaise.timing import TimeThis
     from suitkaise.paths import Skpath
     from suitkaise.circuits import Circuit
-    from suitkaise.cerial import serialize, deserialize
+    from suitkaise.cucumber import serialize, deserialize
     from suitkaise.processing import Skprocess, Pool
     from suitkaise.sk import sk, blocking
     ```
@@ -90,9 +90,9 @@ from .circuits import (
 )
 
 # ============================================================================
-# Cerial Module Exports
+# Cucumber Module Exports
 # ============================================================================
-from .cerial import (
+from .cucumber import (
     # Main functions
     serialize,
     deserialize,
@@ -182,7 +182,7 @@ __all__ = [
     "Circuit",
     "BreakingCircuit",
     
-    # Cerial
+    # Cucumber
     "serialize",
     "deserialize",
     "reconnect_all",

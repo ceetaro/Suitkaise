@@ -71,13 +71,13 @@ def run_all_benchmarks():
     except Exception as e:
         print(f"  Error: {e}")
     
-    # 4. Cerial Benchmarks
+    # 4. Cucumber Benchmarks
     print(f"\n{BOLD}{CYAN}{'─'*80}{RESET}")
-    print(f"{BOLD}CERIAL MODULE{RESET}")
+    print(f"{BOLD}CUCUMBER MODULE{RESET}")
     print(f"{BOLD}{CYAN}{'─'*80}{RESET}")
     try:
-        from tests.cerial.benchmarks import run_all_benchmarks as run_cerial
-        run_cerial()
+        from tests.cucumber.benchmarks import run_all_benchmarks as run_cucumber
+        run_cucumber()
     except Exception as e:
         print(f"  Error: {e}")
     

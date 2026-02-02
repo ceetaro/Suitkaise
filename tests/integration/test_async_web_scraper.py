@@ -371,7 +371,7 @@ def test_full_scraper_pattern():
         
         # Verify results
         assert len(results) > 0, "Should have fetched some pages"
-        assert request_timer.num_times == len(results) + failure_circuit.total_failures, \
+        assert request_timer.num_times == len(results) + failure_circuit.total_trips, \
             "Should have timing for all attempts"
         
         # Rate limiter should have tripped multiple times
@@ -415,9 +415,9 @@ def test_concurrent_circuits_and_timers():
     async def async_test():
         # Multiple rate limiters for different domains
         domain_circuits = {
-            "api_a": Circuit(2, 0.01),
-            "api_b": Circuit(3, 0.01),
-            "api_c": Circuit(2, 0.02),
+            "api_a": Circuit(2, sleep_time_after_trip=0.01),
+            "api_b": Circuit(3, sleep_time_after_trip=0.01),
+            "api_c": Circuit(2, sleep_time_after_trip=0.02),
         }
         
         domain_timers = {

@@ -23,7 +23,7 @@
             <p>All files and code in this repository is licensed under the Apache License 2.0.</p>
             <p><code>suitkaise</code> contains the following modules:</p>
             <ul>
-                <li>cerial: serialization engine</li>
+                <li>cucumber: serialization engine</li>
                 <li>circuit: flow control</li>
                 <li>processing: multiprocessing/subprocesses</li>
                 <li>skpath: path utilities</li>
@@ -169,7 +169,7 @@ result = p.result</code></pre>
         <p>Your functions don't pickle.</p>
         <p>Your loggers don't pickle.</p>
         <p>Your class objects don't pickle.</p>
-        <p>Solution: use <code>cerial</code> to serialize your objects.</p>
+        <p>Solution: use <code>cucumber</code> to serialize your objects.</p>
         <p>I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.</p>
         <p>But being able to serialize "anything" is a steep challenge. I needed a rival, an enemy, a final boss to defeat. One that, after winning, would let me say "I think I can serialize anything now."</p>
         <p>So, I created the <code>WorstPossibleObject</code>.</p>
@@ -182,10 +182,10 @@ result = p.result</code></pre>
         <p>And battled it thousands of times, forcing the engine to successfully serialize it and deserialize it multiple times per battle. Not a single error was allowed to occur.</p>
         <p>Once the engine won, I felt confident that I could serialize anything.</p>
         <p>But even if I can't, I have written a special way for you to.</p>
-        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code>cerial</code>, before it uses the default handling.</p>
+        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code>cucumber</code>, before it uses the default handling.</p>
         <p>You can use them to override the default serialization and deserialization behavior for your own objects.</p>
-        <p>As a bonus, <code>cerial</code> processes dataclasses 2x faster than <code>cloudpickle</code>, the fastest serializer for dataclasses.</p>
-        <a href="#cerial" class="learn-more-link arrow-right nav-link" data-page="cerial">
+        <p>As a bonus, <code>cucumber</code> processes dataclasses 2x faster than <code>cloudpickle</code>, the fastest serializer for dataclasses.</p>
+        <a href="#cucumber" class="learn-more-link arrow-right nav-link" data-page="cucumber">
             learn more <span class="arrow">⟶</span>
         </a>
     </details>

@@ -18,11 +18,11 @@
 
     <p>By inheriting from the <code>Process</code> class, you can create a well organized process in a class structure.</p>
 
-    <p>Since <code>processing</code> uses <code>cerial</code> (another <code>suitkaise</code> module) as its serializer, you can create these process classes with essentially any object you want.</p>
+    <p>Since <code>processing</code> uses <code>cucumber</code> (another <code>suitkaise</code> module) as its serializer, you can create these process classes with essentially any object you want.</p>
 
     <p>You can also use the <code>Pool</code> class for batch processing.</p>
 
-    <p><code>Pool</code> also uses <code>cerial</code> for serialization, so you can use it with any object you want, and it also allows you to use <code>Process</code> inheriting classes instead of just functions.</p>
+    <p><code>Pool</code> also uses <code>cucumber</code> for serialization, so you can use it with any object you want, and it also allows you to use <code>Process</code> inheriting classes instead of just functions.</p>
 
     <p>No more <code>PicklingError: Can't serialize object</code> errors when you start up your process!</p>
 
@@ -433,7 +433,7 @@ except ProcessError as e:
     <p>It does 2 things differently.</p>
 
     <ul>
-        <li>uses <code>cerial</code> for serialization of complex objects between processes</li>
+        <li>uses <code>cucumber</code> for serialization of complex objects between processes</li>
         <li>allows for the use of the <code>Process</code> inheriting classes mentioned above</li>
     </ul>
 

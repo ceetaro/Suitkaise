@@ -38,7 +38,7 @@ During `_setup()`, each lifecycle method is wrapped by `TimedMethod`:
 
 Subprocesses start in `_engine_main` (`_int/engine.py`):
 
-1. Deserialize the `Skprocess` instance with cerial
+1. Deserialize the `Skprocess` instance with cucumber
 2. Initialize queues/events
 3. Run `_engine_main_inner` loop
 
@@ -134,6 +134,6 @@ This enforces read-after-write consistency across processes.
 
 ## `autoreconnect` decorator
 
-`@autoreconnect(**auth)` marks a `Skprocess` class for automatic `cerial.reconnect_all()` after deserialization in the child process.  
+`@autoreconnect(**auth)` marks a `Skprocess` class for automatic `cucumber.reconnect_all()` after deserialization in the child process.  
 This restores DB connections and sockets before `__run__()` executes.
 

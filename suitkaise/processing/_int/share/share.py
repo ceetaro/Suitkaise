@@ -306,7 +306,7 @@ class Share:
         """
         Serialize Share without manager internals.
         
-        Captures a snapshot of shared objects as cerial bytes.
+        Captures a snapshot of shared objects as cucumber bytes.
         """
         coordinator = object.__getattribute__(self, '_coordinator')
         objects: Dict[str, bytes] = {}
@@ -321,11 +321,11 @@ class Share:
                 serialized = None
             if serialized is not None:
                 objects[name] = serialized
-        from suitkaise import cerial
+        from suitkaise import cucumber
         coordinator_state = None
         if object.__getattribute__(self, '_started'):
             # serialize coordinator state separately to avoid proxy pickling issues
-            coordinator_state = cerial.serialize(coordinator.get_state())
+            coordinator_state = cucumber.serialize(coordinator.get_state())
         return {
             "mode": "live" if object.__getattribute__(self, '_started') else "snapshot",
             "objects": objects,
@@ -338,8 +338,8 @@ class Share:
         """
         Reconstruct Share from serialized snapshot.
         """
-        from suitkaise.cerial._int.deserializer import Decerializer
-        deserializer = Decerializer()
+        from suitkaise.cucumber._int.deserializer import Deserializer
+        deserializer = Deserializer()
         coordinator_state = state.get("coordinator_state")
         if coordinator_state:
             coordinator = _Coordinator.from_state(deserializer.deserialize(coordinator_state))

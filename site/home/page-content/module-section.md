@@ -34,7 +34,7 @@ image = __assets__/processing-text-with-branch-neon.png
 
 # 2.1
 
-image = __assets__/cerial-text-with-cerealbowl-neon.png
+image = __assets__/cucumber-text-with-cerealbowl-neon.png
 
 # 2.2
 
@@ -43,14 +43,14 @@ columns = 1
 
 ## 1.1: text = "Serialize anything."
 
-## 2.1: link = "Learn More --->"(site/cerial/__cerial__.md)
+## 2.1: link = "Learn More --->"(site/cucumber/__cucumber__.md)
 
 /*
 The learn more should be a button with the same background color as the home page.
 
 when this link is hovered, the arrow should move slightly to the right and stay there until the mouse is no longer hovering over the link.
 
-this link takes you to the cerial main page.
+this link takes you to the cucumber main page.
 */
 
 # 3.1

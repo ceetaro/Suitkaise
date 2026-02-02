@@ -221,7 +221,7 @@ class TestComparisonWithMultiprocessing:
     
     Note: Raw multiprocessing requires module-level functions because macOS
     uses 'spawn' mode which can't pickle local functions. This is exactly
-    the problem our processing module solves with cerial serialization!
+    the problem our processing module solves with cucumber serialization!
     """
     
     def test_simple_task_comparison(self, reporter):
@@ -669,7 +669,7 @@ def print_final_summary():
   Key Findings:
   
   1. Process Startup (~100ms):
-     - Includes cerial serialization/deserialization
+     - Includes cucumber serialization/deserialization
      - Subprocess spawn overhead
      - Fixed cost regardless of work done
   
@@ -685,7 +685,7 @@ def print_final_summary():
   4. vs Raw Multiprocessing:
      - Processing adds ~50-100ms overhead vs raw
      - BUT: Raw requires module-level functions (not local!)
-     - Processing supports local classes via cerial
+     - Processing supports local classes via cucumber
      - Trade-off: slight overhead for much better ergonomics
   
   5. Parallelism:

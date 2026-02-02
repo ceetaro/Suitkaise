@@ -143,7 +143,7 @@ def test_cli_info():
 def test_cli_modules():
     """CLI modules lists available modules."""
     output = _run_cli(["modules"]).strip().splitlines()
-    expected = {"timing", "paths", "circuits", "cerial", "processing", "sk"}
+    expected = {"timing", "paths", "circuits", "cucumber", "processing", "sk"}
     assert set(output) == expected
 
 

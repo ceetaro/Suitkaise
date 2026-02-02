@@ -13,7 +13,7 @@ import sys
 from typing import Any, Optional
 
 # suitkaise imports
-from suitkaise import timing, cerial, paths
+from suitkaise import timing, cucumber, paths
 from suitkaise.processing import Pool, Share
 
 # pokerml imports
@@ -808,20 +808,20 @@ def main() -> None:
         finished_at=end_time,
     )
 
-    # save run state to disk using cerial
+    # save run state to disk using cucumber
     if args.verbose:
         print(f"\n💾 Saving run state to disk...")
 
     # save as compact binary
-    state_bytes = cerial.serialize(run_state)
-    _log_feature(args.verbose, "cerial.serialize", "Converted RunState dataclass to compact binary format")
+    state_bytes = cucumber.serialize(run_state)
+    _log_feature(args.verbose, "cucumber.serialize", "Converted RunState dataclass to compact binary format")
     state_path = run_dir / "state.bin"  # type: ignore[operator]
     with open(state_path.platform, "wb") as f:
         f.write(state_bytes)
 
     # save as human-readable json
-    state_json = cerial.to_json(run_state)  # type: ignore[attr-defined]
-    _log_feature(args.verbose, "cerial.to_json", "Converted RunState to human-readable JSON")
+    state_json = cucumber.to_json(run_state)  # type: ignore[attr-defined]
+    _log_feature(args.verbose, "cucumber.to_json", "Converted RunState to human-readable JSON")
     with open((run_dir / "state.json").platform, "w") as f:  # type: ignore[operator]
         f.write(state_json)
 

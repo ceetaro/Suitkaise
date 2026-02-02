@@ -53,7 +53,7 @@ while not circ.broken:
     <ul>
         <li><code>broken</code> — <code>True</code> if the circuit has tripped, <code>False</code> otherwise</li>
         <li><code>times_shorted</code> — Number of times <code>short()</code> has been called since last trip</li>
-        <li><code>total_failures</code> — Lifetime count of all failures (never resets)</li>
+        <li><code>total_trips</code> — Lifetime count of all trips (never resets)</li>
     </ul>
 
     <h3><code>short()</code></h3>
@@ -70,7 +70,7 @@ while not circ.broken:
 
     <h3><code>reset()</code></h3>
     <p>Reset the circuit to operational state. Clears <code>broken</code> and <code>times_shorted</code>.</p>
-    <p>Note: <code>total_failures</code> is <strong>not</strong> reset.</p>
+    <p>Note: <code>total_trips</code> is <strong>not</strong> reset.</p>
 
     <hr>
 
@@ -127,7 +127,7 @@ while program.running:
         if current_mem_usage > recc_mem_threshold:
             # will sleep execution for 0.05 seconds instead of default 0.1 if this short causes a trip
             circ.short(custom_sleep=0.05)
-            print(f"Shorted circuit {circ.times_shorted} times. Total failures: {circ.total_failures}")
+            print(f"Shorted circuit {circ.times_shorted} times. Total trips: {circ.total_trips}")
 
         # if circ.broken
         if circ.broken:

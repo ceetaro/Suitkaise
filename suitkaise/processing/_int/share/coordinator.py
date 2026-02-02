@@ -115,11 +115,11 @@ class _Coordinator:
             object_name: Name of the shared object.
             obj: The object to register.
         """
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         # persist initial serialized state as source of truth
         with self._source_lock:
-            serialized = cerial.serialize(obj)
+            serialized = cucumber.serialize(obj)
             self._source_store[object_name] = serialized
         
         # track names for introspection and cleanup
@@ -140,13 +140,13 @@ class _Coordinator:
         Returns:
             Deserialized object or None if not found.
         """
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         with self._source_lock:
             serialized = self._source_store.get(object_name)
             if serialized is None:
                 return None
-            return cerial.deserialize(serialized)
+            return cucumber.deserialize(serialized)
     
     def queue_command(
         self,
@@ -166,7 +166,7 @@ class _Coordinator:
             kwargs: Keyword arguments for the method.
             written_attrs: List of attr names this command writes to.
         """
-        from suitkaise import cerial
+        from suitkaise import cucumber
         
         if kwargs is None:
             kwargs = {}
@@ -174,8 +174,8 @@ class _Coordinator:
             written_attrs = []
         
         # serialize args/kwargs so complex objects survive process boundaries
-        serialized_args = cerial.serialize(args)
-        serialized_kwargs = cerial.serialize(kwargs)
+        serialized_args = cucumber.serialize(args)
+        serialized_kwargs = cucumber.serialize(kwargs)
         
         command = (object_name, method_name, serialized_args, serialized_kwargs, written_attrs)
         self._command_queue.put(command)
@@ -403,7 +403,7 @@ def _coordinator_main(
         poll_timeout: Seconds to wait for each queue.get().
     """
     import queue as queue_module
-    from suitkaise import cerial
+    from suitkaise import cucumber
     
     # local cache of deserialized objects for efficiency
     mirrors: Dict[str, Any] = {}
@@ -461,8 +461,8 @@ def _coordinator_main(
             
             # deserialize args/kwargs for the method invocation
             try:
-                args = cerial.deserialize(serialized_args)
-                kwargs = cerial.deserialize(serialized_kwargs)
+                args = cucumber.deserialize(serialized_args)
+                kwargs = cucumber.deserialize(serialized_kwargs)
             except Exception:
                 _safe_set_error()
                 _update_counters_after_write(counter_registry, object_name, written_attrs)
@@ -474,7 +474,7 @@ def _coordinator_main(
                 with source_lock:
                     serialized = source_store.get(object_name)
                     if serialized is not None:
-                        mirror = cerial.deserialize(serialized)
+                        mirror = cucumber.deserialize(serialized)
                         mirrors[object_name] = mirror
             
             if mirror is None:
@@ -492,7 +492,7 @@ def _coordinator_main(
             
             # commit updated state to source of truth
             with source_lock:
-                serialized = cerial.serialize(mirror)
+                serialized = cucumber.serialize(mirror)
                 source_store[object_name] = serialized
             
             # update counters: decrement pending, increment completed

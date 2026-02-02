@@ -33,7 +33,7 @@ from suitkaise.timing import Sktimer, TimeThis
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.paths import Skpath, get_project_root
 from suitkaise.processing import Share, Skprocess, Pool
-from suitkaise.cerial import serialize, deserialize
+from suitkaise.cucumber import serialize, deserialize
 from suitkaise.sk import sk
 from suitkaise.sk.api import Skclass, Skfunction
 
@@ -324,7 +324,7 @@ def test_share_sk_counter_serialization():
     assert len(data) > 0
     
     # Note: Deserialization of __main__ defined classes doesn't work
-    # This is a cerial limitation - classes must be importable from a module
+    # This is a cucumber limitation - classes must be importable from a module
 
 
 def test_share_sk_datastore():
@@ -516,7 +516,7 @@ def test_share_deeply_nested():
 def test_share_worst_possible_object_import():
     """WorstPossibleObject should be importable."""
     try:
-        from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+        from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
         assert WorstPossibleObject is not None
     except ImportError as e:
         # If WPO can't be imported, skip but note why
@@ -525,7 +525,7 @@ def test_share_worst_possible_object_import():
 
 def test_share_worst_possible_object_creation():
     """WorstPossibleObject should be creatable."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     
     # WPO always creates - just check it works
     try:
@@ -541,7 +541,7 @@ def test_share_worst_possible_object_creation():
 
 def test_share_worst_possible_object_serialization():
     """WorstPossibleObject primitives should serialize."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     
     try:
         wpo = WorstPossibleObject(verbose=False)
@@ -571,7 +571,7 @@ def test_share_worst_possible_object_serialization():
 
 def test_share_worst_possible_object_roundtrip():
     """WorstPossibleObject should roundtrip correctly."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     
     try:
         wpo = WorstPossibleObject(verbose=False)
@@ -594,7 +594,7 @@ def test_share_worst_possible_object_roundtrip():
 
 def test_share_wpo_multiple_roundtrips_iterations():
     """WorstPossibleObject should serialize/deserialize reliably across multiple seeds/iterations."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     import random
     
     # Keep this modest so the suite stays fast, but still catches flaky issues.
@@ -632,7 +632,7 @@ def test_share_wpo_multiple_roundtrips_iterations():
 
 def test_share_wpo_multiple_objects_single_payload():
     """Multiple independently-generated WPOs should roundtrip together in one payload."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     import random
     
     wpos = []
@@ -672,7 +672,7 @@ def test_share_wpo_multiple_objects_single_payload():
 
 def test_share_all_objects_plus_wpo():
     """All suitkaise objects plus WPO should serialize together."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     
     try:
         # Create suitkaise objects
@@ -707,7 +707,7 @@ def test_share_all_objects_plus_wpo():
 
 def test_share_wpo_suitkaise_types():
     """WPO's suitkaise types should serialize correctly."""
-    from suitkaise.cerial._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
+    from suitkaise.cucumber._int.worst_possible_object.worst_possible_obj import WorstPossibleObject
     
     try:
         wpo = WorstPossibleObject(verbose=False)
