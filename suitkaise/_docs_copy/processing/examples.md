@@ -694,6 +694,43 @@ with Pool(workers=4) as pool:
     print(f"Products: {products}")  # Products: [6, 120, 504]
 ```
 
+### `unordered_map` for Fastest List
+
+```python
+from suitkaise.processing import Pool
+import hashlib
+
+def variable_work(item):
+    """Work that takes variable time based on input."""
+    # compute variable number of hashes based on item value
+    iterations = (item % 10 + 1) * 500  # 500 to 5000 iterations
+    
+    data = str(item).encode()
+    for _ in range(iterations):
+        data = hashlib.sha256(data).digest()
+    
+    return {
+        'item': item,
+        'iterations': iterations,
+        'hash': hashlib.sha256(data).hexdigest()[:12]
+    }
+
+
+with Pool(workers=4) as pool:
+    items = list(range(20))
+    
+    # unordered_map returns a list (like map)
+    # but results are in completion order (like unordered_imap)
+    results = pool.unordered_map(variable_work, items)
+    
+    print(f"Got {len(results)} results")
+    print(f"Order received: {[r['item'] for r in results]}")
+    # Order is NOT sequential - items with fewer iterations complete first
+    
+    # useful when you need all results but don't care about order
+    # faster than map() because you don't wait for slow items to unblock fast ones
+```
+
 ### `imap` for Memory Efficiency
 
 ```python
@@ -766,43 +803,6 @@ with Pool(workers=4) as pool:
     
     print(f"\nOrder received: {[r['item'] for r in results]}")
     # Order is NOT sequential - items with fewer iterations complete first
-```
-
-### `unordered_map` for Fastest List
-
-```python
-from suitkaise.processing import Pool
-import hashlib
-
-def variable_work(item):
-    """Work that takes variable time based on input."""
-    # compute variable number of hashes based on item value
-    iterations = (item % 10 + 1) * 500  # 500 to 5000 iterations
-    
-    data = str(item).encode()
-    for _ in range(iterations):
-        data = hashlib.sha256(data).digest()
-    
-    return {
-        'item': item,
-        'iterations': iterations,
-        'hash': hashlib.sha256(data).hexdigest()[:12]
-    }
-
-
-with Pool(workers=4) as pool:
-    items = list(range(20))
-    
-    # unordered_map returns a list (like map)
-    # but results are in completion order (like unordered_imap)
-    results = pool.unordered_map(variable_work, items)
-    
-    print(f"Got {len(results)} results")
-    print(f"Order received: {[r['item'] for r in results]}")
-    # Order is NOT sequential - items with fewer iterations complete first
-    
-    # useful when you need all results but don't care about order
-    # faster than map() because you don't wait for slow items to unblock fast ones
 ```
 
 ### `Pool` with Timeout
@@ -993,7 +993,7 @@ with Pool(workers=2) as pool:
 # ID 4: 40 -> doubled=80, squared=1600
 ```
 
-### Combining star() with Modifiers
+### Combining `star()` with Modifiers
 
 ```python
 from suitkaise.processing import Pool
@@ -1043,7 +1043,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Error Handling in Pool
+### Error Handling in `Pool`
 
 ```python
 from suitkaise.processing import Pool
@@ -1072,27 +1072,25 @@ with Pool(workers=4) as pool:
 
 ---
 
-## Share
+## `Share`
 
-### Basic Shared Counter
+### Basic Shared Counter using `Share`
 
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
 
-# create a Share container
+# create a Share and assign a counter
 share = Share()
-
-# assign a shared counter
 share.counter = 0
 
 
-class IncrementProcess(Skprocess):
+class CounterProcess(Skprocess):
     """
     A process that increments a shared counter.
     
     Demonstrates basic Share usage across processes.
     """
-    
+    # pass the Share instance to the process
     def __init__(self, shared: Share, amount: int = 1):
         self.shared = shared
         self.amount = amount
@@ -1110,16 +1108,16 @@ class IncrementProcess(Skprocess):
 # run 5 processes, each incrementing 10 times
 with Pool(workers=4) as pool:
     # pass the same share instance to all processes
-    pool.map(IncrementProcess, [share] * 5)
+    pool.map(CounterProcess, [share] * 5)
 
-# counter was incremented 5 processes × 10 runs = 50 times
-print(f"Final counter: {share.counter}")  # Final counter: 50
+# counter was incremented 50 times (5 processes × 10 runs each)
+print(f"Final counter: {share.counter}") # will be 50
 
-# always stop share when done
+# always stop share when done to save resources
 share.stop()
 ```
 
-### Sharing Complex Objects (Sktimer)
+### Sharing Complex Objects (like `Sktimer`)
 
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
@@ -1145,38 +1143,40 @@ class TimedWorker(Skprocess):
         self.process_config.runs = work_count
     
     def __run__(self):
-        # time some real work - variable hash iterations
-        start = timing.time()
-        
-        iterations = random.randint(500, 2000)
-        data = b"benchmark_data"
-        for _ in range(iterations):
-            data = hashlib.sha256(data).digest()
-        
-        elapsed = timing.elapsed(start)
+        # variable hash iterations
+        with timing.TimeThis() as run_timer:
+            iterations = random.randint(500, 2000)
+            data = b"benchmark_data"
+            for _ in range(iterations):
+                data = hashlib.sha256(data).digest()
         
         # add timing to shared timer
-        self.shared.timer.add_time(elapsed)
+        self.shared.timer.add_time(run_timer.most_recent)
     
     def __result__(self):
         return "done"
 
 
 # run multiple workers
-with Pool(workers=4) as pool:
-    # 4 workers × 5 runs each = 20 timing measurements
-    pool.map(TimedWorker, [share] * 4)
+workers = 4
+with Pool(workers=workers) as pool:
+    pool.map(TimedWorker, [share] * workers)
 
-# access aggregated statistics
-print(f"Total measurements: {share.timer.num_times}")
-print(f"Mean time: {share.timer.mean:.4f}s")
-print(f"Min: {share.timer.min:.4f}s")
-print(f"Max: {share.timer.max:.4f}s")
+stats = share.timer.get_stats()
+
+# will be 20 (4 workers × 5 runs each)
+num_times = stats.num_times
+
+mean = stats.mean
+min = stats.min
+max = stats.max
+stdev = stats.stdev
+variance = stats.variance
 
 share.stop()
 ```
 
-### Share as Context Manager
+### `Share` as Context Manager
 
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
@@ -1204,13 +1204,14 @@ class WorkerProcess(Skprocess):
 
 # use Share as context manager for automatic cleanup
 with Share() as share:
+
     # assign custom object - auto-wrapped with Skclass
-    share.my_counter = Counter()
+    share.counter = Counter()
     
     with Pool(workers=2) as pool:
         pool.map(WorkerProcess, [share] * 3)
     
-    print(f"Final value: {share.my_counter.value}")  # 30
+    print(f"Final value: {share.counter.value}") # 30
 
 # Share automatically stopped after 'with' block
 ```
@@ -1219,7 +1220,6 @@ with Share() as share:
 
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
-from suitkaise.timing import Sktimer
 from suitkaise import timing
 import hashlib
 import random
@@ -1252,27 +1252,25 @@ class DataProcessor(Skprocess):
     
     def __run__(self):
         # time the processing
-        start = timing.time()
+        with timing.TimeThis() as run_timer:
+            try:
+                # process the data - hash computation
+                data = self.item['data'].encode()
+                
+                # randomly fail based on data content
+                if hash(self.item['data']) % 5 == 0:
+                    raise RuntimeError(f"Failed processing {self.item['id']}")
+                
+                # compute hash chain
+                for _ in range(1000):
+                    data = hashlib.sha256(data).digest()
+                
+                self.shared.stats.record_success()
+                
+            except Exception:
+                self.shared.stats.record_error()
         
-        try:
-            # process the data - hash computation
-            data = self.item['data'].encode()
-            
-            # randomly fail based on data content
-            if hash(self.item['data']) % 5 == 0:
-                raise RuntimeError(f"Failed processing {self.item['id']}")
-            
-            # compute hash chain
-            for _ in range(1000):
-                data = hashlib.sha256(data).digest()
-            
-            self.shared.stats.record_success()
-            
-        except Exception:
-            self.shared.stats.record_error()
-        
-        elapsed = timing.elapsed(start)
-        self.shared.timer.add_time(elapsed)
+        self.shared.timer.add_time(run_timer.most_recent)
     
     def __result__(self):
         return self.item['id']
@@ -1281,7 +1279,7 @@ class DataProcessor(Skprocess):
 with Share() as share:
     # multiple shared objects
     share.stats = Stats()
-    share.timer = Sktimer()
+    share.timer = timing.Sktimer()
     
     # create work items
     items = [{'id': i, 'data': f'item_{i}'} for i in range(20)]
@@ -1298,12 +1296,11 @@ with Share() as share:
     print(f"Avg time: {share.timer.mean:.4f}s")
 ```
 
-### Sharing with Single Skprocess
+### Sharing with single `Skprocess`
 
 ```python
 from suitkaise.processing import Share, Skprocess
-from suitkaise.timing import Sktimer
-from suitkaise import timing
+from suitkaise.timing import Sktimer, TimeThis
 import hashlib
 import random
 
@@ -1318,18 +1315,15 @@ class IterativeWorker(Skprocess):
     
     def __run__(self):
         # variable work - hash computation with random iterations
-        start = timing.time()
-        
-        iterations = random.randint(200, 800)
-        data = f"iteration_{self._current_run}".encode()
-        for _ in range(iterations):
-            data = hashlib.sha256(data).digest()
-        
-        elapsed = timing.elapsed(start)
+        with TimeThis() as run_timer:
+            iterations = random.randint(200, 800)
+            data = f"iteration_{self._current_run}".encode()
+            for _ in range(iterations):
+                data = hashlib.sha256(data).digest()
         
         # update shared state
         self.shared.progress += 1
-        self.shared.timer.add_time(elapsed)
+        self.shared.timer.add_time(run_timer.most_recent)
     
     def __result__(self):
         return "complete"
@@ -1355,7 +1349,7 @@ with Share() as share:
     print(f"Avg iteration: {share.timer.mean:.4f}s")
 ```
 
-### Share Start/Stop Control
+### `Share.start()` and `Share.stop()` control
 
 ```python
 from suitkaise.processing import Share
@@ -1383,7 +1377,7 @@ print(f"Counter: {share.counter}")  # Counter: 100
 share.stop()
 ```
 
-### Clearing Share State
+### Clearing `Share` State
 
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
@@ -1424,9 +1418,9 @@ with Share() as share:
 
 ---
 
-## Pipe
+## `Pipe`
 
-### Basic Pipe Communication
+### Basic `Pipe` Communication
 
 ```python
 from suitkaise.processing import Pipe, Skprocess
@@ -1434,7 +1428,6 @@ from suitkaise.processing import Pipe, Skprocess
 class PipeWorker(Skprocess):
     """
     A process that communicates via Pipe.
-    
     
     - Receiving the point end of a pipe
     - Bidirectional communication with parent
@@ -1483,7 +1476,7 @@ process.wait()
 anchor.close()
 ```
 
-### One-Way Pipe
+### One-Way `Pipe`
 
 ```python
 from suitkaise.processing import Pipe, Skprocess
@@ -1531,7 +1524,7 @@ print(f"Received {len(result)} items")
 anchor.close()
 ```
 
-### Multiple Pipes
+### Multiple `Pipe`s
 
 ```python
 from suitkaise.processing import Pipe, Skprocess
@@ -1594,9 +1587,9 @@ data_anchor.close()
 
 ---
 
-## Tell and Listen
+## `Skprocess.tell()` and `Skprocess.listen()`
 
-### Basic Tell/Listen
+### Basic usage
 
 ```python
 from suitkaise.processing import Skprocess
@@ -1671,7 +1664,7 @@ results = process.result()
 print(f"Got {len(results)} results")
 ```
 
-### Async Tell/Listen
+### Async usage
 
 ```python
 import asyncio
@@ -1730,9 +1723,9 @@ asyncio.run(monitor_process())
 
 ---
 
-## autoreconnect
+## `autoreconnect`
 
-### Basic autoreconnect
+### Basic `autoreconnect`
 
 ```python
 from suitkaise.processing import Skprocess, autoreconnect, Pool
@@ -1782,7 +1775,7 @@ class DatabaseWorker(Skprocess):
 #     results = pool.star().map(DatabaseWorker, queries)
 ```
 
-### autoreconnect with Multiple Connection Types
+### `autoreconnect` with Multiple Connection Types
 
 ```python
 from suitkaise.processing import Skprocess, autoreconnect
@@ -1814,10 +1807,10 @@ class MultiDbWorker(Skprocess):
     """
     
     def __init__(self, main_db, analytics_db, cache, mongo):
-        self.main_db = main_db          # uses "*" auth
-        self.analytics_db = analytics_db # uses "analytics_db" auth
-        self.cache = cache               # Redis with its auth
-        self.mongo = mongo               # MongoDB with its auth
+        self.main_db = main_db            # uses "*" auth
+        self.analytics_db = analytics_db  # uses "analytics_db" auth
+        self.cache = cache                # Redis with its auth
+        self.mongo = mongo                # MongoDB with its auth
         self.process_config.runs = 1
     
     def __run__(self):
@@ -1831,18 +1824,35 @@ class MultiDbWorker(Skprocess):
 
 ---
 
-## Full Example: Distributed Task Queue
+## Full-on distributed task queue
+
+Goal: Build a production-ready task processing system that can handle thousands of jobs with automatic retries, failure tracking, and performance monitoring.
+
+Say you have a batch of data transformation tasks (processing uploaded files, running ML inference on images, generating reports) that need to run in parallel with:
+- Automatic retry when individual tasks fail (network issues, transient errors)
+- Centralized statistics tracking (how many succeeded, failed, retried)
+- Performance metrics (average processing time, P95 latency)
+- Timeout protection (kill tasks that hang)
+
+What this script does
+1. Takes a list of 50 tasks, each with an ID and data payload
+2. Distributes them across 4 parallel workers
+3. Each task computes a cryptographic hash chain (representing real CPU work)
+4. Some tasks fail deterministically (simulating real-world failures)
+5. Failed tasks are automatically retried up to 3 times
+6. All timing and success/failure stats are aggregated across workers
+7. Prints a summary report with task statistics and performance metrics
 
 ```python
 """
 A complete example of a distributed task queue using processing.
 
-This example demonstrates:
+Features used:
 - Pool for parallel worker management
-- Share for tracking global state
-- Skprocess for task execution
-- Timing for performance metrics
-- Error handling with lives
+- Share for tracking global state across processes
+- Skprocess for structured task execution with lifecycle hooks
+- Timing for performance metrics collection
+- lives for automatic retry on failure
 """
 
 from suitkaise.processing import Pool, Share, Skprocess
@@ -2013,8 +2023,8 @@ if __name__ == "__main__":
         {'id': i, 'data': f'task_data_{i}'}
         for i in range(50)
     ]
-    
     print(f"Processing {len(tasks)} tasks...")
+
     start = timing.time()
     
     # run the queue
@@ -2049,17 +2059,36 @@ if __name__ == "__main__":
 
 ---
 
-## Full Example: Real-Time Data Pipeline
+## Full-on data streaming pipeline
+
+Goal: Build a streaming data processor that can handle a continuous flow of incoming data items, distribute them across multiple workers, and collect results in real-time.
+
+Say you're building a system that processes a stream of events (e.g., log entries, sensor readings, user actions, webhook payloads) where:
+- Data arrives continuously and needs to be processed as it comes
+- Multiple workers process data in parallel for throughput
+- Workers run indefinitely until explicitly stopped (not batch processing)
+- Parent process can monitor progress and worker status in real-time
+- System shuts down gracefully, finishing in-flight work before exiting
+
+What this script does
+1. Starts 3 worker processes that run indefinitely
+2. Generates a stream of 100 data items ("item_0", "item_1", etc.)
+3. Distributes items to workers in round-robin fashion via `tell()`
+4. Each worker computes a hash transformation on received items
+5. Workers report their status periodically via `tell()` back to parent
+6. Results accumulate in shared state accessible from all processes
+7. After stream ends, sends stop signal to all workers
+8. Collects final statistics and prints summary
 
 ```python
 """
 A real-time data pipeline using processing.
 
-This example demonstrates:
-- Indefinite process with stop signal
-- tell/listen for real-time communication
-- Share for accumulating results
-- Graceful shutdown
+Features used:
+- Indefinite process with stop signal (runs=None)
+- tell/listen for real-time bidirectional communication
+- Share for accumulating results across processes
+- Graceful shutdown with __onfinish__
 """
 
 from suitkaise.processing import Skprocess, Share
@@ -2120,32 +2149,30 @@ class DataPipelineWorker(Skprocess):
             return
         
         # process the data - real work
-        start = timing.time()
+        with TimeThis() as run_timer:
+            data = self._pending_data
+            
+            # transform the data - compute hash and transform
+            if isinstance(data, str):
+                data_bytes = data.encode()
+                # compute hash chain
+                for _ in range(500):
+                    data_bytes = hashlib.sha256(data_bytes).digest()
+                output = hashlib.sha256(data_bytes).hexdigest()[:16]
+            else:
+                output = data * 2
+            
+            result = {
+                'worker': self.worker_id,
+                'input': data,
+                'output': output,
+                'timestamp': timing.time()
+            }
         
-        data = self._pending_data
-        
-        # transform the data - compute hash and transform
-        if isinstance(data, str):
-            data_bytes = data.encode()
-            # compute hash chain
-            for _ in range(500):
-                data_bytes = hashlib.sha256(data_bytes).digest()
-            output = hashlib.sha256(data_bytes).hexdigest()[:16]
-        else:
-            output = data * 2
-        
-        result = {
-            'worker': self.worker_id,
-            'input': data,
-            'output': output,
-            'timestamp': timing.time()
-        }
-        
-        elapsed = timing.elapsed(start)
         
         # store result in shared state
         self.shared.results.add(result)
-        self.shared.timer.add_time(elapsed)
+        self.shared.timer.add_time(run_timer.most_recent)
         
         self.processed += 1
         self._pending_data = None
@@ -2172,7 +2199,6 @@ class DataPipelineWorker(Skprocess):
             'worker_id': self.worker_id,
             'total_processed': self.processed
         }
-
 
 def run_pipeline(data_stream, num_workers: int = 2, timeout: float = 5.0):
     """
