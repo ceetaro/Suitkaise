@@ -1837,8 +1837,8 @@ Say you have a batch of data transformation tasks (processing uploaded files, ru
 What this script does
 1. Takes a list of 50 tasks, each with an ID and data payload
 2. Distributes them across 4 parallel workers
-3. Each task computes a cryptographic hash chain (representing real CPU work)
-4. Some tasks fail deterministically (simulating real-world failures)
+3. Each task computes a cryptographic hash chain (this represents real CPU work)
+4. Some tasks fail deterministically (simulating failures)
 5. Failed tasks are automatically retried up to 3 times
 6. All timing and success/failure stats are aggregated across workers
 7. Prints a summary report with task statistics and performance metrics
@@ -2063,7 +2063,7 @@ if __name__ == "__main__":
 
 Goal: Build a streaming data processor that can handle a continuous flow of incoming data items, distribute them across multiple workers, and collect results in real-time.
 
-Say you're building a system that processes a stream of events (e.g., log entries, sensor readings, user actions, webhook payloads) where:
+Say you're building a system that processes a stream of events (log entries, sensor readings, user actions, webhook payloads) where:
 - Data arrives continuously and needs to be processed as it comes
 - Multiple workers process data in parallel for throughput
 - Workers run indefinitely until explicitly stopped (not batch processing)
