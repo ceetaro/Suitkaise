@@ -45,6 +45,7 @@ class _ObjectProxy:
         object_name: str,
         coordinator: "_Coordinator",
         wrapped_class: type,
+        shared_meta: Optional[dict] = None,
     ):
         """
         Create a proxy for a shared object.
@@ -59,7 +60,7 @@ class _ObjectProxy:
         object.__setattr__(self, '_wrapped_class', wrapped_class)
         
         # cache the _shared_meta if it exists
-        meta = getattr(wrapped_class, '_shared_meta', None)
+        meta = shared_meta if shared_meta is not None else getattr(wrapped_class, '_shared_meta', None)
         object.__setattr__(self, '_shared_meta', meta)
     
     def __getattr__(self, name: str) -> Any:

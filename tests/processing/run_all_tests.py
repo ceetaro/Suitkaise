@@ -37,6 +37,7 @@ def run_all_tests():
     from tests.processing.test_pool import run_all_tests as run_pool_tests
     from tests.processing.test_share import run_all_tests as run_share_tests
     from tests.processing.test_share_comprehensive import run_all_tests as run_share_comprehensive_tests
+    from tests.processing.test_share_supported_types import run_all_tests as run_share_supported_types_tests
     from tests.processing.test_config import run_all_tests as run_config_tests
     from tests.processing.test_timers import run_all_tests as run_timers_tests
     from tests.processing.test_engine import run_all_tests as run_engine_tests
@@ -63,6 +64,9 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running Share Comprehensive tests...{RESET}")
     results.append(("Share Comprehensive", run_share_comprehensive_tests()))
+
+    print(f"\n{CYAN}Running Share Supported Types tests...{RESET}")
+    results.append(("Share Supported Types", run_share_supported_types_tests()))
     
     print(f"\n{CYAN}Running Config tests...{RESET}")
     results.append(("Config", run_config_tests()))

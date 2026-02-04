@@ -609,7 +609,7 @@ State captured:
 
 Important: EXHAUSTS the iterator. Original becomes empty.
 
-Reconstruction: `iter(remaining_values)`
+Reconstruction: `iter(remaining_values)`. The original iterator type is not preserved.
 
 ### `RangeHandler`
 
@@ -627,7 +627,7 @@ Serializes `enumerate` objects.
 State captured:
 - `remaining`: List of `(index, value)` tuples
 
-Reconstruction: `iter(remaining)`
+Reconstruction: `iter(remaining)`. The enumerate is consumed during serialization, and reconstruction returns a plain iterator over the remaining `(index, value)` pairs.
 
 ### `ZipHandler`
 

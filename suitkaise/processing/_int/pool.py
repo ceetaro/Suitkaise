@@ -1148,6 +1148,16 @@ class Pool:
         """Internal unordered imap implementation."""
         from suitkaise import cucumber
         import time as time_module
+
+        def _decode_payload(payload: Any, kind: str) -> Any:
+            try:
+                return cucumber.deserialize(payload)
+            except Exception as exc:
+                payload_type = type(payload).__name__
+                payload_len = len(payload) if isinstance(payload, (bytes, bytearray)) else None
+                raise cucumber.DeserializationError(
+                    f"Pool failed to deserialize {kind} payload ({payload_type}, len={payload_len}): {type(exc).__name__}: {exc}"
+                ) from exc
         
         items = list(iterable)
         if not items:
@@ -1163,9 +1173,9 @@ class Pool:
             def iterator() -> Iterator:
                 for message in self._mp_pool.imap_unordered(_pool_worker_bytes_args, args):
                     if message["type"] == "error":
-                        error = cucumber.deserialize(message["data"])
+                        error = _decode_payload(message["data"], "error")
                         raise error
-                    yield cucumber.deserialize(message["data"])
+                    yield _decode_payload(message["data"], "result")
             return iterator()
 
         max_workers = self._workers
@@ -1197,9 +1207,9 @@ class Pool:
                         # decode next completed result as soon as it is ready
                         message = q.get()
                         if message["type"] == "error":
-                            error = cucumber.deserialize(message["data"])
+                            error = _decode_payload(message["data"], "error")
                             raise error
-                        yield cucumber.deserialize(message["data"])
+                        yield _decode_payload(message["data"], "result")
                     except queue_module.Empty:
                         yield None
                     finally:
@@ -1354,21 +1364,13 @@ def _pool_worker(
         })
         
     except Exception as e:
-        # Serialize and send error
-        try:
-            serialized_error = cucumber.serialize(e)
-            result_queue.put({
-                "type": "error",
-                "data": serialized_error
-            })
-        except Exception:
-            # If we can't serialize the error, send a generic one
-            import traceback
-            error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
-            result_queue.put({
-                "type": "error",
-                "data": cucumber.serialize(RuntimeError(error_msg))
-            })
+        # Always include traceback details for clarity across processes.
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+        result_queue.put({
+            "type": "error",
+            "data": cucumber.serialize(RuntimeError(error_msg))
+        })
 
 
 def _pool_worker_bytes(
@@ -1403,12 +1405,9 @@ def _pool_worker_bytes(
 
         return {"type": "result", "data": cucumber.serialize(result)}
     except Exception as e:
-        try:
-            return {"type": "error", "data": cucumber.serialize(e)}
-        except Exception:
-            import traceback
-            error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
-            return {"type": "error", "data": cucumber.serialize(RuntimeError(error_msg))}
+        import traceback
+        error_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+        return {"type": "error", "data": cucumber.serialize(RuntimeError(error_msg))}
 
 
 def _pool_worker_bytes_args(args: tuple[bytes, bytes, bool]) -> dict:

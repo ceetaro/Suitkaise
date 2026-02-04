@@ -3,6 +3,7 @@ Handler for pipe objects.
 
 Pipes are inter-process communication channels.
 """
+from __future__ import annotations
 
 import os
 import multiprocessing
@@ -260,7 +261,7 @@ class MultiprocessingManagerHandler(Handler):
         This is tricky since there are many proxy types.
         """
         obj_type_name = type(obj).__name__
-        obj_module = getattr(type(obj), '__module__', '')
+        obj_module = getattr(type(obj), "__module__", "")
         
         # check for manager or proxy objects
         is_manager = 'Manager' in obj_type_name or 'Proxy' in obj_type_name
@@ -288,25 +289,65 @@ class MultiprocessingManagerHandler(Handler):
           auth keys/addresses. This keeps behavior hands-off and secure.
         """
         obj_type_name = type(obj).__name__
+        obj_module = getattr(type(obj), "__module__", "")
         
+        def _contains_auth(value: Any) -> bool:
+            try:
+                from multiprocessing.process import AuthenticationString
+            except Exception:
+                AuthenticationString = None  # type: ignore
+            if AuthenticationString is not None and isinstance(value, AuthenticationString):
+                return True
+            if isinstance(value, (list, tuple, set)):
+                return any(_contains_auth(item) for item in value)
+            if isinstance(value, dict):
+                return any(_contains_auth(k) or _contains_auth(v) for k, v in value.items())
+            return False
+
+        # avoid reduce for manager/proxy objects to prevent authkey leaks
+        if "multiprocessing.managers" in obj_module:
+            value = None
+            try:
+                if hasattr(obj, "items"):
+                    value = dict(obj)
+                elif hasattr(obj, "__iter__"):
+                    value = list(obj)
+            except Exception:
+                value = None
+            return {
+                "type_name": obj_type_name,
+                "value": value,
+            }
+
         # prefer using the proxy's reduce protocol (stable across processes)
         try:
             reducer = obj.__reduce__()
             if isinstance(reducer, tuple) and len(reducer) >= 2:
                 func, args = reducer[:2]
-                return {
-                    "type_name": obj_type_name,
-                    "rebuild": func,
-                    "args": args,
-                }
+                reducer_tail = reducer[2:] if len(reducer) > 2 else ()
+                reducer_payload = (args,) + reducer_tail
+                if not _contains_auth(reducer_payload):
+                    return {
+                        "type_name": obj_type_name,
+                        "rebuild": func,
+                        "args": args,
+                    }
         except Exception:
             pass
         
         # avoid dereferencing proxies or manager internals.
         # these can contain unpicklable auth keys or locks.
+        value = None
+        try:
+            if hasattr(obj, "items"):
+                value = dict(obj)
+            elif hasattr(obj, "__iter__"):
+                value = list(obj)
+        except Exception:
+            value = None
         return {
             "type_name": obj_type_name,
-            "value": None,
+            "value": value,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:

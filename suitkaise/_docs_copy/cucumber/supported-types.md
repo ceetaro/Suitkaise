@@ -1,119 +1,123 @@
 # cucumber supported types
 
-- user-defined class instances
-- `None`
-- `bool`
-- `int`
-- `float`
-- `str`
-- `bytes`
-- `list`
-- `tuple`
-- `set`
-- `frozenset`
-- `dict`
-- `datetime.datetime`
-- `datetime.date`
-- `datetime.time`
-- `datetime.timedelta`
-- `datetime.timezone`
-- `decimal.Decimal`
-- `fractions.Fraction`
-- `uuid.UUID`
-- `pathlib.Path`
-- `pathlib.PurePath`
-- `pathlib.PosixPath`
-- `pathlib.WindowsPath`
-- `types.FunctionType`
-- `functools.partial`
-- `types.MethodType`
-- `staticmethod`
-- `classmethod`
-- `type`
-- `logging.Logger`
-- `logging.StreamHandler`
-- `logging.FileHandler`
-- `logging.Formatter`
-- `_thread.lock`
-- `threading.RLock`
-- `threading.Semaphore`
-- `threading.BoundedSemaphore`
-- `threading.Barrier`
-- `threading.Condition`
-- `io.TextIOBase`
-- `tempfile._TemporaryFileWrapper`
-- `io.StringIO`
-- `io.BytesIO`
-- `queue.Queue`
-- `multiprocessing.Queue`
-- `threading.Event`
-- `multiprocessing.Event`
-- `re.Pattern`
-- `re.Match`
-- `sqlite3.Connection`
-- `sqlite3.Cursor`
-- `contextvars.ContextVar`
-- `contextvars.Token`
-- `requests.Session`
-- `socket.socket`
-- `psycopg2.Connection`
-- `pymysql.Connection`
-- `pymongo.MongoClient`
-- `redis.Redis`
-- `sqlalchemy.Engine`
-- `cassandra.Cluster`
-- `elasticsearch.Elasticsearch`
-- `neo4j.Driver`
-- `influxdb_client.InfluxDBClient`
-- `pyodbc.Connection`
-- `clickhouse_driver.Client`
-- `pymssql.Connection`
-- `oracledb.Connection`
-- `snowflake.Connection`
-- `duckdb.Connection`
-- `collections.abc.Iterator`
-- `range`
-- `enumerate`
-- `zip`
-- `mmap.mmap`
-- `multiprocessing.shared_memory.SharedMemory`
-- `int` (file descriptors)
-- `memoryview`
-- `threading.Thread`
-- `concurrent.futures.ThreadPoolExecutor`
-- `concurrent.futures.ProcessPoolExecutor`
-- `threading.local`
-- `io.FileIO` (from `os.pipe`)
-- `multiprocessing.connection.Connection`
-- `multiprocessing.managers.BaseProxy`
-- `types.CodeType`
-- `types.FrameType`
-- `property`
-- `types.MemberDescriptorType`
-- `types.GetSetDescriptorType`
-- `types.WrapperDescriptorType`
-- `types.MethodDescriptorType`
-- `types.MethodWrapperType`
-- `types.GeneratorType`
-- `weakref.ref`
-- `weakref.WeakValueDictionary`
-- `weakref.WeakKeyDictionary`
-- `enum.Enum`
-- `enum.EnumMeta`
-- `contextlib._GeneratorContextManager`
-- `subprocess.Popen`
-- `subprocess.CompletedProcess`
-- `types.CoroutineType`
-- `types.AsyncGeneratorType`
-- `asyncio.Task`
-- `asyncio.Future`
-- `types.ModuleType`
-- `collections.namedtuple`
-- `typing.NamedTuple`
-- `typing.TypedDict`
-- `DbReconnector`
-- `SocketReconnector`
-- `ThreadReconnector`
-- `PipeReconnector`
-- `SubprocessReconnector`
-- `MatchReconnector`
+Note: Iterator-style objects (including `enumerate` and `zip`) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.
+
+Note: Objects that turn into `Reconnector` objects will need to be reconnected after deserialization to fully work.
+
+- user-defined class instances --> new instance of same type with same state
+- `None` --> `None`
+- `bool` --> `bool`
+- `int` --> `int`
+- `float` --> `float`
+- `str` --> `str`
+- `bytes` --> `bytes`
+- `list` --> `list`
+- `tuple` --> `tuple`
+- `set` --> `set`
+- `frozenset` --> `frozenset`
+- `dict` --> `dict`
+- `datetime.datetime` --> `datetime.datetime`
+- `datetime.date` --> `datetime.date`
+- `datetime.time` --> `datetime.time`
+- `datetime.timedelta` --> `datetime.timedelta`
+- `datetime.timezone` --> `datetime.timezone`
+- `decimal.Decimal` --> `decimal.Decimal`
+- `fractions.Fraction` --> `fractions.Fraction`
+- `uuid.UUID` --> `uuid.UUID`
+- `pathlib.Path` --> `pathlib.Path`
+- `pathlib.PurePath` --> `pathlib.PurePath`
+- `pathlib.PosixPath` --> `pathlib.PosixPath`
+- `pathlib.WindowsPath` --> `pathlib.WindowsPath`
+- `types.FunctionType` --> `types.FunctionType`
+- `functools.partial` --> `functools.partial`
+- `types.MethodType` --> `types.MethodType`
+- `staticmethod` --> `staticmethod`
+- `classmethod` --> `classmethod`
+- `type` --> `type`
+- `logging.Logger` --> `logging.Logger`
+- `logging.StreamHandler` --> `logging.StreamHandler`
+- `logging.FileHandler` --> `logging.FileHandler`
+- `logging.Formatter` --> `logging.Formatter`
+- `_thread.lock` --> `_thread.lock`
+- `threading.RLock` --> `threading.RLock`
+- `threading.Semaphore` --> `threading.Semaphore`
+- `threading.BoundedSemaphore` --> `threading.BoundedSemaphore`
+- `threading.Barrier` --> `threading.Barrier`
+- `threading.Condition` --> `threading.Condition`
+- `io.TextIOBase` --> `io.TextIOBase`
+- `tempfile._TemporaryFileWrapper` --> `tempfile._TemporaryFileWrapper`
+- `io.StringIO` --> `io.StringIO`
+- `io.BytesIO` --> `io.BytesIO`
+- `queue.Queue` --> `queue.Queue`
+- `multiprocessing.Queue` --> `multiprocessing.Queue` (`Share` not supported)
+- `threading.Event` --> `threading.Event`
+- `multiprocessing.Event` --> `multiprocessing.Event` (`Share` not supported)
+- `re.Pattern` --> `re.Pattern`
+- `re.Match` --> `MatchReconnector`
+- `sqlite3.Connection` --> `SQLiteConnectionReconnector`
+- `sqlite3.Cursor` --> `SQLiteCursorReconnector`
+- `contextvars.ContextVar` --> `contextvars.ContextVar`
+- `contextvars.Token` --> `contextvars.Token` (`Share` not supported)
+- `requests.Session` --> `requests.Session`
+- `socket.socket` --> `SocketReconnector`
+- `psycopg2.Connection` --> `DbReconnector`
+- `pymysql.Connection` --> `DbReconnector`
+- `pymongo.MongoClient` --> `DbReconnector`
+- `redis.Redis` --> `DbReconnector`
+- `sqlalchemy.Engine` --> `DbReconnector`
+- `cassandra.Cluster` --> `DbReconnector`
+- `elasticsearch.Elasticsearch` --> `DbReconnector`
+- `neo4j.Driver` --> `DbReconnector`
+- `influxdb_client.InfluxDBClient` --> `DbReconnector`
+- `pyodbc.Connection` --> `DbReconnector`
+- `clickhouse_driver.Client` --> `DbReconnector`
+- `pymssql.Connection` --> `DbReconnector`
+- `oracledb.Connection` --> `DbReconnector`
+- `snowflake.Connection` --> `DbReconnector`
+- `duckdb.Connection` --> `DbReconnector`
+- `collections.abc.Iterator` --> `iterator`
+- `range` --> `range`
+- `enumerate` --> `iterator`
+- `zip` --> `iterator`
+- `mmap.mmap` --> `mmap.mmap`
+- `multiprocessing.shared_memory.SharedMemory` --> `multiprocessing.shared_memory.SharedMemory` (`Share` not supported)
+- `int` (file descriptors) --> `int` (file descriptors)
+- `memoryview` --> `memoryview`
+- `threading.Thread` --> `ThreadReconnector`
+- `concurrent.futures.ThreadPoolExecutor` --> `concurrent.futures.ThreadPoolExecutor`
+- `concurrent.futures.ProcessPoolExecutor` --> `concurrent.futures.ProcessPoolExecutor`
+- `threading.local` --> `threading.local`
+- `io.FileIO` (from `os.pipe`) --> `io.FileIO` (`Share` not supported)
+- `multiprocessing.connection.Connection` --> `multiprocessing.connection.Connection` (`Share` not supported)
+- `multiprocessing.managers.BaseProxy` --> `multiprocessing.managers.BaseProxy` (`Share` not supported)
+- `types.CodeType` --> `types.CodeType`
+- `types.FrameType` --> `types.FrameType` (`Share` not supported)
+- `property` --> `property`
+- `types.MemberDescriptorType` --> `types.MemberDescriptorType` (`Share` not supported)
+- `types.GetSetDescriptorType` --> `types.GetSetDescriptorType` (`Share` not supported)
+- `types.WrapperDescriptorType` --> `types.WrapperDescriptorType` (`Share` not supported)
+- `types.MethodDescriptorType` --> `types.MethodDescriptorType` (`Share` not supported)
+- `types.MethodWrapperType` --> `types.MethodWrapperType`
+- `types.GeneratorType` --> `iterator`
+- `weakref.ref` --> `weakref.ref` (`Share` not supported)
+- `weakref.WeakValueDictionary` --> `weakref.WeakValueDictionary`
+- `weakref.WeakKeyDictionary` --> `weakref.WeakKeyDictionary`
+- `enum.Enum` --> `enum.Enum`
+- `enum.EnumMeta` --> `enum.EnumMeta`
+- `contextlib._GeneratorContextManager` --> `contextlib._GeneratorContextManager`
+- `subprocess.Popen` --> `SubprocessReconnector`
+- `subprocess.CompletedProcess` --> `subprocess.CompletedProcess`
+- `types.CoroutineType` --> `types.CoroutineType`
+- `types.AsyncGeneratorType` --> `types.AsyncGeneratorType`
+- `asyncio.Task` --> `asyncio.Task`
+- `asyncio.Future` --> `asyncio.Future`
+- `types.ModuleType` --> `types.ModuleType`
+- `collections.namedtuple` --> `collections.namedtuple`
+- `typing.NamedTuple` --> `typing.NamedTuple`
+- `typing.TypedDict` --> `typing.TypedDict`
+- `DbReconnector` --> `DbReconnector`
+- `SocketReconnector` --> `SocketReconnector`
+- `ThreadReconnector` --> `ThreadReconnector`
+- `PipeReconnector` --> `PipeReconnector`
+- `SubprocessReconnector` --> `SubprocessReconnector`
+- `MatchReconnector` --> `MatchReconnector`

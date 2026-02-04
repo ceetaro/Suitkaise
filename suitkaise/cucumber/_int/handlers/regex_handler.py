@@ -4,6 +4,7 @@ Handler for compiled regex pattern objects.
 Regex patterns are compiled regular expressions. We serialize the pattern
 string and flags, then recompile in the target process.
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass

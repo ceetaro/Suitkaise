@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from suitkaise.sk._int.analyzer import analyze_class
+
 
 class Reconnector:
     """
@@ -28,3 +30,18 @@ class Reconnector:
 
     def reconnect(self, *args, **kwargs) -> Any:
         raise NotImplementedError("reconnect() must be implemented by subclasses.")
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        try:
+            meta, _ = analyze_class(cls)
+            cls._shared_meta = meta
+        except Exception:
+            pass
+
+
+try:
+    _meta, _ = analyze_class(Reconnector)
+    Reconnector._shared_meta = _meta
+except Exception:
+    pass

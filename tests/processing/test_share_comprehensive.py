@@ -14,6 +14,7 @@ This is the definitive test for Share's ability to handle any object.
 import sys
 import time
 import threading
+import traceback
 from typing import Any, Dict, List, Tuple
 
 from pathlib import Path
@@ -33,7 +34,7 @@ from suitkaise.timing import Sktimer, TimeThis
 from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.paths import Skpath, get_project_root
 from suitkaise.processing import Share, Skprocess, Pool
-from suitkaise.cucumber import serialize, deserialize
+from suitkaise.cucumber import serialize, deserialize, reconnect_all
 from suitkaise.sk import sk
 from suitkaise.sk.api import Skclass, Skfunction
 
@@ -45,11 +46,19 @@ Process = Skprocess
 # =============================================================================
 
 class TestResult:
-    def __init__(self, name: str, passed: bool, message: str = "", error: str = ""):
+    def __init__(
+        self,
+        name: str,
+        passed: bool,
+        message: str = "",
+        error: str = "",
+        traceback_text: str = "",
+    ):
         self.name = name
         self.passed = passed
         self.message = message
         self.error = error
+        self.traceback_text = traceback_text
 
 
 class TestRunner:
@@ -68,9 +77,25 @@ class TestRunner:
             test_func()
             self.results.append(TestResult(name, True))
         except AssertionError as e:
-            self.results.append(TestResult(name, False, error=str(e)))
+            tb = traceback.format_exc()
+            self.results.append(
+                TestResult(
+                    name,
+                    False,
+                    error=str(e),
+                    traceback_text=tb,
+                )
+            )
         except Exception as e:
-            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
+            tb = traceback.format_exc()
+            self.results.append(
+                TestResult(
+                    name,
+                    False,
+                    error=f"{type(e).__name__}: {e}",
+                    traceback_text=tb,
+                )
+            )
     
     def print_results(self):
         print(f"\n{self.BOLD}{self.CYAN}{'='*70}{self.RESET}")
@@ -88,6 +113,8 @@ class TestRunner:
             print(f"  {status}  {result.name}")
             if result.error:
                 print(f"         {self.RED}└─ {result.error}{self.RESET}")
+            if result.traceback_text:
+                print(f"{self.RED}{result.traceback_text}{self.RESET}")
         
         print(f"\n{self.BOLD}{'-'*70}{self.RESET}")
         if failed == 0:
@@ -609,6 +636,7 @@ def test_share_wpo_multiple_roundtrips_iterations():
             
             data = serialize(wpo)
             restored = deserialize(data)
+            restored = reconnect_all(restored)
             
             ok, failures = wpo.verify(restored)
             assert ok, "WPO verification failed:\n" + "\n".join(failures[:50])
@@ -645,6 +673,7 @@ def test_share_wpo_multiple_objects_single_payload():
         
         data = serialize(wpos)
         restored_list = deserialize(data)
+        restored_list = reconnect_all(restored_list)
         
         assert isinstance(restored_list, list)
         assert len(restored_list) == len(wpos)

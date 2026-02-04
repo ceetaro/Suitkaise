@@ -4,6 +4,7 @@ Handler for network-related objects.
 Includes HTTP sessions, socket connections, and other network objects.
 These are challenging because network connections don't transfer across processes.
 """
+from __future__ import annotations
 
 import socket
 import importlib

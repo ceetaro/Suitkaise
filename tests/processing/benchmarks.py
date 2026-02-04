@@ -309,6 +309,215 @@ def benchmark_share_proxy():
 
 
 # =============================================================================
+# Share Cross-Process Benchmarks (the important ones)
+# =============================================================================
+
+class ShareIncrementProcess(Skprocess):
+    """Process that increments a shared counter."""
+    def __init__(self, share: Share, increments: int):
+        self.share = share
+        self.increments = increments
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        for _ in range(self.increments):
+            self.share.counter += 1
+    
+    def __result__(self):
+        return self.increments
+
+
+class ShareTimerProcess(Skprocess):
+    """Process that uses a shared timer."""
+    def __init__(self, share: Share, iterations: int):
+        self.share = share
+        self.iterations = iterations
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        for _ in range(self.iterations):
+            self.share.timer.start()
+            # tiny bit of work
+            _ = sum(range(100))
+            self.share.timer.stop()
+    
+    def __result__(self):
+        return self.iterations
+
+
+def benchmark_share_cross_process():
+    """Measure Share performance across actual subprocess boundaries."""
+    runner = BenchmarkRunner("Share Cross-Process Benchmarks")
+    
+    # Single process incrementing shared counter
+    increments = 50
+    with Share() as share:
+        share.counter = 0
+        
+        start = stdlib_time.perf_counter()
+        proc = ShareIncrementProcess(share, increments)
+        proc.start()
+        proc.wait()
+        proc.result()
+        # Give coordinator time to process final writes
+        stdlib_time.sleep(0.2)
+        elapsed = stdlib_time.perf_counter() - start
+        
+        runner.bench_timed(f"Cross-process increment ({increments}x)", increments, elapsed)
+        
+        final = share.counter
+        print(f"  [Single process: expected {increments}, got {final}]")
+    
+    # Multiple processes incrementing shared counter
+    num_workers = 4
+    increments_per_worker = 10
+    with Share() as share:
+        share.counter = 0
+        
+        pool = Pool(workers=num_workers)
+        
+        start = stdlib_time.perf_counter()
+        pool.star().map(ShareIncrementProcess, [(share, increments_per_worker)] * num_workers)
+        # Give coordinator time to process final writes
+        stdlib_time.sleep(0.5)
+        elapsed = stdlib_time.perf_counter() - start
+        
+        total_increments = num_workers * increments_per_worker
+        runner.bench_timed(f"Cross-process increment ({num_workers} workers × {increments_per_worker})", total_increments, elapsed)
+        
+        final = share.counter
+        print(f"  [Multi process: expected {total_increments}, got {final}]")
+        
+        pool.close()
+    
+    return runner
+
+
+def benchmark_share_timer_cross_process():
+    """Measure shared Sktimer across process boundaries."""
+    runner = BenchmarkRunner("Share Timer Cross-Process Benchmarks")
+    
+    iterations = 20
+    with Share() as share:
+        share.timer = Sktimer()
+        
+        start = stdlib_time.perf_counter()
+        proc = ShareTimerProcess(share, iterations)
+        proc.start()
+        proc.wait()
+        proc.result()
+        # Give coordinator time to process final writes
+        stdlib_time.sleep(0.2)
+        elapsed = stdlib_time.perf_counter() - start
+        
+        runner.bench_timed(f"Cross-process timer start/stop ({iterations}x)", iterations * 2, elapsed)
+        
+        recorded = share.timer.num_times
+        print(f"  [Timer: expected {iterations} times, got {recorded}]")
+    
+    return runner
+
+
+def benchmark_share_vs_baseline():
+    """Compare Share overhead to baseline (no sharing)."""
+    runner = BenchmarkRunner("Share vs Baseline Comparison")
+    
+    # Baseline: local variable increment (no sharing)
+    iterations = 10000
+    counter = 0
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        counter += 1
+    elapsed = stdlib_time.perf_counter() - start
+    runner.bench_timed("Baseline: local int increment", iterations, elapsed)
+    
+    # Share: same process, increment via Share
+    iterations = 100
+    with Share() as share:
+        share.counter = 0
+        
+        start = stdlib_time.perf_counter()
+        for _ in range(iterations):
+            share.counter += 1
+        elapsed = stdlib_time.perf_counter() - start
+        runner.bench_timed("Share: same process increment", iterations, elapsed)
+    
+    # multiprocessing.Value baseline
+    from multiprocessing import Value
+    iterations = 100
+    mp_counter = Value('i', 0)
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        mp_counter.value += 1
+    elapsed = stdlib_time.perf_counter() - start
+    runner.bench_timed("mp.Value: same process increment", iterations, elapsed)
+    
+    # multiprocessing.Manager.Value baseline  
+    from multiprocessing import Manager
+    iterations = 100
+    manager = Manager()
+    mgr_counter = manager.Value('i', 0)
+    start = stdlib_time.perf_counter()
+    for _ in range(iterations):
+        mgr_counter.value += 1
+    elapsed = stdlib_time.perf_counter() - start
+    runner.bench_timed("Manager.Value: same process increment", iterations, elapsed)
+    manager.shutdown()
+    
+    return runner
+
+
+def benchmark_share_latency():
+    """Measure Share read/write latency in detail."""
+    runner = BenchmarkRunner("Share Latency Benchmarks")
+    
+    iterations = 100
+    
+    with Share() as share:
+        share.value = 0
+        
+        # Write latency
+        write_times = []
+        for i in range(iterations):
+            start = stdlib_time.perf_counter()
+            share.value = i
+            elapsed = stdlib_time.perf_counter() - start
+            write_times.append(elapsed)
+        
+        avg_write = sum(write_times) / len(write_times)
+        min_write = min(write_times)
+        max_write = max(write_times)
+        
+        # Read latency (after writes settle)
+        stdlib_time.sleep(0.1)  # let coordinator catch up
+        
+        read_times = []
+        for _ in range(iterations):
+            start = stdlib_time.perf_counter()
+            _ = share.value
+            elapsed = stdlib_time.perf_counter() - start
+            read_times.append(elapsed)
+        
+        avg_read = sum(read_times) / len(read_times)
+        min_read = min(read_times)
+        max_read = max(read_times)
+    
+    # Report using custom format
+    print(f"\n  Share Latency Details:")
+    print(f"  {'Write latency (avg)':<40} {avg_write*1000:>12.3f} ms")
+    print(f"  {'Write latency (min)':<40} {min_write*1000:>12.3f} ms")
+    print(f"  {'Write latency (max)':<40} {max_write*1000:>12.3f} ms")
+    print(f"  {'Read latency (avg)':<40} {avg_read*1000:>12.3f} ms")
+    print(f"  {'Read latency (min)':<40} {min_read*1000:>12.3f} ms")
+    print(f"  {'Read latency (max)':<40} {max_read*1000:>12.3f} ms")
+    
+    runner.bench_timed("Share write (avg)", iterations, sum(write_times))
+    runner.bench_timed("Share read (avg)", iterations, sum(read_times))
+    
+    return runner
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -331,6 +540,10 @@ def run_all_benchmarks():
         benchmark_pool_star(),
         benchmark_share_primitives(),
         benchmark_share_proxy(),
+        benchmark_share_cross_process(),
+        benchmark_share_timer_cross_process(),
+        benchmark_share_vs_baseline(),
+        benchmark_share_latency(),
     ]
     
     for runner in runners:
@@ -338,6 +551,29 @@ def run_all_benchmarks():
     
     print("\n" + "="*80)
     print(" BENCHMARKS COMPLETE ".center(80, "="))
+    print("="*80 + "\n")
+
+
+def run_share_benchmarks_only():
+    """Run only Share benchmarks for quick testing."""
+    print("\n" + "="*80)
+    print(" SHARE BENCHMARKS ".center(80, "="))
+    print("="*80 + "\n")
+    
+    runners = [
+        benchmark_share_primitives(),
+        benchmark_share_proxy(),
+        benchmark_share_cross_process(),
+        benchmark_share_timer_cross_process(),
+        benchmark_share_vs_baseline(),
+        benchmark_share_latency(),
+    ]
+    
+    for runner in runners:
+        runner.print_results()
+    
+    print("\n" + "="*80)
+    print(" SHARE BENCHMARKS COMPLETE ".center(80, "="))
     print("="*80 + "\n")
 
 

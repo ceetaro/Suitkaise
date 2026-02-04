@@ -3,6 +3,7 @@ Handler for threading-related objects.
 
 Includes Thread objects, Executors, and threading.local storage.
 """
+from __future__ import annotations
 
 import threading
 from dataclasses import dataclass

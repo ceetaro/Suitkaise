@@ -16,6 +16,12 @@ import time
 import signal
 import threading
 import warnings
+import logging
+import sqlite3
+import tempfile
+import traceback
+import os
+import io
 
 from pathlib import Path
 
@@ -35,6 +41,7 @@ from suitkaise.timing import Sktimer
 from suitkaise.circuits import Circuit
 from suitkaise.sk import sk
 from suitkaise.sk.api import Skclass
+from suitkaise.cucumber._int.handlers.sqlite_handler import SQLiteConnectionReconnector
 
 # Import test classes from separate module (required for multiprocessing)
 from tests.processing.test_classes import Counter, DataStore, NestedObject
@@ -45,11 +52,19 @@ from tests.processing.test_classes import Counter, DataStore, NestedObject
 # =============================================================================
 
 class TestResult:
-    def __init__(self, name: str, passed: bool, message: str = "", error: str = ""):
+    def __init__(
+        self,
+        name: str,
+        passed: bool,
+        message: str = "",
+        error: str = "",
+        traceback_text: str = "",
+    ):
         self.name = name
         self.passed = passed
         self.message = message
         self.error = error
+        self.traceback_text = traceback_text
 
 
 class TestRunner:
@@ -79,11 +94,35 @@ class TestRunner:
             test_func()
             self.results.append(TestResult(name, True))
         except AssertionError as e:
-            self.results.append(TestResult(name, False, error=str(e)))
+            tb = traceback.format_exc()
+            self.results.append(
+                TestResult(
+                    name,
+                    False,
+                    error=str(e),
+                    traceback_text=tb,
+                )
+            )
         except TimeoutError as e:
-            self.results.append(TestResult(name, False, error=str(e)))
+            tb = traceback.format_exc()
+            self.results.append(
+                TestResult(
+                    name,
+                    False,
+                    error=str(e),
+                    traceback_text=tb,
+                )
+            )
         except Exception as e:
-            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
+            tb = traceback.format_exc()
+            self.results.append(
+                TestResult(
+                    name,
+                    False,
+                    error=f"{type(e).__name__}: {e}",
+                    traceback_text=tb,
+                )
+            )
         finally:
             try:
                 signal.alarm(0)
@@ -108,6 +147,8 @@ class TestRunner:
             print(f"  {status}  {result.name}")
             if result.error:
                 print(f"         {self.RED}└─ {result.error}{self.RESET}")
+            if result.traceback_text:
+                print(f"{self.RED}{result.traceback_text}{self.RESET}")
         
         print(f"\n{self.BOLD}{'-'*70}{self.RESET}")
         if failed == 0:
@@ -634,6 +675,136 @@ def test_share_nested_object_serializes():
         share.exit()
 
 
+def test_share_logger_serializes():
+    """Loggers should serialize and still be usable from Share."""
+    share = Share()
+    logger = logging.getLogger("share.test.logger")
+    old_handlers = list(logger.handlers)
+    old_level = logger.level
+    old_propagate = logger.propagate
+    try:
+        temp_file = tempfile.NamedTemporaryFile(prefix="share-logger-", delete=False)
+        temp_file_path = temp_file.name
+        temp_file.close()
+
+        logger.handlers = []
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+        handler = logging.FileHandler(temp_file_path, mode="w", encoding="utf-8")
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(name)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+        share.logger = logger
+
+        shared_logger = share.logger
+        if isinstance(shared_logger, logging.Logger):
+            assert shared_logger.name == "share.test.logger"
+            assert shared_logger.level == logging.INFO
+            assert shared_logger.propagate is False
+            assert len(shared_logger.handlers) == 1
+            assert isinstance(shared_logger.handlers[0], logging.FileHandler)
+
+        shared_logger.info("hello from share")
+        max_wait = 2.0 if sys.platform == "win32" else 1.0
+        deadline = time.time() + max_wait
+        contents = ""
+        while time.time() < deadline:
+            try:
+                with open(temp_file_path, "r", encoding="utf-8") as handle:
+                    contents = handle.read()
+            except Exception:
+                contents = ""
+            if "share.test.logger - hello from share" in contents:
+                break
+            time.sleep(0.05)
+        assert "share.test.logger - hello from share" in contents
+    finally:
+        logger.handlers = old_handlers
+        logger.setLevel(old_level)
+        logger.propagate = old_propagate
+        share.exit()
+
+
+def test_share_db_connection_serializes_to_reconnector():
+    """Database connections should be usable from Share via reconnect."""
+    share = Share()
+    conn = None
+    try:
+        conn = sqlite3.connect(":memory:")
+        share.db = conn
+
+        shared_db = share.db
+        assert isinstance(shared_db, SQLiteConnectionReconnector)
+
+        reconnected = shared_db.reconnect()
+        try:
+            cursor = reconnected.cursor()
+            cursor.execute("CREATE TABLE t (id INTEGER)")
+            cursor.execute("INSERT INTO t (id) VALUES (1)")
+            reconnected.commit()
+            cursor.execute("SELECT id FROM t")
+            row = cursor.fetchone()
+            assert row is not None and row[0] == 1
+        finally:
+            reconnected.close()
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        share.exit()
+
+
+def test_share_reconnect_all():
+    """Share.reconnect_all should reconnect stored Reconnectors."""
+    share = Share()
+    conn = None
+    try:
+        conn = sqlite3.connect(":memory:")
+        share.db = conn
+
+        stored = share._coordinator.get_object("db")
+        assert isinstance(stored, SQLiteConnectionReconnector)
+
+        reconnected = share.reconnect_all()
+        updated = reconnected.get("db")
+        assert isinstance(updated, sqlite3.Connection)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        share.exit()
+
+
+def test_share_rejects_os_pipe_handles():
+    share = Share()
+    r_fd, w_fd = os.pipe()
+    pipe_handle = None
+    try:
+        pipe_handle = io.FileIO(r_fd, mode="rb", closefd=True)
+        try:
+            share.pipe = pipe_handle
+            assert False, "Share should reject os.pipe() file handles"
+        except ValueError:
+            pass
+    finally:
+        if pipe_handle is not None and not pipe_handle.closed:
+            try:
+                pipe_handle.close()
+            except Exception:
+                pass
+        try:
+            os.close(w_fd)
+        except Exception:
+            pass
+        share.exit()
+
+
 def test_share_serialize_live_and_snapshot_modes():
     """Share.__serialize__ should reflect live vs snapshot mode."""
     share = Share()
@@ -731,6 +902,10 @@ def run_all_tests():
     runner.run_test("Share Circuit serializes", test_share_circuit_serializes, timeout=15)
     runner.run_test("Share user class serializes", test_share_user_class_serializes, timeout=15)
     runner.run_test("Share nested object serializes", test_share_nested_object_serializes, timeout=15)
+    runner.run_test("Share logger serializes", test_share_logger_serializes, timeout=15)
+    runner.run_test("Share db connection serializes", test_share_db_connection_serializes_to_reconnector, timeout=15)
+    runner.run_test("Share reconnect_all", test_share_reconnect_all, timeout=15)
+    runner.run_test("Share rejects os.pipe handles", test_share_rejects_os_pipe_handles, timeout=15)
     runner.run_test("Share serialize live/snapshot", test_share_serialize_live_and_snapshot_modes, timeout=10)
     runner.run_test("Share deserialize snapshot", test_share_deserialize_from_snapshot, timeout=15)
     

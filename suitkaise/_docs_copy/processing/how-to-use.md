@@ -795,6 +795,15 @@ Share uses a coordinator-proxy system:
 - Stored directly in source of truth
 - No proxy needed
 
+**Iterators** (`enumerate`, `zip`, `map`, ...):
+- Serialized by `cucumber` by exhausting remaining values
+- Reconstruction returns a plain iterator over remaining values (not the original iterator type)
+
+**Not Supported**:
+- `multiprocessing.*` objects (queues, managers, events, shared_memory, connections)
+- These are process-bound IPC primitives; use `Share` primitives instead
+- `os.pipe()` file handles / pipe-backed `io.FileIO`
+
 ### Start and Stop
 
 ```python
@@ -810,6 +819,21 @@ share.start()
 ```
 
 While stopped, changes are queued but won't take effect until `start()` is called.
+
+### Reconnect All
+
+`Share.reconnect_all()` reconnects all `cucumber` Reconnector objects currently stored in Share and returns a dict of reconnected objects by name.
+
+```python
+share = Share()
+share.db = sqlite3.connect(":memory:")
+
+# share.db is a Reconnector in Share
+reconnected = share.reconnect_all()
+
+# now it's a live connection again
+conn = reconnected["db"]
+```
 
 ### Context Manager
 

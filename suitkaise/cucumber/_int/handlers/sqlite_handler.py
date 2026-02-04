@@ -4,6 +4,7 @@ Handler for sqlite3 database connection objects.
 SQLite connections are database handles. We serialize the database path
 and optionally the schema and data, then reconnect in the target process.
 """
+from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass

@@ -3,6 +3,7 @@ Share api
 """
 
 from typing import Any, Dict, Optional
+import io
 import warnings
 from multiprocessing.managers import SyncManager
 
@@ -10,7 +11,7 @@ from .coordinator import _Coordinator
 from .proxy import _ObjectProxy
 
 # import Skclass for auto-wrapping user objects (internal API)
-from suitkaise.sk.api import Skclass
+from suitkaise.sk._int.analyzer import analyze_class
 
 
 class Share:
@@ -83,6 +84,7 @@ class Share:
     _SHARE_ATTRS = frozenset({
         '_coordinator', '_proxies', '_started',
     })
+    _META_CACHE: dict[type, dict] = {}
     
     def __init__(
         self,
@@ -126,22 +128,36 @@ class Share:
                     "effect until share.start() is called.",
                     RuntimeWarning,
                 )
+
+        obj_module = getattr(type(value), "__module__", "")
+        if obj_module.startswith("multiprocessing"):
+            raise ValueError(
+                "Share does not support multiprocessing.* objects. "
+                "Use Share primitives or plain data instead."
+            )
+        if isinstance(value, io.IOBase):
+            try:
+                file_name = getattr(value, "name", None)
+            except Exception:
+                file_name = None
+            if isinstance(file_name, int):
+                raise ValueError(
+                    "Share does not support os.pipe() file handles. "
+                    "Use Share primitives or Suitkaise Pipe instead."
+                )
         
         # check if this is an object with _shared_meta (suitkaise or @sk wrapped)
-        has_meta = hasattr(type(value), '_shared_meta')
+        meta = getattr(type(value), '_shared_meta', None)
         
-        # if it's a user class instance without _shared_meta, auto-wrap with Skclass
-        if not has_meta and self._is_user_class_instance(value):
-            # apply Skclass to generate _shared_meta
-            sk_wrapper = Skclass(type(value))
-            # now the class has _shared_meta attached
-            has_meta = True
+        # if it's a user class instance without _shared_meta, auto-generate meta
+        if meta is None and self._is_user_class_instance(value):
+            meta = self._ensure_shared_meta(type(value))
+        has_meta = meta is not None
         
         # register the object with the coordinator and compute read/write attrs
         #   for efficient barrier waits in the proxy
         attrs: set[str] = set()
         if has_meta:
-            meta = getattr(type(value), '_shared_meta', {})
             for method_meta in meta.get('methods', {}).values():
                 attrs.update(method_meta.get('writes', []))
                 attrs.update(method_meta.get('reads', []))
@@ -149,10 +165,25 @@ class Share:
                 attrs.update(prop_meta.get('reads', []))
                 attrs.update(prop_meta.get('writes', []))
         self._coordinator.register_object(name, value, attrs=attrs if attrs else None)
-        
-        if has_meta:
+
+        should_proxy = has_meta
+        if should_proxy:
+            handler = self._get_cucumber_handler(value)
+            if handler and handler.__class__.__name__ in {
+                "SQLiteConnectionHandler",
+                "SQLiteCursorHandler",
+                "SocketHandler",
+                "DatabaseConnectionHandler",
+                "ThreadHandler",
+                "PopenHandler",
+                "MatchObjectHandler",
+                "MultiprocessingPipeHandler",
+                "MultiprocessingManagerHandler",
+            }:
+                should_proxy = False
+        if should_proxy:
             # create a proxy for this object
-            proxy = _ObjectProxy(name, self._coordinator, type(value))
+            proxy = _ObjectProxy(name, self._coordinator, type(value), shared_meta=meta)
             self._proxies[name] = proxy
         else:
             # no proxy - we'll fetch directly from source of truth
@@ -173,6 +204,38 @@ class Share:
         
         # it's a class instance
         return True
+
+    def _ensure_shared_meta(self, cls: type) -> dict:
+        """
+        Generate and attach _shared_meta for a class if possible.
+        """
+        cached = self._META_CACHE.get(cls)
+        if cached is not None:
+            return cached
+        try:
+            meta, _ = analyze_class(cls)
+        except Exception:
+            meta = {'methods': {}, 'properties': {}}
+        self._META_CACHE[cls] = meta
+        try:
+            setattr(cls, '_shared_meta', meta)
+        except (TypeError, AttributeError):
+            pass
+        return meta
+
+    def _get_cucumber_handler(self, value: Any) -> Any | None:
+        """
+        Check whether cucumber already has a dedicated handler for this object.
+        """
+        try:
+            from suitkaise.cucumber._int.serializer import Serializer
+        except Exception:
+            return None
+        try:
+            serializer = Serializer()
+            return serializer._find_handler(value)
+        except Exception:
+            return None
     
     def __getattr__(self, name: str) -> Any:
         """
@@ -302,6 +365,32 @@ class Share:
         self._coordinator.clear()
         self._proxies.clear()
 
+    def reconnect_all(self, *, start_threads: bool = False, **auth) -> Dict[str, Any]:
+        """
+        Reconnect all Reconnectors currently stored in Share.
+
+        Uses cucumber.reconnect_all() against each stored object snapshot and
+        returns the reconnected values keyed by object name.
+        """
+        from suitkaise import cucumber
+
+        try:
+            names = list(self._coordinator._object_names)
+        except Exception:
+            names = []
+
+        results: Dict[str, Any] = {}
+        for name in names:
+            try:
+                obj = self._coordinator.get_object(name)
+            except Exception:
+                continue
+            if obj is None:
+                continue
+            reconnected = cucumber.reconnect_all(obj, start_threads=start_threads, **auth)
+            results[name] = reconnected
+        return results
+
     def __serialize__(self) -> dict:
         """
         Serialize Share without manager internals.
@@ -321,11 +410,11 @@ class Share:
                 serialized = None
             if serialized is not None:
                 objects[name] = serialized
-        from suitkaise import cucumber
+        import pickle
         coordinator_state = None
         if object.__getattribute__(self, '_started'):
-            # serialize coordinator state separately to avoid proxy pickling issues
-            coordinator_state = cucumber.serialize(coordinator.get_state())
+            # pickle raw manager proxies to preserve Share internals
+            coordinator_state = pickle.dumps(coordinator.get_state())
         return {
             "mode": "live" if object.__getattribute__(self, '_started') else "snapshot",
             "objects": objects,
@@ -338,11 +427,16 @@ class Share:
         """
         Reconstruct Share from serialized snapshot.
         """
+        import pickle
         from suitkaise.cucumber._int.deserializer import Deserializer
         deserializer = Deserializer()
         coordinator_state = state.get("coordinator_state")
         if coordinator_state:
-            coordinator = _Coordinator.from_state(deserializer.deserialize(coordinator_state))
+            if isinstance(coordinator_state, (bytes, bytearray)):
+                coordinator_state = pickle.loads(coordinator_state)
+            else:
+                coordinator_state = deserializer.deserialize(coordinator_state)
+            coordinator = _Coordinator.from_state(coordinator_state)
             share = Share(
                 manager=None,
                 auto_start=False,

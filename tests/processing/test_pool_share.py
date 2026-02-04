@@ -7,6 +7,7 @@ Validates passing Share into Pool workers and round-tripping state.
 from __future__ import annotations
 
 import sys
+import traceback
 import time
 from pathlib import Path
 
@@ -48,11 +49,12 @@ class ShareWorker(Skprocess):
 
 
 class TestResult:
-    def __init__(self, name: str, passed: bool, message: str = "", error: str = ""):
+    def __init__(self, name: str, passed: bool, message: str = "", error: str = "", traceback_text: str = ""):
         self.name = name
         self.passed = passed
         self.message = message
         self.error = error
+        self.traceback_text = traceback_text
 
 
 class TestRunner:
@@ -77,9 +79,9 @@ class TestRunner:
             test_func()
             self.results.append(TestResult(name, True))
         except AssertionError as e:
-            self.results.append(TestResult(name, False, error=str(e)))
+            self.results.append(TestResult(name, False, error=str(e), traceback_text=traceback.format_exc()))
         except Exception as e:
-            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
+            self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}", traceback_text=traceback.format_exc()))
 
     def print_results(self):
         print(f"\n{self.BOLD}{self.CYAN}{'='*70}{self.RESET}")
@@ -98,6 +100,8 @@ class TestRunner:
             if result.error:
                 for line in self._wrap(result.error):
                     print(f"         {self.RED}└─ {line}{self.RESET}")
+            if result.traceback_text:
+                print(f"{self.RED}{result.traceback_text}{self.RESET}")
 
         print(f"\n{self.BOLD}{'-'*70}{self.RESET}")
         if failed == 0:
