@@ -1,10 +1,14 @@
 # `cucumber` performance
 
+Note from future me: I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).
+
 Here are the performance benchmarks for `cucumber` compared to other serialization libraries.
 
 These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.
 
-Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows.
+Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.
+
+Note: `cucumber` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
 
 To run the benchmarks yourself, run the following command:
 ```bash

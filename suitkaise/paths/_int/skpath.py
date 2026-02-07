@@ -167,12 +167,10 @@ class Skpath:
                 if not decoded_path.is_absolute():
                     try:
                         root = detect_project_root()
-                        full_path = root / decoded_path
-                        if full_path.exists():
-                            return full_path.resolve()
+                        return (root / decoded_path).resolve()
                     except PathDetectionError:
                         pass
-                elif decoded_path.exists():
+                else:
                     return decoded_path.resolve()
         
         # fall back to treating as path (may not exist, that's OK)
@@ -508,6 +506,49 @@ class Skpath:
             exist_ok: Don't raise if file exists
         """
         self._path.touch(mode=mode, exist_ok=exist_ok)
+
+    def read_text(self, encoding: str | None = None, errors: str | None = None) -> str:
+        """
+        Read text from the file.
+        
+        Mirrors pathlib.Path.read_text().
+        """
+        return self._path.read_text(encoding=encoding, errors=errors)
+
+    def write_text(
+        self,
+        data: str,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
+        """
+        Write text to the file.
+        
+        Mirrors pathlib.Path.write_text().
+        """
+        return self._path.write_text(
+            data,
+            encoding=encoding,
+            errors=errors,
+            newline=newline,
+        )
+
+    def read_bytes(self) -> bytes:
+        """
+        Read bytes from the file.
+        
+        Mirrors pathlib.Path.read_bytes().
+        """
+        return self._path.read_bytes()
+
+    def write_bytes(self, data: bytes) -> int:
+        """
+        Write bytes to the file.
+        
+        Mirrors pathlib.Path.write_bytes().
+        """
+        return self._path.write_bytes(data)
     
     def rmdir(self) -> None:
         """Remove this directory. Directory must be empty.

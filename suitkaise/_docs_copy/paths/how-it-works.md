@@ -112,7 +112,7 @@ Calls `_resolve_string_path()` which tries multiple interpretations (see below).
 3. If string looks like a base64url encoded ID:
    - Try to decode it
    - If decoded path is relative, resolve from project root
-   - If decoded path exists, use it
+   - Use the resolved path even if it doesn't exist yet
 4. Fall back to treating as path (may not exist)
 
 ### Core properties
@@ -180,7 +180,7 @@ Project root access in different formats.
 
 ### pathlib compatibility
 
-`Skpath` mirrors most `pathlib.Path` properties and methods.
+`Skpath` mirrors most `pathlib.Path` properties and methods, including file IO helpers like `read_text()`, `write_text()`, `read_bytes()`, and `write_bytes()`.
 
 Properties: `name`, `stem`, `suffix`, `suffixes`, `parent`, `parents`, `parts`, `exists`, `is_file`, `is_dir`, `is_symlink`, `is_empty`, `stat`, `lstat`
 

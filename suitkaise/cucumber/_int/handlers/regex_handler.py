@@ -128,6 +128,7 @@ class MatchReconnector(Reconnector):
     If the match can't be re-created (pattern or string changed), reconnect()
     returns None and the caller can fall back to the stored state.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
     
     def reconnect(self) -> Optional[re.Match]:

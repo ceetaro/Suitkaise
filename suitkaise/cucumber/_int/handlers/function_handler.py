@@ -7,6 +7,9 @@ Functions are tricky because they contain bytecode, closures, and references to 
 
 import types
 import functools
+import hashlib
+import marshal
+import pickle
 from typing import Any, Dict, Tuple
 from .base_class import Handler
 
@@ -38,6 +41,7 @@ class FunctionHandler(Handler):
     """
     
     type_name = "function"
+    _force_full_reference_fallback = False
     
     def can_handle(self, obj: Any) -> bool:
         """Check if object is a function (but not a lambda)."""
@@ -96,6 +100,23 @@ class FunctionHandler(Handler):
             return False
         
         return True
+
+    def _hash_function_signature(self, func: types.FunctionType) -> str:
+        """
+        Hash function signature for reference validation.
+        """
+        parts: list[bytes] = []
+        try:
+            parts.append(marshal.dumps(func.__code__))
+        except Exception:
+            parts.append(repr(func.__code__).encode())
+        for value in (func.__defaults__, func.__kwdefaults__, func.__annotations__):
+            try:
+                parts.append(pickle.dumps(value))
+            except Exception:
+                parts.append(repr(value).encode())
+        payload = b"".join(parts)
+        return hashlib.sha256(payload).hexdigest()
     
     def extract_state(self, obj: types.FunctionType) -> Dict[str, Any]:
         """
@@ -112,11 +133,15 @@ class FunctionHandler(Handler):
         """
         # try reference-based serialization first (fast path)
         if self._can_use_reference(obj):
-            return {
+            state = {
                 "serialization_type": "reference",
                 "module": obj.__module__,
                 "qualname": obj.__qualname__,
+                "hash": self._hash_function_signature(obj),
             }
+            if self._force_full_reference_fallback:
+                state["full_state"] = self._extract_full_state(obj)
+            return state
         
         # fall back to full serialization (slow path)
         return self._extract_full_state(obj)
@@ -184,9 +209,44 @@ class FunctionHandler(Handler):
         serialization_type = state.get("serialization_type", "full")
         
         if serialization_type == "reference":
-            return self._reconstruct_from_reference(state)
+            func = self._reconstruct_from_reference(state)
+            expected_hash = state.get("hash")
+            try:
+                actual_hash = self._hash_function_signature(func)
+            except Exception:
+                actual_hash = None
+            if expected_hash is not None and actual_hash is not None and expected_hash != actual_hash:
+                import warnings
+                warnings.warn(
+                    "Function reference mismatch detected; returning placeholder and "
+                    "switching future serializations to full mode.",
+                    RuntimeWarning,
+                )
+                FunctionHandler._force_full_reference_fallback = True
+                if "full_state" in state:
+                    return self._reconstruct_full(state["full_state"])
+                return self._FunctionPlaceholder(
+                    module=state.get("module"),
+                    qualname=state.get("qualname"),
+                )
+            return func
         else:
             return self._reconstruct_full(state)
+
+    class _FunctionPlaceholder:
+        def __init__(self, module: str | None, qualname: str | None):
+            self._module = module
+            self._qualname = qualname
+            self.__name__ = qualname or "function"
+        
+        def __call__(self, *args, **kwargs):
+            raise FunctionSerializationError(
+                f"Cannot call placeholder for {self._module}.{self._qualname}. "
+                "Function reference mismatch detected."
+            )
+        
+        def __repr__(self) -> str:
+            return f"<function placeholder {self._module}.{self._qualname}>"
     
     def _reconstruct_from_reference(self, state: Dict[str, Any]) -> types.FunctionType:
         """

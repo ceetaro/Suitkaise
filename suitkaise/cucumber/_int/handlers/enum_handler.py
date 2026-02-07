@@ -67,6 +67,13 @@ class EnumHandler(Handler):
         match by value.
         """
         enum_class = type(obj)
+        definition = None
+        if not self._is_module_level_enum(enum_class):
+            definition = self._extract_enum_definition(enum_class)
+        
+        member_names = None
+        if isinstance(obj, enum.Flag):
+            member_names = [member.name for member in enum_class if member in obj]
         
         return {
             "module": enum_class.__module__,
@@ -74,6 +81,8 @@ class EnumHandler(Handler):
             "qualname": enum_class.__qualname__,
             "member_name": obj.name,
             "value": obj.value,  # the actual value (int, str, etc.)
+            "member_names": member_names,
+            "definition": definition,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> enum.Enum:
@@ -86,32 +95,24 @@ class EnumHandler(Handler):
         3. If that fails, try to get member by value (fallback)
         4. If both fail, raise error
         """
-        # import module
+        enum_class = None
         try:
             module = importlib.import_module(state["module"])
-        except ImportError as e:
-            raise EnumSerializationError(
-                f"Cannot import module '{state['module']}' for enum {state['enum_name']}. "
-                f"Ensure the module exists in the target process."
-            ) from e
-        
-        # get enum class
-        # handle nested enums (qualname might be "Outer.Inner.MyEnum")
-        parts = state["qualname"].split('.')
-        enum_class = module
-        for part in parts:
-            try:
+            parts = state["qualname"].split('.')
+            enum_class = module
+            for part in parts:
                 enum_class = getattr(enum_class, part)
-            except AttributeError as e:
-                raise EnumSerializationError(
-                    f"Cannot find enum '{state['qualname']}' in module '{state['module']}'. "
-                    f"Ensure the enum definition exists in the target process."
-                ) from e
+            if not isinstance(enum_class, type) or not issubclass(enum_class, enum.Enum):
+                enum_class = None
+        except Exception:
+            enum_class = None
         
-        # verify it's actually an enum class
-        if not isinstance(enum_class, type) or not issubclass(enum_class, enum.Enum):
+        if enum_class is None and state.get("definition"):
+            enum_class = self._reconstruct_enum_definition(state["definition"])
+        
+        if enum_class is None:
             raise EnumSerializationError(
-                f"'{state['qualname']}' is not an Enum class"
+                f"Cannot resolve enum '{state['qualname']}' from module '{state['module']}'."
             )
         
         # try to get enum member by name first (most reliable)
@@ -120,6 +121,19 @@ class EnumHandler(Handler):
         except KeyError:
             # member name doesn't exist, try by value
             pass
+
+        # handle Flag/IntFlag combined members
+        member_names = state.get("member_names") or []
+        if member_names:
+            try:
+                combined = None
+                for name in member_names:
+                    member = enum_class[name]
+                    combined = member if combined is None else combined | member
+                if combined is not None:
+                    return combined
+            except Exception:
+                pass
         
         # fallback: try to get member by value
         try:
@@ -130,6 +144,39 @@ class EnumHandler(Handler):
                 f"Neither member name '{state['member_name']}' nor value {state['value']} "
                 f"exist in the enum. The enum definition may have changed."
             ) from e
+
+    def _is_module_level_enum(self, enum_class: type) -> bool:
+        try:
+            module = importlib.import_module(enum_class.__module__)
+            module_enum = getattr(module, enum_class.__name__, None)
+            return module_enum is enum_class
+        except Exception:
+            return False
+
+    def _extract_enum_definition(self, enum_class: type) -> Dict[str, Any]:
+        members = {}
+        for member in enum_class:
+            members[member.name] = member.value
+        
+        base_type = None
+        for base in enum_class.__mro__[1:]:
+            if base in (enum.Enum, enum.IntEnum, enum.Flag, enum.IntFlag):
+                base_type = base.__name__
+                break
+        
+        if base_type is None:
+            base_type = "Enum"
+        
+        return {
+            "type": "definition",
+            "name": enum_class.__name__,
+            "members": members,
+            "base_type": base_type,
+        }
+
+    def _reconstruct_enum_definition(self, definition: Dict[str, Any]) -> type:
+        base_type = getattr(enum, definition["base_type"], enum.Enum)
+        return base_type(definition["name"], definition["members"])
 
 
 class EnumClassHandler(Handler):

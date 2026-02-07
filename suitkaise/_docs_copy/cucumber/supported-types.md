@@ -2,7 +2,14 @@
 
 Note: Iterator-style objects (including `enumerate` and `zip`) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.
 
-Note: Objects that turn into `Reconnector` objects will need to be reconnected after deserialization to fully work.
+Note: Objects that turn into `Reconnector` objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `reconnect_all(...)` with credentials).
+
+Note: Due to Python limitations, some types are not supported by `Share`.
+- `multiprocessing.*` objects (queues, managers, events, shared_memory, connections)
+- `os.pipe()` file handles / pipe-backed `io.FileIO`
+- `weakref.ref` objects (recreated as weak references; dead refs become placeholders)
+- tokens with authentication (cannot serialize authentication strings)
+
 
 - user-defined class instances --> new instance of same type with same state
 - `None` --> `None`

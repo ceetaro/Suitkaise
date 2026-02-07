@@ -228,7 +228,7 @@ def __deserialize__(state):
 What happens when you call `process.start()`
 1. **Initialize timers** - Create `ProcessTimers` if not already present
 2. **Serialize the process** - Convert entire object to bytes using `cucumber`
-3. **Create communication primitives**:
+3. **Create communication primitives** (manager-backed, shared across processes):
    - `_stop_event` - Signal to tell subprocess to stop
    - `_result_queue` - Subprocess sends final result/error here
    - `_tell_queue` - Parent sends messages to child
@@ -236,6 +236,7 @@ What happens when you call `process.start()`
 4. **Record start time** - For `join_in` time limit checking
 5. **Spawn subprocess** - Create `multiprocessing.Process` targeting the engine
 6. **Start the subprocess** - Control returns immediately to parent
+7. **IPC cleanup** - Manager/queues are cleaned up when `result()` completes
 
 ```python
 def start(self):
@@ -249,11 +250,12 @@ def start(self):
     # serialize current state
     serialized = cucumber.serialize(self)
     
-    # create communication primitives
-    self._stop_event = multiprocessing.Event()
-    self._result_queue = multiprocessing.Queue()
-    self._tell_queue = multiprocessing.Queue()   # Parent → Child
-    self._listen_queue = multiprocessing.Queue() # Child → Parent
+    # create communication primitives (manager-backed to avoid SemLock issues)
+    manager = _get_ipc_manager()  # shared manager for all Skprocess instances
+    self._stop_event = manager.Event()
+    self._result_queue = manager.Queue()
+    self._tell_queue = manager.Queue()   # Parent → Child
+    self._listen_queue = manager.Queue() # Child → Parent
     
     # record start time
     from suitkaise import timing
@@ -1006,6 +1008,11 @@ What happens when you assign to a Share attribute (`share.timer = Sktimer()`)
 6. **Create proxy** - If has metadata, create `_ObjectProxy` to intercept access
 7. **Store proxy** - Future attribute access returns the proxy, not the real object
 
+Note: When `Share` is deserialized inside a subprocess, it is reconstructed in
+client mode from a snapshot. In that mode it does not re-register objects
+or allocate new counters; it simply restores the serialized snapshots and
+proxies so reads/writes go through the existing coordinator.
+
 ```python
 def __setattr__(self, name, value):
     if name in self._SHARE_ATTRS:
@@ -1301,7 +1308,7 @@ How `recv()` works
 
 How serialization works
 1. Check if locked - locked endpoints **cannot** be serialized
-2. Pickle the connection handle (Python's multiprocessing handles this)
+2. Pickle the connection handle (uses `multiprocessing.reduction.ForkingPickler`)
 3. Package with lock state and role for reconstruction
 
 ```python
@@ -1325,7 +1332,7 @@ class _PipeEndpoint:
             raise PipeEndpointError("Locked endpoint cannot be serialized")
         
         # pickle the connection handle for multiprocessing
-        payload = pickle.dumps(self._conn)
+        payload = ForkingPickler.dumps(self._conn)
         return {
             "conn_pickle": payload,
             "locked": self._locked,
@@ -1346,9 +1353,10 @@ Why this separation?
 
 How `pair()` works
 1. Create a `multiprocessing.Pipe` with two connection objects
-2. Wrap one in `Anchor` (automatically locked)
-3. Wrap other in `Point` (unlocked, ready to transfer)
-4. Return both for parent to use anchor and pass point to subprocess
+2. If `one_way=True`, ensure anchor is the send-only end and point is the recv-only end
+3. Wrap one in `Anchor` (automatically locked)
+4. Wrap other in `Point` (unlocked, ready to transfer)
+5. Return both for parent to use anchor and pass point to subprocess
 
 ```python
 class Pipe:
@@ -1365,8 +1373,13 @@ class Pipe:
     @staticmethod
     def pair(one_way=False):
         conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
-        anchor = Pipe.Anchor(conn1)
-        point = Pipe.Point(conn2, False, "point")
+        if one_way:
+            # conn1 is recv-only, conn2 is send-only
+            anchor = Pipe.Anchor(conn2)
+            point = Pipe.Point(conn1, False, "point")
+        else:
+            anchor = Pipe.Anchor(conn1)
+            point = Pipe.Point(conn2, False, "point")
         return anchor, point
 ```
 

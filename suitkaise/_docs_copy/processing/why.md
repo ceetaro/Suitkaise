@@ -1,5 +1,17 @@
 # Why you should use `processing`
 
+## TLDR
+
+- **Anything works in parallel** - Locally-defined functions, lambdas, closures, live connections all work
+- **Easiest shared state possible** - `share.counter = 0` just works across processes
+- **Class-based processes** - No more giant, messy functions. Lifecycle hooks organize your code naturally.
+- **Crash and restart** - `lives=3` and your process auto-retries. No try/except loops.
+- **Timeouts** - Advanced timeout system that works on all platforms.
+- **Database connections just work** - `@autoreconnect` brings live connections into subprocesses. Normally impossible.
+- **Sync and async in one API** - Same code, add `.asynced()` when you need it.
+
+---
+
 ## Python has a parallel processing problem.
 
 Python uses a Global Interpreter Lock (GIL).
@@ -643,7 +655,7 @@ To use them: access and update them as normal.
 
 `processing` has 2 high speed options for sharing state.
 
-#### 1. `Skprocess.tell()` and `Skprocess.listen()`
+### 1. `Skprocess.tell()` and `Skprocess.listen()`
 
 The 2 queue-like methods that are a part of `Skprocess` (and all inheriting classes).
 
@@ -686,7 +698,7 @@ p.tell("stop")
 p.wait()
 ```
 
-#### 2. `Pipe`
+### 2. `Pipe`
 
 The fastest, most direct way to communicate between processes.
 
@@ -709,13 +721,111 @@ class MyProcess(Skprocess):
 process = MyProcess(point)
 process.start()
 
-process.pipe.send("hello")
+anchor.send("hello")
 
-result = process.pipe.recv()
+result = anchor.recv()
 print(result)
 
 process.wait()
 ```
 
+One way pipe:
+```python
+from suitkaise.processing import Pipe, Skprocess
 
+# one way pipe: only anchor can send data, point can only receive
+anchor, point = Pipe.pair(one_way=True)
 
+class MyProcess(Skprocess):
+    def __init__(self, pipe_point: Pipe.Point):
+        self.pipe = pipe_point
+        self.process_config.runs = 1
+
+    def __prerun__(self):
+        self.data_to_process = self.pipe.recv()
+
+    def __run__(self):
+        self.process_data(self.data_to_process)
+
+    def __postrun__(self):
+        self.data_to_process = None
+```
+
+### So, which one should you use?
+
+Most of the time, you should just use `Share`.
+
+If you want simpler, faster, 2-way communication without setup, use `tell()` and `listen()`.
+
+But if you still need speed, or want more manual control, use `Pipe`.
+
+## Putting it all together
+
+Throughout this page, you might have seen something called `Pool`.
+
+`Pool` is an upgraded wrapper around `multiprocessing.Pool` used for parallel batch processing.
+
+What this enables:
+- process pools support `Share`
+- process pools using `cucumber` for serialization
+- process pools using `Skprocess` class objects
+- process pools get access to `sk` modifiers
+
+So, already, `Pool` is vastly more powerful than `multiprocessing.Pool`. especially because you can use `Share`.
+
+### `Pool` is better, but still familiar to users
+
+It has the 4 main map methods, with clearer names.
+
+`map`: returns a list, ordered by input. Each item gets added to the list in the order it was added to the pool.
+```python
+list_in_order = Pool.map(fn_or_skprocess, items)
+```
+
+`unordered_map`: returns a list, unordered. Whatever finishes first, gets added to the list first.
+```python
+unordered_list = Pool.unordered_map(fn_or_skprocess, items)
+```
+
+`imap`: returns an iterator, ordered by input. Each item gets added to the iterator in the order it was added to the pool.
+```python
+for item in Pool.imap(fn_or_skprocess, items):
+    print(item)
+```
+
+`unordered_imap`: returns an iterator, unordered. Whatever finishes first, gets added to the iterator first.
+```python
+for item in Pool.unordered_imap(fn_or_skprocess, items):
+    print(item)
+```
+
+Since you can use `Skprocess` objects that can `stop()` themselves (or set a number of runs), you can theoretically keep running the pool and let the processes run until they are done. This opens up a lot of possibilities for complex parallel processing tasks.
+
+### Modifiers are what make it reach the next level
+
+`sk` modifiers are from another `suitkaise` module, and are available on most `suitkaise` functions and methods, including `Pool`.
+
+- timeouts
+- native async support
+- background execution with `Future`s
+
+And, `Pool` itself has a special modifier, `star()`, that allows you to unpack tuples into function arguments.
+
+```python
+from suitkaise.processing import Pool
+import asyncio
+
+# get a coroutine for map with a timeout
+coro = Pool.map.timeout(20.0).asynced()
+results = await coro(fn_or_skprocess, items)
+
+# or, run in the background, get a Future
+# and unpack tuples across function arguments (instead of adding the whole tuple as a single argument)
+future = Pool.star().map.background()(fn_or_skprocess, items)
+```
+
+`asynced()` and `background()` do not work with each other (they do the same thing in different ways), but other than that, everything else is combinable.
+
+These modifiers work with all map methods.
+
+For more info on how to use these modifiers, see the `sk` pages or look at the `processing` examples.

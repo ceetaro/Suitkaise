@@ -73,6 +73,7 @@ class SubprocessReconnector(Reconnector):
     - .snapshot() returns a DeserializedPopen (cached metadata/output).
     - .reconnect() starts a NEW process using the saved args.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
     
     def snapshot(self) -> DeserializedPopen:

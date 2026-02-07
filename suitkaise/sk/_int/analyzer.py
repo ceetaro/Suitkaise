@@ -22,7 +22,6 @@ BLOCKING_CALLS: Set[str] = {
     
     # timing (suitkaise)
     'timing.sleep',
-    'sktime.sleep',
     'suitkaise.timing.sleep',
     
     # file io

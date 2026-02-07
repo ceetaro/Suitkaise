@@ -26,6 +26,7 @@ class ThreadReconnector(Reconnector):
     Use reconnect() to build a new Thread with the same configuration.
     The thread is NOT started - call thread.start() yourself.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
     
     def reconnect(self, start: bool = False) -> threading.Thread:

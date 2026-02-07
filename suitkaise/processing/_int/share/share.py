@@ -447,12 +447,57 @@ class Share:
         else:
             share = Share()
 
+        def _restore_snapshot(name: str, serialized_obj: bytes, obj: Any) -> None:
+            coordinator = object.__getattribute__(share, '_coordinator')
+            proxies = object.__getattribute__(share, '_proxies')
+            meta = getattr(type(obj), '_shared_meta', None)
+            if meta is None and share._is_user_class_instance(obj):
+                meta = share._ensure_shared_meta(type(obj))
+
+            should_proxy = meta is not None
+            if should_proxy:
+                handler = share._get_cucumber_handler(obj)
+                if handler and handler.__class__.__name__ in {
+                    "SQLiteConnectionHandler",
+                    "SQLiteCursorHandler",
+                    "SocketHandler",
+                    "DatabaseConnectionHandler",
+                    "ThreadHandler",
+                    "PopenHandler",
+                    "MatchObjectHandler",
+                    "MultiprocessingPipeHandler",
+                    "MultiprocessingManagerHandler",
+                }:
+                    should_proxy = False
+
+            if should_proxy:
+                proxies[name] = _ObjectProxy(name, coordinator, type(obj), shared_meta=meta)
+            else:
+                proxies[name] = None
+
+            try:
+                with coordinator._source_lock:
+                    coordinator._source_store[name] = serialized_obj
+            except Exception:
+                try:
+                    coordinator._source_store[name] = serialized_obj
+                except Exception:
+                    pass
+            try:
+                if name not in list(coordinator._object_names):
+                    coordinator._object_names.append(name)
+            except Exception:
+                pass
+
         for name, serialized in state.get("objects", {}).items():
             try:
                 obj = deserializer.deserialize(serialized)
             except Exception:
                 continue
-            setattr(share, name, obj)
+            if object.__getattribute__(share, '_client_mode'):
+                _restore_snapshot(name, serialized, obj)
+            else:
+                setattr(share, name, obj)
         if state.get("started") and not object.__getattribute__(share, '_client_mode'):
             share.start()
         return share

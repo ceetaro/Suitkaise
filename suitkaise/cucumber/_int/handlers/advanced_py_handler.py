@@ -500,10 +500,18 @@ class DescriptorHandler(Handler):
         
         For custom descriptors, we try to extract __dict__.
         """
+        owner = getattr(obj, "__objclass__", None)
+        owner_module = getattr(owner, "__module__", None) if owner is not None else None
+        owner_name = getattr(owner, "__name__", None) if owner is not None else None
+        attr_name = getattr(obj, "__name__", None)
+
         return {
             "class_module": type(obj).__module__,
             "class_name": type(obj).__name__,
             "instance_dict": obj.__dict__ if hasattr(obj, '__dict__') else {},
+            "owner_module": owner_module,
+            "owner_name": owner_name,
+            "attr_name": attr_name,
         }
     
     def reconstruct(self, state: Dict[str, Any]) -> Any:
@@ -513,13 +521,54 @@ class DescriptorHandler(Handler):
         Import the class and create new instance.
         """
         import importlib
+        import types
+        from dataclasses import dataclass
         
+        @dataclass
+        class _DescriptorPlaceholder:
+            class_module: str
+            class_name: str
+            instance_dict: dict
+            
+            def __repr__(self) -> str:
+                return f"<descriptor {self.class_module}.{self.class_name} (placeholder)>"
+        
+        owner_module = state.get("owner_module")
+        owner_name = state.get("owner_name")
+        attr_name = state.get("attr_name")
+        if owner_module and owner_name and attr_name:
+            try:
+                owner_mod = importlib.import_module(owner_module)
+                owner_cls = getattr(owner_mod, owner_name)
+                return getattr(owner_cls, attr_name)
+            except Exception:
+                pass
+
         module = importlib.import_module(state["class_module"])
-        cls = getattr(module, state["class_name"])
+        try:
+            cls = getattr(module, state["class_name"])
+        except AttributeError:
+            # Some builtin descriptor types report module "builtins" but live in types.
+            type_map = {
+                "wrapper_descriptor": getattr(types, "WrapperDescriptorType", None),
+                "method_descriptor": getattr(types, "MethodDescriptorType", None),
+                "builtin_function_or_method": getattr(types, "BuiltinFunctionType", None),
+                "method-wrapper": getattr(types, "MethodWrapperType", None),
+            }
+            cls = type_map.get(state["class_name"])
+            if cls is None:
+                return _DescriptorPlaceholder(
+                    state["class_module"],
+                    state["class_name"],
+                    state.get("instance_dict", {}),
+                )
         
         # create instance without calling __init__
-        obj = cls.__new__(cls)
-        obj.__dict__ = state["instance_dict"]
-        
-        return obj
+        try:
+            obj = cls.__new__(cls)
+            obj.__dict__ = state["instance_dict"]
+            return obj
+        except Exception:
+            # Fall back to returning the descriptor type itself.
+            return cls
 

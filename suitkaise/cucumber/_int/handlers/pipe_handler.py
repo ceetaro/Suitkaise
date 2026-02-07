@@ -27,6 +27,7 @@ class PipeReconnector(Reconnector):
     Since connection handles don't survive across processes, we return a
     PipeReconnector that can generate a fresh pipe and provide both ends.
     """
+    _lazy_reconnect_on_access = True
     duplex: bool = True
     preferred_end: str = "either"
     readable: bool = True

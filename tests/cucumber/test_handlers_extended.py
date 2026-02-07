@@ -1596,11 +1596,11 @@ def test_weak_key_dict_extract_keyerror():
 
 
 def test_weak_key_dict_unweakrefable():
-    """WeakKeyDictionary should skip unweakrefable keys."""
+    """WeakKeyDictionary should store placeholder keys."""
     handler = WeakKeyDictionaryHandler()
     state = {"items": [(1, "a")]}
     restored = handler.reconstruct(state)
-    assert len(restored) == 0
+    assert len(restored) == 1
 
 
 # =============================================================================

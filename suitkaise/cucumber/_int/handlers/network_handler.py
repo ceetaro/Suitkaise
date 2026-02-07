@@ -132,6 +132,7 @@ class MySQLReconnector(_DbReconnector):
 @dataclass
 class SQLiteReconnector(_DbReconnector):
     """Reconnector for SQLite."""
+    _lazy_reconnect_on_access = True
     
     def __repr__(self) -> str:
         path = self.details.get("path", self.details.get("database", ":memory:"))
@@ -856,6 +857,7 @@ class SocketReconnector(Reconnector):
     .reconnect() creates a new socket, applies timeout/blocking, and
     attempts best-effort bind/connect using saved local/remote addresses.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
     
     def reconnect(self) -> socket.socket:
@@ -1102,6 +1104,14 @@ class DatabaseConnectionHandler(Handler):
         details = dict(state)
         module = str(details.pop("module", "unknown"))
         class_name = str(details.pop("class_name", "unknown"))
-        return _create_db_reconnector(module, class_name, details)
+        reconnector = _create_db_reconnector(module, class_name, details)
+
+        if isinstance(reconnector, SQLiteReconnector):
+            try:
+                return reconnector.reconnect()
+            except Exception:
+                return reconnector
+
+        return reconnector
 
 

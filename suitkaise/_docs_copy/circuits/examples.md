@@ -557,10 +557,27 @@ circ = Circuit(
     backoff_factor=2.0
 )
 
-# simulate some activity
+# process real files and count failures
+from pathlib import Path
+import json
+
+data_dir = Path("data/circuits")
+data_dir.mkdir(parents=True, exist_ok=True)
+
+# seed files (some invalid)
+files = []
 for i in range(20):
-    # count a short
-    circ.short()
+    path = data_dir / f"item_{i}.json"
+    content = json.dumps({"id": i}) if i % 6 else '{"id":'
+    path.write_text(content)
+    files.append(path)
+
+for path in files:
+    try:
+        json.loads(path.read_text())
+    except json.JSONDecodeError:
+        # count a short on bad input
+        circ.short()
     
     # check if we just tripped (counter resets to 0 after trip)
     if circ.times_shorted == 0:
@@ -574,7 +591,7 @@ A web scraper with rate limiting and failure handling.
 
 ```python
 """
-Web scraper with circuit breakers for rate limiting and failure handling.
+In-memory scraper with circuit breakers for rate limiting and failures.
 
 Uses two circuits:
 - Circuit for rate limiting (auto-recovers after cooldown)
@@ -582,7 +599,8 @@ Uses two circuits:
 """
 
 import asyncio
-import aiohttp
+import json
+import hashlib
 from dataclasses import dataclass
 from suitkaise import Circuit, BreakingCircuit
 
@@ -591,27 +609,24 @@ from suitkaise import Circuit, BreakingCircuit
 class ScrapeResult:
     """Result of scraping a single URL."""
     url: str
-    status: str  # "success", "rate_limited", "server_error", "client_error", "timeout", "error", "skipped"
+    status: str  # "success", "rate_limited", "server_error", "client_error", "skipped"
     data: dict | None = None
     error: str | None = None
 
 
 class WebScraper:
-    """Web scraper with circuit breaker protection."""
+    """Scraper with circuit breaker protection (in-memory data)."""
     
     def __init__(
         self,
+        data_store: dict[str, tuple[int, dict]],
         max_rate_limits: int = 10,
         max_failures: int = 5,
         rate_limit_sleep: float = 2.0,
         failure_sleep: float = 1.0,
     ):
+        self.data_store = data_store
         # CIRCUIT 1: rate limiting
-        # - auto-recovers after sleeping
-        # - trips after max_rate_limits 429 responses
-        # - sleeps rate_limit_sleep seconds
-        # - increases sleep by 1.5x after each trip
-        # - adds ±20% randomness to spread out retries
         self.rate_limiter = Circuit(
             num_shorts_to_trip=max_rate_limits,
             sleep_time_after_trip=rate_limit_sleep,
@@ -619,13 +634,7 @@ class WebScraper:
             max_sleep_time=30.0,
             jitter=0.2
         )
-        
         # CIRCUIT 2: failure handling
-        # - stays broken until manually reset
-        # - breaks after max_failures errors
-        # - sleeps failure_sleep seconds when broken
-        # - doubles sleep time after each reset
-        # - adds ±10% randomness
         self.failure_circuit = BreakingCircuit(
             num_shorts_to_trip=max_failures,
             sleep_time_after_trip=failure_sleep,
@@ -637,71 +646,41 @@ class WebScraper:
     async def scrape(self, urls: list[str]) -> list[ScrapeResult]:
         """Scrape multiple URLs with circuit breaker protection."""
         results = []
-        
-        # create HTTP session for all requests
-        async with aiohttp.ClientSession() as session:
-            for url in urls:
-                # CHECK: is failure circuit broken?
-                # if so, skip remaining URLs
-                if self.failure_circuit.broken:
-                    results.append(ScrapeResult(
-                        url=url,
-                        status="skipped",
-                        error="Too many failures, circuit broken"
-                    ))
-                    continue
-                
-                # scrape this URL
-                result = await self._scrape_url(session, url)
-                results.append(result)
-        
+        for url in urls:
+            if self.failure_circuit.broken:
+                results.append(ScrapeResult(
+                    url=url,
+                    status="skipped",
+                    error="Too many failures, circuit broken"
+                ))
+                continue
+            result = await self._scrape_url(url)
+            results.append(result)
         return results
     
-    async def _scrape_url(self, session: aiohttp.ClientSession, url: str) -> ScrapeResult:
+    async def _scrape_url(self, url: str) -> ScrapeResult:
         """Scrape a single URL with error handling."""
-        try:
-            # make async HTTP request with 10 second timeout
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                
-                # CASE 1: rate limited (HTTP 429)
-                if response.status == 429:
-                    # count rate limit - circuit will sleep after threshold
-                    # uses asyncio.sleep (non-blocking)
-                    await self.rate_limiter.short.asynced()()
-                    return ScrapeResult(url=url, status="rate_limited")
-                
-                # CASE 2: server error (HTTP 5xx)
-                if response.status >= 500:
-                    # count as failure - may break circuit
-                    await self.failure_circuit.short.asynced()()
-                    return ScrapeResult(
-                        url=url,
-                        status="server_error",
-                        error=f"HTTP {response.status}"
-                    )
-                
-                # CASE 3: client error (HTTP 4xx, not 429)
-                if response.status >= 400:
-                    # don't count as failure - it's our fault
-                    return ScrapeResult(
-                        url=url,
-                        status="client_error",
-                        error=f"HTTP {response.status}"
-                    )
-                
-                # CASE 4: success (HTTP 2xx/3xx)
-                data = await response.json()
-                return ScrapeResult(url=url, status="success", data=data)
+        status, payload = self.data_store[url]
         
-        except asyncio.TimeoutError:
-            # CASE 5: request timed out
-            await self.failure_circuit.short.asynced()()
-            return ScrapeResult(url=url, status="timeout", error="Request timed out")
+        # perform real work regardless of status
+        data_bytes = json.dumps(payload).encode()
+        digest = hashlib.sha256(data_bytes).hexdigest()
         
-        except aiohttp.ClientError as e:
-            # CASE 6: connection error, DNS error, etc.
+        if status == 429:
+            await self.rate_limiter.short.asynced()()
+            return ScrapeResult(url=url, status="rate_limited")
+        
+        if status >= 500:
             await self.failure_circuit.short.asynced()()
-            return ScrapeResult(url=url, status="error", error=str(e))
+            return ScrapeResult(url=url, status="server_error", error=f"HTTP {status}")
+        
+        if status >= 400:
+            return ScrapeResult(url=url, status="client_error", error=f"HTTP {status}")
+        
+        # success: parse and return with hash
+        data = json.loads(data_bytes)
+        data["hash"] = digest[:8]
+        return ScrapeResult(url=url, status="success", data=data)
     
     def get_stats(self) -> dict:
         """Get current circuit statistics."""
@@ -714,42 +693,40 @@ class WebScraper:
     
     def reset(self):
         """Reset circuits for a new batch of URLs."""
-        # reset failure circuit (clears broken flag)
         self.failure_circuit.reset()
-        # reset backoff on both circuits (restore original sleep times)
         self.rate_limiter.reset_backoff()
         self.failure_circuit.reset_backoff()
 
 
 async def main():
-    # URLs to scrape
-    urls = [
-        "https://api.example.com/users/1",
-        "https://api.example.com/users/2",
-        "https://api.example.com/users/3",
-        # ... more urls
-    ]
+    # in-memory responses: url -> (status_code, payload)
+    data_store = {
+        "mem://users/1": (200, {"id": 1, "name": "Ada"}),
+        "mem://users/2": (200, {"id": 2, "name": "Lin"}),
+        "mem://users/3": (429, {"detail": "rate limited"}),
+        "mem://users/4": (500, {"detail": "server error"}),
+        "mem://users/5": (404, {"detail": "not found"}),
+    }
     
-    # create scraper with custom thresholds
+    urls = list(data_store.keys())
+    
     scraper = WebScraper(
-        max_rate_limits=5,   # pause after 5 rate limits
-        max_failures=3,      # stop after 3 failures
+        data_store=data_store,
+        max_rate_limits=2,
+        max_failures=2,
         rate_limit_sleep=2.0,
         failure_sleep=1.0,
     )
     
-    # scrape all URLs
     results = await scraper.scrape(urls)
     
-    # summarize results
     success = sum(1 for r in results if r.status == "success")
-    failed = sum(1 for r in results if r.status in ("error", "timeout", "server_error"))
+    failed = sum(1 for r in results if r.status in ("server_error",))
     skipped = sum(1 for r in results if r.status == "skipped")
     
     print(f"Results: {success} success, {failed} failed, {skipped} skipped")
     print(f"Stats: {scraper.get_stats()}")
     
-    # if circuit broke, we can reset and try again later
     if scraper.failure_circuit.broken:
         print("Circuit broke, will reset and retry later...")
         scraper.reset()

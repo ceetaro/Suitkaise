@@ -119,7 +119,11 @@ class ClassInstanceHandler(Handler):
             )
         
         # extract state based on strategy
-        if strategy == "custom_serialize":
+        if strategy == "generic_alias":
+            state["origin"] = obj.__origin__
+            state["args"] = obj.__args__
+        
+        elif strategy == "custom_serialize":
             # user provided __serialize__ method (module-level class)
             state["custom_state"] = obj.__serialize__()
             
@@ -158,6 +162,9 @@ class ClassInstanceHandler(Handler):
         Returns: "custom_serialize", "custom_serialize_local", "to_dict", or "dict"
         """
         obj_class = obj.__class__
+        generic_alias_type = getattr(types, "GenericAlias", None)
+        if generic_alias_type is not None and isinstance(obj, generic_alias_type):
+            return "generic_alias"
         
         # check for __serialize__ / __deserialize__
         if hasattr(obj, '__serialize__'):
@@ -356,6 +363,24 @@ class ClassInstanceHandler(Handler):
         
         # reconstruct based on strategy
         strategy = state["strategy"]
+        
+        if strategy == "generic_alias":
+            origin = state["origin"]
+            args = state["args"]
+            try:
+                return types.GenericAlias(origin, args)
+            except Exception:
+                try:
+                    if isinstance(args, tuple):
+                        if len(args) == 1:
+                            return origin[args[0]]
+                        return origin[args]
+                    return origin[args]
+                except Exception:
+                    return types.GenericAlias(
+                        origin,
+                        tuple(args) if not isinstance(args, tuple) else args,
+                    )
         
         if strategy == "custom_serialize":
             # use class's __deserialize__ method (module-level class)

@@ -7,6 +7,7 @@ Serializing them is tricky because the referenced object might not exist anymore
 
 import weakref
 from typing import Any, Dict, Optional
+from dataclasses import dataclass
 from .base_class import Handler
 
 
@@ -23,11 +24,10 @@ class WeakrefHandler(Handler):
     - Try to dereference the weak reference
     - If object still exists, serialize it
     - If object is gone, store None
-    - On reconstruction, create strong reference (not weak)
+    - On reconstruction, create a new weak reference to the deserialized object
     
-    NOTE: Weak references become strong references after deserialization.
-    This is necessary because weak references don't make sense across processes -
-    we can't preserve the original object identity and garbage collection state.
+    NOTE: Weak references become strong during serialization, then weak again
+    when inserted into a new weakref in the target process.
     """
     
     type_name = "weakref"
@@ -72,16 +72,10 @@ class WeakrefHandler(Handler):
         We choose option 2 to maintain the weak reference semantics, but note
         that this is a NEW object, not the original.
         """
-        if state["is_dead"]:
-            # reference was dead, create a dead reference
-            # we can't create a truly dead weakref, so return a lambda that returns None
-            return lambda: None
+        if state["is_dead"] or state.get("referenced_object") is None:
+            return _DeadWeakref()
         
-        # create new weak reference to deserialized object
-        if state["referenced_object"] is not None:
-            return weakref.ref(state["referenced_object"])
-        else:
-            return lambda: None
+        return weakref.ref(state["referenced_object"])
 
 
 class WeakValueDictionaryHandler(Handler):
@@ -131,7 +125,16 @@ class WeakValueDictionaryHandler(Handler):
         
         # add items back
         for key, value in state["items"].items():
-            wvd[key] = value
+            try:
+                wvd[key] = value
+            except TypeError:
+                import warnings
+                warnings.warn(
+                    f"WeakValueDictionary value for key {key!r} is not weakrefable; "
+                    "storing placeholder.",
+                    RuntimeWarning,
+                )
+                wvd[key] = _WeakValuePlaceholder(value)
         
         return wvd
 
@@ -185,9 +188,45 @@ class WeakKeyDictionaryHandler(Handler):
             try:
                 wkd[key] = value
             except TypeError:
-                # key might not be weakly referenceable (e.g., int, str)
-                # skip these items
-                pass
+                import warnings
+                warnings.warn(
+                    f"WeakKeyDictionary key {key!r} is not weakrefable; "
+                    "storing placeholder key.",
+                    RuntimeWarning,
+                )
+                placeholder = _WeakKeyPlaceholder(key)
+                wkd[placeholder] = value
+                _WEAKKEY_PLACEHOLDER_CACHE.append(placeholder)
         
         return wkd
+
+
+@dataclass
+class _DeadWeakref:
+    def __call__(self) -> None:
+        return None
+    
+    def __repr__(self) -> str:
+        return "<dead weakref>"
+
+
+@dataclass
+class _WeakValuePlaceholder:
+    value: Any
+    
+    def __repr__(self) -> str:
+        return f"<weak value placeholder {self.value!r}>"
+
+
+@dataclass(eq=False)
+class _WeakKeyPlaceholder:
+    key: Any
+    
+    __hash__ = object.__hash__
+    
+    def __repr__(self) -> str:
+        return f"<weak key placeholder {self.key!r}>"
+
+
+_WEAKKEY_PLACEHOLDER_CACHE: list[_WeakKeyPlaceholder] = []
 

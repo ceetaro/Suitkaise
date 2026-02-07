@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import multiprocessing
 import pickle
+from multiprocessing import reduction
 from typing import Any, Optional, Tuple
 
 from suitkaise import cucumber
@@ -97,7 +98,7 @@ class _PipeEndpoint:
             raise PipeEndpointError(
                 "Pipe endpoint has no peer. It must be handed off at process start."
             )
-        payload = pickle.dumps(self._conn)
+        payload = reduction.ForkingPickler.dumps(self._conn)
         return {
             "conn_pickle": payload,
             "locked": self._locked,
@@ -106,7 +107,7 @@ class _PipeEndpoint:
 
     @classmethod
     def __deserialize__(cls, state: dict) -> "_PipeEndpoint":
-        conn = pickle.loads(state["conn_pickle"])
+        conn = reduction.ForkingPickler.loads(state["conn_pickle"])
         return cls(conn, state.get("locked", False), state.get("role", "point"))
 
     @classmethod
@@ -152,6 +153,11 @@ class Pipe:
             (anchor, point) where anchor is locked by default.
         """
         conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
-        anchor = Pipe.Anchor(conn1)
-        point = Pipe.Point(conn2, False, "point")
+        if one_way:
+            # multiprocessing.Pipe(duplex=False) returns recv-end first, send-end second
+            anchor = Pipe.Anchor(conn2)
+            point = Pipe.Point(conn1, False, "point")
+        else:
+            anchor = Pipe.Anchor(conn1)
+            point = Pipe.Point(conn2, False, "point")
         return anchor, point

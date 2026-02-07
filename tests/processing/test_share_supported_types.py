@@ -599,10 +599,11 @@ def _load_supported_type_names() -> List[str]:
             line = line.strip()
             if line.startswith("- "):
                 name = line[2:].strip()
+                if " --> " not in name:
+                    continue
                 if "`" in name:
                     name = name.replace("`", "")
-                if " --> " in name:
-                    name = name.split(" --> ", 1)[0].strip()
+                name = name.split(" --> ", 1)[0].strip()
                 names.append(name)
     return names
 

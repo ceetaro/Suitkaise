@@ -7,6 +7,9 @@ handles running, timing, error recovery, and subprocess management.
 
 import asyncio
 import multiprocessing
+from multiprocessing.managers import SyncManager
+import atexit
+import threading
 import queue as queue_module
 from typing import Any, TYPE_CHECKING
 
@@ -19,6 +22,30 @@ if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
     from multiprocessing import Queue
     from suitkaise.timing import Sktimer
+
+
+_IPC_MANAGER: SyncManager | None = None
+_IPC_MANAGER_LOCK = threading.Lock()
+
+
+def _get_ipc_manager() -> SyncManager:
+    global _IPC_MANAGER
+    if _IPC_MANAGER is None:
+        with _IPC_MANAGER_LOCK:
+            if _IPC_MANAGER is None:
+                _IPC_MANAGER = multiprocessing.Manager()
+                atexit.register(_shutdown_ipc_manager)
+    return _IPC_MANAGER
+
+
+def _shutdown_ipc_manager() -> None:
+    global _IPC_MANAGER
+    if _IPC_MANAGER is not None:
+        try:
+            _IPC_MANAGER.shutdown()
+        except Exception:
+            pass
+        _IPC_MANAGER = None
 
 
 class TimedMethod:
@@ -440,6 +467,7 @@ class Skprocess:
         instance._result_queue = None
         instance._tell_queue = None  # Parent → Child
         instance._listen_queue = None  # Child → Parent
+        instance._ipc_manager = None
         
         # subprocess handle
         instance._subprocess = None
@@ -545,10 +573,13 @@ class Skprocess:
         original_state = serialized
         
         # create communication primitives for control and results
-        self._stop_event = multiprocessing.Event()
-        self._result_queue = multiprocessing.Queue()
-        self._tell_queue = multiprocessing.Queue()  # Parent → Child
-        self._listen_queue = multiprocessing.Queue()  # Child → Parent
+        # use a Manager to avoid SemLock issues on spawn
+        manager = _get_ipc_manager()
+        self._ipc_manager = manager
+        self._stop_event = manager.Event()
+        self._result_queue = manager.Queue()
+        self._tell_queue = manager.Queue()  # Parent → Child
+        self._listen_queue = manager.Queue()  # Child → Parent
         
         # record start time for join_in and timers
         from suitkaise import timing
@@ -719,6 +750,16 @@ class Skprocess:
         self._subprocess.join(timeout=timeout)
         self._drain_result_queue()
         return not self._subprocess.is_alive()
+
+    def _cleanup_ipc(self) -> None:
+        """
+        Close IPC resources after process completion.
+        """
+        self._stop_event = None
+        self._result_queue = None
+        self._tell_queue = None
+        self._listen_queue = None
+        self._ipc_manager = None
     
     wait = _ModifiableMethod(
         _sync_wait,
@@ -823,9 +864,13 @@ class Skprocess:
         
         if self._has_result:
             if isinstance(self._result, BaseException):
+                self._cleanup_ipc()
                 raise self._result
-            return self._result
+            result = self._result
+            self._cleanup_ipc()
+            return result
         
+        self._cleanup_ipc()
         return None
     
     def _sync_result(self) -> Any:
@@ -847,10 +892,14 @@ class Skprocess:
         
         if self._has_result:
             if isinstance(self._result, BaseException):
+                self._cleanup_ipc()
                 raise self._result
-            return self._result
+            result = self._result
+            self._cleanup_ipc()
+            return result
         
         # no result retrieved - subprocess may have crashed silently
+        self._cleanup_ipc()
         return None
     
     result = _ModifiableMethod(

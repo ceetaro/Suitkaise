@@ -332,7 +332,7 @@ Serializes function objects.
 
 1. Reference-based (fast path)
 
-For module-level functions without closures, stores `module` + `qualname` and imports on reconstruction. This is ~100x faster and smaller.
+For module-level functions without closures, stores `module` + `qualname` and imports on reconstruction. This is ~100x faster and smaller. It also stores a lightweight hash of the function signature to validate the reference.
 
 Requirements
 - Has `__module__` and `__qualname__`
@@ -352,7 +352,8 @@ State captured:
 - `annotations`, `doc`, `module`
 
 Reconstruction:
-- Reference: import module and navigate qualname
+- Reference: import module and navigate qualname, then validate the signature hash.
+- If the hash mismatches, a placeholder is returned with a warning and future serializations switch to full fallback mode.
 - Full: rebuild function with `types.FunctionType()`, inject local `__builtins__`, recreate closure cells
 
 ### `LambdaHandler`
@@ -773,7 +774,7 @@ State captured:
 - `is_dead`: Whether reference is dead
 
 Reconstruction:
-- Dead reference: Return callable that returns None
+- Dead reference: Return a dead weakref placeholder (callable returning None)
 - Alive: Create new weak reference to deserialized object
 
 Note: Weak references become strong references during serialization, then weak again in new weakref.
@@ -785,7 +786,7 @@ Serializes `weakref.WeakValueDictionary` objects.
 State captured:
 - `items`: Current key-value pairs (values that exist)
 
-Reconstruction: New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted.
+Reconstruction: New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted. If a value is not weakrefable, a weakrefable placeholder is stored (with a warning) so data is preserved.
 
 ### `WeakKeyDictionaryHandler`
 
@@ -794,7 +795,7 @@ Serializes `weakref.WeakKeyDictionary` objects.
 State captured:
 - `items`: Current key-value pairs (keys that exist)
 
-Reconstruction: New WeakKeyDictionary, add items. Skips non-weakly-referenceable keys (int, str).
+Reconstruction: New WeakKeyDictionary, add items. Non-weakrefable keys are replaced with placeholder keys (with a warning) so data is preserved.
 
 ### `EnumHandler`
 
@@ -803,8 +804,10 @@ Serializes `enum.Enum` instances.
 State captured:
 - `module`, `enum_name`, `qualname`
 - `member_name`, `value`
+- `member_names` for Flag/IntFlag combinations
+- `definition` for dynamic enums (name, members, base_type)
 
-Reconstruction: Import enum class, get member by name (or by value as fallback).
+Reconstruction: Import enum class, get member by name (or by value as fallback). If import fails and a definition is present, reconstruct from definition.
 
 Works for Enum, IntEnum, Flag, IntFlag, and custom subclasses.
 
@@ -879,6 +882,7 @@ Extraction strategy hierarchy:
 3. `__dict__` access (generic)
 4. `__slots__` extraction (for slots-only classes)
 5. Both `__dict__` and `__slots__` (for hybrid classes)
+6. Special-case `types.GenericAlias` (stores `origin` + `args`)
 
 State captured:
 - `module`, `qualname`: Class identity
@@ -904,7 +908,7 @@ Network sockets, database connections, threads, subprocesses, and more cannot be
 
 Additionally, auto reconnecting live resources like these can lead to unexpected behavior.
 
-For these cases, we return `Reconnector` instances that store as much metadata as possible to recreate the live resource, acting as a placeholder until we actually reconnect the live resource.
+For these cases, we return `Reconnector` instances that store as much metadata as possible to recreate the live resource, acting as a placeholder until we actually reconnect the live resource. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `reconnect_all(...)` with credentials).
 
 1. Original object is serialized
 2. Object is then deserialized (likely in a different process)
@@ -1265,7 +1269,7 @@ Data collected:
 - `stdout_data`
 - `stderr_data`
 
-When you call `reconnect()`, a new subprocess is started with the saved launch parameters (args and other state).
+When you call `reconnect()`, a new subprocess is started with the saved launch parameters (args and other state). Because `SubprocessReconnector` does not require auth, it will also lazily reconnect on first attribute access, which starts a new process; use `.snapshot()` if you want metadata without starting a process.
 
 Result: `subprocess.Popen` (new process)
 

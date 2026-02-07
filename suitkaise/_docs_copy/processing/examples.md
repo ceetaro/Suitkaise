@@ -197,14 +197,16 @@ class MonitorProcess(Skprocess):
     def __run__(self):
         # record timestamp and system info each iteration
         import os
+        import hashlib
+        payload = f"{self._current_run}:{os.getpid()}".encode()
+        digest = hashlib.sha256(payload).hexdigest()
         self.events.append({
             'run': self._current_run,
             'time': timing.time(),
             'pid': os.getpid(),
-            'memory': self._get_memory_usage()
+            'memory': self._get_memory_usage(),
+            'hash': digest[:12],
         })
-        # small delay to avoid spinning CPU
-        timing.sleep(0.1)
     
     def _get_memory_usage(self):
         """Get current process memory usage in MB."""
@@ -223,10 +225,14 @@ class MonitorProcess(Skprocess):
 process = MonitorProcess()
 process.start()
 
-# let it collect some data
-timing.sleep(0.5)
+# do some work while it collects data
+import hashlib
+data = b"monitor_work"
+for _ in range(2000):
+    data = hashlib.sha256(data).digest()
 
 # signal graceful stop
+timing.sleep(0.05)
 process.stop()
 
 # wait for it to finish
@@ -257,7 +263,10 @@ class TimeBoundProcess(Skprocess):
         self.iterations = 0
     
     def __run__(self):
-        self.iterations += 1
+        import hashlib
+        payload = f"iter_{self._current_run}".encode()
+        digest = hashlib.sha256(payload).digest()
+        self.iterations += digest[0]
 
     
     def __result__(self):
@@ -273,8 +282,8 @@ print(f"Completed {result} iterations in ~1 second")
 ### Process with Retries (Lives)
 
 ```python
-import random
-from suitkaise.processing import Skprocess, RunError
+import hashlib
+from suitkaise.processing import Skprocess, RunError, ProcessError
 
 class UnreliableProcess(Skprocess):
     """
@@ -285,8 +294,7 @@ class UnreliableProcess(Skprocess):
     - __error__ for handling final failure
     """
     
-    def __init__(self, fail_probability: float = 0.3):
-        self.fail_probability = fail_probability
+    def __init__(self):
         self.process_config.runs = 10
         # allow 3 total attempts (2 retries)
         self.process_config.lives = 3
@@ -299,9 +307,11 @@ class UnreliableProcess(Skprocess):
         self.attempt_count += 1
     
     def __run__(self):
-        # randomly fail based on probability
-        if random.random() < self.fail_probability:
-            raise RuntimeError(f"Random failure on run {self._current_run}")
+        # deterministic failure based on real work
+        payload = f"run:{self._current_run}".encode()
+        digest = hashlib.sha256(payload).digest()
+        if digest[0] % 5 == 0:
+            raise RuntimeError(f"Content failure on run {self._current_run}")
         
         # success!
         self.successful_runs += 1
@@ -328,13 +338,11 @@ class UnreliableProcess(Skprocess):
 
 
 # set seed for reproducibility
-random.seed(42)
-
-process = UnreliableProcess(fail_probability=0.2)
+process = UnreliableProcess()
 try:
     result = process.run()
     print(f"Result: {result}")
-except Exception as e:
+except ProcessError as e:
     print(f"Process ultimately failed: {e}")
 ```
 
@@ -409,7 +417,6 @@ print(f"Result: {result}")
 
 ```python
 from suitkaise.processing import Skprocess
-import random
 import hashlib
 
 class TimedProcess(Skprocess):
@@ -426,12 +433,12 @@ class TimedProcess(Skprocess):
         self.data = [f"data_block_{i}" for i in range(1000)]
     
     def __prerun__(self):
-        # variable prerun work - shuffle data
-        random.shuffle(self.data)
+        # variable prerun work - rotate data
+        self.data = self.data[-1:] + self.data[:-1]
     
     def __run__(self):
         # variable run work - hash computations
-        iterations = random.randint(50, 150)
+        iterations = 50 + (self._current_run * 7 % 100)
         for _ in range(iterations):
             for item in self.data[:100]:
                 hashlib.sha256(item.encode()).hexdigest()
@@ -1061,7 +1068,7 @@ with Pool(workers=4) as pool:
     try:
         # error in any worker propagates to main process
         results = pool.map(risky_function, items)
-    except ValueError as e:
+    except RuntimeError as e:
         print(f"Caught error: {e}")
     
     # process the items that don't cause errors
@@ -1079,9 +1086,17 @@ with Pool(workers=4) as pool:
 ```python
 from suitkaise.processing import Share, Pool, Skprocess
 
-# create a Share and assign a counter
+# create a Share and assign a counter object
 share = Share()
-share.counter = 0
+
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self, amount: int = 1):
+        self.value += amount
+
+share.counter = Counter()
 
 
 class CounterProcess(Skprocess):
@@ -1098,8 +1113,8 @@ class CounterProcess(Skprocess):
     
     def __postrun__(self):
         # increment the shared counter
-        # this works across process boundaries!
-        self.shared.counter += self.amount
+        # use a method to avoid read/modify/write races
+        self.shared.counter.increment(self.amount)
     
     def __result__(self):
         return "done"
@@ -1111,7 +1126,7 @@ with Pool(workers=4) as pool:
     pool.map(CounterProcess, [share] * 5)
 
 # counter was incremented 50 times (5 processes × 10 runs each)
-print(f"Final counter: {share.counter}") # will be 50
+print(f"Final counter: {share.counter.value}") # will be 50
 
 # always stop share when done to save resources
 share.stop()
@@ -1124,7 +1139,6 @@ from suitkaise.processing import Share, Pool, Skprocess
 from suitkaise.timing import Sktimer
 from suitkaise import timing
 import hashlib
-import random
 
 # create Share and assign a timer
 share = Share()
@@ -1143,10 +1157,10 @@ class TimedWorker(Skprocess):
         self.process_config.runs = work_count
     
     def __run__(self):
-        # variable hash iterations
+        # variable hash iterations (deterministic)
         with timing.TimeThis() as run_timer:
-            iterations = random.randint(500, 2000)
             data = b"benchmark_data"
+            iterations = 500 + (self._current_run * 97 % 1500)
             for _ in range(iterations):
                 data = hashlib.sha256(data).digest()
         
@@ -1222,7 +1236,6 @@ with Share() as share:
 from suitkaise.processing import Share, Pool, Skprocess
 from suitkaise import timing
 import hashlib
-import random
 
 class Stats:
     """Track statistics across processes."""
@@ -1257,8 +1270,9 @@ class DataProcessor(Skprocess):
                 # process the data - hash computation
                 data = self.item['data'].encode()
                 
-                # randomly fail based on data content
-                if hash(self.item['data']) % 5 == 0:
+                # deterministically fail based on content hash
+                checksum = hashlib.sha256(data).digest()
+                if checksum[0] % 5 == 0:
                     raise RuntimeError(f"Failed processing {self.item['id']}")
                 
                 # compute hash chain
@@ -1302,7 +1316,6 @@ with Share() as share:
 from suitkaise.processing import Share, Skprocess
 from suitkaise.timing import Sktimer, TimeThis
 import hashlib
-import random
 
 class IterativeWorker(Skprocess):
     """
@@ -1314,10 +1327,10 @@ class IterativeWorker(Skprocess):
         self.process_config.runs = 100
     
     def __run__(self):
-        # variable work - hash computation with random iterations
+        # variable work - hash computation with deterministic iterations
         with TimeThis() as run_timer:
-            iterations = random.randint(200, 800)
             data = f"iteration_{self._current_run}".encode()
+            iterations = 200 + (hashlib.sha256(data).digest()[0] % 600)
             for _ in range(iterations):
                 data = hashlib.sha256(data).digest()
         
@@ -1340,7 +1353,10 @@ with Share() as share:
     # monitor progress from parent
     while process.is_alive:
         print(f"Progress: {share.progress}/100")
-        timing.sleep(0.5)
+        # do real work while waiting
+        payload = b"progress"
+        for _ in range(500):
+            payload = hashlib.sha256(payload).digest()
     
     process.wait()
     
@@ -1460,6 +1476,7 @@ anchor, point = Pipe.pair()
 # start process with pipe point
 process = PipeWorker(point)
 process.start()
+point.close()
 
 # send command through anchor
 print("[Parent] Sending command...")
@@ -1509,6 +1526,7 @@ anchor, point = Pipe.pair(one_way=True)
 
 process = DataReceiver(point)
 process.start()
+point.close()
 
 # send multiple items
 for i in range(5):
@@ -1518,7 +1536,8 @@ for i in range(5):
 anchor.send(None)
 
 # get results
-result = process.run()
+process.wait()
+result = process.result()
 print(f"Received {len(result)} items")
 
 anchor.close()
@@ -1566,6 +1585,8 @@ data_anchor, data_point = Pipe.pair()
 
 process = DualPipeWorker(cmd_point, data_point)
 process.start()
+cmd_point.close()
+data_point.close()
 
 # send process command
 cmd_anchor.send({'action': 'process'})
@@ -1642,23 +1663,32 @@ class CommandableProcess(Skprocess):
 process = CommandableProcess()
 process.start()
 
-# let it run a bit
-timing.sleep(0.3)
+# let it run while doing work in parent
+import hashlib
+data = b"parent_work"
+for _ in range(1500):
+    data = hashlib.sha256(data).digest()
 
 # send command to change multiplier
 process.tell({'action': 'set_multiplier', 'value': 10})
 
-# listen for progress updates
-timing.sleep(0.3)
+# listen for progress updates for a short window
+data = b"parent_work_2"
+for _ in range(1500):
+    data = hashlib.sha256(data).digest()
+for _ in range(20):
+    msg = process.listen(timeout=0.1)
+    if msg is not None:
+        print(f"[Parent] Progress: {msg}")
+
+# stop the process, then drain any remaining messages
+process.tell({'action': 'stop'})
+process.wait()
 while True:
     msg = process.listen(timeout=0.1)
     if msg is None:
         break
-    print(f"[Parent] Progress: {msg}")
-
-# stop the process
-process.tell({'action': 'stop'})
-process.wait()
+    print(f"[Parent] Progress (late): {msg}")
 
 results = process.result()
 print(f"Got {len(results)} results")
@@ -1838,7 +1868,7 @@ What this script does
 1. Takes a list of 50 tasks, each with an ID and data payload
 2. Distributes them across 4 parallel workers
 3. Each task computes a cryptographic hash chain (this represents real CPU work)
-4. Some tasks fail deterministically (simulating failures)
+4. Some tasks fail deterministically based on content
 5. Failed tasks are automatically retried up to 3 times
 6. All timing and success/failure stats are aggregated across workers
 7. Prints a summary report with task statistics and performance metrics
@@ -1858,7 +1888,6 @@ Features used:
 from suitkaise.processing import Pool, Share, Skprocess
 from suitkaise.timing import Sktimer
 from suitkaise import timing
-import random
 import hashlib
 
 
@@ -1892,17 +1921,16 @@ class TaskWorker(Skprocess):
     A worker that processes a single task.
     
     Features:
-    - Configurable failure probability for testing
+    - Deterministic failure based on task content
     - Retry support via lives
     - Timing recorded to shared timer
     - Stats recorded to shared stats object
     """
     
-    def __init__(self, shared: Share, task: dict, fail_prob: float = 0.1):
+    def __init__(self, shared: Share, task: dict):
         # store references
         self.shared = shared
         self.task = task
-        self.fail_prob = fail_prob
         
         # configure process
         self.process_config.runs = 1      # one run per task
@@ -1925,15 +1953,16 @@ class TaskWorker(Skprocess):
         start = timing.time()
         
         try:
-            # real work - compute hash chain with variable iterations
-            iterations = random.randint(500, 2000)
+            # real work - compute hash chain with deterministic iterations
+            iterations = 500 + (self.task['id'] * 37 % 1500)
             data = self.task['data'].encode()
             for _ in range(iterations):
                 data = hashlib.sha256(data).digest()
             
-            # deterministic "failure" based on task data for reproducibility
-            if hash(self.task['data']) % 100 < int(self.fail_prob * 100):
-                raise RuntimeError(f"Task {self.task['id']} failed (deterministic)")
+            # deterministic failure based on task content
+            checksum = hashlib.sha256(self.task['data'].encode()).digest()
+            if checksum[0] % 10 == 0:
+                raise RuntimeError(f"Task {self.task['id']} failed (content check)")
             
             # process the task
             self.result_data = {
@@ -1970,15 +1999,13 @@ class TaskWorker(Skprocess):
         return self.result_data
 
 
-def run_task_queue(tasks: list[dict], workers: int = 4, fail_prob: float = 0.1):
+def run_task_queue(tasks: list[dict], workers: int = 4):
     """
     Process a list of tasks using a distributed worker pool.
     
     Args:
         tasks: List of task dicts with 'id' and 'data' keys
         workers: Number of parallel workers
-        fail_prob: Probability of random failure (for testing)
-    
     Returns:
         Dict with results and statistics
     """
@@ -1989,7 +2016,7 @@ def run_task_queue(tasks: list[dict], workers: int = 4, fail_prob: float = 0.1):
         share.timer = Sktimer()
         
         # create argument tuples for star()
-        args = [(share, task, fail_prob) for task in tasks]
+        args = [(share, task) for task in tasks]
         
         # process all tasks in parallel
         with Pool(workers=workers) as pool:
@@ -2028,7 +2055,7 @@ if __name__ == "__main__":
     start = timing.time()
     
     # run the queue
-    output = run_task_queue(tasks, workers=4, fail_prob=0.15)
+    output = run_task_queue(tasks, workers=4)
     
     elapsed = timing.elapsed(start)
     
@@ -2233,12 +2260,15 @@ def run_pipeline(data_stream, num_workers: int = 2, timeout: float = 5.0):
             if timing.elapsed(start_time) > timeout:
                 break
             
-            # round-robin to workers
-            workers[worker_idx].tell({'action': 'data', 'payload': item})
+            # round-robin to workers (compute checksum in parent)
+            import hashlib
+            checksum = hashlib.sha256(str(item).encode()).hexdigest()[:8]
+            workers[worker_idx].tell({
+                'action': 'data',
+                'payload': item,
+                'checksum': checksum,
+            })
             worker_idx = (worker_idx + 1) % num_workers
-            
-            # small delay to avoid flooding - allows workers to process
-            timing.sleep(0.01)
         
         # signal workers to stop
         for worker in workers:

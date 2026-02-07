@@ -62,10 +62,11 @@ from suitkaise import timing
 # - returns seconds since epoch as a float
 start = timing.time()
 
-# simulate some work
-# - sleep() pauses execution for the specified seconds
-# - also returns current time after sleeping (bonus feature)
-timing.sleep(0.5)
+# do real work
+import hashlib
+payload = b"elapsed_example"
+for _ in range(20000):
+    payload = hashlib.sha256(payload).digest()
 
 # calculate elapsed time with one argument
 # - uses current time as the second timestamp
@@ -90,7 +91,7 @@ print(f"Reversed: {elapsed_reversed:.3f}s")  # same value
 
 ```python
 from suitkaise import timing
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Collecting multiple measurements for statistics
@@ -107,10 +108,9 @@ timer = timing.Sktimer()
 for i in range(100):
     timer.start()
     
-    # simulate variable-time work
-    # - random sleep creates natural variance in measurements
-    # - real-world operations have similar variance from I/O, CPU load, etc.
-    timing.sleep(random.uniform(0.01, 0.05))
+    # variable work based on input size
+    payload = b"x" * (2000 + (i % 5) * 500)
+    hashlib.sha256(payload).hexdigest()
     
     timer.stop()
 
@@ -158,8 +158,10 @@ timer.start()
 items = ["item1", "item2", "item3", "item4", "item5"]
 
 for item in items:
-    # simulate processing each item
-    timing.sleep(0.1)
+    # real work per item
+    import hashlib
+    payload = (item * 1000).encode()
+    hashlib.sha256(payload).hexdigest()
     
     # record lap time and continue
     # - records time since last lap() or start()
@@ -198,17 +200,22 @@ timer.start()
 
 # phase 1: initial processing (timed)
 print("Phase 1: Processing data...")
-timing.sleep(0.2)
+import hashlib
+data = b"phase1"
+for _ in range(20000):
+    data = hashlib.sha256(data).digest()
 
 # pause timing during user interaction
 # - time spent paused is tracked separately
 # - will be excluded from the final elapsed time
 timer.pause()
 
-# simulate user thinking time (not timed)
+# do work while paused (not timed)
 # - in real code: user_input = input("Continue? ")
 print("Waiting for user input (not timed)...")
-timing.sleep(1.0)  # simulate user delay
+data = b"paused_work"
+for _ in range(30000):
+    data = hashlib.sha256(data).digest()
 
 # resume timing
 # - clock starts again from where it paused
@@ -216,7 +223,9 @@ timer.resume()
 
 # phase 2: more processing (timed)
 print("Phase 2: More processing...")
-timing.sleep(0.2)
+data = b"phase2"
+for _ in range(20000):
+    data = hashlib.sha256(data).digest()
 
 # stop and get elapsed time
 elapsed = timer.stop()
@@ -277,7 +286,9 @@ print(f"Ratio: {timer_b.most_recent / timer_a.most_recent:.1f}x slower")
 
 ```python
 from suitkaise import timing
-import random
+from pathlib import Path
+import json
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Accumulating statistics across multiple TimeThis blocks
@@ -287,24 +298,37 @@ import random
 # Great for timing the same operation in different parts of your code.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# create a shared timer for all API calls
+# create a shared timer for all API-like file reads
 api_timer = timing.Sktimer()
 
+# seed local data files
+data_dir = Path("data/api")
+data_dir.mkdir(parents=True, exist_ok=True)
+for user_id in range(5):
+    (data_dir / f"user_{user_id}.json").write_text(
+        json.dumps({"id": user_id, "name": f"User {user_id}"})
+    )
+    (data_dir / f"posts_{user_id}.json").write_text(
+        json.dumps([{"id": i, "title": f"Post {i}"} for i in range(3)])
+    )
+
 def fetch_user(user_id):
-    """Simulate fetching a user from an API."""
+    """Fetch a user from disk."""
     # pass the shared timer to TimeThis
     # - each call adds one measurement to api_timer
     with timing.TimeThis(api_timer):
-        # simulate API latency
-        timing.sleep(random.uniform(0.05, 0.15))
-        return {"id": user_id, "name": f"User {user_id}"}
+        text = (data_dir / f"user_{user_id}.json").read_text()
+        digest = hashlib.sha256(text.encode()).hexdigest()
+        return {**json.loads(text), "digest": digest[:8]}
 
 def fetch_posts(user_id):
-    """Simulate fetching posts for a user."""
+    """Fetch posts for a user from disk."""
     with timing.TimeThis(api_timer):
-        # simulate API latency
-        timing.sleep(random.uniform(0.08, 0.20))
-        return [{"id": i, "title": f"Post {i}"} for i in range(3)]
+        text = (data_dir / f"posts_{user_id}.json").read_text()
+        posts = json.loads(text)
+        for post in posts:
+            post["hash"] = hashlib.sha256(post["title"].encode()).hexdigest()[:8]
+        return posts
 
 # make several API calls
 # - each call is timed and added to api_timer
@@ -325,7 +349,7 @@ print(f"95th percentile: {api_timer.percentile(95):.3f}s")
 
 ```python
 from suitkaise import timing
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Filtering out fast operations with threshold
@@ -343,12 +367,11 @@ def process_item(item):
     # - fast operations won't be recorded
     # - helps focus analysis on problematic cases
     with timing.TimeThis(slow_timer, threshold=0.1):
-        # simulate variable processing time
-        # - 20% chance of being slow
-        if random.random() < 0.2:
-            timing.sleep(0.15)  # slow path
-        else:
-            timing.sleep(0.02)  # fast path
+        # variable processing time based on item size
+        data = f"item_{item}".encode()
+        iterations = 40000 if item % 5 == 0 else 4000
+        for _ in range(iterations):
+            data = hashlib.sha256(data).digest()
 
 # process 50 items
 for i in range(50):
@@ -405,7 +428,7 @@ print(f"Max time: {fibonacci.timer.max:.3f}s")
 
 ```python
 from suitkaise import timing
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Single timer tracking multiple functions
@@ -420,23 +443,23 @@ math_timer = timing.Sktimer()
 
 @timing.timethis(math_timer)
 def add(a, b):
-    timing.sleep(random.uniform(0.001, 0.005))
+    hashlib.sha256(f"{a}+{b}".encode()).digest()
     return a + b
 
 @timing.timethis(math_timer)
 def multiply(a, b):
-    timing.sleep(random.uniform(0.001, 0.005))
+    hashlib.sha256(f"{a}*{b}".encode()).digest()
     return a * b
 
 @timing.timethis(math_timer)
 def divide(a, b):
-    timing.sleep(random.uniform(0.001, 0.005))
+    hashlib.sha256(f"{a}/{b}".encode()).digest()
     return a / b if b != 0 else 0
 
 # perform many operations
 # - all times go into math_timer
-for _ in range(100):
-    a, b = random.randint(1, 100), random.randint(1, 100)
+for i in range(1, 101):
+    a, b = i, i + 1
     add(a, b)
     multiply(a, b)
     divide(a, b)
@@ -452,7 +475,8 @@ print(f"Average operation: {math_timer.mean:.6f}s")
 
 ```python
 from suitkaise import timing
-import random
+from pathlib import Path
+import json
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Both shared and per-function timing
@@ -468,16 +492,22 @@ db_timer = timing.Sktimer()
 @timing.timethis()           # per-function timer (auto-attached)
 @timing.timethis(db_timer)   # shared timer
 def db_read(key):
-    """Simulate database read."""
-    timing.sleep(random.uniform(0.01, 0.03))
-    return f"value_{key}"
+    """Read from a JSON file as a tiny local store."""
+    data = json.loads(db_path.read_text())
+    return data.get(key)
 
 @timing.timethis()           # per-function timer (auto-attached)
 @timing.timethis(db_timer)   # shared timer
 def db_write(key, value):
-    """Simulate database write."""
-    timing.sleep(random.uniform(0.02, 0.05))
+    """Write to a JSON file as a tiny local store."""
+    data = json.loads(db_path.read_text())
+    data[key] = value
+    db_path.write_text(json.dumps(data))
     return True
+
+db_path = Path("data/db.json")
+db_path.parent.mkdir(parents=True, exist_ok=True)
+db_path.write_text(json.dumps({}))
 
 # perform operations
 for i in range(20):
@@ -504,7 +534,7 @@ print(f"Write mean: {db_write.timer.mean:.3f}s")
 
 ```python
 from suitkaise import timing
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Rolling window for recent measurements only
@@ -519,8 +549,9 @@ import random
 # - memory stays bounded regardless of how many calls
 @timing.timethis(max_times=10)
 def process_request():
-    """Simulate processing a web request."""
-    timing.sleep(random.uniform(0.01, 0.05))
+    """Process a request by hashing its payload."""
+    payload = b"request_payload" * 500
+    hashlib.sha256(payload).hexdigest()
 
 # process 100 requests
 for i in range(100):
@@ -547,7 +578,7 @@ print(f"Max: {process_request.timer.max:.3f}s")
 ```python
 from suitkaise import timing
 import threading
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Thread-safe timing across multiple threads
@@ -564,8 +595,11 @@ def worker(worker_id, iterations):
     for i in range(iterations):
         timer.start()
         
-        # simulate variable work
-        timing.sleep(random.uniform(0.01, 0.03))
+        # real work with deterministic variation
+        payload = f"worker_{worker_id}_{i}".encode()
+        iterations = 2000 + (i % 5) * 500
+        for _ in range(iterations):
+            payload = hashlib.sha256(payload).digest()
         
         timer.stop()
     
@@ -660,7 +694,7 @@ for r in sorted(results, key=lambda x: x['mean']):
 
 ```python
 from suitkaise import timing
-import random
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Only recording successful operations
@@ -674,22 +708,23 @@ timer = timing.Sktimer()
 success_count = 0
 failure_count = 0
 
-def unreliable_operation():
-    """Simulate an operation that sometimes fails."""
-    timing.sleep(random.uniform(0.01, 0.05))
+def unreliable_operation(item_id: int):
+    """Operation that sometimes fails based on content."""
+    payload = f"item_{item_id}".encode()
+    digest = hashlib.sha256(payload).digest()
     
-    # 30% chance of failure
-    if random.random() < 0.3:
+    # deterministic failure for some inputs
+    if digest[0] % 3 == 0:
         raise RuntimeError("Operation failed")
     
-    return "success"
+    return digest[:8].hex()
 
 # run many operations
 for i in range(100):
     timer.start()
     
     try:
-        result = unreliable_operation()
+        result = unreliable_operation(i)
         # success - record the timing
         timer.stop()
         success_count += 1
@@ -716,17 +751,16 @@ from suitkaise import timing
 # ──────────────────────────────────────────────────────────────────────────────
 # Timing async operations
 #
-# Use timing.sleep.asynced() for async-compatible sleep.
-# The rest of the timing API works the same in async context.
+# The timing API works the same in async context.
 # ──────────────────────────────────────────────────────────────────────────────
 
-async def fetch_data(url_id):
-    """Simulate async network request."""
-    # async-compatible sleep
-    # - uses asyncio.sleep internally
-    # - call .asynced() to get async version, then call with args
-    await timing.sleep.asynced()(0.1)
-    return f"data_{url_id}"
+async def fetch_data(item_id):
+    """Async file read with real I/O."""
+    from pathlib import Path
+    path = Path(f"data/async_{item_id}.txt")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("async data\n" * 1000)
+    return await asyncio.to_thread(path.read_text)
 
 async def main():
     timer = timing.Sktimer()
@@ -748,8 +782,8 @@ asyncio.run(main())
 
 ```python
 from suitkaise import timing
-import random
 import threading
+import hashlib
 from dataclasses import dataclass
 from typing import Dict, Optional
 
@@ -855,33 +889,30 @@ class APIMonitor:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Simulate API Usage
+# API-like Workload
 # ──────────────────────────────────────────────────────────────────────────────
 
-def simulate_api_calls(monitor: APIMonitor, num_calls: int):
-    """Simulate random API calls."""
-    endpoints = [
-        ("/users", 0.02, 0.05),      # endpoint, min_time, max_time
-        ("/posts", 0.01, 0.03),
-        ("/comments", 0.01, 0.02),
-        ("/search", 0.05, 0.15),     # slow endpoint
-        ("/health", 0.001, 0.005),   # fast endpoint
-    ]
+def run_api_calls(monitor: APIMonitor, num_calls: int):
+    """Run deterministic, real work for API-like calls."""
+    endpoints = ["/users", "/posts", "/comments", "/search", "/health"]
+    payloads = {
+        "/users": b"user\n" * 2000,
+        "/posts": b"post\n" * 4000,
+        "/comments": b"comment\n" * 8000,
+        "/search": b"search\n" * 20000,
+        "/health": b"ok\n" * 200,
+    }
     
-    for _ in range(num_calls):
-        # pick a random endpoint
-        endpoint, min_time, max_time = random.choice(endpoints)
-        
-        # time the request using our monitor
+    for i in range(num_calls):
+        endpoint = endpoints[i % len(endpoints)]
         with monitor.time_request(endpoint):
-            # simulate the request
-            timing.sleep(random.uniform(min_time, max_time))
+            hashlib.sha256(payloads[endpoint]).digest()
 
 
 def worker(monitor: APIMonitor, worker_id: int, num_calls: int):
     """Worker thread that makes API calls."""
     print(f"Worker {worker_id} starting {num_calls} calls...")
-    simulate_api_calls(monitor, num_calls)
+    run_api_calls(monitor, num_calls)
     print(f"Worker {worker_id} completed")
 
 
@@ -890,7 +921,7 @@ def worker(monitor: APIMonitor, worker_id: int, num_calls: int):
 monitor = APIMonitor(max_measurements=1000)
 
 # spawn multiple worker threads
-# - simulates concurrent API usage
+# - runs concurrent API-like work
 threads = []
 for i in range(4):
     t = threading.Thread(target=worker, args=(monitor, i, 50))

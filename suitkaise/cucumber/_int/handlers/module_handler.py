@@ -9,6 +9,7 @@ import types
 import sys
 import importlib
 from typing import Any, Dict
+from dataclasses import dataclass
 from .base_class import Handler
 
 
@@ -30,6 +31,16 @@ class ModuleHandler(Handler):
     """
     
     type_name = "module"
+    _failed_imports: Dict[str, int] = {}
+    _module_cache: Dict[str, types.ModuleType] = {}
+
+    @dataclass
+    class _ModulePlaceholder:
+        name: str
+        reason: str
+        
+        def __repr__(self) -> str:
+            return f"<module placeholder {self.name}: {self.reason}>"
     
     def can_handle(self, obj: Any) -> bool:
         """Check if object is a module."""
@@ -52,17 +63,14 @@ class ModuleHandler(Handler):
         module_doc = getattr(obj, '__doc__', None)
         module_package = getattr(obj, '__package__', None)
         
-        # determine if module is dynamic
-        # try to import it to see if it exists in the standard path
-        is_dynamic = False
-        try:
-            imported = importlib.import_module(module_name)
-            # if it imported and is NOT the same object, it's a custom module
-            if imported is not obj:
-                is_dynamic = True
-        except (ImportError, ModuleNotFoundError):
-            # can't import it - it's definitely dynamic
-            is_dynamic = True
+        def _is_dynamic_module(mod: types.ModuleType) -> bool:
+            try:
+                imported = importlib.import_module(mod.__name__)
+                return imported is not mod
+            except (ImportError, ModuleNotFoundError):
+                return True
+        
+        is_dynamic = _is_dynamic_module(obj)
         
         # for dynamic modules, serialize the entire __dict__
         module_dict = {}
@@ -76,10 +84,15 @@ class ModuleHandler(Handler):
                         module_dict[key] = value
                     continue
                 
-                # skip modules (to avoid deep recursion)
+                # handle module references (avoid deep recursion)
                 if isinstance(value, types.ModuleType):
-                    # store just the module name for reference
-                    module_dict[key] = {"__module_ref__": value.__name__}
+                    ref = {"__module_ref__": value.__name__}
+                    if _is_dynamic_module(value):
+                        ref["__module_state__"] = self._build_module_state(
+                            value,
+                            include_module_state=False,
+                        )
+                    module_dict[key] = ref
                     continue
                 
                 # include everything else (will be recursively serialized)
@@ -102,6 +115,47 @@ class ModuleHandler(Handler):
             "file": module_file,
             "package": module_package,
         }
+
+    def _build_module_state(
+        self,
+        obj: types.ModuleType,
+        *,
+        include_module_state: bool,
+    ) -> Dict[str, Any]:
+        """
+        Build a best-effort module state for module references.
+        """
+        module_dict = {}
+        for key, value in obj.__dict__.items():
+            if key.startswith('__') and key.endswith('__'):
+                if key in ('__name__', '__doc__', '__package__', '__file__'):
+                    module_dict[key] = value
+                continue
+            if isinstance(value, types.ModuleType):
+                ref = {"__module_ref__": value.__name__}
+                if include_module_state and self._is_dynamic_module(value):
+                    ref["__module_state__"] = self._build_module_state(
+                        value,
+                        include_module_state=False,
+                    )
+                module_dict[key] = ref
+                continue
+            module_dict[key] = value
+        return {
+            "name": obj.__name__,
+            "is_dynamic": True,
+            "module_dict": module_dict,
+            "doc": getattr(obj, '__doc__', None),
+            "file": getattr(obj, '__file__', None),
+            "package": getattr(obj, '__package__', None),
+        }
+
+    def _is_dynamic_module(self, mod: types.ModuleType) -> bool:
+        try:
+            imported = importlib.import_module(mod.__name__)
+            return imported is not mod
+        except (ImportError, ModuleNotFoundError):
+            return True
     
     def reconstruct(self, state: Dict[str, Any]) -> types.ModuleType:
         """
@@ -118,13 +172,26 @@ class ModuleHandler(Handler):
             try:
                 return importlib.import_module(module_name)
             except (ImportError, ModuleNotFoundError) as e:
-                raise ModuleSerializationError(
+                count = ModuleHandler._failed_imports.get(module_name, 0) + 1
+                ModuleHandler._failed_imports[module_name] = count
+                if count > 1:
+                    raise ModuleSerializationError(
+                        f"Cannot import module '{module_name}' in target process. "
+                        f"Ensure the module is installed: {e}"
+                    ) from e
+                import warnings
+                warnings.warn(
                     f"Cannot import module '{module_name}' in target process. "
-                    f"Ensure the module is installed: {e}"
-                ) from e
+                    f"Returning placeholder.",
+                    RuntimeWarning,
+                )
+                return ModuleHandler._ModulePlaceholder(module_name, "import failed")
         
-        # create dynamic module
-        module = types.ModuleType(module_name, state["doc"])
+        if module_name in ModuleHandler._module_cache:
+            module = ModuleHandler._module_cache[module_name]
+        else:
+            module = types.ModuleType(module_name, state["doc"])
+            ModuleHandler._module_cache[module_name] = module
         
         # set special attributes
         if state["file"]:
@@ -140,15 +207,30 @@ class ModuleHandler(Handler):
                 try:
                     value = importlib.import_module(value["__module_ref__"])
                 except (ImportError, ModuleNotFoundError):
-                    # referenced module not available - skip this attribute
-                    import warnings
-                    warnings.warn(f"Cannot import referenced module {value['__module_ref__']} for dynamic module")
-                    continue
+                    module_state = value.get("__module_state__")
+                    if module_state:
+                        value = self.reconstruct(module_state)
+                    else:
+                        import warnings
+                        warnings.warn(
+                            f"Cannot import referenced module {value['__module_ref__']} for dynamic module",
+                            RuntimeWarning,
+                        )
+                        value = ModuleHandler._ModulePlaceholder(
+                            value["__module_ref__"],
+                            "import failed",
+                        )
                 except Exception as e:
                     # unexpected import error
                     import warnings
-                    warnings.warn(f"Unexpected error importing module {value['__module_ref__']}: {e}")
-                    continue
+                    warnings.warn(
+                        f"Unexpected error importing module {value['__module_ref__']}: {e}",
+                        RuntimeWarning,
+                    )
+                    value = ModuleHandler._ModulePlaceholder(
+                        value["__module_ref__"],
+                        f"error: {e}",
+                    )
             
             setattr(module, key, value)
         

@@ -7,7 +7,7 @@ and optionally the schema and data, then reconnect in the target process.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 from .base_class import Handler
 from .reconnector import Reconnector
@@ -26,7 +26,9 @@ class SQLiteConnectionReconnector(Reconnector):
     Call reconnect() to create a new live connection. For in-memory databases,
     this will also restore the schema and data that was captured during serialization.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
+    _conn: sqlite3.Connection | None = field(default=None, init=False, repr=False)
     
     def __repr__(self) -> str:
         db = self.state.get("database", ":memory:")
@@ -39,6 +41,9 @@ class SQLiteConnectionReconnector(Reconnector):
         For file-based databases: connects to the database file.
         For in-memory databases: creates new connection and restores schema/data.
         """
+        if self._conn is not None:
+            return self._conn
+
         state = self.state
         
         # connect to database
@@ -78,7 +83,9 @@ class SQLiteConnectionReconnector(Reconnector):
             
             conn.commit()
         
+        self._conn = conn
         return conn
+
 
 
 @dataclass
@@ -92,7 +99,10 @@ class SQLiteCursorReconnector(Reconnector):
     Note: The original query result set is NOT restored - you must re-execute
     your query after reconnecting.
     """
+    _lazy_reconnect_on_access = True
     state: Dict[str, Any]
+    _conn: sqlite3.Connection | None = field(default=None, init=False, repr=False)
+    _cursor: sqlite3.Cursor | None = field(default=None, init=False, repr=False)
     
     def __repr__(self) -> str:
         return "SQLiteCursorReconnector()"
@@ -103,17 +113,32 @@ class SQLiteCursorReconnector(Reconnector):
         
         If the connection is a SQLiteConnectionReconnector, reconnects it first.
         """
-        conn = self.state["connection"]
-        
-        # if connection is a reconnector, reconnect it first
-        if isinstance(conn, SQLiteConnectionReconnector):
-            conn = conn.reconnect()
-        
+        if self._cursor is not None:
+            return self._cursor
+
+        conn = self.connection
+
         # create new cursor
         cursor = conn.cursor()
         cursor.arraysize = self.state["arraysize"]
-        
+
+        self._cursor = cursor
         return cursor
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        if self._conn is not None:
+            return self._conn
+
+        conn = self.state["connection"]
+
+        # if connection is a reconnector, reconnect it first
+        if isinstance(conn, SQLiteConnectionReconnector):
+            conn = conn.reconnect()
+
+        self._conn = conn
+        return conn
+
 
 
 class SQLiteConnectionHandler(Handler):

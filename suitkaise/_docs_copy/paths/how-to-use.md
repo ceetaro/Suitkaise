@@ -247,6 +247,35 @@ Arguments
 Returns
 `Skpath`: Path with new name.
 
+#### `read_text()` / `write_text()`
+
+Read and write text files (mirrors `pathlib.Path`).
+
+```python
+path = Skpath("data/config.json")
+path.write_text("{}")
+contents = path.read_text()
+```
+
+Arguments
+`write_text(data, encoding=None, errors=None, newline=None)`
+
+Returns
+`int`: Number of characters written.
+
+#### `read_bytes()` / `write_bytes()`
+
+Read and write binary files (mirrors `pathlib.Path`).
+
+```python
+path = Skpath("data/blob.bin")
+path.write_bytes(b"\x00\x01")
+data = path.read_bytes()
+```
+
+Returns
+`bytes`: File contents.
+
 #### `with_stem()`
 
 Return path with changed stem (filename without suffix).

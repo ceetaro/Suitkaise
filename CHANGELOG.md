@@ -33,6 +33,8 @@ As of version 0.3.0, the project is still unreleased.
 - Full auth/credential support in DbReconnector for MongoDB, Cassandra, Elasticsearch, OpenSearch, SQLAlchemy, ODBC, Neo4j, and InfluxDB v2.
 - Documentation for Reconnectors in `cucumber` how-to-use and how-it-works.
 - Documentation for `@autoreconnect` in `processing` how-to-use and how-it-works.
+- GenericAlias handling in `ClassInstanceHandler` (stores origin + args for reconstruction).
+- Processing benchmark comparing Skprocess vs multiprocessing concurrency.
 
 ### Changed
 - FrameType deserialization now returns `FrameInfo` metadata instead of raising (frames cannot be reconstructed).
@@ -41,6 +43,10 @@ As of version 0.3.0, the project is still unreleased.
 - `reconnect_all()` now accepts `**kwargs` instead of `overrides` parameter for cleaner API.
 - All DbReconnector implementations now use consistent dict-based parameter passing for authentication.
 - License updated to Apache License 2.0.
+- `Skprocess` IPC now uses manager-backed queues/events to avoid spawn SemLock issues; IPC cleanup happens after `result()`.
+- Pipe endpoint serialization uses `multiprocessing.reduction.ForkingPickler` for stable handle transfer.
+- `Skpath` encoded-id resolution now returns resolved paths even if they don't exist yet.
+- WeakKeyDictionary reconstruction preserves unweakrefable keys using placeholders instead of dropping them.
 
 ## [0.3.0] - 2026-01-16 - 2026-01-27
 

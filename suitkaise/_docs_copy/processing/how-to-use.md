@@ -888,6 +888,9 @@ anchor, point = Pipe.pair()
 anchor, point = Pipe.pair(one_way=True)
 ```
 
+For one-way pipes, the anchor is the send-only end (parent), and the point
+is the receive-only end (child).
+
 ### Anchor vs Point
 
 **Anchor**:

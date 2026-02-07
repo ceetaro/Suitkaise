@@ -108,26 +108,26 @@ def run_real_world_tests():
     results = []
     
     try:
-        from tests.integration.test_async_patterns import run_all_tests as run_async
-        from tests.integration.test_data_pipeline import run_all_tests as run_pipeline
-        from tests.integration.test_async_web_scraper import run_all_tests as run_scraper
-        from tests.integration.test_parallel_processing import run_all_tests as run_parallel
-        from tests.integration.test_path_utilities import run_all_tests as run_paths
-        
-        print(f"\n  {MAGENTA}▸ Async Patterns{RESET}")
-        results.append(("Async Patterns", run_async()))
-        
-        print(f"\n  {MAGENTA}▸ Data Pipeline{RESET}")
-        results.append(("Data Pipeline", run_pipeline()))
-        
-        print(f"\n  {MAGENTA}▸ Async Web Scraper{RESET}")
-        results.append(("Web Scraper", run_scraper()))
-        
-        print(f"\n  {MAGENTA}▸ Parallel Processing{RESET}")
-        results.append(("Parallel Processing", run_parallel()))
-        
-        print(f"\n  {MAGENTA}▸ Path Utilities{RESET}")
-        results.append(("Path Utilities", run_paths()))
+        from tests.integration.test_examples_sk import run_all_tests as run_sk_examples
+        from tests.integration.test_examples_processing import run_all_tests as run_processing_examples
+        from tests.integration.test_examples_timing import run_all_tests as run_timing_examples
+        from tests.integration.test_examples_circuits import run_all_tests as run_circuits_examples
+        from tests.integration.test_examples_paths import run_all_tests as run_paths_examples
+
+        print(f"\n  {MAGENTA}▸ sk Examples{RESET}")
+        results.append(("sk examples", run_sk_examples()))
+
+        print(f"\n  {MAGENTA}▸ processing Examples{RESET}")
+        results.append(("processing examples", run_processing_examples()))
+
+        print(f"\n  {MAGENTA}▸ timing Examples{RESET}")
+        results.append(("timing examples", run_timing_examples()))
+
+        print(f"\n  {MAGENTA}▸ circuits Examples{RESET}")
+        results.append(("circuits examples", run_circuits_examples()))
+
+        print(f"\n  {MAGENTA}▸ paths Examples{RESET}")
+        results.append(("paths examples", run_paths_examples()))
         
     except Exception as e:
         print(f"    {RED}Error loading integration tests: {e}{RESET}")

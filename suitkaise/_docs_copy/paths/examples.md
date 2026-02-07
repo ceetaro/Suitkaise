@@ -18,6 +18,7 @@ print(current_file.ap)
 # "/Users/me/myproject/src/utils/helpers.py"
 
 # get the path relative to project root
+# (empty if the caller is outside the detected project root)
 print(current_file.rp)
 # "src/utils/helpers.py"
 
@@ -191,8 +192,10 @@ for py_file in Skpath().root.rglob("*.py"):
 ```python
 from suitkaise.paths import Skpath
 
+root = Skpath().root
+
 # create directories
-new_dir = Skpath("output/reports")
+new_dir = root / "output/reports"
 new_dir.mkdir(parents=True, exist_ok=True)
 
 # create files
@@ -200,20 +203,20 @@ new_file = new_dir / "report.txt"
 new_file.touch()
 
 # copy files
-source = Skpath("data/input.csv")
-dest = source.copy_to("backup/input.csv", parents=True)
+source = root / "data/input.csv"
+dest = source.copy_to(root / "backup/input.csv", parents=True)
 # dest is an Skpath pointing to the copied file
 
 # move files
-temp_file = Skpath("temp/data.json")
-final = temp_file.move_to("data/final.json", overwrite=True)
+temp_file = root / "temp/data.json"
+final = temp_file.move_to(root / "data/final.json", overwrite=True)
 
 # delete files
-old_file = Skpath("temp/old.txt")
+old_file = root / "temp/old.txt"
 old_file.unlink(missing_ok=True)
 
 # delete empty directories
-empty_dir = Skpath("temp/empty")
+empty_dir = root / "temp/empty"
 empty_dir.rmdir()
 ```
 
@@ -1039,64 +1042,61 @@ class FileOrganizer:
 # MAIN
 
 def main():
-    """Main entry point."""
+    """Main entry point (self-contained)."""
+    import tempfile
     
-    # create organizer with default output directory
-    organizer = FileOrganizer()
-    
-    # get source directory from command line or use default
-    import sys
-    if len(sys.argv) > 1:
-        source_dir = sys.argv[1]
-    else:
-        # default: organize "downloads" folder in project
-        source_dir = organizer.project_root / "downloads"
-    
-    print(f"Organizing files from: {source_dir}")
-    print(f"Output directory: {organizer.output_dir.rp}")
-    print()
-    
-    # first, do a dry run
-    print("Dry run:")
-    result = organizer.organize(source_dir, dry_run=True)
-    print(f"Would organize {result.files_organized} files")
-    print(f"Would skip {result.files_skipped} files")
-    print()
-    
-    # ask for confirmation
-    response = input("Proceed with organizing? [y/N] ")
-    if response.lower() != "y":
-        print("Cancelled.")
-        return
-    
-    # actually organize
-    print()
-    print("Organizing...")
-    result = organizer.organize(source_dir, dry_run=False)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_root = Skpath(tmpdir)
+        source_dir = tmp_root / "downloads"
+        output_dir = tmp_root / "organized"
+        
+        # seed some sample files
+        (source_dir / "notes.txt").write_text("notes\n" * 10)
+        (source_dir / "script.py").write_text("print('hello')\n")
+        (source_dir / "data.json").write_text('{"ok": true}\n')
+        (source_dir / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        
+        # create organizer with temp output directory
+        organizer = FileOrganizer(output_dir=output_dir)
+        
+        print(f"Organizing files from: {source_dir.rp}")
+        print(f"Output directory: {organizer.output_dir.rp}")
+        print()
+        
+        # dry run
+        print("Dry run:")
+        result = organizer.organize(source_dir, dry_run=True)
+        print(f"Would organize {result.files_organized} files")
+        print(f"Would skip {result.files_skipped} files")
+        print()
+        
+        # actually organize
+        print("Organizing...")
+        result = organizer.organize(source_dir, dry_run=False)
     
     # print results
-    print(f"Organized: {result.files_organized} files")
-    print(f"Skipped: {result.files_skipped} files")
-    
-    if result.errors:
-        print(f"Errors: {len(result.errors)}")
-        for error in result.errors[:5]:
-            print(f"  - {error}")
-    
-    # show summary
-    organizer.print_summary()
-    
-    # demonstrate path ID retrieval
-    if organizer.manifest:
-        print()
-        print("Path ID demonstration:")
-        record = organizer.manifest[0]
-        print(f"  Original: {record.original_path}")
-        print(f"  Path ID: {record.path_id}")
+        print(f"Organized: {result.files_organized} files")
+        print(f"Skipped: {result.files_skipped} files")
         
-        # reconstruct path from ID
-        reconstructed = Skpath(record.path_id)
-        print(f"  Reconstructed: {reconstructed.rp}")
+        if result.errors:
+            print(f"Errors: {len(result.errors)}")
+            for error in result.errors[:5]:
+                print(f"  - {error}")
+        
+        # show summary
+        organizer.print_summary()
+        
+        # demonstrate path ID retrieval
+        if organizer.manifest:
+            print()
+            print("Path ID demonstration:")
+            record = organizer.manifest[0]
+            print(f"  Original: {record.original_path}")
+            print(f"  Path ID: {record.path_id}")
+            
+            # reconstruct path from ID
+            reconstructed = Skpath(record.path_id)
+            print(f"  Reconstructed: {reconstructed.rp}")
 
 
 if __name__ == "__main__":

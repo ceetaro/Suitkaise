@@ -116,6 +116,19 @@ class EchoProcess(Skprocess):
         return self._result
 
 
+class SleepProcess(Skprocess):
+    """Process that sleeps for a fixed duration."""
+    def __init__(self, duration: float):
+        self.duration = duration
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        stdlib_time.sleep(self.duration)
+    
+    def __result__(self):
+        return None
+
+
 # =============================================================================
 # Process Spawn Benchmarks
 # =============================================================================
@@ -518,6 +531,92 @@ def benchmark_share_latency():
 
 
 # =============================================================================
+# Concurrency Benchmarks
+# =============================================================================
+
+def benchmark_concurrency_vs_multiprocessing():
+    """Compare Skprocess vs base multiprocessing concurrency."""
+    print("\n" + "-"*80)
+    print(" Concurrency Comparison ".center(80, "-"))
+    print("-"*80)
+    
+    workers = 6
+    sleep_s = 0.1
+    long_sleep_s = 3.0
+    
+    # Skprocess concurrent
+    start = stdlib_time.perf_counter()
+    procs = [SleepProcess(sleep_s) for _ in range(workers)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.wait()
+    for p in procs:
+        p.result()
+    sk_concurrent = stdlib_time.perf_counter() - start
+    
+    # Skprocess sequential
+    start = stdlib_time.perf_counter()
+    for _ in range(workers):
+        p = SleepProcess(sleep_s)
+        p.start()
+        p.wait()
+        p.result()
+    sk_sequential = stdlib_time.perf_counter() - start
+    
+    # Base multiprocessing concurrent
+    import multiprocessing as mp
+    start = stdlib_time.perf_counter()
+    mp_procs = [mp.Process(target=stdlib_time.sleep, args=(sleep_s,)) for _ in range(workers)]
+    for p in mp_procs:
+        p.start()
+    for p in mp_procs:
+        p.join()
+    mp_concurrent = stdlib_time.perf_counter() - start
+    
+    def _speedup(seq: float, conc: float) -> float:
+        return (seq / conc) if conc > 0 else float("inf")
+    
+    print(f"Workers: {workers}, sleep: {sleep_s:.2f}s each\n")
+    print(f"{'Scenario':<35} {'Elapsed (s)':>12} {'Speedup':>10}")
+    print(f"{'-'*35} {'-'*12} {'-'*10}")
+    print(f"{'Skprocess concurrent':<35} {sk_concurrent:>12.3f} {_speedup(sk_sequential, sk_concurrent):>10.2f}x")
+    print(f"{'Skprocess sequential':<35} {sk_sequential:>12.3f} {'1.00x':>10}")
+    print(f"{'multiprocessing concurrent':<35} {mp_concurrent:>12.3f} {_speedup(sk_sequential, mp_concurrent):>10.2f}x")
+    print("-"*80 + "\n")
+
+    # Longer workload comparison (concurrency only)
+    print("\n" + "-"*80)
+    print(" Concurrency Comparison (Long Workload) ".center(80, "-"))
+    print("-"*80)
+
+    start = stdlib_time.perf_counter()
+    procs = [SleepProcess(long_sleep_s) for _ in range(workers)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.wait()
+    for p in procs:
+        p.result()
+    sk_concurrent_long = stdlib_time.perf_counter() - start
+
+    start = stdlib_time.perf_counter()
+    mp_procs = [mp.Process(target=stdlib_time.sleep, args=(long_sleep_s,)) for _ in range(workers)]
+    for p in mp_procs:
+        p.start()
+    for p in mp_procs:
+        p.join()
+    mp_concurrent_long = stdlib_time.perf_counter() - start
+
+    print(f"Workers: {workers}, sleep: {long_sleep_s:.2f}s each\n")
+    print(f"{'Scenario':<35} {'Elapsed (s)':>12}")
+    print(f"{'-'*35} {'-'*12}")
+    print(f"{'Skprocess concurrent':<35} {sk_concurrent_long:>12.3f}")
+    print(f"{'multiprocessing concurrent':<35} {mp_concurrent_long:>12.3f}")
+    print("-"*80 + "\n")
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -548,6 +647,8 @@ def run_all_benchmarks():
     
     for runner in runners:
         runner.print_results()
+
+    benchmark_concurrency_vs_multiprocessing()
     
     print("\n" + "="*80)
     print(" BENCHMARKS COMPLETE ".center(80, "="))
