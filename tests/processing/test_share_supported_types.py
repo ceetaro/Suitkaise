@@ -592,7 +592,8 @@ def _make_async_generator() -> types.AsyncGeneratorType:
 
 
 def _load_supported_type_names() -> List[str]:
-    md_path = Path(__file__).resolve().parents[2] / "suitkaise" / "_docs_copy" / "cucumber" / "supported-types.md"
+    repo_root = Path(__file__).resolve().parents[2]
+    md_path = repo_root / "suitkaise" / "suitkaise-docs" / "cucumber" / "supported-types.md"
     names = []
     with open(md_path, "r", encoding="utf-8") as handle:
         for line in handle:

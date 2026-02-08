@@ -44,6 +44,39 @@ from pathlib import Path
 
 # Add project root to path (auto-detect by marker files)
 
+def _suppress_windows_invalid_handle() -> None:
+    """Avoid noisy WinError 6 during handle finalization on Windows."""
+    if os.name != "nt":
+        return
+    try:
+        _orig_handle_close = subprocess.Handle.Close  # type: ignore[attr-defined]
+    except Exception:
+        _orig_handle_close = None
+    if _orig_handle_close:
+        def _safe_handle_close(self):
+            try:
+                return _orig_handle_close(self)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 6:
+                    return None
+                raise
+        subprocess.Handle.Close = _safe_handle_close  # type: ignore[attr-defined]
+    try:
+        import multiprocessing.connection as _mp_conn
+    except Exception:
+        return
+    for _name in ("_close", "_CloseHandle"):
+        if hasattr(_mp_conn, _name):
+            _orig = getattr(_mp_conn, _name)
+            def _safe_close(handle, _orig=_orig):
+                try:
+                    return _orig(handle)
+                except OSError as exc:
+                    if getattr(exc, "winerror", None) == 6:
+                        return None
+                    raise
+            setattr(_mp_conn, _name, _safe_close)
+
 def _find_project_root(start: Path) -> Path:
     for parent in [start] + list(start.parents):
         if (parent / 'pyproject.toml').exists() or (parent / 'setup.py').exists():
@@ -52,6 +85,7 @@ def _find_project_root(start: Path) -> Path:
 
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
+_suppress_windows_invalid_handle()
 
 from suitkaise.cucumber import (
     serialize,
@@ -334,6 +368,12 @@ def _extract_reconnected_value(reconnected):
     return reconnected
 
 
+def _pipe_end():
+    conn1, conn2 = multiprocessing.Pipe()
+    conn2.close()
+    return conn1
+
+
 @contextmanager
 def _reconnector_payload(name, factory):
     obj = factory()
@@ -351,6 +391,16 @@ def _reconnector_payload(name, factory):
                 obj.wait(timeout=5)
             except Exception:
                 pass
+            for stream in (obj.stdin, obj.stdout, obj.stderr):
+                if stream:
+                    with contextlib.suppress(Exception):
+                        stream.close()
+        if name == "multiprocessing.Pipe":
+            try:
+                if isinstance(obj, multiprocessing.connection.Connection):
+                    obj.close()
+            except Exception:
+                pass
 
 
 def benchmark_reconnector_showcase():
@@ -366,7 +416,7 @@ def benchmark_reconnector_showcase():
     
     # Objects that serialize into reconnectors
     add_roundtrip("socket.socket", lambda: socket.socket(), socket.socket)
-    add_roundtrip("multiprocessing.Pipe", lambda: multiprocessing.Pipe()[0], object)
+    add_roundtrip("multiprocessing.Pipe", _pipe_end, object)
     add_roundtrip(
         "subprocess.Popen",
         lambda: subprocess.Popen([sys.executable, "-c", "pass"], stdout=subprocess.PIPE, stderr=subprocess.PIPE),
@@ -583,6 +633,9 @@ def benchmark_worst_possible_object():
     runner.bench("cucumber: WorstPossibleObject deserialize", 5, lambda: deserialize(wpo_bytes))
     runner.bench("cucumber: WorstPossibleObject roundtrip", 3, lambda: deserialize(serialize(wpo)))
     
+    if hasattr(wpo, "cleanup"):
+        wpo.cleanup()
+    
     return runner
 
 
@@ -610,34 +663,55 @@ def _spooled_temp():
 
 @contextmanager
 def _file_io_handle():
-    with tempfile.NamedTemporaryFile() as tmp:
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp.close()
         f = __import__("io").FileIO(tmp.name, mode="r")
         try:
             yield f
         finally:
             f.close()
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except FileNotFoundError:
+            pass
 
 
 @contextmanager
 def _buffered_reader_handle():
-    with tempfile.NamedTemporaryFile() as tmp:
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp.close()
         with open(tmp.name, "rb") as raw:
             reader = __import__("io").BufferedReader(raw)
             try:
                 yield reader
             finally:
                 reader.close()
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except FileNotFoundError:
+            pass
 
 
 @contextmanager
 def _buffered_writer_handle():
-    with tempfile.NamedTemporaryFile() as tmp:
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp.close()
         with open(tmp.name, "wb") as raw:
             writer = __import__("io").BufferedWriter(raw)
             try:
                 yield writer
             finally:
                 writer.close()
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except FileNotFoundError:
+            pass
 
 
 @contextmanager
@@ -686,8 +760,14 @@ def _subprocess_popen():
     try:
         yield proc
     finally:
-        proc.terminate()
-        proc.wait(timeout=5)
+        with contextlib.suppress(Exception):
+            proc.terminate()
+        with contextlib.suppress(Exception):
+            proc.wait(timeout=5)
+        for stream in (proc.stdin, proc.stdout, proc.stderr):
+            if stream:
+                with contextlib.suppress(Exception):
+                    stream.close()
 
 
 @contextmanager
@@ -834,12 +914,17 @@ def _requests_session():
 
 @contextmanager
 def _file_handler():
-    with tempfile.NamedTemporaryFile() as tmp:
-        handler = logging.FileHandler(tmp.name)
+    fd, path = tempfile.mkstemp()
+    os.close(fd)
+    handler = logging.FileHandler(path)
+    try:
+        yield handler
+    finally:
+        handler.close()
         try:
-            yield handler
-        finally:
-            handler.close()
+            os.remove(path)
+        except OSError:
+            pass
 
 
 @contextmanager
@@ -862,12 +947,19 @@ def _process_pool_executor():
 
 @contextmanager
 def _file_descriptor():
-    with tempfile.NamedTemporaryFile() as tmp:
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        tmp.close()
         fd = os.open(tmp.name, os.O_RDONLY)
         try:
             yield fd
         finally:
             os.close(fd)
+    finally:
+        try:
+            os.remove(tmp.name)
+        except OSError:
+            pass
 
 
 @contextmanager
@@ -978,7 +1070,7 @@ def _get_supported_objects():
         ("UUID", lambda: uuid.uuid4()),
         ("Path", lambda: Path.cwd()),
         ("PurePath", lambda: PurePath("a/b")),
-        ("PosixPath", lambda: PosixPath("/tmp")),
+        ("PosixPath", lambda: PosixPath("/tmp") if os.name != "nt" else None),
         ("WindowsPath", lambda: WindowsPath("C:/Temp") if os.name == "nt" else None),
         ("Logger", lambda: logging.getLogger("cucumber_bench")),
         ("StreamHandler", lambda: logging.StreamHandler()),
@@ -1096,6 +1188,59 @@ def _get_supported_objects():
     return objects
 
 
+def _cleanup_object(obj):
+    if obj is None:
+        return
+    try:
+        if isinstance(obj, subprocess.Popen):
+            with contextlib.suppress(Exception):
+                obj.terminate()
+            with contextlib.suppress(Exception):
+                obj.wait(timeout=5)
+            for stream in (obj.stdin, obj.stdout, obj.stderr):
+                if stream:
+                    with contextlib.suppress(Exception):
+                        stream.close()
+            return
+        if isinstance(obj, multiprocessing.connection.Connection):
+            with contextlib.suppress(Exception):
+                obj.close()
+            return
+        if isinstance(obj, socket.socket):
+            with contextlib.suppress(Exception):
+                obj.close()
+            return
+        if isinstance(obj, sqlite3.Cursor):
+            with contextlib.suppress(Exception):
+                obj.close()
+            return
+        if isinstance(obj, sqlite3.Connection):
+            with contextlib.suppress(Exception):
+                obj.close()
+            return
+        if isinstance(obj, logging.Handler):
+            with contextlib.suppress(Exception):
+                obj.close()
+            return
+    except Exception:
+        return
+    if hasattr(obj, "close"):
+        with contextlib.suppress(Exception):
+            obj.close()
+    if hasattr(obj, "join_thread"):
+        with contextlib.suppress(Exception):
+            obj.join_thread()
+    if hasattr(obj, "shutdown"):
+        with contextlib.suppress(Exception):
+            obj.shutdown()
+    if hasattr(obj, "terminate"):
+        with contextlib.suppress(Exception):
+            obj.terminate()
+    if hasattr(obj, "join"):
+        with contextlib.suppress(Exception):
+            obj.join(timeout=0)
+
+
 def benchmark_supported_types_compatibility():
     """Attempt serialization of every supported type across serializers."""
     runner = CompatibilityRunner("Supported Types Compatibility Benchmarks")
@@ -1127,6 +1272,7 @@ def benchmark_supported_types_compatibility():
                 if func is None:
                     continue
                 runner.check(type_name, lib_name, lambda f=func, o=obj_or_cm: f(o))
+            _cleanup_object(obj_or_cm)
     
     return runner
 
@@ -1152,6 +1298,7 @@ def benchmark_supported_types_throughput():
                 runner.bench(f"cucumber: {type_name}", 200, lambda o=obj_or_cm: serialize(o))
             except Exception as e:
                 print(f"  [skip] cucumber: {type_name} ({type(e).__name__}: {e})")
+            _cleanup_object(obj_or_cm)
     
     return runner
 

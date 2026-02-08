@@ -1438,6 +1438,19 @@ class WorstPossibleObject:
         """Clean up any resources (files, connections, etc.)."""
         self._log("\n[CLEANUP] Cleaning up resources...")
         
+        def _cleanup_subprocess_popen():
+            proc = getattr(self, "subprocess_popen", None)
+            if not proc:
+                return
+            with contextlib.suppress(Exception):
+                proc.terminate()
+            with contextlib.suppress(Exception):
+                proc.wait(timeout=5)
+            for stream in (proc.stdin, proc.stdout, proc.stderr):
+                if stream:
+                    with contextlib.suppress(Exception):
+                        stream.close()
+
         resources_to_cleanup = [
             ('temp_file', lambda: (self.temp_file.close(), Path(self.temp_file.name).unlink(missing_ok=True))),
             ('temp_file_binary', lambda: (self.temp_file_binary.close(), Path(self.temp_file_binary.name).unlink(missing_ok=True))),
@@ -1448,6 +1461,7 @@ class WorstPossibleObject:
             ('socket_tcp', lambda: self.socket_tcp.close()),
             ('socket_udp', lambda: self.socket_udp.close()),
             ('socket_with_options', lambda: self.socket_with_options.close()),
+            ('subprocess_popen', _cleanup_subprocess_popen),
         ]
         
         for attr_name, cleanup_func in resources_to_cleanup:

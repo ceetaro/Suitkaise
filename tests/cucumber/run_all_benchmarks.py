@@ -23,4 +23,14 @@ from tests.cucumber.benchmarks import run_all_benchmarks
 
 
 if __name__ == '__main__':
+    # Silence known Windows handle cleanup noise at interpreter shutdown.
+    _default_unraisablehook = sys.unraisablehook
+
+    def _suppress_winerror_6_unraisable(args) -> None:
+        exc = args.exc_value
+        if isinstance(exc, OSError) and getattr(exc, "winerror", None) == 6:
+            return
+        _default_unraisablehook(args)
+
+    sys.unraisablehook = _suppress_winerror_6_unraisable
     run_all_benchmarks()
