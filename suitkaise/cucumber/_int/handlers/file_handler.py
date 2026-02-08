@@ -270,9 +270,24 @@ class TemporaryFileHandler(Handler):
         Check if object is a NamedTemporaryFile.
         
         This is tricky because NamedTemporaryFile returns a file-like object.
-        We check if it has the 'delete' attribute which is specific to temp files.
+        We check for temp-file-specific attributes and that it is file-like.
+        
+        Python version notes:
+        - Pre-3.12: wrapper has 'name' and 'delete' directly
+        - 3.12+: wrapper has 'name' and '_closer' (delete moved to _closer)
+        
+        The file-like check (tell/seek/read) excludes internal helpers like
+        _TemporaryFileCloser that have 'name'/'delete' but are not file objects.
         """
-        if not (hasattr(obj, 'name') and hasattr(obj, 'delete')):
+        if not hasattr(obj, 'name'):
+            return False
+        
+        # Check for temp-file markers: 'delete' (pre-3.12) or '_closer' (3.12+)
+        if not (hasattr(obj, 'delete') or hasattr(obj, '_closer')):
+            return False
+        
+        # Must be file-like — excludes internal helpers like _TemporaryFileCloser
+        if not (hasattr(obj, 'tell') and hasattr(obj, 'seek') and hasattr(obj, 'read')):
             return False
         
         try:
@@ -320,7 +335,12 @@ class TemporaryFileHandler(Handler):
         # try to extract tempfile-specific attributes
         suffix = getattr(obj, 'suffix', '')
         prefix = getattr(obj, 'prefix', 'tmp')
-        delete = getattr(obj, 'delete', True)
+        # Python 3.12+ moved 'delete' to _closer
+        delete = getattr(obj, 'delete', None)
+        if delete is None and hasattr(obj, '_closer'):
+            delete = getattr(obj._closer, 'delete', True)
+        if delete is None:
+            delete = True
         
         # record the original temp file path for reference
         # (though we'll create a new one with different name)

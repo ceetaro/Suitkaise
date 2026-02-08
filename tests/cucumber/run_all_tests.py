@@ -41,6 +41,7 @@ def run_all_tests():
     from tests.cucumber.test_handlers_extended import run_all_tests as run_handlers_extended_tests
     from tests.cucumber.test_ir_json import run_all_tests as run_ir_json_tests
     from tests.cucumber.test_reconnect import run_all_tests as run_reconnect_tests
+    from tests.cucumber.test_network_handler import run_all_tests as run_network_handler_tests
     
     results = []
     
@@ -67,6 +68,9 @@ def run_all_tests():
     
     print(f"\n{CYAN}Running Reconnect tests...{RESET}")
     results.append(("Reconnect", run_reconnect_tests()))
+    
+    print(f"\n{CYAN}Running Network Handler tests...{RESET}")
+    results.append(("Network Handler", run_network_handler_tests()))
     
     # Summary
     print(f"\n{BOLD}{CYAN}{'='*80}{RESET}")

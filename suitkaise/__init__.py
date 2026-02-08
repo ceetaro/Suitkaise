@@ -95,8 +95,15 @@ from .circuits import (
 from .cucumber import (
     # Main functions
     serialize,
+    serialize_ir,
     deserialize,
     reconnect_all,
+    
+    # JSON / IR helpers
+    ir_to_jsonable,
+    ir_to_json,
+    to_jsonable,
+    to_json,
     
     # Exceptions
     SerializationError,
@@ -111,6 +118,7 @@ from .processing import (
     Skprocess,
     Pool,
     Share,
+    Pipe,
     
     # Timers
     ProcessTimers,
@@ -148,7 +156,7 @@ from . import docs
 # ============================================================================
 # Module Metadata
 # ============================================================================
-__version__ = "0.3.0"
+__version__ = "0.4.0b0"
 __author__ = "Suitkaise Development Team"
 
 __all__ = [
@@ -189,8 +197,13 @@ __all__ = [
     
     # Cucumber
     "serialize",
+    "serialize_ir",
     "deserialize",
     "reconnect_all",
+    "ir_to_jsonable",
+    "ir_to_json",
+    "to_jsonable",
+    "to_json",
     "SerializationError",
     "DeserializationError",
     
@@ -198,6 +211,7 @@ __all__ = [
     "Skprocess",
     "Pool",
     "Share",
+    "Pipe",
     "autoreconnect",
     "ProcessTimers",
     "ProcessError",

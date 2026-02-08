@@ -26,3 +26,7 @@ __all__ = [
     'SkModifierError',
     'FunctionTimeoutError',
 ]
+
+# Module metadata
+__version__ = "0.4.0b0"
+__author__ = "Suitkaise Development Team"

@@ -332,7 +332,11 @@ class _Coordinator:
         
         # signal shutdown and wait for the process to exit gracefully
         if self._stop_event is not None:
-            self._stop_event.set()
+            try:
+                self._stop_event.set()
+            except (OSError, EOFError, BrokenPipeError, ConnectionRefusedError):
+                # Manager connection already dead — process likely exited
+                pass
         
         self._process.join(timeout=timeout)
         

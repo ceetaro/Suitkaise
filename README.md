@@ -23,7 +23,7 @@ pip install suitkaise
 
 Explicitly supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.3.0`.
+Currently, `suitkaise` is version `0.4.0 beta`.
 
 `suitkaise` contains the following modules:
 

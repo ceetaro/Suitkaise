@@ -100,3 +100,7 @@ __all__ = [
     "streamline_path",
     "streamline_path_quick",
 ]
+
+# Module metadata
+__version__ = "0.4.0b0"
+__author__ = "Suitkaise Development Team"
