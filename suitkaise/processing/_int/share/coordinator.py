@@ -74,6 +74,7 @@ class _Coordinator:
         self._process: Optional[Process] = None
         self._stop_event: Optional[Event] = None
         self._error_event: Optional[Event] = None
+        self._client_mode: bool = False  # True when reconstructed in child process
         
         # configuration
         self._poll_timeout = 0.1  # how long to wait for commands
@@ -102,6 +103,7 @@ class _Coordinator:
             object_names=state["object_names"],
         )
         coord._poll_timeout = state.get("poll_timeout", 0.1)
+        coord._client_mode = True  # child process - coordinator runs in parent
         return coord
     
     def register_object(self, object_name: str, obj: Any, attrs: set[str] | None = None) -> None:
@@ -366,6 +368,14 @@ class _Coordinator:
     @property
     def is_alive(self) -> bool:
         """Check if the coordinator process is running."""
+        if self._client_mode:
+            # child process — coordinator runs in parent, check Manager connection
+            try:
+                # lightweight probe: access the shared store
+                _ = len(self._source_store)
+                return True
+            except Exception:
+                return False
         return self._process is not None and self._process.is_alive()
     
     @property
