@@ -14,6 +14,76 @@ from .proxy import _ObjectProxy
 from suitkaise.sk._int.analyzer import analyze_class
 
 
+# ── Built-in mutable type metadata ──────────────────────────────────────
+# Since we can't set _shared_meta on built-in types, we keep a registry.
+# 'writes' = mutating attrs (fire-and-forget via proxy)
+# 'reads'  = read-only attrs (fetched from source of truth)
+_BUILTIN_SHARED_META: dict[type, dict] = {
+    list: {
+        'methods': {
+            # mutating (fire-and-forget)
+            'append':  {'writes': ['_data']},
+            'extend':  {'writes': ['_data']},
+            'insert':  {'writes': ['_data']},
+            'remove':  {'writes': ['_data']},
+            'pop':     {'writes': ['_data']},
+            'clear':   {'writes': ['_data']},
+            'sort':    {'writes': ['_data']},
+            'reverse': {'writes': ['_data']},
+            '__setitem__': {'writes': ['_data']},
+            '__delitem__': {'writes': ['_data']},
+            # read-only (return values directly)
+            'copy':  {'reads': ['_data']},
+            'count': {'reads': ['_data']},
+            'index': {'reads': ['_data']},
+        },
+        'properties': {},
+    },
+    set: {
+        'methods': {
+            # mutating
+            'add':     {'writes': ['_data']},
+            'discard': {'writes': ['_data']},
+            'remove':  {'writes': ['_data']},
+            'pop':     {'writes': ['_data']},
+            'clear':   {'writes': ['_data']},
+            'update':  {'writes': ['_data']},
+            'intersection_update':        {'writes': ['_data']},
+            'difference_update':          {'writes': ['_data']},
+            'symmetric_difference_update': {'writes': ['_data']},
+            # read-only
+            'copy':                 {'reads': ['_data']},
+            'issubset':             {'reads': ['_data']},
+            'issuperset':           {'reads': ['_data']},
+            'union':                {'reads': ['_data']},
+            'intersection':         {'reads': ['_data']},
+            'difference':           {'reads': ['_data']},
+            'symmetric_difference': {'reads': ['_data']},
+        },
+        'properties': {},
+    },
+    dict: {
+        'methods': {
+            # mutating
+            'update':     {'writes': ['_data']},
+            'pop':        {'writes': ['_data']},
+            'popitem':    {'writes': ['_data']},
+            'clear':      {'writes': ['_data']},
+            'setdefault': {'writes': ['_data']},
+            '__setitem__': {'writes': ['_data']},
+            '__delitem__': {'writes': ['_data']},
+            # read-only
+            'get':    {'reads': ['_data']},
+            'keys':   {'reads': ['_data']},
+            'values': {'reads': ['_data']},
+            'items':  {'reads': ['_data']},
+            'copy':   {'reads': ['_data']},
+        },
+        'properties': {},
+    },
+}
+
+
 class Share:
     """
     ────────────────────────────────────────────────────────
@@ -148,6 +218,10 @@ class Share:
         
         # check if this is an object with _shared_meta (suitkaise or @sk wrapped)
         meta = getattr(type(value), '_shared_meta', None)
+        
+        # check built-in mutable types (list, set, dict)
+        if meta is None:
+            meta = _BUILTIN_SHARED_META.get(type(value))
         
         # if it's a user class instance without _shared_meta, auto-generate meta
         if meta is None and self._is_user_class_instance(value):
@@ -451,6 +525,8 @@ class Share:
             coordinator = object.__getattribute__(share, '_coordinator')
             proxies = object.__getattribute__(share, '_proxies')
             meta = getattr(type(obj), '_shared_meta', None)
+            if meta is None:
+                meta = _BUILTIN_SHARED_META.get(type(obj))
             if meta is None and share._is_user_class_instance(obj):
                 meta = share._ensure_shared_meta(type(obj))
 

@@ -18,6 +18,11 @@ COMPLETED TASKS
 - all 12 test suites passing on Python 3.11; WorstPossibleObject tests now pass on 3.12/3.13
 - expanded CI matrix to 9 jobs: ubuntu-latest + macos-latest + windows-latest x Python 3.11/3.12/3.13
 - audited processing module for Linux (fork) compatibility — confirmed Linux-ready (Manager-backed primitives, no platform assumptions, correct ForkingPickler usage)
+- fixed coordinator is_alive returning False in child processes (added _client_mode flag, probes Manager connection instead of checking local _process)
+- added _BUILTIN_SHARED_META registry for list/set/dict — mutating methods proxied through coordinator, read-only methods fetch and return values directly
+- added dunder protocol methods to _ObjectProxy (__len__, __iter__, __contains__, __bool__, __getitem__, __setitem__, __delitem__, __str__)
+- fixed proxy __getattr__ misclassifying user class methods as read-only (empty writes list was falsy)
+- fixed shared memory leaks at shutdown — stop()/kill() now always clean up segments, added close_local() for child processes, added __del__ to coordinator
 
 
 TEST RELEASE
@@ -27,7 +32,9 @@ TEST RELEASE
 *2.5. rerun test coverage check (target >82%) — 82% achieved
 *3. change version in all files to 0.4.0b0
 *4. organize the changelog by date.
-5. build 0.4.0b0 package and upload to test pypi
+*5. build 0.4.0b0 package and upload to test pypi
+
+5.5. bug fixes
 
 6. wait for me to test package in a different project space, by running all examples, tests, and benchmarks
 7. confirm that dev has given the go ahead

@@ -346,6 +346,11 @@ class _Coordinator:
             # force kill if didn't stop gracefully
             self._process.terminate()
             self._process.join(timeout=1.0)
+            # still clean up shared-memory even on forced shutdown
+            try:
+                self._counter_registry.reset()
+            except Exception:
+                pass
             return False
         # cleanup shared-memory counters after stopping
         try:
@@ -364,6 +369,17 @@ class _Coordinator:
             self._process.join(timeout=1.0)
             if self._process.is_alive():
                 self._process.kill()
+        try:
+            self._counter_registry.reset()
+        except Exception:
+            pass
+
+    def __del__(self) -> None:
+        """Release local shared-memory handles on garbage collection."""
+        try:
+            self._counter_registry.close_local()
+        except Exception:
+            pass
     
     @property
     def is_alive(self) -> bool:

@@ -67,13 +67,19 @@ class _ObjectProxy:
         """
         Intercept attribute access.
         
-        - If it's a method in _shared_meta, return a callable that queues commands
+        - If it's a write method in _shared_meta, return a callable that queues commands
+        - If it's a read-only method in _shared_meta, fetch object and return bound method
         - If it's a property in _shared_meta, wait for writes and return value
         - Otherwise, fetch from source of truth and return the attr
         """
-        # methods in _shared_meta are wrapped as fire-and-forget commands
         if self._shared_meta and name in self._shared_meta.get('methods', {}):
-            return _MethodProxy(self, name)
+            method_meta = self._shared_meta['methods'][name]
+            if 'writes' in method_meta:
+                # mutating method → fire-and-forget via coordinator
+                return _MethodProxy(self, name)
+            else:
+                # read-only method → fetch fresh object and return bound method
+                return getattr(self._fetch_object(), name)
         
         # properties in _shared_meta require read barriers before access
         if self._shared_meta and name in self._shared_meta.get('properties', {}):
@@ -109,6 +115,54 @@ class _ObjectProxy:
             [name],
         )
     
+    # ── helpers ──────────────────────────────────────────────────────────
+
+    def _fetch_object(self) -> Any:
+        """
+        Fetch the real object from source of truth, waiting for
+        all pending writes on this object to complete first.
+        """
+        all_keys = self._coordinator.get_object_keys(self._object_name)
+        if all_keys:
+            self._coordinator.wait_for_read(all_keys, timeout=10.0)
+        obj = self._coordinator.get_object(self._object_name)
+        if obj is None:
+            raise AttributeError(f"Object '{self._object_name}' not found in Share")
+        return obj
+
+    # ── dunder protocol methods ─────────────────────────────────────────
+    # Python looks up special methods on the *type*, not the instance,
+    # so __getattr__ never sees them. We define them explicitly so that
+    # len(), iter(), in, indexing, etc. work on proxied builtins.
+
+    def __len__(self) -> int:
+        return len(self._fetch_object())
+
+    def __iter__(self):
+        return iter(self._fetch_object())
+
+    def __contains__(self, item) -> bool:
+        return item in self._fetch_object()
+
+    def __bool__(self) -> bool:
+        return bool(self._fetch_object())
+
+    def __getitem__(self, key):
+        return self._fetch_object()[key]
+
+    def __setitem__(self, key, value):
+        """Queue a __setitem__ write through the coordinator."""
+        _MethodProxy(self, '__setitem__')(key, value)
+
+    def __delitem__(self, key):
+        """Queue a __delitem__ write through the coordinator."""
+        _MethodProxy(self, '__delitem__')(key)
+
+    def __str__(self) -> str:
+        return str(self._fetch_object())
+
+    # ── property reads ──────────────────────────────────────────────────
+
     def _read_property(self, name: str) -> Any:
         """
         Read a property, waiting for pending writes first.

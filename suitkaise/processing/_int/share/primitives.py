@@ -445,17 +445,15 @@ class _AtomicCounterRegistry:
                 except Exception:
                     pass
 
-    def reset(self) -> None:
-        """Clear all counters and local caches."""
-        names: list[str] = []
-        with self._lock:
-            for pending_name, completed_name in list(self._registry.values()):
-                names.extend([pending_name, completed_name])
-            self._registry.clear()
-            self._object_keys.clear()
-            local = list(self._local.values())
-            self._local.clear()
-            self._local_object_keys.clear()
+    def close_local(self) -> None:
+        """Close local shared-memory handles without unlinking.
+
+        Safe to call from child processes — releases local file descriptors
+        so the resource_tracker does not report leaked segments.
+        """
+        local = list(self._local.values())
+        self._local.clear()
+        self._local_object_keys.clear()
         for pending, completed in local:
             try:
                 pending.close()
@@ -465,6 +463,22 @@ class _AtomicCounterRegistry:
                 completed.close()
             except Exception:
                 pass
+
+    def reset(self) -> None:
+        """Clear all counters and local caches, unlink owned segments."""
+        names: list[str] = []
+        try:
+            with self._lock:
+                for pending_name, completed_name in list(self._registry.values()):
+                    names.extend([pending_name, completed_name])
+                self._registry.clear()
+                self._object_keys.clear()
+        except (EOFError, BrokenPipeError, ConnectionRefusedError, OSError):
+            # Manager connection gone — still clean up local handles
+            pass
+        # close local handles
+        self.close_local()
+        # unlink owned segments
         for name in set(names + list(self._owned_names)):
             try:
                 shm = shared_memory.SharedMemory(name=name)
