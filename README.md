@@ -4,6 +4,15 @@ Making things easier for developers of all skill levels to develop complex Pytho
 
 (pronounced exactly like the word suitcase)
 
+All files in this repository are licensed under the Apache License 2.0, including:
+- source code
+- examples
+- documentation
+- tests
+- site content code
+- and everything else
+
+
 ## Installation
 
 ```bash
@@ -12,232 +21,185 @@ pip install suitkaise
 
 ## Info
 
-Supported Python versions: 3.11 and above
+Explicitly supported Python versions: 3.11 and above
 
 Currently, `suitkaise` is version `0.3.0`.
 
-All files and code in this repository is licensed under the Apache License 2.0.
-
 `suitkaise` contains the following modules:
 
-- cucumber: serialization engine
-
-- circuits: flow control with the Circuit and BreakingCircuit classes.
-
-- processing: multiprocessing/subprocesses with pools, methodized queue sharing, and shared memory patterns with the Share class.
-
-- paths: Skpath class and utilities for path operations.
-
-- sk: utility for modifying functions and classes
-
-- timing: Sktimer class and utilities for timing operations.
+- `cucumber`: serialization engine
+- `circuits`: flow control with the Circuit and BreakingCircuit classes.
+- `processing`: upgraded multiprocessing with easy shared state
+- `paths`: upgraded path class and utilities for path ops
+- `sk`: modifiers for functions and class methods
+- `timing`: timer class with deep statistics usable in many ways
 
 ## Documentation
 
-All documentation is available for download:
+All documentation is available for download.
+
+CLI:
+- downloads to project root
+- cwd must be within project root
+
+```bash
+suitkaise docs
+```
+
+Python:
 
 ```python
 from suitkaise import docs
 
-docs.download("path/where/you/want/them/to/go")
-
-# auto send them to project root
+# download to project root
 docs.download()
+
+# download to a specific path within your project
+docs.download("path/within/project")
 ```
 
-To send them outside of your project root, use the `Permission` class:
+To place docs outside your project root, use the `Permission` context manager.
 
 ```python
-from suitkaise import docs, Permission
+from suitkaise import docs
 
-with Permission():
-    docs.download("Users/joe/Documents")
+with docs.Permission():
+    docs.download("/Users/joe/Documents")
 ```
 
 You can also view more at [suitkaise.info](https://suitkaise.info).
 
 ## Quick Start
 
-###
+### Parallel processing with shared state
 
-### Time all of your code
-
-Time a function/method without a specific timer.
 ```python
-from suitkaise import timing
+from suitkaise.processing import Share, Pool, Skprocess
+import logging
 
-# time functions and methods automatically
-@timing.timethis()
+# put anything on Share — literally anything
+share = Share()
+share.counter = 0
+share.results = []
+share.log = logging.getLogger("worker")
+
+class Worker(Skprocess):
+    def __init__(self, share, item):
+        self.share = share
+        self.item = item
+
+    def __run__(self):
+        result = self.item * 2
+        self.share.results.append(result)       # shared list
+        self.share.counter += 1                 # shared counter
+        self.share.log.info(f"done: {result}")  # shared logger
+
+pool = Pool(workers=4)
+pool.star().map(Worker, [(share, x) for x in range(20)])
+
+print(share.counter)         # 20
+print(len(share.results))    # 20
+print(share.log.handlers)    # still works
+```
+
+### Serialize anything
+
+```python
+from suitkaise import cucumber
+
+data = cucumber.serialize(any_object)
+restored = cucumber.deserialize(data)
+```
+
+### Time anything
+
+```python
+from suitkaise.timing import timethis
+
+@timethis()
 def my_function():
-    # your code here
-    pass
+    do_work()
 
-for i in range(100):
-    my_function()
-
-# get stats directly from function object
-mean = my_function.timer.mean
-stdev = my_function.timer.stdev
+my_function()
+print(my_function.timer.mean)
 ```
 
-Time a function/method with a specific timer.
 ```python
-from suitkaise import timing
+from suitkaise.timing import TimeThis
 
-t = timing.Sktimer()
+with TimeThis() as timer:
+    do_this()
+    then_this()
+    this_too()
 
-class MyClass:
+# stops timing and records on exit
 
-    @timing.timethis(timer=t)
-    def my_function(self):
-        # your code here
-        pass
-
-    @timing.timethis(timer=t)
-    def my_function_2(self):
-        # your code here
-        pass
-
-# create an instance of MyClass
-my_instance = MyClass()
-
-# get stats from the timer
-print(t.mean)
-print(t.stdev)
-print(t.percentile(95))
-```
-
-Time a block of code without a specific timer.
-```python
-from suitkaise import timing
-
-with timing.TimeThis() as timer:
-    # your code here
-    pass
-
-# get the time that was just recorded (returns the Sktimer object)
-# does not collect stats over time without a specific timer
+# get most recent time
 print(timer.most_recent)
 ```
 
-Time a block of code with a specific timer.
+### Add retry, timeout, background execution to any function
+
 ```python
-from suitkaise import timing
+from suitkaise import sk
 
-t = timing.Sktimer()
+@sk
+def fetch(url):
+    return requests.get(url).json()
 
-with timing.TimeThis(timer=t):
-    # your code here
-    pass
-
-# get stats
-print(t.mean)
-print(t.stdev)
-print(t.percentile(95))
+# retry 3 times, timeout after 5 seconds each attempt
+data = fetch.retry(3).timeout(5.0)("https://api.example.com")
 ```
 
-Simple utilities
-```python
-from suitkaise import timing
-
-# get the current time
-start_time = timing.time()
-
-# sleep for a given number of seconds and get time after sleeping
-time_after_sleeping = timing.sleep(1)
-
-# get the elapsed time from start time to current time
-elapsed_time = timing.elapsed(start_time)
-
-# get the elapsed time from start time to time after sleeping
-elapsed_time2 = timing.elapsed(start_time, time_after_sleeping)
-```
-
-There is much more to the timing module. For more information, read the docs on timing or visit [suitkaise.info](https://suitkaise.info).
-
-### Path operations and `Skpath`
-
-`Skpath` is a special path object that automatically detects your project root and uses it to normalize paths to an `rp` property.
-
-`Skpaths` in the same project on different machines will be equal without any extra work.
+### Cross-platform paths, normalized path types
 
 ```python
 from suitkaise.paths import Skpath
 
-path = Skpath("myproject/feature/file.txt")
-
-# get absolute path as str
-abs_path = path.ap
-
-# get path relative to project root as str
-rp_path = path.rp
-
-# get path with platform-native separators as str
-platform_path = path.platform
-
-# get path as reconstructible ID
-path_id = path.id
+path = Skpath("data/file.txt")
+print(path.rp)  # "data/file.txt" — same on every machine, every OS
 ```
 
-Use the `@autopath` decorator to automatically convert incoming values to their correct types, normalizing them through `Skpath` before passing them to the function.
-
 ```python
-from suitkaise.paths import autopath, AnyPath
+from suitkaise.paths import autopath
 
 @autopath()
-def process_file(path: str):
+def process(path: AnyPath):
+    print(path.rp)  # always an Skpath, no matter what was passed in
 
-    # all Skpaths, Paths, and strs will be converted to strs
-
-@autopath(use_caller=True)
-def process_file(path: Path):
-
-    # if no path is provided, uses caller file path
-    # all Skpaths, Paths, and strs will be converted to Paths
-
-@autopath(only="path")
-def process_file(path: str, names: list[str], ids: list[str]):
-
-    # autopath will only do path param 
-
-
-@autopath()
-def copy_file(path: AnyPath, target_path: AnyPath):
-
-    # AnyPath = Skpath | Path | str
-    # all Paths and strs will be converted to Skpaths
+process("data/file.txt")        # str → Skpath
+process(Path("data/file.txt"))  # Path → Skpath
 ```
 
-Get caller path automatically
+
+### Circuit breakers
+
 ```python
-from suitkaise.paths import Skpath
+from suitkaise import Circuit
 
-caller = Skpath()
+circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
-caller = get_caller_path()
+for request in requests:
+    try:
+        process(request)
+    except ServiceError:
+        circuit.short()
 ```
 
-Get project root automatically
 ```python
-from suitkaise.paths import Skpath
+from suitkaise import BreakingCircuit
 
-root = Skpath().root
+breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-root = get_project_root()
+while not breaker.broken:
+    try:
+        result = risky_operation()
+        break  # success
+    except OperationError:
+        breaker.short()  # count the failure
+
+if breaker.broken:
+    handle_failure()
 ```
 
-Get a nested dict representing your project structure in `Skpaths`
-```python
-from suitkaise.paths import Skpath
-
-structure = get_project_structure()
-```
-
-There is much more to the paths module. For more information, read the docs on paths or visit [suitkaise.info](https://suitkaise.info).
-
-### Flow control with `Circuit` and `BreakingCircuit`
-
-
-
-
-
+For more, see the full documentation at [suitkaise.info](https://suitkaise.info) or download the docs with `suitkaise docs` in your terminal after installation.

@@ -44,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
         "modules",
         help="List available modules.",
     )
+
+    subparsers.add_parser(
+        "docs",
+        help="Download suitkaise documentation to the project root.",
+    )
+
     return parser
 
 
@@ -61,6 +67,19 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "modules":
         print("\n".join(_module_names()))
+        return 0
+
+    if args.command == "docs":
+        from . import docs
+
+        try:
+            docs.download()
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            return 1
+        except Exception as e:
+            print(f"Error downloading docs: {e}")
+            return 1
         return 0
 
     parser.print_help()
