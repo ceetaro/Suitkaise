@@ -91,7 +91,7 @@ class Share:
         from suitkaise import Share, Sktimer, Skprocess, Pool
         
         share = Share()
-        share.timer = Sktimer() # complex objs work too
+        share.timer = Sktimer() # use add_time() to aggregate across processes
         share.counter = 0
 
         class ProcessUsingShare(Skprocess):
@@ -198,6 +198,11 @@ class Share:
                     "effect until share.start() is called.",
                     RuntimeWarning,
                 )
+
+        # check for objects that explicitly disallow Share usage
+        disallowed_msg = getattr(type(value), '_share_disallowed', None)
+        if disallowed_msg:
+            raise TypeError(disallowed_msg)
 
         obj_module = getattr(type(value), "__module__", "")
         if obj_module.startswith("multiprocessing"):

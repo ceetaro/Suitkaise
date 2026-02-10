@@ -67,11 +67,17 @@ class _ObjectProxy:
         """
         Intercept attribute access.
         
+        - If it's a blocked method in _share_blocked_methods, raise TypeError
         - If it's a write method in _shared_meta, return a callable that queues commands
         - If it's a read-only method in _shared_meta, fetch object and return bound method
         - If it's a property in _shared_meta, wait for writes and return value
         - Otherwise, fetch from source of truth and return the attr
         """
+        # check for methods that are explicitly blocked in Share
+        blocked = getattr(self._wrapped_class, '_share_blocked_methods', None)
+        if blocked and name in blocked:
+            raise TypeError(blocked[name])
+
         if self._shared_meta and name in self._shared_meta.get('methods', {}):
             method_meta = self._shared_meta['methods'][name]
             if 'writes' in method_meta:
@@ -228,6 +234,10 @@ class _MethodProxy:
         
         Increments pending counters for all attrs this method writes,
         then queues the command. Returns immediately.
+        
+        If the wrapped class defines _share_method_aliases, the actual
+        method executed by the coordinator may differ from the one the
+        user called (e.g. a no-sleep variant).
         """
         proxy = self._object_proxy
         
@@ -248,10 +258,16 @@ class _MethodProxy:
             key = f"{proxy._object_name}.{attr}"
             proxy._coordinator.increment_pending(key)
         
+        # resolve method alias (e.g. 'short' → '_nosleep_short')
+        aliases = getattr(proxy._wrapped_class, '_share_method_aliases', None)
+        target_method = self._method_name
+        if aliases and self._method_name in aliases:
+            target_method = aliases[self._method_name]
+        
         # queue the command to be executed by the coordinator process
         proxy._coordinator.queue_command(
             proxy._object_name,
-            self._method_name,
+            target_method,
             args,
             kwargs,
             write_attrs,

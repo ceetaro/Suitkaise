@@ -310,6 +310,222 @@ def test_object_proxy_fallback_attr():
 
 
 # =============================================================================
+# Sktimer Blocked Methods in Share
+# =============================================================================
+
+def test_sktimer_blocked_start():
+    """Sktimer.start() should raise TypeError when accessed through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        try:
+            share.timer.start()
+            raise AssertionError("Expected TypeError for start()")
+        except TypeError as e:
+            assert "start()" in str(e)
+            assert "add_time" in str(e)
+    finally:
+        share.stop()
+
+
+def test_sktimer_blocked_stop():
+    """Sktimer.stop() should raise TypeError when accessed through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        try:
+            share.timer.stop()
+            raise AssertionError("Expected TypeError for stop()")
+        except TypeError as e:
+            assert "stop()" in str(e)
+    finally:
+        share.stop()
+
+
+def test_sktimer_blocked_pause_resume_lap_discard():
+    """pause/resume/lap/discard should all raise TypeError through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        for method_name in ('pause', 'resume', 'lap', 'discard'):
+            try:
+                getattr(share.timer, method_name)()
+                raise AssertionError(f"Expected TypeError for {method_name}()")
+            except TypeError as e:
+                assert method_name in str(e)
+    finally:
+        share.stop()
+
+
+def test_sktimer_add_time_allowed():
+    """Sktimer.add_time() should work through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        share.timer.add_time(1.5)
+        share.timer.add_time(2.5)
+        assert share.timer.num_times == 2
+        assert abs(share.timer.mean - 2.0) < 0.01
+    finally:
+        share.stop()
+
+
+def test_sktimer_read_properties_allowed():
+    """Sktimer read properties should work through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        share.timer.add_time(3.0)
+        assert share.timer.num_times == 1
+        assert abs(share.timer.most_recent - 3.0) < 0.01
+        assert abs(share.timer.total_time - 3.0) < 0.01
+        assert abs(share.timer.mean - 3.0) < 0.01
+    finally:
+        share.stop()
+
+
+def test_sktimer_reset_allowed():
+    """Sktimer.reset() should work through Share proxy."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        share.timer.add_time(1.0)
+        assert share.timer.num_times == 1
+        share.timer.reset()
+        assert share.timer.num_times == 0
+    finally:
+        share.stop()
+
+
+def test_sktimer_read_methods_return_values():
+    """Sktimer read-only methods (percentile, get_time, etc.) should return values, not None."""
+    from suitkaise.timing import Sktimer
+    share = Share()
+    try:
+        share.timer = Sktimer()
+        share.timer.add_time(1.0)
+        share.timer.add_time(2.0)
+        share.timer.add_time(3.0)
+
+        # percentile() must return a float, not None
+        p95 = share.timer.percentile(95)
+        assert p95 is not None, f"percentile(95) returned None"
+        assert isinstance(p95, float), f"percentile(95) returned {type(p95)}, expected float"
+        assert p95 > 0, f"percentile(95) = {p95}, expected > 0"
+
+        # get_time() must return the recorded value
+        t0 = share.timer.get_time(0)
+        assert t0 is not None, f"get_time(0) returned None"
+        assert abs(t0 - 1.0) < 0.01, f"get_time(0) = {t0}, expected 1.0"
+
+        # get_statistics() must return a stats object
+        stats = share.timer.get_statistics()
+        assert stats is not None, f"get_statistics() returned None"
+    finally:
+        share.stop()
+
+
+# =============================================================================
+# Circuit / BreakingCircuit in Share
+# =============================================================================
+
+def test_circuit_disallowed_in_share():
+    """Circuit should raise TypeError when assigned to Share."""
+    from suitkaise.circuits import Circuit
+    share = Share()
+    try:
+        try:
+            share.circ = Circuit(num_shorts_to_trip=3)
+            raise AssertionError("Expected TypeError for Circuit in Share")
+        except TypeError as e:
+            assert "Circuit" in str(e)
+            assert "BreakingCircuit" in str(e)
+    finally:
+        share.stop()
+
+
+def test_breaking_circuit_allowed_in_share():
+    """BreakingCircuit should be assignable to Share."""
+    from suitkaise.circuits import BreakingCircuit
+    share = Share()
+    try:
+        share.breaker = BreakingCircuit(num_shorts_to_trip=3)
+        assert share.breaker.broken == False
+        assert share.breaker.times_shorted == 0
+    finally:
+        share.stop()
+
+
+def test_breaking_circuit_short_no_sleep():
+    """BreakingCircuit.short() through Share should update state without sleeping."""
+    from suitkaise.circuits import BreakingCircuit
+    import time as _time
+
+    share = Share()
+    try:
+        # large sleep to make it obvious if sleep actually fires
+        share.breaker = BreakingCircuit(
+            num_shorts_to_trip=2,
+            sleep_time_after_trip=10.0,
+        )
+
+        t0 = _time.monotonic()
+        share.breaker.short()  # 1st short
+        share.breaker.short()  # 2nd short — trips, but should NOT sleep
+        elapsed = _time.monotonic() - t0
+
+        # if the 10s sleep fired, this would be > 10s
+        assert elapsed < 2.0, f"short() slept in coordinator ({elapsed:.1f}s)"
+        assert share.breaker.broken == True
+        assert share.breaker.total_trips == 2
+    finally:
+        share.stop()
+
+
+def test_breaking_circuit_trip_no_sleep():
+    """BreakingCircuit.trip() through Share should break without sleeping."""
+    from suitkaise.circuits import BreakingCircuit
+    import time as _time
+
+    share = Share()
+    try:
+        share.breaker = BreakingCircuit(
+            num_shorts_to_trip=100,
+            sleep_time_after_trip=10.0,
+        )
+
+        t0 = _time.monotonic()
+        share.breaker.trip()
+        elapsed = _time.monotonic() - t0
+
+        assert elapsed < 2.0, f"trip() slept in coordinator ({elapsed:.1f}s)"
+        assert share.breaker.broken == True
+        assert share.breaker.total_trips == 1
+    finally:
+        share.stop()
+
+
+def test_breaking_circuit_reset_in_share():
+    """BreakingCircuit.reset() should work through Share."""
+    from suitkaise.circuits import BreakingCircuit
+    share = Share()
+    try:
+        share.breaker = BreakingCircuit(num_shorts_to_trip=1)
+        share.breaker.short()  # trips immediately
+        assert share.breaker.broken == True
+        share.breaker.reset()
+        assert share.breaker.broken == False
+    finally:
+        share.stop()
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -326,6 +542,18 @@ def run_all_tests():
     runner.run_test("Share clear/repr", test_share_clear_and_repr)
     runner.run_test("Share serialize/deserialize", test_share_serialize_deserialize)
     runner.run_test("Proxy fallback attr", test_object_proxy_fallback_attr)
+    runner.run_test("Sktimer blocked: start()", test_sktimer_blocked_start)
+    runner.run_test("Sktimer blocked: stop()", test_sktimer_blocked_stop)
+    runner.run_test("Sktimer blocked: pause/resume/lap/discard", test_sktimer_blocked_pause_resume_lap_discard)
+    runner.run_test("Sktimer allowed: add_time()", test_sktimer_add_time_allowed)
+    runner.run_test("Sktimer allowed: read properties", test_sktimer_read_properties_allowed)
+    runner.run_test("Sktimer allowed: reset()", test_sktimer_reset_allowed)
+    runner.run_test("Sktimer read methods return values", test_sktimer_read_methods_return_values)
+    runner.run_test("Circuit disallowed in Share", test_circuit_disallowed_in_share)
+    runner.run_test("BreakingCircuit allowed in Share", test_breaking_circuit_allowed_in_share)
+    runner.run_test("BreakingCircuit short() no sleep", test_breaking_circuit_short_no_sleep)
+    runner.run_test("BreakingCircuit trip() no sleep", test_breaking_circuit_trip_no_sleep)
+    runner.run_test("BreakingCircuit reset() in Share", test_breaking_circuit_reset_in_share)
 
     return runner.print_results()
 

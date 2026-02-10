@@ -369,21 +369,24 @@ class Serializer:
                     return serialized_items
                 
                 elif isinstance(obj, tuple):
-                    # recursively serialize tuple items
-                    # need special handling to preserve tuple type
-                    serialized_items = [
-                        self._serialize_recursive(item)
-                        for item in obj
-                    ]
-                    result = {
-                        "__cucumber_type__": "tuple",
-                        "items": serialized_items,
-                    }
-                    # add object_id if this tuple is circular-capable (was tracked)
-                    if obj_id in self.seen_objects:
-                        result["__object_id__"] = obj_id
-                        self._all_object_ids.add(obj_id)
-                    return result
+                    # namedtuples are tuple subclasses — skip inline path
+                    # so they fall through to the handler dispatch below,
+                    # preserving field names and class info
+                    if not (hasattr(type(obj), '_fields') and hasattr(type(obj), '_make')):
+                        # plain tuple: recursively serialize items
+                        serialized_items = [
+                            self._serialize_recursive(item)
+                            for item in obj
+                        ]
+                        result = {
+                            "__cucumber_type__": "tuple",
+                            "items": serialized_items,
+                        }
+                        # add object_id if this tuple is circular-capable (was tracked)
+                        if obj_id in self.seen_objects:
+                            result["__object_id__"] = obj_id
+                            self._all_object_ids.add(obj_id)
+                        return result
                 
                 elif isinstance(obj, set):
                     # recursively serialize set items

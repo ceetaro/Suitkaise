@@ -92,6 +92,13 @@ class Circuit:
     ────────────────────────────────────────────────────────
     """
     
+    _share_disallowed = (
+        "Circuit cannot be used in Share. Circuit auto-resets and sleeps "
+        "on trip — both behaviors break when replayed in the coordinator "
+        "process. Use BreakingCircuit in Share instead (sleep is automatically "
+        "disabled, state changes work normally)."
+    )
+
     _shared_meta = {
         'methods': {
             'short': {'writes': ['_times_shorted', '_total_trips', '_current_sleep_time']},
@@ -410,6 +417,14 @@ class BreakingCircuit:
         }
     }
 
+    # When used through Share, short() and trip() are aliased to no-sleep
+    # versions. The sleep would execute in the coordinator process (useless),
+    # and block it from processing other commands. State changes still apply.
+    _share_method_aliases = {
+        'short': '_nosleep_short',
+        'trip': '_nosleep_trip',
+    }
+
     def __init__(
         self, 
         num_shorts_to_trip: int,
@@ -620,6 +635,26 @@ class BreakingCircuit:
         sleep_duration = self._apply_jitter(sleep_duration)
         if sleep_duration > 0:
             timing.sleep(sleep_duration)
+
+    # ── Share-safe methods (no sleep) ────────────────────────────────────
+    # These are called by the coordinator via _share_method_aliases when
+    # short() or trip() are invoked through a Share proxy.
+
+    def _nosleep_short(self, custom_sleep: float | None = None) -> None:
+        """State-only short: increment counters and break if threshold reached."""
+        with self._lock:
+            self._times_shorted += 1
+            self._total_trips += 1
+            if self._times_shorted >= self._num_shorts_to_trip:
+                self._broken = True
+                self._times_shorted = 0
+
+    def _nosleep_trip(self, custom_sleep: float | None = None) -> None:
+        """State-only trip: immediately break the circuit."""
+        with self._lock:
+            self._total_trips += 1
+            self._broken = True
+            self._times_shorted = 0
 
     def _apply_jitter(self, sleep_duration: float) -> float:
         """Apply randomized jitter to sleep duration."""

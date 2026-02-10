@@ -11,7 +11,7 @@ columns = 1
 
 # 1.1
 
-title = "Why `sktime`?"
+title = "Why `timing`?"
 
 # 1.2
 
@@ -98,7 +98,7 @@ And I ended up with 2 really awesome things!
 
 ## `@timethis` decorator
 
-Without `sktime` - *7 lines*
+Without `timing` - *7 lines*
 (start of dropdown)
 ```python
 import time # 1
@@ -121,14 +121,14 @@ times_my_function.append(time_taken) # 7
 ```
 (end of dropdown)
 
-With `sktime` - *2 lines*
+With `timing` - *2 lines*
 
 - you can just slap `@timethis()` on any function you need to time
 - stored as a property of the function
 - don't have to edit a function to time it
 
 ```python
-from suitkaise.sktime import timethis # 1
+from suitkaise.timing import timethis # 1
 
 @timethis() # 2
 def my_function():
@@ -144,7 +144,7 @@ result = my_function()
 
 ## `TimeThis` context manager
 
-Without `sktime` - *6 lines*
+Without `timing` - *6 lines*
 (start of dropdown)
 ```python
 import time # 1
@@ -163,15 +163,15 @@ times.append(time_taken) # 6
 (end of dropdown)
 
 
-With `sktime` - *4 lines*
+With `timing` - *4 lines*
 
 - no manual tracking
 - context manager makes it clear what is being timed
 
 ```python
-from suitkaise.sktime import TimeThis, Timer # 1
+from suitkaise.timing import TimeThis, Sktimer # 1
 
-t = Timer() # 2
+t = Sktimer() # 2
 
 with TimeThis(t): # 3
 

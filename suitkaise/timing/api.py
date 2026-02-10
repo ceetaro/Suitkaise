@@ -313,11 +313,16 @@ class TimeThis:
         return self.timer
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Get elapsed time without recording
-        elapsed = self.timer.discard()
-        
-        # Only record if above threshold
-        if elapsed >= self.threshold:
+        try:
+            elapsed = self.timer.discard()
+        except Exception:
+            # never mask the original exception
+            if exc_type is None:
+                raise
+            return  # discard failed, original exception takes priority
+
+        # only record if the block completed without exception
+        if exc_type is None and elapsed >= self.threshold:
             self.timer.add_time(elapsed)
 
 

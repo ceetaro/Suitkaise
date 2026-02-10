@@ -224,19 +224,13 @@ class Sktimer:
     # used by the Share for synchronization
     _shared_meta = {
         'methods': {
-            'start': {'writes': ['_sessions', 'original_start_time']},
-            'stop': {'writes': ['times', '_paused_durations']},
-            'discard': {'writes': []},
-            'lap': {'writes': ['times', '_paused_durations']},
-            'pause': {'writes': ['_sessions']},
-            'resume': {'writes': ['_sessions']},
             'add_time': {'writes': ['times', '_paused_durations']},
             'set_max_times': {'writes': ['times', '_paused_durations', '_max_times']},
             'reset': {'writes': ['times', '_sessions', '_paused_durations', 'original_start_time']},
-            'get_statistics': {'writes': []},
-            'get_stats': {'writes': []},
-            'get_time': {'writes': []},
-            'percentile': {'writes': []},
+            'get_statistics': {'reads': ['times']},
+            'get_stats': {'reads': ['times']},
+            'get_time': {'reads': ['times']},
+            'percentile': {'reads': ['times']},
         },
         'properties': {
             'num_times': {'reads': ['times']},
@@ -257,6 +251,19 @@ class Sktimer:
             'variance': {'reads': ['times']},
             'max_times': {'reads': ['_max_times']},
         }
+    }
+
+    # methods that are blocked when accessed through Share's proxy.
+    # start/stop/pause/resume/lap/discard rely on perf_counter() and
+    # thread-local sessions - they would silently produce meaningless
+    # measurements when replayed in the coordinator process.
+    _share_blocked_methods = {
+        'start':   "Sktimer.start() cannot be used through Share — timing would be measured in the coordinator process, not your subprocess. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
+        'stop':    "Sktimer.stop() cannot be used through Share — timing would be measured in the coordinator process, not your subprocess. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
+        'pause':   "Sktimer.pause() cannot be used through Share — timing sessions are thread-local and cannot cross process boundaries. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
+        'resume':  "Sktimer.resume() cannot be used through Share — timing sessions are thread-local and cannot cross process boundaries. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
+        'lap':     "Sktimer.lap() cannot be used through Share — timing would be measured in the coordinator process, not your subprocess. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
+        'discard': "Sktimer.discard() cannot be used through Share — timing sessions are thread-local and cannot cross process boundaries.",
     }
     
     def __init__(self, max_times: Optional[int] = None):
@@ -894,23 +901,32 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
             if timer._has_active_frame():
                 start = perf_counter()
                 try:
-                    return func(*args, **kwargs)
-                finally:
-                    elapsed = perf_counter() - start
-                    if elapsed >= threshold:
-                        timer.add_time(elapsed)
+                    result = func(*args, **kwargs)
+                except BaseException:
+                    # don't record partial timing on exception
+                    raise
+                elapsed = perf_counter() - start
+                if elapsed >= threshold:
+                    timer.add_time(elapsed)
+                return result
             else:
                 # concurrent session-aware: each thread call starts/stops its own session
                 timer.start()
                 try:
                     result = func(*args, **kwargs)
-                    return result
-                finally:
-                    # get elapsed time without recording
-                    elapsed = timer.discard()
-                    # only record if above threshold
-                    if elapsed >= threshold:
-                        timer.add_time(elapsed)
+                except BaseException:
+                    # don't record partial timing on exception;
+                    # discard the frame so the timer doesn't leak a session
+                    try:
+                        timer.discard()
+                    except Exception:
+                        pass
+                    raise
+                # success path: record timing
+                elapsed = timer.discard()
+                if elapsed >= threshold:
+                    timer.add_time(elapsed)
+                return result
         return wrapper
     return decorator
 
