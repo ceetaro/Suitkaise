@@ -23,6 +23,16 @@ COMPLETED TASKS
 - added dunder protocol methods to _ObjectProxy (__len__, __iter__, __contains__, __bool__, __getitem__, __setitem__, __delitem__, __str__)
 - fixed proxy __getattr__ misclassifying user class methods as read-only (empty writes list was falsy)
 - fixed shared memory leaks at shutdown — stop()/kill() now always clean up segments, added close_local() for child processes, added __del__ to coordinator
+- blocked Sktimer start/stop/pause/resume/lap/discard through Share proxy (_share_blocked_methods) — these rely on perf_counter() and thread-local sessions that produce garbage when replayed in coordinator
+- added _share_blocked_methods support in _ObjectProxy — generic mechanism for any class to declare methods that raise TypeError through Share
+- added _share_disallowed support in Share.__setattr__ — generic mechanism for any class to prevent being added to Share entirely
+- added _share_method_aliases support in _MethodProxy — generic mechanism to route proxy method calls to internal alternatives (e.g. no-sleep variants)
+- disallowed Circuit in Share entirely (_share_disallowed) — auto-reset + sleep fundamentally breaks in coordinator
+- BreakingCircuit short()/trip() now skip sleep through Share via _share_method_aliases → _nosleep_short/_nosleep_trip; state changes still apply
+- fixed Sktimer percentile/get_time/get_statistics/get_stats returning None through Share — read-only methods had {'writes': []} which proxy treated as fire-and-forget; changed to {'reads': ['times']}
+- fixed TimeThis and @timethis recording partial timing on exceptions — now only records on successful completion; __exit__ no longer masks original exceptions
+- fixed namedtuple serialization in cucumber — NamedTupleHandler existed but was never invoked because isinstance(obj, tuple) intercepted first; now namedtuples route to handler preserving fields/class/module
+- updated timing-why.md docs (sktime→timing, Timer→Sktimer)
 
 
 TEST RELEASE
@@ -34,15 +44,15 @@ TEST RELEASE
 *4. organize the changelog by date.
 *5. build 0.4.0b0 package and upload to test pypi
 
-5.5. bug fixes
+*5.5. bug fixes
 
-6. wait for me to test package in a different project space, by running all examples, tests, and benchmarks
-7. confirm that dev has given the go ahead
+*6. wait for me to test package in a different project space, by running all examples, tests, and benchmarks
+*7. confirm that dev has given the go ahead
 
 ACTUAL RELEASE
 
 8. what do I have to do in github to prepare for release?
-*9. anything else I need to do pre release? (licensing verified)
+9. anything else I need to do pre release? (licensing verified)
 10. build 0.4.0b0 package and upload to pypi
 11. test package in a different project space, by running all examples, tests, and benchmarks, ensuring all work (can reuse same test space)
 
