@@ -28,6 +28,7 @@ project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
 from suitkaise.timing import Sktimer, timethis, clear_global_timers
+from suitkaise.sk import sk
 
 
 # =============================================================================
@@ -477,8 +478,8 @@ def test_timethis_with_other_decorators():
 # Exception Handling Tests
 # =============================================================================
 
-def test_timethis_exception_still_times():
-    """@timethis should record time even when function raises."""
+def test_timethis_exception_does_not_time():
+    """@timethis should NOT record time when function raises (avoid polluting stats)."""
     timer = Sktimer()
     
     @timethis(timer, threshold=0.0)
@@ -491,8 +492,8 @@ def test_timethis_exception_still_times():
     except ValueError:
         pass
     
-    # Time should still be recorded
-    assert timer.num_times == 1, f"Should record time on exception, got {timer.num_times}"
+    # Time should NOT be recorded — partial measurements pollute statistics
+    assert timer.num_times == 0, f"Should not record time on exception, got {timer.num_times}"
 
 
 def test_timethis_exception_propagates():
@@ -506,6 +507,65 @@ def test_timethis_exception_propagates():
         assert False, "Should have raised TypeError"
     except TypeError as e:
         assert "specific error" in str(e)
+
+
+# =============================================================================
+# @sk Modifier Interaction Tests
+# =============================================================================
+
+def test_timethis_sk_retry_preserves_timing():
+    """@timethis + @sk retry should still record timing for successful calls."""
+    timer = Sktimer()
+    
+    @timethis(timer, threshold=0.0)
+    @sk
+    def always_succeeds():
+        stdlib_time.sleep(0.005)
+        return 42
+    
+    result = always_succeeds.retry(times=3)()
+    assert result == 42, f"Expected 42, got {result}"
+    assert timer.num_times == 1, f"Expected 1 timing recorded, got {timer.num_times}"
+    assert timer.most_recent >= 0.004, f"Expected timing >= 0.004s, got {timer.most_recent}"
+
+
+def test_timethis_sk_retry_records_after_failures():
+    """retry + @timethis: only the successful attempt should be timed."""
+    timer = Sktimer()
+    call_count = [0]
+    
+    @timethis(timer, threshold=0.0)
+    @sk
+    def fails_twice_then_succeeds():
+        call_count[0] += 1
+        if call_count[0] <= 2:
+            raise ValueError(f"fail #{call_count[0]}")
+        stdlib_time.sleep(0.005)
+        return "ok"
+    
+    result = fails_twice_then_succeeds.retry(times=5, delay=0.0)()
+    assert result == "ok", f"Expected 'ok', got {result}"
+    assert call_count[0] == 3, f"Expected 3 calls, got {call_count[0]}"
+    # only the successful (3rd) attempt should be timed
+    assert timer.num_times == 1, f"Expected 1 timing (success only), got {timer.num_times}"
+
+
+def test_timethis_sk_retry_all_fail_no_timing():
+    """retry + @timethis: if all retries fail, no timing should be recorded."""
+    timer = Sktimer()
+    
+    @timethis(timer, threshold=0.0)
+    @sk
+    def always_fails():
+        raise RuntimeError("always fails")
+    
+    try:
+        always_fails.retry(times=3, delay=0.0)()
+        assert False, "Should have raised RuntimeError"
+    except RuntimeError:
+        pass
+    
+    assert timer.num_times == 0, f"Expected 0 timing (all failed), got {timer.num_times}"
 
 
 # =============================================================================
@@ -632,8 +692,13 @@ def run_all_tests():
     runner.run_test("@timethis with other decorators", test_timethis_with_other_decorators)
     
     # Exception tests
-    runner.run_test("@timethis exception still times", test_timethis_exception_still_times)
+    runner.run_test("@timethis exception does not time", test_timethis_exception_does_not_time)
     runner.run_test("@timethis exception propagates", test_timethis_exception_propagates)
+    
+    # @sk modifier interaction tests
+    runner.run_test("@timethis + @sk retry preserves timing", test_timethis_sk_retry_preserves_timing)
+    runner.run_test("@timethis + @sk retry records on success after failures", test_timethis_sk_retry_records_after_failures)
+    runner.run_test("@timethis + @sk retry all fail records nothing", test_timethis_sk_retry_all_fail_no_timing)
     
     # docstring examples
     runner.run_test("doc: timethis auto", test_doc_timethis_auto_example)

@@ -25,7 +25,7 @@ def _find_project_root(start: Path) -> Path:
 project_root = _find_project_root(Path(__file__).resolve())
 sys.path.insert(0, str(project_root))
 
-from suitkaise.sk import SkModifierError
+from suitkaise.sk import SkModifierError, sk, blocking
 from suitkaise.sk.api import Skclass
 from suitkaise.processing import Share
 
@@ -321,15 +321,15 @@ def test_skclass_async_methods_work():
 
 
 def test_skclass_async_non_blocking_methods():
-    """Non-blocking methods should still work (sync) in async class."""
+    """Non-blocking methods should be awaitable in async class."""
     async def async_test():
         SkWorker = Skclass(SlowWorker)
         AsyncWorker = SkWorker.asynced()
         
         worker = AsyncWorker()
         
-        # fast_work is not blocking, should work normally
-        result = worker.fast_work()
+        # fast_work is not blocking, but should still be awaitable
+        result = await worker.fast_work()
         
         assert result == "fast"
     
@@ -438,6 +438,80 @@ def test_doc_skclass_share_example():
 
 
 # =============================================================================
+# @sk Class asynced() Tests
+# =============================================================================
+
+def test_sk_class_asynced_blocking_method():
+    """@sk class .asynced() should produce awaitable blocking methods."""
+    import hashlib
+
+    @sk
+    class Hasher:
+        @blocking
+        def compute(self, data: str) -> str:
+            return hashlib.sha256(data.encode()).hexdigest()
+
+    async def async_test():
+        AsyncHasher = Hasher.asynced()
+        h = AsyncHasher()
+        result = await h.compute("hello")
+        expected = hashlib.sha256(b"hello").hexdigest()
+        assert result == expected, f"Expected {expected}, got {result}"
+
+    asyncio.run(async_test())
+
+
+def test_sk_class_asynced_non_blocking_method():
+    """@sk class .asynced() should make non-blocking methods awaitable too."""
+    @sk
+    class Worker:
+        @blocking
+        def slow(self):
+            stdlib_time.sleep(0.01)
+            return "slow"
+
+        def fast(self):
+            return "fast"
+
+    async def async_test():
+        AsyncWorker = Worker.asynced()
+        w = AsyncWorker()
+        # non-blocking method should still be awaitable
+        result = await w.fast()
+        assert result == "fast", f"Expected 'fast', got {result}"
+
+    asyncio.run(async_test())
+
+
+def test_sk_class_asynced_concurrent():
+    """@sk class .asynced() blocking methods should run concurrently."""
+    @sk
+    class Sleeper:
+        @blocking
+        def nap(self):
+            stdlib_time.sleep(0.02)
+            return "done"
+
+    async def async_test():
+        AsyncSleeper = Sleeper.asynced()
+        sleepers = [AsyncSleeper() for _ in range(3)]
+
+        start = stdlib_time.perf_counter()
+        results = await asyncio.gather(
+            sleepers[0].nap(),
+            sleepers[1].nap(),
+            sleepers[2].nap(),
+        )
+        elapsed = stdlib_time.perf_counter() - start
+
+        assert all(r == "done" for r in results)
+        # concurrent: ~20ms, not ~60ms
+        assert elapsed < 0.05, f"Should be concurrent (~20ms), got {elapsed:.3f}s"
+
+    asyncio.run(async_test())
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 
@@ -474,6 +548,11 @@ def run_all_tests():
     runner.run_test("doc: Skclass basic", test_doc_skclass_basic_example)
     runner.run_test("doc: Skclass async", test_doc_skclass_async_example)
     runner.run_test("doc: Skclass Share", test_doc_skclass_share_example)
+    
+    # @sk class asynced() tests
+    runner.run_test("@sk class asynced blocking method", test_sk_class_asynced_blocking_method)
+    runner.run_test("@sk class asynced non-blocking method", test_sk_class_asynced_non_blocking_method)
+    runner.run_test("@sk class asynced concurrent", test_sk_class_asynced_concurrent)
     
     return runner.print_results()
 

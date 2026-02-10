@@ -45,5 +45,5 @@ __all__ = [
 ]
 
 # Module metadata
-__version__ = "0.4.2b0"
+__version__ = "0.4.4b0"
 __author__ = "Suitkaise Development Team"

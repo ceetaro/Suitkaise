@@ -29,6 +29,27 @@ def _create_async_method(sync_method: Callable, method_name: str) -> Callable:
     return async_wrapper
 
 
+def _create_async_passthrough(sync_method: Callable, method_name: str) -> Callable:
+    """
+    Create a trivial async wrapper for a non-blocking sync method.
+    
+    Calls the method directly (no thread pool) and returns the result
+    so that `await instance.method()` works uniformly on async classes.
+    
+    Args:
+        sync_method: The original synchronous method
+        method_name: Name of the method (for debugging)
+        
+    Returns:
+        Async wrapper function
+    """
+    @functools.wraps(sync_method)
+    async def async_wrapper(self, *args, **kwargs):
+        return sync_method(self, *args, **kwargs)
+    
+    return async_wrapper
+
+
 def create_async_class(
     original_cls: Type,
     blocking_methods: Dict[str, List[str]],
@@ -64,6 +85,12 @@ def create_async_class(
             if name not in ('__init__', '__repr__', '__str__'):
                 continue
         
+        # unwrap _ModifiableMethod / _AsyncModifiableMethod descriptors
+        # (@sk replaces class methods with these, but we need the raw function)
+        raw_func = getattr(member, '_sync_method', None) or getattr(member, '_async_method', None)
+        if raw_func is not None:
+            member = raw_func
+        
         if name in blocking_methods:
             # this method has blocking calls - wrap it
             if callable(member) and not isinstance(member, (type, property)):
@@ -79,8 +106,12 @@ def create_async_class(
             else:
                 namespace[name] = member
         elif callable(member) and not isinstance(member, type):
-            # non-blocking method - keep as sync
-            namespace[name] = member
+            # dunder methods must stay sync (Python calls them implicitly)
+            if name.startswith('__') and name.endswith('__'):
+                namespace[name] = member
+            else:
+                # non-blocking method — wrap in trivial async so await works uniformly
+                namespace[name] = _create_async_passthrough(member, name)
     
     # create the new class
     async_class = type(class_name, (original_cls,), namespace)

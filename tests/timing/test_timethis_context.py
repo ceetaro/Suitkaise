@@ -271,8 +271,8 @@ def test_timethis_lap():
 # TimeThis Exception Handling Tests
 # =============================================================================
 
-def test_timethis_exception_still_times():
-    """TimeThis should record time even on exception."""
+def test_timethis_exception_does_not_time():
+    """TimeThis should NOT record time on exception (avoid polluting stats)."""
     timer = Sktimer()
     
     try:
@@ -282,7 +282,7 @@ def test_timethis_exception_still_times():
     except ValueError:
         pass
     
-    assert timer.num_times == 1, f"Should record time on exception, got {timer.num_times}"
+    assert timer.num_times == 0, f"Should not record time on exception, got {timer.num_times}"
 
 
 def test_timethis_exception_propagates():
@@ -456,7 +456,7 @@ def run_all_tests():
     runner.run_test("TimeThis lap", test_timethis_lap)
     
     # Exception tests
-    runner.run_test("TimeThis exception still times", test_timethis_exception_still_times)
+    runner.run_test("TimeThis exception does not time", test_timethis_exception_does_not_time)
     runner.run_test("TimeThis exception propagates", test_timethis_exception_propagates)
     runner.run_test("TimeThis exception below threshold", test_timethis_exception_below_threshold)
     

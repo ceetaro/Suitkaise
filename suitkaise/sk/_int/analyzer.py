@@ -357,6 +357,7 @@ class _AttributeVisitor(ast.NodeVisitor):
     def __init__(self):
         self.reads: Set[str] = set()
         self.writes: Set[str] = set()
+        self.has_return_value: bool = False
         self._in_store_context = False
     
     def visit_Attribute(self, node: ast.Attribute) -> None:
@@ -373,6 +374,14 @@ class _AttributeVisitor(ast.NodeVisitor):
                 self.reads.add(attr_name)
         
         # continue visiting children
+        self.generic_visit(node)
+    
+    def visit_Return(self, node: ast.Return) -> None:
+        """Detect explicit return statements with a non-None value."""
+        if node.value is not None:
+            # exclude bare `return None`
+            if not (isinstance(node.value, ast.Constant) and node.value.value is None):
+                self.has_return_value = True
         self.generic_visit(node)
     
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
@@ -454,18 +463,19 @@ def _get_method_source(method) -> str | None:
         return None
 
 
-def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
+def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str], bool]:
     """
     Analyze a single method to extract:
     - reads: set of self.attr that are read
     - writes: set of self.attr that are written
     - blocking_calls: list of blocking calls found
+    - has_return_value: whether the method has an explicit return <value>
     
     Checks for @blocking decorator first - if present, skips AST analysis
     for blocking detection (performance optimization).
     
     Returns:
-        Tuple of (reads, writes, blocking_calls)
+        Tuple of (reads, writes, blocking_calls, has_return_value)
     """
     # check for explicit @blocking decorator FIRST
     # if found, we can skip AST analysis for blocking detection
@@ -474,27 +484,27 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
         # still need to analyze for attribute access (_shared_meta)
         source = _get_method_source(method)
         if source is None:
-            return set(), set(), ['@blocking']
+            return set(), set(), ['@blocking'], False
         
         try:
             tree = ast.parse(source)
         except SyntaxError:
-            return set(), set(), ['@blocking']
+            return set(), set(), ['@blocking'], False
         
         # only analyze attributes, skip blocking call detection
         attr_visitor = _AttributeVisitor()
         attr_visitor.visit(tree)
-        return attr_visitor.reads, attr_visitor.writes, ['@blocking']
+        return attr_visitor.reads, attr_visitor.writes, ['@blocking'], attr_visitor.has_return_value
     
     # no @blocking decorator - do full AST analysis
     source = _get_method_source(method)
     if source is None:
-        return set(), set(), []
+        return set(), set(), [], False
     
     try:
         tree = ast.parse(source)
     except SyntaxError:
-        return set(), set(), []
+        return set(), set(), [], False
     
     # find attribute accesses
     attr_visitor = _AttributeVisitor()
@@ -504,7 +514,7 @@ def _analyze_method(method) -> Tuple[Set[str], Set[str], List[str]]:
     blocking_visitor = _BlockingCallVisitor()
     blocking_visitor.visit(tree)
     
-    return attr_visitor.reads, attr_visitor.writes, blocking_visitor.blocking_calls
+    return attr_visitor.reads, attr_visitor.writes, blocking_visitor.blocking_calls, attr_visitor.has_return_value
 
 
 def analyze_class(cls: Type) -> Tuple[Dict[str, Any], Dict[str, List[str]]]:
@@ -535,7 +545,7 @@ def analyze_class(cls: Type) -> Tuple[Dict[str, Any], Dict[str, List[str]]]:
         if isinstance(member, property):
             # analyze property getter
             if member.fget:
-                reads, writes, blocks = _analyze_method(member.fget)
+                reads, writes, blocks, _ = _analyze_method(member.fget)
                 if not is_private:
                     shared_meta['properties'][name] = {'reads': list(reads)}
                 if blocks:
@@ -543,9 +553,22 @@ def analyze_class(cls: Type) -> Tuple[Dict[str, Any], Dict[str, List[str]]]:
                     
         elif callable(member) and not isinstance(member, type):
             # it's a method
-            reads, writes, blocks = _analyze_method(member)
+            reads, writes, blocks, has_return = _analyze_method(member)
             if not is_private:
-                shared_meta['methods'][name] = {'writes': list(writes)}
+                if writes:
+                    # detected direct self.attr writes → fire-and-forget
+                    method_entry: Dict[str, Any] = {'writes': list(writes)}
+                    if reads:
+                        method_entry['reads'] = list(reads)
+                elif has_return:
+                    # no writes but returns a value → read-only (fetch & call)
+                    method_entry = {'reads': list(reads)} if reads else {}
+                else:
+                    # no writes, no return value → conservative fire-and-forget
+                    # (covers in-place mutations like self.items[key]=val,
+                    #  self.list.append(), etc. that AST can't detect as writes)
+                    method_entry = {'writes': []}
+                shared_meta['methods'][name] = method_entry
             if blocks:
                 blocking_calls[name] = blocks
     

@@ -38,7 +38,7 @@ sys.path.insert(0, str(project_root))
 
 from suitkaise.processing import Share
 from suitkaise.timing import Sktimer
-from suitkaise.circuits import Circuit
+from suitkaise.circuits import Circuit, BreakingCircuit
 from suitkaise.sk import sk
 from suitkaise.sk.api import Skclass
 from suitkaise.cucumber._int.handlers.sqlite_handler import SQLiteConnectionReconnector
@@ -236,9 +236,7 @@ def test_timer_shared_meta_structure():
     assert 'methods' in meta
     assert 'properties' in meta
     
-    # Check key methods
-    assert 'start' in meta['methods']
-    assert 'stop' in meta['methods']
+    # start/stop are now in _share_blocked_methods, not _shared_meta
     assert 'add_time' in meta['methods']
     assert 'reset' in meta['methods']
     
@@ -251,15 +249,15 @@ def test_timer_shared_meta_writes():
     """Sktimer._shared_meta methods should declare writes."""
     meta = Sktimer._shared_meta
     
-    # start() writes to _sessions and original_start_time
-    start_meta = meta['methods']['start']
-    assert 'writes' in start_meta
-    assert '_sessions' in start_meta['writes']
-    
     # add_time() writes to times
     add_meta = meta['methods']['add_time']
     assert 'writes' in add_meta
     assert 'times' in add_meta['writes']
+    
+    # reset() writes to times, _sessions, etc.
+    reset_meta = meta['methods']['reset']
+    assert 'writes' in reset_meta
+    assert 'times' in reset_meta['writes']
 
 
 def test_timer_shared_meta_reads():
@@ -407,11 +405,18 @@ def test_share_clear():
 
 
 def test_share_set_circuit():
-    """Share should accept Circuit."""
+    """Circuit should be disallowed in Share; BreakingCircuit should be accepted."""
     share = Share()
     try:
-        # Circuit requires num_shorts_to_trip
-        share.circuit = Circuit(num_shorts_to_trip=3)
+        # Circuit is disallowed (auto-reset + sleep breaks in coordinator)
+        try:
+            share.circuit = Circuit(num_shorts_to_trip=3)
+            assert False, "Should have raised TypeError"
+        except TypeError:
+            pass
+        
+        # BreakingCircuit is allowed (sleep is disabled via aliases)
+        share.circuit = BreakingCircuit(num_shorts_to_trip=3)
         assert hasattr(share, 'circuit')
     finally:
         share.exit()
@@ -432,7 +437,7 @@ def test_share_set_multiple_objects():
     share = Share()
     try:
         share.timer = Sktimer()
-        share.circuit = Circuit(num_shorts_to_trip=3)
+        share.circuit = BreakingCircuit(num_shorts_to_trip=3)
         share.counter = Counter()
         
         assert hasattr(share, 'timer')
@@ -620,10 +625,10 @@ def test_share_timer_serializes():
 
 
 def test_share_circuit_serializes():
-    """Circuit should serialize correctly in Share."""
+    """BreakingCircuit should serialize correctly in Share."""
     share = Share()
     try:
-        circuit = Circuit(
+        circuit = BreakingCircuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=0.5,
             backoff_factor=2.0

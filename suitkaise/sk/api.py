@@ -811,29 +811,38 @@ def sk(cls_or_func):
         func.has_blocking_calls = len(blocking_calls) > 0
         func.blocking_calls = blocking_calls
         
+        # mutable reference so outer decorators (e.g. @timethis) can update
+        # the target function and sk modifiers will use the outermost wrapper
+        _func_ref = [func]
+        
+        def _sk_update_source(new_func):
+            """Called by outer decorators to redirect sk modifiers."""
+            _func_ref[0] = new_func
+        
         # attach methods that use Skfunction internally for chaining
         def asynced():
             """Get async version. Raises SkModifierError if no blocking calls."""
             if not blocking_calls:
                 raise SkModifierError(f"{func.__name__} has no blocking calls")
-            return Skfunction(func).asynced()
+            return Skfunction(_func_ref[0]).asynced()
         
         def retry(times: int = 3, delay: float = 1.0, backoff_factor: float = 1.0, exceptions: tuple = (Exception,)):
             """Get version that retries on failure."""
-            return Skfunction(func).retry(times, delay, backoff_factor, exceptions)
+            return Skfunction(_func_ref[0]).retry(times, delay, backoff_factor, exceptions)
         
         def timeout(seconds: float):
             """Get version with execution timeout."""
-            return Skfunction(func).timeout(seconds)
+            return Skfunction(_func_ref[0]).timeout(seconds)
         
         def background():
             """Get version that runs in background thread."""
-            return Skfunction(func).background()
+            return Skfunction(_func_ref[0]).background()
 
         def rate_limit(per_second: float):
             """Get version with rate limiting."""
-            return Skfunction(func).rate_limit(per_second)
+            return Skfunction(_func_ref[0]).rate_limit(per_second)
         
+        func._sk_update_source = _sk_update_source
         func.asynced = asynced
         func.retry = retry
         func.timeout = timeout

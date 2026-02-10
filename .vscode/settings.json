@@ -10,5 +10,6 @@
     "code-runner.executorMap": {
         "python": "/opt/homebrew/bin/python3.11"
     },
+    "code-runner.ignoreSelection": true,
     "terminal.integrated.scrollback": 20000
 }

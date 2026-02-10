@@ -51,9 +51,9 @@ TEST RELEASE
 
 ACTUAL RELEASE
 
-8. what do I have to do in github to prepare for release?
-9. anything else I need to do pre release? (licensing verified)
-10. build 0.4.0b0 package and upload to pypi
+*8. what do I have to do in github to prepare for release?
+*9. anything else I need to do pre release? (licensing verified)
+10. build 0.4.2b0 package and upload to pypi
 11. test package in a different project space, by running all examples, tests, and benchmarks, ensuring all work (can reuse same test space)
 
 

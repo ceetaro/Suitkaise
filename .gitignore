@@ -52,3 +52,6 @@ suitkaise/fileconv/tests/*_results/
 # image assets
 site/__assets__/
 suitkaise-noncode/
+
+# Code Runner temp files
+tempCodeRunnerFile*

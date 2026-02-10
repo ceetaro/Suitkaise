@@ -399,6 +399,100 @@ def test_skpath_hash():
 
 
 # =============================================================================
+# Ordering Comparison Tests
+# =============================================================================
+
+def test_skpath_less_than():
+    """Skpath should support < comparison."""
+    path_a = Skpath("/aaa/file.txt")
+    path_b = Skpath("/bbb/file.txt")
+    
+    assert path_a < path_b, f"Expected {path_a} < {path_b}"
+    assert not (path_b < path_a), f"Expected not {path_b} < {path_a}"
+
+
+def test_skpath_greater_than():
+    """Skpath should support > comparison."""
+    path_a = Skpath("/aaa/file.txt")
+    path_b = Skpath("/bbb/file.txt")
+    
+    assert path_b > path_a, f"Expected {path_b} > {path_a}"
+    assert not (path_a > path_b), f"Expected not {path_a} > {path_b}"
+
+
+def test_skpath_less_equal():
+    """Skpath should support <= comparison."""
+    path_a = Skpath("/aaa/file.txt")
+    path_b = Skpath("/bbb/file.txt")
+    path_a2 = Skpath("/aaa/file.txt")
+    
+    assert path_a <= path_b
+    assert path_a <= path_a2  # equal paths
+    assert not (path_b <= path_a)
+
+
+def test_skpath_greater_equal():
+    """Skpath should support >= comparison."""
+    path_a = Skpath("/aaa/file.txt")
+    path_b = Skpath("/bbb/file.txt")
+    path_b2 = Skpath("/bbb/file.txt")
+    
+    assert path_b >= path_a
+    assert path_b >= path_b2  # equal paths
+    assert not (path_a >= path_b)
+
+
+def test_skpath_compare_with_str():
+    """Skpath ordering should work with str operands."""
+    path = Skpath("/bbb/file.txt")
+    
+    assert path > "/aaa/file.txt"
+    assert path < "/ccc/file.txt"
+
+
+def test_skpath_compare_with_path():
+    """Skpath ordering should work with pathlib.Path operands."""
+    path = Skpath("/bbb/file.txt")
+    
+    assert path > Path("/aaa/file.txt")
+    assert path < Path("/ccc/file.txt")
+
+
+def test_skpath_sorted():
+    """Skpath should work with sorted() for lexicographic ordering."""
+    paths = [
+        Skpath("/c/file.txt"),
+        Skpath("/a/file.txt"),
+        Skpath("/b/file.txt"),
+    ]
+    
+    result = sorted(paths)
+    names = [p.parts[1] for p in result]
+    assert names == ['a', 'b', 'c'], f"Expected ['a', 'b', 'c'], got {names}"
+
+
+def test_skpath_case_sensitive_ordering():
+    """Skpath ordering must be case-sensitive on all platforms (uppercase < lowercase)."""
+    upper = Skpath("/tmp/Apple")
+    lower = Skpath("/tmp/banana")
+    
+    # 'A' (65) < 'b' (98) in ASCII — must hold even on Windows
+    assert upper < lower, f"Expected case-sensitive: {upper} < {lower}"
+    assert lower > upper
+
+
+def test_skpath_compare_not_implemented():
+    """Skpath ordering with non-path types should return NotImplemented."""
+    path = Skpath("/a/file.txt")
+    
+    try:
+        result = path < 42
+        assert False, "Should have raised TypeError"
+    except TypeError:
+        pass  # expected — Python raises TypeError when both sides return NotImplemented
+
+
+# =============================================================================
 # String Conversion Tests
 # =============================================================================
 
@@ -465,6 +559,17 @@ def run_all_tests():
     runner.run_test("Skpath equality", test_skpath_equality)
     runner.run_test("Skpath inequality", test_skpath_inequality)
     runner.run_test("Skpath hash", test_skpath_hash)
+    
+    # Ordering comparison tests
+    runner.run_test("Skpath <", test_skpath_less_than)
+    runner.run_test("Skpath >", test_skpath_greater_than)
+    runner.run_test("Skpath <=", test_skpath_less_equal)
+    runner.run_test("Skpath >=", test_skpath_greater_equal)
+    runner.run_test("Skpath < > with str", test_skpath_compare_with_str)
+    runner.run_test("Skpath < > with Path", test_skpath_compare_with_path)
+    runner.run_test("Skpath sorted()", test_skpath_sorted)
+    runner.run_test("Skpath case-sensitive ordering", test_skpath_case_sensitive_ordering)
+    runner.run_test("Skpath < non-path TypeError", test_skpath_compare_not_implemented)
     
     # String conversion tests
     runner.run_test("str(Skpath)", test_skpath_str)

@@ -275,7 +275,7 @@ def test_timethis_preserves_return():
 
 
 def test_timethis_preserves_exception():
-    """@timethis should propagate exceptions."""
+    """@timethis should propagate exceptions without recording timing."""
     clear_global_timers()
     
     @timethis()
@@ -288,8 +288,8 @@ def test_timethis_preserves_exception():
     except ValueError as e:
         assert str(e) == "test error"
     
-    # Time should still be recorded
-    assert raises_error.timer.num_times == 1
+    # Time should NOT be recorded on exception (avoid polluting stats)
+    assert raises_error.timer.num_times == 0
 
 
 def test_timethis_preserves_args():

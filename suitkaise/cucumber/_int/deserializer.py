@@ -589,7 +589,8 @@ class Deserializer:
             # replace placeholder with real object in registry
             if obj_id is not None:
                 self._object_registry[obj_id] = obj
-                placeholder.real_object = obj  # Update placeholder for any existing references
+                if placeholder is not None and isinstance(placeholder, _ReconstructionPlaceholder):
+                    placeholder.real_object = obj  # Update placeholder for any existing references
                 self._log(f"Replaced placeholder with real object {obj_id} ({type_name})")
             
             # post-process to replace placeholders in the reconstructed object

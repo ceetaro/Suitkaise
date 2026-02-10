@@ -772,6 +772,47 @@ class Skpath:
             return NotImplemented
         return not result
     
+    def _ordering_key(self, other: Any):
+        """Return (self_parts, other_parts) for case-sensitive ordering, or NotImplemented."""
+        if isinstance(other, Skpath):
+            other_parts = other._path.parts
+        elif isinstance(other, Path):
+            other_parts = other.parts
+        elif isinstance(other, str):
+            other_parts = Path(other).parts
+        else:
+            return NotImplemented
+        # always case-sensitive: compare raw str parts regardless of OS
+        return (self._path.parts, other_parts)
+    
+    def __lt__(self, other: Any) -> bool:
+        """Less-than comparison (case-sensitive lexicographic by path components)."""
+        key = self._ordering_key(other)
+        if key is NotImplemented:
+            return NotImplemented
+        return key[0] < key[1]
+    
+    def __le__(self, other: Any) -> bool:
+        """Less-than-or-equal comparison (case-sensitive)."""
+        key = self._ordering_key(other)
+        if key is NotImplemented:
+            return NotImplemented
+        return key[0] <= key[1]
+    
+    def __gt__(self, other: Any) -> bool:
+        """Greater-than comparison (case-sensitive lexicographic by path components)."""
+        key = self._ordering_key(other)
+        if key is NotImplemented:
+            return NotImplemented
+        return key[0] > key[1]
+    
+    def __ge__(self, other: Any) -> bool:
+        """Greater-than-or-equal comparison (case-sensitive)."""
+        key = self._ordering_key(other)
+        if key is NotImplemented:
+            return NotImplemented
+        return key[0] >= key[1]
+    
     def __hash__(self) -> int:
         """
         Return hash for use in sets and dict keys.

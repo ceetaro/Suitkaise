@@ -927,6 +927,13 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
                 if elapsed >= threshold:
                     timer.add_time(elapsed)
                 return result
+        
+        # if the wrapped function has @sk modifiers, redirect them to use
+        # the timed wrapper so retry/timeout/background go through timing
+        _sk_update = getattr(func, '_sk_update_source', None)
+        if _sk_update is not None:
+            _sk_update(wrapper)
+        
         return wrapper
     return decorator
 

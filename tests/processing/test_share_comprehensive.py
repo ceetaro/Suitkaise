@@ -166,8 +166,9 @@ def test_share_timer_has_shared_meta():
     
     assert 'methods' in meta
     assert 'properties' in meta
-    assert 'start' in meta['methods']
-    assert 'stop' in meta['methods']
+    # start/stop are now in _share_blocked_methods, not _shared_meta
+    assert 'add_time' in meta['methods']
+    assert 'reset' in meta['methods']
     assert 'mean' in meta['properties']
 
 
