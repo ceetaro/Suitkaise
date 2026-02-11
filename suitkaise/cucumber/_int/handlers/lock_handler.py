@@ -21,6 +21,9 @@ import threading
 from typing import Any, Dict, Union
 from .base_class import Handler
 
+_LOCK_TYPE = type(threading.Lock())
+_RLOCK_TYPE = type(threading.RLock())
+
 
 class LockSerializationError(Exception):
     """Raised when lock serialization fails."""
@@ -51,11 +54,7 @@ class LockHandler(Handler):
         Note: type(obj) might be a private _thread.lock type, so we check
         the module and class name.
         """
-        obj_type = type(obj)
-        return (
-            obj_type == threading.Lock().__class__ or  # threading.Lock
-            obj_type == threading.RLock().__class__    # threading.RLock
-        )
+        return isinstance(obj, (_LOCK_TYPE, _RLOCK_TYPE))
     
     def extract_state(self, obj: Any) -> Dict[str, Any]:
         """
@@ -69,7 +68,7 @@ class LockHandler(Handler):
         For RLock, we try acquire(blocking=False) to check state.
         """
         # determine lock type by comparing to known lock types
-        is_rlock = type(obj) == threading.RLock().__class__
+        is_rlock = isinstance(obj, _RLOCK_TYPE)
         
         if is_rlock:
             lock_type_name = "RLock"
@@ -178,8 +177,14 @@ class SemaphoreHandler(Handler):
         This gets the counter to the right value, though the actual
         acquisition history is lost (which is fine for most use cases).
         """
-        initial = state["initial_value"]
-        current = state["current_value"]
+        initial = int(state["initial_value"])
+        current = int(state["current_value"])
+        if initial < 0:
+            raise LockSerializationError("Semaphore initial_value must be >= 0")
+        if current < 0 or current > initial:
+            raise LockSerializationError(
+                f"Semaphore current_value ({current}) must be between 0 and initial_value ({initial})"
+            )
         
         # create semaphore of appropriate type
         if state["semaphore_type"] == "BoundedSemaphore":

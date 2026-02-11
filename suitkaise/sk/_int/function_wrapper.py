@@ -8,7 +8,7 @@ import asyncio
 import functools
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import Future
 from typing import Callable, Any, TypeVar, ParamSpec, Optional, Type, Tuple, Awaitable
 
 P = ParamSpec('P')
@@ -38,7 +38,6 @@ class RateLimiter:
         # minimum spacing between calls
         self._min_interval = 1.0 / per_second
         self._lock = threading.Lock()
-        self._async_lock = asyncio.Lock()
         # last call timestamp in monotonic time
         self._last_call = 0.0
 
@@ -53,14 +52,9 @@ class RateLimiter:
             self._last_call = time.monotonic()
 
     async def acquire_async(self) -> None:
-        async with self._async_lock:
-            now = time.monotonic()
-            # compute remaining delay before next allowed call
-            wait_time = (self._last_call + self._min_interval) - now
-            if wait_time > 0:
-                await asyncio.sleep(wait_time)
-            # update last call after any wait
-            self._last_call = time.monotonic()
+        # Use the same lock/state transition path as sync acquire().
+        # This avoids sync/async races on _last_call.
+        await asyncio.to_thread(self.acquire)
 
 
 def create_retry_wrapper(
@@ -198,16 +192,17 @@ def create_timeout_wrapper(
     
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        # run in a single worker thread and wait for timeout
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(func, *args, **kwargs)
-            try:
-                return future.result(timeout=seconds)
-            except concurrent.futures.TimeoutError:
-                # raise a consistent timeout error for callers
-                raise FunctionTimeoutError(
-                    f"{func.__name__} timed out after {seconds} seconds"
-                )
+        from suitkaise.sk._int.asyncable import _get_executor
+        # run in shared worker pool and wait for timeout
+        future = _get_executor().submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=seconds)
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            # raise a consistent timeout error for callers
+            raise FunctionTimeoutError(
+                f"{func.__name__} timed out after {seconds} seconds"
+            )
     
     return wrapper
 
@@ -250,18 +245,11 @@ def create_background_wrapper(
     Returns:
         Wrapped function that returns a Future
     """
-    # use a shared executor for background tasks
-    # this is created lazily and reused
-    executor: Optional[ThreadPoolExecutor] = None
-    
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Future[R]:
-        nonlocal executor
-        if executor is None:
-            # create executor on first background call
-            executor = ThreadPoolExecutor(max_workers=4)
+        from suitkaise.sk._int.asyncable import _get_executor
         # return Future immediately to avoid blocking
-        return executor.submit(func, *args, **kwargs)
+        return _get_executor().submit(func, *args, **kwargs)
     
     return wrapper
 

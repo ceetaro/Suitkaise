@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suitkaise"
-version = "0.4.5b0"
+version = "0.4.6b0"
 description = "Making things easier for developers of all skill levels to develop complex applications."
 authors = [
     {name = "Casey Eddings", email = "suitkaise@suitkaise.info"}

@@ -281,7 +281,6 @@ class Skfunction(Generic[P, R]):
         3. Function call (innermost)
         """
         import time as time_module
-        from concurrent.futures import ThreadPoolExecutor
         import concurrent.futures
         
         # Extract config
@@ -302,21 +301,15 @@ class Skfunction(Generic[P, R]):
                 rate_limit_config['limiter'].acquire()
             if timeout_config:
                 seconds = timeout_config['seconds']
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    start_time = time_module.perf_counter()
-                    future = executor.submit(func, *args, **kwargs)
-                    try:
-                        result = future.result(timeout=seconds)
-                    except concurrent.futures.TimeoutError:
-                        raise FunctionTimeoutError(
-                            f"{func.__name__} timed out after {seconds} seconds"
-                        )
-                    elapsed = time_module.perf_counter() - start_time
-                    if elapsed > seconds:
-                        raise FunctionTimeoutError(
-                            f"{func.__name__} timed out after {seconds} seconds"
-                        )
-                    return result
+                from ._int.asyncable import _get_executor
+                future = _get_executor().submit(func, *args, **kwargs)
+                try:
+                    return future.result(timeout=seconds)
+                except concurrent.futures.TimeoutError:
+                    future.cancel()
+                    raise FunctionTimeoutError(
+                        f"{func.__name__} timed out after {seconds} seconds"
+                    )
             else:
                 return func(*args, **kwargs)
         

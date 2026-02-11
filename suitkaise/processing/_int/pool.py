@@ -8,6 +8,8 @@ Uses cucumber for serialization, avoiding pickle limitations.
 
 import asyncio
 import multiprocessing
+import os
+import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Any, Callable, Iterator, TypeVar, Generic, Union, Iterable, TYPE_CHECKING
 import queue as queue_module
@@ -21,13 +23,25 @@ R = TypeVar('R')
 # shared executor used by background modifiers
 # worker processes still run via multiprocessing
 _pool_executor: ThreadPoolExecutor | None = None
+_pool_executor_pid: int | None = None
+_pool_executor_lock = threading.Lock()
 
 def _get_pool_executor() -> ThreadPoolExecutor:
     """Get or create the shared thread pool executor for Pool operations."""
-    global _pool_executor
-    if _pool_executor is None:
-        # thread pool only runs coordinator logic for background calls
-        _pool_executor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="pool_bg_")
+    global _pool_executor, _pool_executor_pid
+    pid = os.getpid()
+    if _pool_executor is None or _pool_executor_pid != pid:
+        with _pool_executor_lock:
+            if _pool_executor is None or _pool_executor_pid != pid:
+                # Forked children must not reuse inherited thread-pool internals.
+                if _pool_executor is not None:
+                    try:
+                        _pool_executor.shutdown(wait=False, cancel_futures=True)
+                    except Exception:
+                        pass
+                # thread pool only runs coordinator logic for background calls
+                _pool_executor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="pool_bg_")
+                _pool_executor_pid = pid
     return _pool_executor
 
 

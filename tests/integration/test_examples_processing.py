@@ -77,24 +77,45 @@ class TestRunner:
                 self.results.append(TestResult(name, False, error=f"{type(e).__name__}: {e}"))
             return
 
-        ctx = multiprocessing.get_context("spawn")
+        # On POSIX, fork avoids expensive nested-spawn startup and the
+        # "__main__" import coupling that can cause flaky timeout tests
+        # when this suite is invoked from a larger test runner.
+        start_method = "spawn" if sys.platform == "win32" else "fork"
+        ctx = multiprocessing.get_context(start_method)
         queue = ctx.Queue()
         proc = ctx.Process(target=_run_test_in_subprocess, args=(test_func, queue))
         proc.start()
-        proc.join(timeout=timeout)
-        if proc.is_alive():
-            proc.terminate()
-            proc.join(timeout=1.0)
-            self.results.append(TestResult(name, False, error=f"Timeout after {timeout}s"))
-            return
         try:
-            ok, error = queue.get_nowait()
-        except Exception:
-            ok, error = False, "No result returned"
-        if ok:
-            self.results.append(TestResult(name, True))
-        else:
-            self.results.append(TestResult(name, False, error=error))
+            proc.join(timeout=timeout)
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=1.0)
+                self.results.append(TestResult(name, False, error=f"Timeout after {timeout}s"))
+                return
+
+            # Child may need a short window to flush queue payload after exit.
+            try:
+                ok, error = queue.get(timeout=1.0)
+            except Exception:
+                ok, error = False, "No result returned"
+            if ok:
+                self.results.append(TestResult(name, True))
+            else:
+                self.results.append(TestResult(name, False, error=error))
+        finally:
+            # Deterministic cleanup to prevent descriptor/thread leaks across many tests.
+            try:
+                queue.close()
+            except Exception:
+                pass
+            try:
+                queue.join_thread()
+            except Exception:
+                pass
+            try:
+                proc.close()
+            except Exception:
+                pass
 
     def print_results(self):
         print(f"\n{self.BOLD}{self.CYAN}{'=' * 70}{self.RESET}")

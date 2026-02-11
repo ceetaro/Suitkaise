@@ -25,6 +25,7 @@ except ImportError:
 # import asyncable wrapper
 from suitkaise.sk._int.asyncable import _AsyncableFunction
 
+_TIMETHIS_INIT_LOCK = threading.Lock()
 
 
 # simple timing functions
@@ -486,10 +487,11 @@ def timethis(
                 func_name = func_qualname
                 timer_name = f"{module_name}_{func_name}_timer"
             
-            # get or create global timer (thread-safe)
-            if not hasattr(timethis, '_global_timers'):
-                setattr(timethis, '_global_timers', {})
-                setattr(timethis, '_timers_lock', threading.RLock())
+            # get or create global timer registry safely (single init point)
+            with _TIMETHIS_INIT_LOCK:
+                if not hasattr(timethis, '_global_timers'):
+                    setattr(timethis, '_global_timers', {})
+                    setattr(timethis, '_timers_lock', threading.RLock())
             
             lock = getattr(timethis, '_timers_lock')
             with lock:
@@ -531,6 +533,11 @@ def clear_global_timers() -> None:
         lock = getattr(timethis, '_timers_lock')
         with lock:
             timers = getattr(timethis, '_global_timers')
+            for timer in timers.values():
+                try:
+                    timer.reset()
+                except Exception:
+                    pass
             timers.clear()
 
 

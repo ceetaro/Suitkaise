@@ -9,7 +9,7 @@ Changelog is maintained from version 0.3.0 forward.
 
 ---
 
-## [0.4.5b0] - 2026-02-11
+## [0.4.6b0] - 2026-02-11
 
 ### Fixed
 - Memory leak: `_Coordinator.stop()` skipped `SharedMemory` cleanup when called on an already-stopped coordinator. The early-return path now calls `counter_registry.reset()` to unlink shared memory segments, eliminating the `resource_tracker: leaked shared_memory objects` warning.
@@ -17,6 +17,10 @@ Changelog is maintained from version 0.3.0 forward.
 - Memory leak: `Share._META_CACHE` used a plain `dict` keyed by class types, preventing garbage collection of classes. Changed to `weakref.WeakKeyDictionary` so classes (and their cached metadata) are collected when no longer referenced.
 
 - Memory leak: `Sktimer._sessions` grew unboundedly as threads were created and destroyed. Added `_purge_dead_sessions()` to remove entries for threads that no longer exist, called automatically during session access.
+
+- Regression fix (Pool + TimeThis): `Sktimer` is now fork-safe in subprocess workers. After fork, process-local timer lock/session state is rebuilt automatically, and dead-session purge now uses `sys._current_frames()` instead of `threading.enumerate()` to avoid fork-time deadlocks.
+
+- Regression fix (Share + BreakingCircuit): `Circuit` and `BreakingCircuit` now serialize without carrying live `threading.RLock` internals; deserialization recreates a fresh lock per process. This prevents `Share`/`Pool` hangs when a breaker is assigned to shared state.
 
 - Memory leak: `Pool` worker `multiprocessing.Queue` resources were not cleaned up after worker timeout/termination. Added `_drain_queue()` helper that empties, closes, and joins queues after workers complete.
 

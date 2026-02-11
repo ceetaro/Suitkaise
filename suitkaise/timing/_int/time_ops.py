@@ -14,6 +14,8 @@ The internal operations handle all the complex timing logic and state management
 """
 
 from dataclasses import dataclass
+import os
+import sys
 import time
 from time import perf_counter
 import threading
@@ -265,6 +267,16 @@ class Sktimer:
         'lap':     "Sktimer.lap() cannot be used through Share — timing would be measured in the coordinator process, not your subprocess. Use timer.add_time(elapsed) to aggregate pre-computed durations across processes.",
         'discard': "Sktimer.discard() cannot be used through Share — timing sessions are thread-local and cannot cross process boundaries.",
     }
+
+    _PROCESS_LOCAL_ATTRS = frozenset({
+        "_owner_pid",
+        "_ensure_process_local_state",
+        "_lock",
+        "_sessions",
+        "__class__",
+        "__dict__",
+        "__getattribute__",
+    })
     
     def __init__(self, max_times: Optional[int] = None):
         """
@@ -298,12 +310,25 @@ class Sktimer:
 
         # thread safety lock for manager state (times, sessions)
         self._lock = threading.RLock()
+        self._owner_pid = os.getpid()
 
         # session management: keyed by thread ident
         self._sessions: Dict[int, "TimerSession"] = {}
         
         if max_times is not None:
             self.set_max_times(max_times)
+
+    def __getattribute__(self, name: str):
+        # Ensure process-local locks/session state are refreshed after fork
+        # before most attribute access paths touch self._lock.
+        if name not in object.__getattribute__(self, "_PROCESS_LOCAL_ATTRS"):
+            try:
+                owner_pid = object.__getattribute__(self, "_owner_pid")
+            except Exception:
+                owner_pid = None
+            if owner_pid is not None and os.getpid() != owner_pid:
+                object.__getattribute__(self, "_ensure_process_local_state")()
+        return object.__getattribute__(self, name)
         
 
 
@@ -462,7 +487,19 @@ class Sktimer:
 
     # internal session management
 
+    def _ensure_process_local_state(self) -> None:
+        """Reset process-local synchronization state after a fork."""
+        current_pid = os.getpid()
+        if current_pid == self._owner_pid:
+            return
+        # A fork can inherit an RLock in an unusable state.
+        # Recreate lock/session bookkeeping in the child process.
+        self._lock = threading.RLock()
+        self._sessions = {}
+        self._owner_pid = current_pid
+
     def _get_or_create_session(self) -> "TimerSession":
+        self._ensure_process_local_state()
 
         ident = threading.get_ident()
 
@@ -481,13 +518,16 @@ class Sktimer:
         
         Must be called while holding self._lock.
         """
-        alive_ids = {t.ident for t in threading.enumerate()}
+        # threading.enumerate() may deadlock in forked children when parent
+        # threads held interpreter locks at fork time. Use frame keys instead.
+        alive_ids = set(sys._current_frames().keys())
         dead = [tid for tid in self._sessions if tid not in alive_ids]
         for tid in dead:
             del self._sessions[tid]
     
     def _has_active_frame(self) -> bool:
         """Check if current thread has an active timing frame."""
+        self._ensure_process_local_state()
         ident = threading.get_ident()
         with self._lock:
             sess = self._sessions.get(ident)
@@ -515,6 +555,8 @@ class Sktimer:
         Returns:
             Start timestamp (from `perf_counter()`)
         """
+        self._ensure_process_local_state()
+
         # warn if there's already an active frame (user might not intend nesting)
         if self._has_active_frame():
             warnings.warn(

@@ -135,6 +135,20 @@ class Circuit:
         self._total_trips = 0
         self._current_sleep_time = sleep_time_after_trip
         self._lock = threading.RLock()
+
+    def __serialize__(self) -> dict:
+        """Serialize circuit state without process-local lock internals."""
+        state = dict(self.__dict__)
+        state.pop("_lock", None)
+        return state
+
+    @classmethod
+    def __deserialize__(cls, state: dict) -> "Circuit":
+        """Rebuild circuit state with a fresh process-local lock."""
+        obj = cls.__new__(cls)
+        obj.__dict__.update(state)
+        obj._lock = threading.RLock()
+        return obj
     
     @property
     def num_shorts_to_trip(self) -> int:
@@ -185,15 +199,26 @@ class Circuit:
     
     async def _async_short(self, custom_sleep: float | None = None) -> bool:
         """Async version of short()."""
+        sleep_duration = 0.0
         should_trip = False
-        
         with self._lock:
             self._times_shorted += 1
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
+                sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+                self._total_trips += 1
+                self._times_shorted = 0
+                if self.backoff_factor != 1.0:
+                    self._current_sleep_time = min(
+                        self._current_sleep_time * self.backoff_factor,
+                        self.max_sleep_time
+                    )
         
         if should_trip:
-            return await self._async_trip_circuit(custom_sleep)
+            sleep_duration = self._apply_jitter(sleep_duration)
+            if sleep_duration > 0:
+                await asyncio.sleep(sleep_duration)
+            return True
         
         return False
     
@@ -207,6 +232,7 @@ class Circuit:
 
     def _sync_short(self, custom_sleep: float | None = None) -> bool:
         """Sync implementation of short()."""
+        sleep_duration = 0.0
         should_trip = False
         
         with self._lock:
@@ -214,9 +240,20 @@ class Circuit:
             
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
+                sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+                self._total_trips += 1
+                self._times_shorted = 0  # auto-reset counter
+                if self.backoff_factor != 1.0:
+                    self._current_sleep_time = min(
+                        self._current_sleep_time * self.backoff_factor,
+                        self.max_sleep_time
+                    )
         
         if should_trip:
-            return self._trip_circuit(custom_sleep)
+            sleep_duration = self._apply_jitter(sleep_duration)
+            if sleep_duration > 0:
+                timing.sleep(sleep_duration)
+            return True
         
         return False
     
@@ -449,6 +486,20 @@ class BreakingCircuit:
         self._total_trips = 0
         self._current_sleep_time = sleep_time_after_trip
         self._lock = threading.RLock()
+
+    def __serialize__(self) -> dict:
+        """Serialize breaker state without process-local lock internals."""
+        state = dict(self.__dict__)
+        state.pop("_lock", None)
+        return state
+
+    @classmethod
+    def __deserialize__(cls, state: dict) -> "BreakingCircuit":
+        """Rebuild breaker state with a fresh process-local lock."""
+        obj = cls.__new__(cls)
+        obj.__dict__.update(state)
+        obj._lock = threading.RLock()
+        return obj
     
     @property
     def num_shorts_to_trip(self) -> int:
@@ -498,7 +549,7 @@ class BreakingCircuit:
     async def _async_short(self, custom_sleep: float | None = None) -> None:
         """Async version of short()."""
         should_trip = False
-        sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+        sleep_duration = 0.0
         
         with self._lock:
             self._times_shorted += 1
@@ -506,17 +557,21 @@ class BreakingCircuit:
             
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
+                sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+                self._broken = True
+                self._times_shorted = 0
         
         if should_trip:
-            await self._async_break_circuit(sleep_duration)
+            sleep_duration = self._apply_jitter(sleep_duration)
+            if sleep_duration > 0:
+                await asyncio.sleep(sleep_duration)
     
     async def _async_trip(self, custom_sleep: float | None = None) -> None:
         """Async version of trip()."""
         with self._lock:
             self._total_trips += 1
-        await self._async_break_circuit(
-            custom_sleep if custom_sleep is not None else self._current_sleep_time
-        )
+            sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+        await self._async_break_circuit(sleep_duration)
     
 
 
@@ -525,7 +580,7 @@ class BreakingCircuit:
     def _sync_short(self, custom_sleep: float | None = None) -> None:
         """Sync implementation of short()."""
         should_trip = False
-        sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+        sleep_duration = 0.0
         
         with self._lock:
             self._times_shorted += 1
@@ -533,9 +588,14 @@ class BreakingCircuit:
             
             if self._times_shorted >= self.num_shorts_to_trip:
                 should_trip = True
+                sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+                self._broken = True
+                self._times_shorted = 0
         
         if should_trip:
-            self._break_circuit(sleep_duration)
+            sleep_duration = self._apply_jitter(sleep_duration)
+            if sleep_duration > 0:
+                timing.sleep(sleep_duration)
     
     short = _AsyncableMethod(_sync_short, _async_short)
     """
@@ -562,7 +622,8 @@ class BreakingCircuit:
         """Sync implementation of trip()."""
         with self._lock:
             self._total_trips += 1
-        self._break_circuit(custom_sleep if custom_sleep is not None else self._current_sleep_time)
+            sleep_duration = custom_sleep if custom_sleep is not None else self._current_sleep_time
+        self._break_circuit(sleep_duration)
     
     trip = _AsyncableMethod(_sync_trip, _async_trip)
     """

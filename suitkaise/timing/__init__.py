@@ -26,5 +26,5 @@ from .api import __all__
 
 # Module-level convenience - expose main classes at module level
 # This allows: import suitkaise.timing; timer = suitkaise.timing.Sktimer()
-__version__ = "0.4.5b0"
+__version__ = "0.4.6b0"
 __author__ = "Suitkaise Development Team"

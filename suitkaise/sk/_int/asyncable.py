@@ -10,6 +10,8 @@ we also provide .timeout() and .background() via _ModifiableMethod.
 
 import asyncio
 import functools
+import os
+import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Callable, TypeVar, ParamSpec, Any, Optional
 
@@ -18,6 +20,8 @@ R = TypeVar('R')
 
 # shared executor for background operations
 _background_executor: ThreadPoolExecutor | None = None
+_background_executor_pid: int | None = None
+_background_executor_lock = threading.Lock()
 
 
 class SkModifierError(Exception):
@@ -34,9 +38,23 @@ class SkModifierError(Exception):
 
 def _get_executor() -> ThreadPoolExecutor:
     """Get or create the shared thread pool executor."""
-    global _background_executor
-    if _background_executor is None:
-        _background_executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix="sk_bg_")
+    global _background_executor, _background_executor_pid
+    pid = os.getpid()
+    if _background_executor is None or _background_executor_pid != pid:
+        with _background_executor_lock:
+            if _background_executor is None or _background_executor_pid != pid:
+                # After fork, inherited executors contain dead threads in the child.
+                # Rebuild per-process executors to avoid background-call hangs.
+                if _background_executor is not None:
+                    try:
+                        _background_executor.shutdown(wait=False, cancel_futures=True)
+                    except Exception:
+                        pass
+                _background_executor = ThreadPoolExecutor(
+                    max_workers=32,
+                    thread_name_prefix="sk_bg_",
+                )
+                _background_executor_pid = pid
     return _background_executor
 
 

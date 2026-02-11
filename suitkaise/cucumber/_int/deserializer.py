@@ -68,6 +68,7 @@ This is the inverse of serializer.py.
 
 import pickle
 import sys
+import types
 from typing import Any, Dict, List, Optional, Type
 
 from .handlers import ALL_HANDLERS
@@ -366,11 +367,9 @@ class Deserializer:
                 if len(data) == 1:
                     return True
                 else:
-                    # if you reach this else statement...
-                    # this is a bug - dict has __cucumber_ref__ but also other keys
-                    # this shouldn't happen!
-                    import sys
-                    print(f"WARNING: Found dict with __cucumber_ref__ AND other keys: {list(data.keys())}", file=sys.stderr)
+                    raise DeserializationError(
+                        f"Malformed circular reference marker: unexpected keys {list(data.keys())}"
+                    )
         return False
     
     def _resolve_circular_reference(self, data: Dict[str, Any]) -> Any:
@@ -545,6 +544,10 @@ class Deserializer:
         handler_name = data.get("__handler__")
         obj_id = data.get("__object_id__")
         state = data.get("state")
+        if state is None:
+            raise DeserializationError(
+                f"Malformed handler IR for type '{type_name}': missing 'state'"
+            )
         
         # update path for error reporting
         self._reconstruction_path.append(type_name)
@@ -616,6 +619,8 @@ class Deserializer:
         Format: {"__cucumber_type__": "pickle_native", "__object_id__": id, "value": obj}
         """
         obj_id = data.get("__object_id__")
+        if "value" not in data:
+            raise DeserializationError("Malformed pickle_native IR: missing 'value'")
         value = data["value"]
         
         # register the object if it has an ID (for circular refs)
@@ -636,6 +641,8 @@ class Deserializer:
         Format: {"__cucumber_type__": "pickle_native_func", "__object_id__": id, "value": func}
         """
         obj_id = data.get("__object_id__")
+        if "value" not in data:
+            raise DeserializationError("Malformed pickle_native_func IR: missing 'value'")
         value = data["value"]
         
         # register the function if it has an ID (for circular refs)
@@ -872,38 +879,81 @@ class Deserializer:
             placeholder: Placeholder to search for
             real_obj: Real object to replace placeholder with
         """
-        # handle objects with __dict__
-        if hasattr(obj, '__dict__'):
-            for key, value in obj.__dict__.items():
-                if value is placeholder:
-                    setattr(obj, key, real_obj)
-                elif isinstance(value, list):
-                    for i, item in enumerate(value):
-                        if item is placeholder:
-                            value[i] = real_obj
-                elif isinstance(value, dict):
-                    for k, v in value.items():
-                        if v is placeholder:
-                            value[k] = real_obj
-        
-        # handle objects with __slots__
-        if hasattr(type(obj), '__slots__'):
-            for slot in type(obj).__slots__:
-                try:
-                    value = getattr(obj, slot)
-                    if value is placeholder:
-                        setattr(obj, slot, real_obj)
-                    elif isinstance(value, list):
-                        for i, item in enumerate(value):
-                            if item is placeholder:
-                                value[i] = real_obj
-                    elif isinstance(value, dict):
-                        for k, v in value.items():
-                            if v is placeholder:
-                                value[k] = real_obj
-                except AttributeError:
-                    # Slot not set
-                    pass
+        visited: set[int] = set()
+
+        def _replace(value: Any) -> Any:
+            if value is placeholder:
+                return real_obj
+
+            if isinstance(value, (str, bytes, bytearray, int, float, bool, type(None))):
+                return value
+
+            # Never mutate interpreter/runtime metadata objects.
+            if isinstance(value, (
+                type,
+                types.ModuleType,
+                types.FunctionType,
+                types.BuiltinFunctionType,
+                types.MethodType,
+                types.BuiltinMethodType,
+                types.CodeType,
+                property,
+                staticmethod,
+                classmethod,
+            )):
+                return value
+
+            value_id = id(value)
+            if value_id in visited:
+                return value
+            visited.add(value_id)
+
+            if isinstance(value, list):
+                for i, item in enumerate(value):
+                    value[i] = _replace(item)
+                return value
+
+            if isinstance(value, tuple):
+                return tuple(_replace(item) for item in value)
+
+            if isinstance(value, dict):
+                old_items = list(value.items())
+                value.clear()
+                for k, v in old_items:
+                    value[_replace(k)] = _replace(v)
+                return value
+
+            if isinstance(value, set):
+                replaced = {_replace(item) for item in value}
+                value.clear()
+                value.update(replaced)
+                return value
+
+            if isinstance(value, frozenset):
+                return frozenset(_replace(item) for item in value)
+
+            if hasattr(value, '__dict__'):
+                for key, item in list(value.__dict__.items()):
+                    try:
+                        setattr(value, key, _replace(item))
+                    except Exception:
+                        continue
+
+            if hasattr(type(value), '__slots__'):
+                raw_slots = type(value).__slots__
+                slots = (raw_slots,) if isinstance(raw_slots, str) else raw_slots
+                for slot in slots:
+                    if not isinstance(slot, str):
+                        continue
+                    try:
+                        setattr(value, slot, _replace(getattr(value, slot)))
+                    except AttributeError:
+                        pass
+                    except Exception:
+                        continue
+            return value
+
+        _replace(obj)
     
     def _log(self, message: str) -> None:
         """Log a message if debug mode is enabled."""

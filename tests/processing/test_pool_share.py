@@ -11,7 +11,7 @@ import traceback
 import time
 from pathlib import Path
 
-from suitkaise import timing, cucumber
+from suitkaise import timing, cucumber, BreakingCircuit
 
 # Add project root to path (auto-detect by marker files)
 
@@ -46,6 +46,35 @@ class ShareWorker(Skprocess):
         worker_key = f"worker_{self.value}"
         setattr(self.share, worker_key, {"hands": 1, "reward": float(self.value)})
         return {"ok": True, "value": self.value}
+
+
+class TimeThisWorker(Skprocess):
+    def __init__(self, value: int):
+        self.value = value
+        self.out = None
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        # Regression guard: this must not deadlock in Pool workers.
+        with timing.TimeThis():
+            self.out = self.value * 2
+
+    def __result__(self):
+        return self.out
+
+
+class NoopShareWorker(Skprocess):
+    def __init__(self, share: Share, value: int):
+        self.share = share
+        self.value = value
+        self.out = None
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.out = self.value
+
+    def __result__(self):
+        return self.out
 
 
 class TestResult:
@@ -190,11 +219,36 @@ def test_pool_share_roundtrip_timing():
         time.sleep(0.1)
 
 
+def test_pool_star_map_timethis_worker_regression():
+    pool = Pool(workers=2)
+    try:
+        results = pool.star().map.timeout(5.0)(TimeThisWorker, [(1,), (2,), (3,)])
+        assert results == [2, 4, 6], f"Unexpected results: {results}"
+    finally:
+        pool.close()
+        time.sleep(0.1)
+
+
+def test_share_breaking_circuit_pool_regression():
+    share = Share()
+    pool = Pool(workers=2)
+    try:
+        share.circuit = BreakingCircuit(num_shorts_to_trip=2, sleep_time_after_trip=0.0)
+        results = pool.star().map.timeout(5.0)(NoopShareWorker, [(share, 1), (share, 2)])
+        assert results == [1, 2], f"Unexpected results: {results}"
+    finally:
+        pool.close()
+        share._coordinator.stop()
+        time.sleep(0.1)
+
+
 def run_all_tests():
     runner = TestRunner("Pool + Share Tests")
     runner.run_test("Share serialize/deserialize", test_share_serialization_roundtrip)
     runner.run_test("Share coordinator state roundtrip", test_share_coordinator_state_roundtrip)
     runner.run_test("Pool with Share roundtrip + timing", test_pool_share_roundtrip_timing)
+    runner.run_test("Pool worker TimeThis regression", test_pool_star_map_timethis_worker_regression)
+    runner.run_test("Share BreakingCircuit pool regression", test_share_breaking_circuit_pool_regression)
     return runner.print_results()
 
 
