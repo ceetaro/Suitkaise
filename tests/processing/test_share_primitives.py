@@ -214,6 +214,24 @@ def test_atomic_registry_remove_object():
     assert registry.keys_for_object("obj") == []
     registry.reset()
 
+def test_atomic_registry_recovers_closed_manager_handle():
+    """Atomic registry should recover if manager proxy handle is closed."""
+    registry = _AtomicCounterRegistry()
+    registry.register_keys("obj", {"a"})
+
+    # Prime lock proxy connection, then forcibly close it to simulate
+    # stale manager handles in long-running worker processes.
+    registry.increment_pending("obj.a")
+    lock_tls = getattr(registry._lock, "_tls", None)
+    lock_conn = getattr(lock_tls, "connection", None) if lock_tls is not None else None
+    if lock_conn is not None:
+        lock_conn.close()
+
+    # Next operation should reconnect and succeed.
+    value = registry.increment_pending("obj.a")
+    assert value >= 1
+    registry.reset()
+
 
 # =============================================================================
 # _CommandQueue Tests
@@ -266,6 +284,7 @@ def run_all_tests():
     runner.run_test("Atomic registry register/wait", test_atomic_registry_register_and_wait)
     runner.run_test("Atomic registry multi-key wait", test_atomic_registry_multiple_keys_wait)
     runner.run_test("Atomic registry remove object", test_atomic_registry_remove_object)
+    runner.run_test("Atomic registry recovers closed handle", test_atomic_registry_recovers_closed_manager_handle)
     runner.run_test("CommandQueue roundtrip", test_command_queue_roundtrip)
     runner.run_test("SourceOfTruth basic", test_source_of_truth_basic)
 

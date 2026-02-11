@@ -91,6 +91,34 @@ class _Coordinator:
             "poll_timeout": self._poll_timeout,
         }
 
+    @staticmethod
+    def _reset_proxy_connection(proxy: Any) -> None:
+        """Clear a manager proxy's cached thread-local connection."""
+        tls = getattr(proxy, "_tls", None)
+        if tls is None:
+            return
+        conn = getattr(tls, "connection", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                del tls.connection
+            except Exception:
+                pass
+
+    def _repair_proxy_connections(self) -> None:
+        """Best-effort reconnect for coordinator manager-backed proxies."""
+        for proxy in (self._command_queue, self._source_store, self._source_lock, self._object_names):
+            self._reset_proxy_connection(proxy)
+        recover = getattr(self._counter_registry, "_recover_manager_connections", None)
+        if callable(recover):
+            try:
+                recover()
+            except Exception:
+                pass
+
     @classmethod
     def from_state(cls, state: dict) -> "_Coordinator":
         """Create a coordinator instance bound to existing shared proxies."""
@@ -180,7 +208,21 @@ class _Coordinator:
         serialized_kwargs = cucumber.serialize(kwargs)
         
         command = (object_name, method_name, serialized_args, serialized_kwargs, written_attrs)
-        self._command_queue.put(command)
+        for attempt in range(2):
+            try:
+                self._command_queue.put(command)
+                return
+            except (
+                OSError,
+                EOFError,
+                BrokenPipeError,
+                ConnectionResetError,
+                ConnectionAbortedError,
+            ):
+                if attempt == 0:
+                    self._repair_proxy_connections()
+                    continue
+                raise
     
     def increment_pending(self, key: str) -> int:
         """
@@ -194,7 +236,20 @@ class _Coordinator:
         Returns:
             New pending count.
         """
-        return self._counter_registry.increment_pending(key)
+        for attempt in range(2):
+            try:
+                return self._counter_registry.increment_pending(key)
+            except (
+                OSError,
+                EOFError,
+                BrokenPipeError,
+                ConnectionResetError,
+                ConnectionAbortedError,
+            ):
+                if attempt == 0:
+                    self._repair_proxy_connections()
+                    continue
+                raise
     
     def get_read_target(self, key: str) -> int:
         """

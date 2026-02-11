@@ -266,6 +266,53 @@ class _AtomicCounterRegistry:
         self._local_object_keys = {}
         self._owned_names = set()
 
+    @staticmethod
+    def _reset_proxy_connection(proxy: Any) -> None:
+        """
+        Reset a manager proxy's thread-local connection.
+
+        In long-running forked workers, manager proxy file handles can become
+        stale/closed. Clearing the cached connection allows BaseProxy to
+        reconnect on the next call.
+        """
+        tls = getattr(proxy, "_tls", None)
+        if tls is None:
+            return
+        conn = getattr(tls, "connection", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                del tls.connection
+            except Exception:
+                pass
+
+    def _recover_manager_connections(self) -> None:
+        """Best-effort manager proxy reconnection for lock/dict proxies."""
+        for proxy in (self._lock, self._registry, self._object_keys):
+            self._reset_proxy_connection(proxy)
+
+    def _with_manager_retry(self, operation):
+        """
+        Run an operation and retry once after reconnecting manager proxies.
+        """
+        for attempt in range(2):
+            try:
+                return operation()
+            except (
+                OSError,
+                EOFError,
+                BrokenPipeError,
+                ConnectionResetError,
+                ConnectionAbortedError,
+            ):
+                if attempt == 0:
+                    self._recover_manager_connections()
+                    continue
+                raise
+
     def __serialize__(self) -> dict:
         """Custom cucumber hook to avoid serializing Manager internals."""
         return self.__getstate__()
@@ -282,22 +329,24 @@ class _AtomicCounterRegistry:
         keys = [f"{object_name}.{attr}" for attr in attrs]
         if not keys:
             return
-        with self._lock:
-            for key in keys:
-                if key not in self._registry:
-                    # create shared memory counters for new keys
-                    pending = self._create_shared_counter()
-                    completed = self._create_shared_counter()
-                    self._registry[key] = (pending.name, completed.name)
-                    self._local[key] = (pending, completed)
-                    self._owned_names.update({pending.name, completed.name})
-                else:
-                    # attach to existing shared counters when already registered
-                    self._local[key] = self._attach_shared_counter(self._registry[key])
-            existing = list(self._object_keys.get(object_name, []))
-            merged = list(dict.fromkeys(existing + keys))
-            self._object_keys[object_name] = merged
-            self._local_object_keys[object_name] = merged
+        def _op() -> None:
+            with self._lock:
+                for key in keys:
+                    if key not in self._registry:
+                        # create shared memory counters for new keys
+                        pending = self._create_shared_counter()
+                        completed = self._create_shared_counter()
+                        self._registry[key] = (pending.name, completed.name)
+                        self._local[key] = (pending, completed)
+                        self._owned_names.update({pending.name, completed.name})
+                    else:
+                        # attach to existing shared counters when already registered
+                        self._local[key] = self._attach_shared_counter(self._registry[key])
+                existing = list(self._object_keys.get(object_name, []))
+                merged = list(dict.fromkeys(existing + keys))
+                self._object_keys[object_name] = merged
+                self._local_object_keys[object_name] = merged
+        self._with_manager_retry(_op)
     
     def _create_shared_counter(self) -> shared_memory.SharedMemory:
         # single int counter stored in shared memory
@@ -316,23 +365,25 @@ class _AtomicCounterRegistry:
         )
 
     def _ensure_counter(self, key: str) -> tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]:
-        with self._lock:
-            counter = self._registry.get(key)
-            if counter is None:
-                # lazily create counters if a key is seen for the first time
-                pending = self._create_shared_counter()
-                completed = self._create_shared_counter()
-                self._registry[key] = (pending.name, completed.name)
-                object_name = key.rsplit(".", 1)[0]
-                existing = list(self._object_keys.get(object_name, []))
-                merged = list(dict.fromkeys(existing + [key]))
-                self._object_keys[object_name] = merged
-                self._local_object_keys[object_name] = merged
-                self._local[key] = (pending, completed)
-                self._owned_names.update({pending.name, completed.name})
+        def _op() -> tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]:
+            with self._lock:
+                counter = self._registry.get(key)
+                if counter is None:
+                    # lazily create counters if a key is seen for the first time
+                    pending = self._create_shared_counter()
+                    completed = self._create_shared_counter()
+                    self._registry[key] = (pending.name, completed.name)
+                    object_name = key.rsplit(".", 1)[0]
+                    existing = list(self._object_keys.get(object_name, []))
+                    merged = list(dict.fromkeys(existing + [key]))
+                    self._object_keys[object_name] = merged
+                    self._local_object_keys[object_name] = merged
+                    self._local[key] = (pending, completed)
+                    self._owned_names.update({pending.name, completed.name})
+                    return self._local[key]
+                self._local[key] = self._attach_shared_counter(counter)
                 return self._local[key]
-            self._local[key] = self._attach_shared_counter(counter)
-            return self._local[key]
+        return self._with_manager_retry(_op)
     
     def _get_counter(
         self,
@@ -346,32 +397,39 @@ class _AtomicCounterRegistry:
     def increment_pending(self, key: str) -> int:
         counter = self._get_counter(key)
         pending, _ = counter
-        with self._lock:
-            # pending increments happen before enqueueing a write command
-            value = struct.unpack_from("i", pending.buf, 0)[0] + 1
-            struct.pack_into("i", pending.buf, 0, value)
-            return value
+        def _op() -> int:
+            with self._lock:
+                # pending increments happen before enqueueing a write command
+                value = struct.unpack_from("i", pending.buf, 0)[0] + 1
+                struct.pack_into("i", pending.buf, 0, value)
+                return value
+        return self._with_manager_retry(_op)
     
     def update_after_write(self, key: str) -> None:
         counter = self._get_counter(key)
         pending, completed = counter
-        with self._lock:
-            # coordinator marks a write as completed after commit
-            pending_val = struct.unpack_from("i", pending.buf, 0)[0]
-            pending_val = max(0, pending_val - 1)
-            struct.pack_into("i", pending.buf, 0, pending_val)
-            completed_val = struct.unpack_from("i", completed.buf, 0)[0] + 1
-            struct.pack_into("i", completed.buf, 0, completed_val)
+        def _op() -> None:
+            with self._lock:
+                # coordinator marks a write as completed after commit
+                pending_val = struct.unpack_from("i", pending.buf, 0)[0]
+                pending_val = max(0, pending_val - 1)
+                struct.pack_into("i", pending.buf, 0, pending_val)
+                completed_val = struct.unpack_from("i", completed.buf, 0)[0] + 1
+                struct.pack_into("i", completed.buf, 0, completed_val)
+        self._with_manager_retry(_op)
     
     def get_read_targets(self, keys: list[str]) -> dict[str, int]:
         targets: dict[str, int] = {}
         for key in keys:
             counter = self._get_counter(key)
             pending, completed = counter
-            with self._lock:
-                # snapshot pending + completed to avoid read starvation
-                pending_val = struct.unpack_from("i", pending.buf, 0)[0]
-                completed_val = struct.unpack_from("i", completed.buf, 0)[0]
+            def _op() -> tuple[int, int]:
+                with self._lock:
+                    # snapshot pending + completed to avoid read starvation
+                    pending_val = struct.unpack_from("i", pending.buf, 0)[0]
+                    completed_val = struct.unpack_from("i", completed.buf, 0)[0]
+                    return pending_val, completed_val
+            pending_val, completed_val = self._with_manager_retry(_op)
             targets[key] = completed_val + pending_val
         return targets
     
@@ -398,7 +456,7 @@ class _AtomicCounterRegistry:
         keys = self._local_object_keys.get(object_name)
         if keys is not None:
             return keys
-        keys = list(self._object_keys.get(object_name, []))
+        keys = self._with_manager_retry(lambda: list(self._object_keys.get(object_name, [])))
         self._local_object_keys[object_name] = keys
         return keys
 
