@@ -403,7 +403,7 @@ class _AtomicCounterRegistry:
         return keys
 
     def remove_object(self, object_name: str) -> None:
-        """Remove all counters for a shared object."""
+        """Remove all counters for a shared object, unlinking shared memory."""
         # use cached keys if available; fall back to manager registry
         keys = self._local_object_keys.get(object_name)
         if keys is None:
@@ -433,17 +433,19 @@ class _AtomicCounterRegistry:
                 completed.close()
             except Exception:
                 pass
-        # unlink only shared memory segments owned by this process
+        # unlink shared memory segments (always unlink — if owner is gone,
+        # segments would leak forever otherwise)
         for pending_name, completed_name in entries:
             for name in (pending_name, completed_name):
                 try:
                     shm = shared_memory.SharedMemory(name=name)
                     shm.close()
-                    if name in self._owned_names:
-                        shm.unlink()
-                        self._owned_names.discard(name)
+                    shm.unlink()
+                except FileNotFoundError:
+                    pass  # already unlinked
                 except Exception:
                     pass
+                self._owned_names.discard(name)
 
     def close_local(self) -> None:
         """Close local shared-memory handles without unlinking.

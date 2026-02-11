@@ -9,7 +9,24 @@ Changelog is maintained from version 0.3.0 forward.
 
 ---
 
-## [Unreleased]
+## [0.4.5b0] - 2026-02-11
+
+### Fixed
+- Memory leak: `_Coordinator.stop()` skipped `SharedMemory` cleanup when called on an already-stopped coordinator. The early-return path now calls `counter_registry.reset()` to unlink shared memory segments, eliminating the `resource_tracker: leaked shared_memory objects` warning.
+
+- Memory leak: `Share._META_CACHE` used a plain `dict` keyed by class types, preventing garbage collection of classes. Changed to `weakref.WeakKeyDictionary` so classes (and their cached metadata) are collected when no longer referenced.
+
+- Memory leak: `Sktimer._sessions` grew unboundedly as threads were created and destroyed. Added `_purge_dead_sessions()` to remove entries for threads that no longer exist, called automatically during session access.
+
+- Memory leak: `Pool` worker `multiprocessing.Queue` resources were not cleaned up after worker timeout/termination. Added `_drain_queue()` helper that empties, closes, and joins queues after workers complete.
+
+- Memory leak: `_AtomicCounterRegistry.remove_object()` only unlinked `SharedMemory` segments for the "owning" process. If the owner died, segments leaked. Now always attempts `shm.unlink()` on removal regardless of ownership.
+
+- Memory leak: `_Coordinator.destroy()` / `__del__` split — `stop()` no longer shuts down the `SyncManager`, preserving restart capability. `destroy()` handles permanent shutdown. `Share.__exit__` calls `stop()` (restartable), `Share.__del__` calls `destroy()` (final cleanup).
+
+- Thread-safety: `cucumber.serialize()` and `cucumber.deserialize()` used module-level singleton `Serializer`/`Deserializer` instances with mutable per-call state (`seen_objects`, `_object_registry`). Concurrent calls from multiple threads (e.g. `asyncio.gather` + `to_thread`) caused data races — one thread clearing the registry mid-reconstruction. Replaced singletons with per-thread instances via `threading.local()`.
+
+## [0.4.4b0] - 2026-02-10
 
 ### Fixed
 - Python 3.12/3.13 compatibility: `TemporaryFileHandler` no longer crashes on `_TemporaryFileCloser` objects. Python 3.12 restructured `NamedTemporaryFile` internals — the handler now requires file-like interface (`tell`/`seek`/`read`) and supports the moved `delete` attribute via `_closer`.

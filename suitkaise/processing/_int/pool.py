@@ -1040,6 +1040,8 @@ class Pool:
                 
                 if w.is_alive():
                     w.terminate()
+                    w.join(timeout=1.0)
+                    _drain_queue(q)
                     raise TimeoutError(f"Pool.map worker {idx} timed out after {timeout}s")
                 
                 try:
@@ -1118,6 +1120,8 @@ class Pool:
                 
                 if w.is_alive():
                     w.terminate()
+                    w.join(timeout=1.0)
+                    _drain_queue(q)
                     raise TimeoutError(f"Pool.imap worker {next_yield} timed out after {timeout}s")
                 
                 try:
@@ -1222,9 +1226,11 @@ class Pool:
                         elapsed = time_module.perf_counter() - start_time
                         if elapsed >= timeout:
                             # terminate remaining workers on timeout
-                            for _, _, w in active:
+                            for _, q_drain, w in active:
                                 if w.is_alive():
                                     w.terminate()
+                                    w.join(timeout=1.0)
+                                _drain_queue(q_drain)
                             raise TimeoutError(f"Pool.unordered_imap timed out after {timeout}s")
                     time_module.sleep(0.01)
         
@@ -1246,6 +1252,8 @@ def _ordered_results(
         # check if worker timed out
         if w.is_alive():
             w.terminate()
+            w.join(timeout=1.0)
+            _drain_queue(q)
             raise TimeoutError(f"Pool.imap worker {i} timed out after {timeout}s")
         
         try:
@@ -1286,6 +1294,8 @@ def _unordered_results(
                 for q, w in remaining:
                     if w.is_alive():
                         w.terminate()
+                        w.join(timeout=1.0)
+                    _drain_queue(q)
                     if w in active_processes:
                         active_processes.remove(w)
                 raise TimeoutError(f"Pool.unordered_imap timed out after {timeout}s")
@@ -1310,6 +1320,21 @@ def _unordered_results(
         else:
             # No worker finished yet, wait a bit
             time_module.sleep(0.01)
+
+
+def _drain_queue(q) -> None:
+    """Drain a multiprocessing.Queue to prevent resource leaks after worker termination."""
+    import queue as _q
+    try:
+        while True:
+            q.get_nowait()
+    except (_q.Empty, EOFError, OSError):
+        pass
+    try:
+        q.close()
+        q.join_thread()
+    except Exception:
+        pass
 
 
 def _pool_worker(

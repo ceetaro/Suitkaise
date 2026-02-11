@@ -471,7 +471,20 @@ class Sktimer:
             if sess is None:
                 sess = TimerSession(self)
                 self._sessions[ident] = sess
+                # periodically purge sessions for dead threads to prevent
+                # unbounded memory growth in long-running / many-thread apps
+                self._purge_dead_sessions()
             return sess
+
+    def _purge_dead_sessions(self) -> None:
+        """Remove sessions for threads that no longer exist.
+        
+        Must be called while holding self._lock.
+        """
+        alive_ids = {t.ident for t in threading.enumerate()}
+        dead = [tid for tid in self._sessions if tid not in alive_ids]
+        for tid in dead:
+            del self._sessions[tid]
     
     def _has_active_frame(self) -> bool:
         """Check if current thread has an active timing frame."""

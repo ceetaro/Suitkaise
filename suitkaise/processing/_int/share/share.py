@@ -4,6 +4,7 @@ Share api
 
 from typing import Any, Dict, Optional
 import io
+import weakref
 import warnings
 from multiprocessing.managers import SyncManager
 
@@ -154,7 +155,7 @@ class Share:
     _SHARE_ATTRS = frozenset({
         '_coordinator', '_proxies', '_started',
     })
-    _META_CACHE: dict[type, dict] = {}
+    _META_CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
     
     def __init__(
         self,
@@ -438,6 +439,15 @@ class Share:
     def exit(self, timeout: float = 5.0) -> bool:
         """Alias for stop()."""
         return self.stop(timeout)
+
+    def __del__(self) -> None:
+        """Destroy the coordinator on garbage collection to prevent resource leaks."""
+        try:
+            if not object.__getattribute__(self, '_client_mode'):
+                coordinator = object.__getattribute__(self, '_coordinator')
+                coordinator.destroy()
+        except Exception:
+            pass
 
     def clear(self) -> None:
         """Clear all shared objects and counters."""

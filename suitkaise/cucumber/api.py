@@ -15,15 +15,18 @@ Additionally, includes a function to reconnect all live objects that need to
 be reauthenticated or reinitialized after serialization.
 """
 
+import threading
+
 from ._int.serializer import Serializer, SerializationError
 from ._int.deserializer import Deserializer, DeserializationError
 from ._int.ir_json import ir_to_json as _ir_to_json
 from ._int.ir_json import ir_to_jsonable as _ir_to_jsonable
 from ._int.handlers.reconnector import Reconnector
 
-# convenient default instances
-_default_serializer = Serializer()
-_default_deserializer = Deserializer()
+# thread-local serializer/deserializer instances — both have mutable per-call
+# state (seen_objects, _object_registry, etc.) that is NOT thread-safe.
+# one instance per thread avoids data races while reusing handler registries.
+_thread_local = threading.local()
 
 
 def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
@@ -85,9 +88,13 @@ def serialize(obj, debug: bool = False, verbose: bool = False) -> bytes:
     ────────────────────────────────────────────────────────
     """
     if debug or verbose:
-        serializer = Serializer(debug=debug, verbose=verbose)
-        return serializer.serialize(obj)
-    return _default_serializer.serialize(obj)
+        return Serializer(debug=debug, verbose=verbose).serialize(obj)
+    
+    ser = getattr(_thread_local, 'serializer', None)
+    if ser is None:
+        ser = Serializer()
+        _thread_local.serializer = ser
+    return ser.serialize(obj)
 
 
 def serialize_ir(obj, debug: bool = False, verbose: bool = False):
@@ -122,9 +129,13 @@ def serialize_ir(obj, debug: bool = False, verbose: bool = False):
     }
     """
     if debug or verbose:
-        serializer = Serializer(debug=debug, verbose=verbose)
-        return serializer.serialize_ir(obj)
-    return _default_serializer.serialize_ir(obj)
+        return Serializer(debug=debug, verbose=verbose).serialize_ir(obj)
+    
+    ser = getattr(_thread_local, 'serializer', None)
+    if ser is None:
+        ser = Serializer()
+        _thread_local.serializer = ser
+    return ser.serialize_ir(obj)
 
 
 def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
@@ -173,9 +184,16 @@ def deserialize(data: bytes, debug: bool = False, verbose: bool = False):
     ────────────────────────────────────────────────────────
     """
     if debug or verbose:
-        deserializer = Deserializer(debug=debug, verbose=verbose)
-        return deserializer.deserialize(data)
-    return _default_deserializer.deserialize(data)
+        # debug/verbose mode: one-off instance with those flags
+        return Deserializer(debug=debug, verbose=verbose).deserialize(data)
+    
+    # fast path: reuse a per-thread Deserializer (avoids rebuilding
+    # handler registries every call while staying thread-safe)
+    deser = getattr(_thread_local, 'deserializer', None)
+    if deser is None:
+        deser = Deserializer()
+        _thread_local.deserializer = deser
+    return deser.deserialize(data)
 
 
 def reconnect_all(obj, *, start_threads: bool = False, **auth):

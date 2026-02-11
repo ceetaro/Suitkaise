@@ -323,6 +323,10 @@ class _Coordinator:
         Signals the coordinator to stop and waits for it to finish
         processing any remaining commands.
         
+        The SyncManager stays alive so the coordinator can be restarted
+        with start().  Use destroy() or let __del__ run to release
+        all OS resources (sockets, shared memory).
+        
         Args:
             timeout: Maximum seconds to wait for shutdown.
         
@@ -330,6 +334,11 @@ class _Coordinator:
             True if stopped cleanly, False if timed out.
         """
         if self._process is None or not self._process.is_alive():
+            # process already stopped — still clean up shared memory
+            try:
+                self._counter_registry.reset()
+            except Exception:
+                pass
             return True
         
         # signal shutdown and wait for the process to exit gracefully
@@ -359,6 +368,15 @@ class _Coordinator:
             pass
         return True
     
+    def destroy(self) -> None:
+        """Stop the coordinator AND shut down the SyncManager.
+        
+        After calling this, the coordinator cannot be restarted.
+        Releases all OS resources (sockets, shared memory segments).
+        """
+        self.stop(timeout=3.0)
+        self._shutdown_manager()
+    
     def kill(self) -> None:
         """
         Forcefully terminate the coordinator immediately.
@@ -373,11 +391,27 @@ class _Coordinator:
             self._counter_registry.reset()
         except Exception:
             pass
+        self._shutdown_manager()
+
+    def _shutdown_manager(self) -> None:
+        """Shut down the SyncManager if we own it, releasing OS resources."""
+        if self._manager is not None and not self._client_mode:
+            try:
+                self._manager.shutdown()
+            except (OSError, EOFError, BrokenPipeError, ConnectionRefusedError):
+                pass
+            except Exception:
+                pass
+            self._manager = None
 
     def __del__(self) -> None:
-        """Release local shared-memory handles on garbage collection."""
+        """Release local shared-memory handles and manager on garbage collection."""
         try:
             self._counter_registry.close_local()
+        except Exception:
+            pass
+        try:
+            self._shutdown_manager()
         except Exception:
             pass
     
