@@ -2,178 +2,415 @@
     <button class="module-bar-title">suitkaise.cucumber</button>
     <nav class="module-bar-nav">
         <a href="#cucumber-why" class="module-bar-link" data-page="cucumber-why">why</a>
+        <a href="#cucumber-quick-start" class="module-bar-link" data-page="cucumber-quick-start">quick start</a>
         <a href="#cucumber" class="module-bar-link active" data-page="cucumber">how to use</a>
         <a href="#cucumber-how-it-works" class="module-bar-link" data-page="cucumber-how-it-works">how it works</a>
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
-        <a href="#cucumber-examples" class="module-bar-link" data-page="cucumber-examples">examples</a>
+        <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
+        <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
+        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1>How to use <code>cucumber</code></h1>
-
-    <p><code>cucumber</code> is a serialization engine that handles complex Python objects that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot.</p>
-
-    <p>Meant for internal, cross-process communication, not for external or cross-language serialization.</p><br>
-
-    <h2>API Functions</h2>
-
-    <p>Cucumber contains 2 API functions:</p>
-
+    <p><code>cucumber</code> is a module that handles serializaton and deserialization of Python objects.</p>
+    <p>Basically any object in Python will work, and it covers more types than <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> combined.</p>
     <ul>
-        <li><code>cucumber.serialize(obj)</code> - serialize an object to bytes</li>
-        <li><code>cucumber.deserialize(bytes)</code> - deserialize bytes back to an object</li>
+        <li>extensive type coverage</li>
+        <li>superior speed for simple types compared to <code>cloudpickle</code> and <code>dill</code></li>
+        <li>handles all circular references</li>
+        <li>works on class objects defined in <code>__main__</code></li>
+        <li>and more</li>
     </ul>
-
-<pre><code class="language-python">from suitkaise import cucumber
-
-obj = MyClass()
-bytes = cucumber.serialize(obj)
-my_class = cucumber.deserialize(bytes)</code></pre>
-
-    <h2>Custom serialization and deserialization</h2>
-
-    <p>Sometimes, <code>cucumber</code> might not be able to serialize/deserialize an object correctly.</p>
-
-    <p>If this happens, you can override the default behavior.</p>
-
-    <p>Use <code>__serialize__</code> and <code>__deserialize__</code> methods in your classes to override the default behavior.</p>
-
-    <p>In order for <code>__serialize__</code> to work, data must be reduced down to a <code>dict</code> with only native <code>pickle</code> types. Do not convert to bytes, <code>cucumber</code> will do that for you.</p>
-
-    <p><code>__deserialize__</code> needs to take this representation and reconstruct the object.</p>
-
-<pre><code class="language-python">from suitkaise import cucumber
-
-class MyClass:
-    def __serialize__(self):
-        return {"custom": "state"}
-    
-    @classmethod
-    def __deserialize__(cls, state):
-        obj = cls.__new__(cls)
-        # custom reconstruction logic...
-        return obj
-
-bytes = cucumber.serialize(MyClass())
-my_class = cucumber.deserialize(cucumber.serialize(MyClass()))
-
-assert my_class.custom == "state"</code></pre>
-
-    <h2>Debugging with <code>debug</code> and <code>verbose</code> modes</h2>
-
-    <p>The <code>serialize</code> and <code>deserialize</code> functions have 2 optional params:</p>
-
+    <p>To see a list of supported types, see the supported types page.</p>
+    <p>To see how <code>cucumber</code> stacks up against other serialization libraries, see the performance page.</p>
+    <p><code>cucumber</code> is mainly meant for internal, cross-process communication, not for external or cross-language serialization.</p>
+    <p>However, you can convert the intermediate representation (IR) to JSON, and you are welcome to use that to send data to other languages using your own tools.</p>
+    <h2>Importing</h2>
+    <pre><code class="language-python">from suitkaise import cucumber</code></pre>
+    <pre><code class="language-python">from suitkaise.cucumber import serialize, deserialize, serialize_ir, deserialize_ir, ir_to_jsonable, ir_to_json, to_jsonable, to_json, reconnect_all</code></pre>
+    <h2><code>serialize()</code></h2>
+    <p>Serializes any Python object to bytes using <code>cucumber</code>&#x27;s intermediate representation (IR).</p>
+    <pre><code class="language-python">data = cucumber.serialize(obj)</code></pre>
+    <p>Arguments <code>obj</code>: Any Python object</p>
     <ul>
-        <li><code>debug</code> - when True, provides detailed error messages showing exactly where serialization/deserialization failed, including path breadcrumbs</li>
-        <li><code>verbose</code> - when True, prints color-coded progress as it walks through nested structures</li>
+        <li><code>Any</code></li>
+        <li>required</li>
     </ul>
-
-<pre><code class="language-python">data = cucumber.serialize(obj, debug=True, verbose=True)
-
-obj = cucumber.deserialize(data, debug=True, verbose=True)</code></pre>
-
-    <details>
-        <summary><code>verbose</code> output example</summary>
-        <p>When <code>verbose=True</code>, cucumber prints the path it's taking through your object, color-coded by depth:</p>
-
-<pre><code>  [1] MyService
-    [2] MyService → config
-      [3] MyService → config → dict
-        [4] ... → config → dict → database
-        [4] ... → config → dict → api_keys
-    [2] MyService → lock
-    [2] MyService → logger</code></pre>
-
-        <p>This helps you see exactly which attributes are being serialized.</p>
-    </details>
-
-    <details>
-        <summary><code>debug</code> error example</summary>
-        <p>When something goes wrong and <code>debug=True</code>, cucumber shows you where it happened:</p>
-
-<pre><code>======================================================================
-DESERIALIZATION ERROR
+    <p><code>debug</code>: Enables deep error context and path reporting.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>verbose</code>: Prints progress and handler selection information.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns <code>bytes</code>: <code>cucumber</code> IR as bytes.</p>
+    <p>Raises <code>SerializationError</code>: If serialization fails.</p>
+    <p>This is a <code>SerializationError</code> that appears when you try to serialize a <code>suitkaise.processing.Pipe.Anchor</code> point.</p>
+    <pre><code class="language-python">Traceback (most recent call last):
+  File &quot;my_app.py&quot;, line 42, in &lt;module&gt;
+    payload = cucumber.serialize(obj)
+  File &quot;.../suitkaise/cucumber/api.py&quot;, line 90, in serialize
+    return _default_serializer.serialize(obj)
+  File &quot;.../suitkaise/cucumber/_int/serializer.py&quot;, line 113, in serialize
+    raise SerializationError(message)
+suitkaise.cucumber._int.serializer.SerializationError:
 ======================================================================
+HANDLER FAILED
+======================================================================
+Path: Anchor
+Handler: ClassInstanceHandler
+Object: Anchor
 
-Error: AttributeError: type object 'MyClass' has no attribute 'from_state'
+The handler failed to extract state from this object.
 
-Path: MyService → config → handler
-
-Type: custom_object
-Handler: CustomObjectHandler
-
-IR Data: {'__cucumber_type__': 'custom_object', '__module__': 'myapp.handlers'...
+Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
 ======================================================================</code></pre>
+    <h3><code>debug</code> and <code>verbose</code></h3>
+    <p><code>debug</code> and <code>verbose</code> are keyword only arguments.</p>
+    <p>When <code>debug=True</code>, <code>cucumber</code> shows you where it failed to serialize an object.</p>
+    <pre><code class="language-python">======================================================================
+HANDLER FAILED
+======================================================================
+Path: Anchor@1234567890
+Handler: ClassInstanceHandler
+Object: Anchor
 
-        <p>The path tells you exactly where in your nested object the failure occurred.</p>
-    </details>
+The handler failed to extract state from this object.
 
-    <h2>Printing a serialized nested <code>dict</code> for a complex object</h2>
+Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
+======================================================================</code></pre>
+    <p>When <code>verbose=True</code>, <code>cucumber</code> prints the path it&#x27;s taking through your object, color-coded by depth.</p>
+    <pre><code class="language-python">[CUCUMBER] Starting serialization of dict
+  [1] dict
+    [2] dict → Widget
+        ↳ Handler: ClassInstanceHandler
+      [3] dict → Widget → dict
+        [4] dict → Widget → dict → dict
+          [5] dict → Widget → dict → dict → list
+          [5] dict → Widget → dict → dict → dict
+        [4] dict → Widget → dict → dict
+          [5] dict → Widget → dict → dict → tuple
+    [2] dict → dict
+      [3] dict → dict → list
+    [2] dict → list
+      [3] dict → list → dict
+        [4] dict → list → dict → set
+      [3] dict → list → tuple
+[CUCUMBER] Built IR successfully, size: 1464 chars
+[CUCUMBER] Serialization complete, bytes: 760</code></pre>
+    <p><code>[5] dict → Widget → dict → dict → tuple</code> colors:</p>
+    <ul>
+        <li><code>dict</code> is red</li>
+        <li><code>Widget</code> is orange</li>
+        <li><code>dict</code> is yellow</li>
+        <li><code>dict</code> is green</li>
+        <li><code>tuple</code> is blue</li>
+        <li>the next object would be purple</li>
+        <li>the object after that would be red again</li>
+    </ul>
+    <p>Colors will only display if your terminal supports color.</p>
+    <h2><code>deserialize()</code></h2>
+    <p>Reconstructs a Python object from bytes created by <code>cucumber.serialize</code>.</p>
+    <p>Will not work if the object was serialized with <code>pickle</code>, <code>cloudpickle</code>, or <code>dill</code>, as these libraries do not use <code>cucumber</code>&#x27;s IR.</p>
+    <ul>
+        <li>restores all circular references before reconstructing objects</li>
+        <li><code>Reconnector</code> objects are returned for certain types</li>
+    </ul>
+    <pre><code class="language-python">data = cucumber.serialize(obj)
 
-    <p>To see what cucumber's intermediate representation looks like, serialize the object with <code>cucumber</code> and deserialize it with <code>pickle</code>.</p>
+restored = cucumber.deserialize(data)</code></pre>
+    <p>Arguments <code>data</code>: Serialized bytes from <code>cucumber.serialize</code>.</p>
+    <ul>
+        <li><code>bytes</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>debug</code>: Enables deep error context and path reporting.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>verbose</code>: Prints progress and handler selection information.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns <code>obj</code>: Reconstructed Python object.</p>
+    <ul>
+        <li><code>Any</code></li>
+    </ul>
+    <p>Raises <code>DeserializationError</code>: If deserialization/reconstruction fails.</p>
+    <p>This is a <code>DeserializationError</code> that appears when you try to deserialize an object that is missing a required key.</p>
+    <pre><code class="language-python">Traceback (most recent call last):
+  File &quot;my_app.py&quot;, line 44, in &lt;module&gt;
+    restored = cucumber.deserialize(data)
+  File &quot;.../suitkaise/cucumber/api.py&quot;, line 177, in deserialize
+    return _default_deserializer.deserialize(data)
+  File &quot;.../suitkaise/cucumber/_int/deserializer.py&quot;, line 88, in deserialize
+    raise DeserializationError(message)
+suitkaise.cucumber._int.deserializer.DeserializationError:
+======================================================================
+DESERIALIZATION FAILED
+======================================================================
+Path: Payload -&gt; 1 -&gt; state
+Handler: ClassInstanceHandler
+Object: dict
 
-    <p>This is useful for understanding how cucumber transforms your objects.</p>
+The handler failed to reconstruct this object.
 
-<pre><code class="language-python">from suitkaise import cucumber
-import pickle
+Error: Missing key &#x27;state&#x27; for class reconstruction
+======================================================================</code></pre>
+    <h2><code>reconnect_all()</code> and <code>Reconnectors</code></h2>
+    <p><code>Reconnector</code> objects are returned for certain types when you deserialize an object.</p>
+    <p>These objects are placeholders for certain objects that cannot be directly serialized and deserialized for various reasons.</p>
+    <ul>
+        <li><code>DbReconnector</code> --&gt; database connections</li>
+        <li><code>SocketReconnector</code> --&gt; network sockets</li>
+        <li><code>PipeReconnector</code> --&gt; OS pipes (not <code>suitkaise.processing.Pipe</code> objects)</li>
+        <li><code>ThreadReconnector</code> --&gt; threads</li>
+        <li><code>SubprocessReconnector</code> --&gt; subprocesses</li>
+        <li><code>MatchReconnector</code> --&gt; compiled regex matches</li>
+    </ul>
+    <p>Each <code>Reconnector</code> has a <code>reconnect()</code> method that creates a new live resource, using stored metadata. If the resource requires authentication, you must provide it again. We do not store secrets in the IR for security reasons.</p>
+    <p>For more information on each <code>Reconnector</code>, see the how it works page.</p>
+    <p><code>reconnect_all()</code> allows you to reconnect all <code>Reconnectors</code> in an object at once.</p>
+    <p>Arguments <code>obj</code>: Object or container to traverse for <code>Reconnectors</code>.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>start_threads</code>: Auto-start reconnected threads.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>**auth</code>: Mapping of type key to secrets (authentication).</p>
+    <ul>
+        <li><code>dict[str, dict[str, str]]</code></li>
+        <li>keyword only</li>
+        <li>default: <code>{}</code> (no auth)</li>
+    </ul>
+    <p>Returns <code>obj</code>: Object with all <code>Reconnectors</code> replaced by live resources.</p>
+    <ul>
+        <li><code>Any</code></li>
+    </ul>
+    <p>Raises</p>
+    <ul>
+        <li>Nothing by default. <code>reconnect_all()</code> swallows reconnect errors and keeps the original <code>Reconnector</code> in place if reconnect fails.</li>
+    </ul>
+    <h3><code>**auth</code></h3>
+    <p><code>**auth</code> is a mapping of type key to secrets (authentication).</p>
+    <p>Type keys are the actual connection types (<code>module.ClassName</code> strings).</p>
+    <p><code>&quot;psycopg2.Connection&quot;</code>, <code>&quot;redis.Redis&quot;</code>, ...</p>
+    <p>Each of these type keys maps to a dict.</p>
+    <ul>
+        <li>Use <code>&quot;*&quot;</code> to provide the default authentication for all instances of that type</li>
+        <li>Use attribute names to override the default for that given attribute</li>
+    </ul>
+    <pre><code class="language-python">auth = {
+    &quot;psycopg2.Connection&quot;: {
+        &quot;*&quot;: &quot;default_psycopg2_password&quot;,
+        &quot;analytics_db&quot;: &quot;analytics_password&quot;  # used for obj.analytics_db specifically
+    },
+    &quot;redis.Redis&quot;: {
+        &quot;*&quot;: &quot;default_redis_password&quot;
+    }
+}
 
-class GameState:
-    def __init__(self):
-        self.player = "Gurphy"
-        self.score = 100
-        self.items = ["sword", "shield"]
-
-obj = GameState()
-
-# Serialize with cucumber
-data = cucumber.serialize(obj)
-
-# Deserialize with pickle to see the intermediate representation
-ir = pickle.loads(data)
-print(ir)</code></pre>
-
-    <details>
-        <summary>Output (simplified)</summary>
-
-<pre><code class="language-python">{
-    '__cucumber_type__': 'class_instance',
-    '__handler__': 'ClassInstanceHandler',
-    '__object_id__': 4371208656,
-    'state': {
-        '__cucumber_type__': 'dict',
-        'items': [
-            ('module', '__main__'),
-            ('qualname', 'GameState'),
-            ('strategy', 'dict'),
-            ('instance_dict', {
-                '__cucumber_type__': 'dict',
-                'items': [
-                    ('player', 'Gurphy'),
-                    ('score', 100),
-                    ('items', {
-                        '__cucumber_type__': 'list',
-                        'items': ['sword', 'shield']
-                    })
-                ]
-            })
-        ]
+restored = cucumber.deserialize(data)
+restored = cucumber.reconnect_all(restored, start_threads=True, **auth)</code></pre>
+    <p>If no <code>auth</code> is provided for a reconnector, <code>reconnect()</code> and <code>reconnect_all()</code> are still called.</p>
+    <p>This is fine in most cases unless you are using database connections that require authentication (a password, token, ...).</p>
+    <h3><code>DbReconnector</code> supported database types</h3>
+    <ul>
+        <li><code>psycopg2.Connection</code> (PostgreSQL / psycopg2): auth required</li>
+        <li><code>psycopg.Connection</code> (PostgreSQL / psycopg3): auth required</li>
+        <li><code>pymysql.Connection</code> (MySQL / PyMySQL): auth required</li>
+        <li><code>mysql.connector.connection.MySQLConnection</code> (MySQL / mysql-connector): auth required</li>
+        <li><code>mariadb.Connection</code> (MariaDB): auth required</li>
+        <li><code>sqlite3.Connection</code> (SQLite): no auth (file/&quot;:memory:&quot; path)</li>
+        <li><code>pymongo.MongoClient</code> (MongoDB): auth required for protected deployments</li>
+        <li><code>redis.Redis</code> (Redis): auth required for protected deployments</li>
+        <li><code>sqlalchemy.Engine</code> (SQLAlchemy): auth required if the URL requires it</li>
+        <li><code>cassandra.Cluster</code> (Cassandra): auth required for protected deployments</li>
+        <li><code>elasticsearch.Elasticsearch</code> (Elasticsearch): auth required for protected deployments</li>
+        <li><code>neo4j.Driver</code> (Neo4j): auth required</li>
+        <li><code>influxdb_client.InfluxDBClient</code> (InfluxDB): auth required (token)</li>
+        <li><code>pyodbc.Connection</code> (ODBC): auth required</li>
+        <li><code>clickhouse_driver.Client</code> (ClickHouse): auth required for protected deployments</li>
+        <li><code>pymssql.Connection</code> (MS SQL Server): auth required</li>
+        <li><code>oracledb.Connection</code> (Oracle): auth required</li>
+        <li><code>cx_Oracle.Connection</code> (Oracle / cx_Oracle): auth required</li>
+        <li><code>snowflake.Connection</code> (Snowflake): auth required</li>
+        <li><code>duckdb.Connection</code> (DuckDB): no auth (file/&quot;:memory:&quot; path)</li>
+    </ul>
+    <h2>IR, <code>serialize_ir()</code> and deserializing an IR</h2>
+    <p><code>cucumber</code> converts Python objects into an intermediate representation (IR) that is solely comprised of <code>pickle</code> native types. Then, <code>pickle</code> is used to serialize the IR to bytes.</p>
+    <pre><code class="language-python">{
+    &quot;__cucumber_type__&quot;: &quot;class_instance&quot;,
+    &quot;__handler__&quot;: &quot;ClassInstanceHandler&quot;,
+    &quot;__object_id__&quot;: 140123456789232,
+    &quot;module&quot;: &quot;my_app.models&quot;,
+    &quot;class_name&quot;: &quot;User&quot;,
+    &quot;state&quot;: {
+        &quot;id&quot;: 1,
+        &quot;name&quot;: &quot;alice&quot;,
+        &quot;roles&quot;: [&quot;admin&quot;, &quot;editor&quot;],
     }
 }</code></pre>
+    <h3><code>serialize_ir()</code></h3>
+    <p>Returns the IR without converting to bytes.</p>
+    <p>Use this to inspect the IR of an object.</p>
+    <ul>
+        <li>debugging</li>
+        <li>inspection</li>
+        <li>custom tooling</li>
+    </ul>
+    <pre><code class="language-python">ir = cucumber.serialize_ir(obj)</code></pre>
+    <p>Arguments <code>obj</code>: Any Python object</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>debug</code>: Enables deep error context and path reporting.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>verbose</code>: Prints progress and handler selection information.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns A <code>pickle</code> native IR (nested <code>dict</code>/<code>list</code> structure)</p>
+    <p>Raises <code>SerializationError</code>: If serialization fails.</p>
+    <h3>Deserializing an IR</h3>
+    <p>In order to deserialize an IR, you must first convert it to bytes using <code>pickle.dumps()</code>.</p>
+    <p>Generally, when serializing to an ir, you are doing it to inspect it, directly work with it.</p>
+    <pre><code class="language-python">ir = cucumber.serialize_ir(obj)
+data = pickle.dumps(ir)
 
-        <p>The representation includes:</p>
-        <ul>
-            <li><code>__cucumber_type__</code> - the type of object (class_instance, dict, list, lock, logger, etc.)</li>
-            <li><code>__handler__</code> - which handler serialized/deserializes this object</li>
-            <li><code>__object_id__</code> - unique ID for handling circular references</li>
-            <li><code>state</code> or <code>items</code> - the actual data</li>
-        </ul>
+restored = cucumber.deserialize_ir(ir)</code></pre>
+    <p>Raises <code>DeserializationError</code>: If deserialization fails.</p>
+    <h2>JSON conversion</h2>
+    <p><code>cucumber</code> provides 4 ways to convert an IR to JSON.</p>
+    <p>2 of them convert the IR to a JSON-serializable structure, and the other 2 convert the IR directly to a JSON string.</p>
+    <h3>What is the difference between a JSON-serializable structure and a JSON string?</h3>
+    <p>A JSON-serializable structure is a Python <code>dict</code>/<code>list</code> tree that only uses JSON-safe types (<code>dict</code>, <code>list</code>, <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>, <code>None</code>).</p>
+    <p>A JSON string is the final serialized text output (the result of <code>json.dumps</code>). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.</p>
+    <h3><code>to_jsonable()</code></h3>
+    <p>Serialize an object to IR and return a JSON-serializable structure.</p>
+    <pre><code class="language-python">jsonable = cucumber.to_jsonable(obj)</code></pre>
+    <p>Arguments <code>obj</code>: Any Python object to convert to IR before JSON conversion.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>debug</code>: Enables deep error context and path reporting.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>verbose</code>: Prints progress and handler selection information.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns A JSON-serializable structure.</p>
+    <p>Raises <code>SerializationError</code>: If serialization fails.</p>
+    <h3><code>to_json()</code></h3>
+    <p>Serialize an object to IR and return a JSON string.</p>
+    <pre><code class="language-python">json_text = cucumber.to_json(obj)</code></pre>
+    <p>Arguments <code>obj</code>: Any Python object to convert to IR before JSON conversion.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>indent</code>: The number of spaces to use for indentation.</p>
+    <ul>
+        <li><code>int | None = 2</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>sort_keys</code>: Sort keys in the JSON output.</p>
+    <ul>
+        <li><code>bool = True</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>debug</code>: Enables deep error context and path reporting.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>verbose</code>: Prints progress and handler selection information.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns A JSON string.</p>
+    <p>Raises <code>SerializationError</code>: If serialization fails.</p>
+    <h3><code>ir_to_jsonable()</code></h3>
+    <p>Convert an IR to a JSON-serializable structure.</p>
+    <pre><code class="language-python">ir = cucumber.serialize_ir(obj)
+jsonable = cucumber.ir_to_jsonable(ir)</code></pre>
+    <p>Arguments <code>ir</code>: The IR to convert.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p>Returns A JSON-serializable structure.</p>
+    <p>Raises <code>SerializationError</code>: If conversion fails.</p>
+    <h3><code>ir_to_json()</code></h3>
+    <p>Convert an IR to a JSON string.</p>
+    <pre><code class="language-python">ir = cucumber.serialize_ir(obj)
+json_text = cucumber.ir_to_json(ir)</code></pre>
+    <p>Arguments <code>ir</code>: The IR to convert.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>indent</code>: The number of spaces to use for indentation.</p>
+    <ul>
+        <li><code>int | None = 2</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>sort_keys</code>: Sort keys in the JSON output.</p>
+    <ul>
+        <li><code>bool = True</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p>Returns A JSON string.</p>
+    <p>Raises <code>SerializationError</code>: If conversion fails.</p>
+    <h3>Crossing programming language boundaries using JSON</h3>
+    <p><code>cucumber</code> is meant to work solely within Python.</p>
+    <p>Here are the steps to convert a Python object to an object in another programming language:</p>
+    <ol>
+        <li>Convert a Python object to a JSON-serializable IR using <code>cucumber.to_jsonable()</code> (or directly to text using <code>cucumber.to_json()</code>), then write it out.</li>
+    </ol>
+    <pre><code class="language-python">class Counter:
 
-        <p>For objects with locks, loggers, or other unpicklables, you'll see how cucumber represents them in a pickle-safe format.</p>
+    def __init__(self):
+        self.count = 0
 
-        <p>Simple class instances and functions may look slightly different, as they are not subjected to the entire process.</p>
-    </details>
+    def increment(self):
+        self.count += 1
 
+    def decrement(self):
+        self.count -= 1
+
+counter = Counter()
+
+jsonable = cucumber.to_jsonable(counter)
+with open(&quot;counter.json&quot;, &quot;w&quot;) as f:
+    json.dump(jsonable, f)</code></pre>
+    <ol start="2">
+        <li>Load the JSON data in the target language.</li>
+        <li>Interpret the IR nodes (<code>__cucumber_type__</code>, <code>__handler__</code>) and map them to equivalent types or a custom schema.</li>
+        <li>Replace Python-only concepts (modules, class names, callables) with your own equivalents or drop them.</li>
+        <li>Reconstruct the object graph in the target language.</li>
+    </ol>
 </section>

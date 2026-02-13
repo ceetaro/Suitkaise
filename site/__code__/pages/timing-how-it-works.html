@@ -1,0 +1,553 @@
+<div class="module-bar" data-module="timing">
+    <button class="module-bar-title">suitkaise.timing</button>
+    <nav class="module-bar-nav">
+        <a href="#timing-why" class="module-bar-link" data-page="timing-why">why</a>
+        <a href="#timing-quick-start" class="module-bar-link" data-page="timing-quick-start">quick start</a>
+        <a href="#timing" class="module-bar-link" data-page="timing">how to use</a>
+        <a href="#timing-how-it-works" class="module-bar-link active" data-page="timing-how-it-works">how it works</a>
+        <a href="#timing-examples" class="module-bar-link" data-page="timing-examples">examples</a>
+        <a href="#timing-videos" class="module-bar-link" data-page="timing-videos">videos</a>
+        <a href="#timing-tests" class="module-bar-link" data-page="timing-tests">tests</a>
+        <a href="#timing-learn" class="module-bar-link" data-page="timing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>How <code>timing</code> actually works</h1>
+    <p><code>timing</code> provides simple and powerful timing utilities for measuring execution time, collecting statistics, and analyzing performance.</p>
+    <ul>
+        <li><code>Sktimer</code> - statistical timer with thread-safe concurrent sessions</li>
+        <li><code>TimerStats</code> - frozen snapshot of timer statistics</li>
+        <li><code>TimeThis</code> - context manager for timing code blocks</li>
+        <li><code>timethis</code> - decorator for timing function executions</li>
+        <li>Simple functions: <code>time()</code>, <code>sleep()</code>, <code>elapsed()</code></li>
+    </ul>
+    <h2>Simple Functions</h2>
+    <h3><code>time()</code></h3>
+    <p>Get the current Unix timestamp.</p>
+    <pre><code class="language-python">def time() -&gt; float:
+    return time.time()</code></pre>
+    <p>Returns <code>float</code>: Current Unix timestamp.</p>
+    <p>Directly wraps Python&#x27;s <code>time.time()</code>.</p>
+    <h3><code>sleep()</code></h3>
+    <p>Sleep the current thread.</p>
+    <pre><code class="language-python">def _sync_sleep(seconds: float) -&gt; float:
+    time.sleep(seconds)
+    return time.time()
+
+async def _async_sleep(seconds: float) -&gt; float:
+    await asyncio.sleep(seconds)
+    return time.time()
+
+_sleep_impl = _AsyncableFunction(_sync_sleep, _async_sleep, name=&#x27;sleep&#x27;)
+
+def sleep(seconds: float) -&gt; float:
+    return _sleep_impl(seconds)
+
+sleep.asynced = _sleep_impl.asynced</code></pre>
+    <p>Arguments <code>seconds</code>: Number of seconds to sleep.</p>
+    <ul>
+        <li><code>float</code></li>
+        <li>required</li>
+    </ul>
+    <p>Returns <code>float</code>: Current time after sleeping.</p>
+    <p>The function uses <code>_AsyncableFunction</code> to provide both sync and async implementations:</p>
+    <ul>
+        <li>Sync: Uses <code>time.sleep()</code> internally</li>
+        <li>Async: Uses <code>asyncio.sleep()</code> internally via <code>.asynced()</code></li>
+    </ul>
+    <h3><code>elapsed()</code></h3>
+    <p>Calculate elapsed time between timestamps.</p>
+    <pre><code class="language-python">def _elapsed_time(time1: float, time2: Optional[float] = None) -&gt; float:
+    if time2 is None:
+        time2 = time.time()
+    
+    # return absolute difference so order doesn&#x27;t matter
+    return fabs(time2 - time1)</code></pre>
+    <p>Arguments <code>time1</code>: First timestamp.</p>
+    <ul>
+        <li><code>float</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>time2</code>: Second timestamp.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li>defaults to current time</li>
+    </ul>
+    <p>Returns <code>float</code>: Absolute elapsed time in seconds.</p>
+    <p>Uses <code>math.fabs()</code> to always return positive value regardless of argument order.</p>
+    <h2><code>Sktimer</code></h2>
+    <p>Statistical timer for collecting and analyzing execution times.</p>
+    <p>Arguments <code>max_times</code>: Rolling window size.</p>
+    <ul>
+        <li><code>int | None = None</code></li>
+        <li>if <code>None</code>, keeps all measurements</li>
+    </ul>
+    <p>Returns <code>Sktimer</code>: A new timer instance.</p>
+    <h3>Tracking State</h3>
+    <p><code>original_start_time: float | None</code> Earliest start time across all sessions. Set on first <code>start()</code> call.</p>
+    <p><code>times: list[float]</code> Aggregated list of all recorded measurements across all sessions.</p>
+    <p><code>_paused_durations: list[float]</code> Parallel list of paused durations for each recorded measurement.</p>
+    <p><code>_max_times: int | None</code> Rolling window size. <code>None</code> means keep all.</p>
+    <p><code>_lock: threading.RLock</code> Thread safety lock for manager state.</p>
+    <p><code>_sessions: dict[int, TimerSession]</code> Per-thread timing sessions, keyed by thread ident.</p>
+    <h3>Thread Model</h3>
+    <p><code>Sktimer</code> uses a session-per-thread model for concurrent safety.</p>
+    <pre><code class="language-python">Thread 1                    Thread 2
+   │                           │
+   ├─ start() ──────────┐      ├─ start() ──────────┐
+   │                    │      │                    │
+   │  TimerSession 1    │      │  TimerSession 2    │
+   │   └─ frames: [f1]  │      │   └─ frames: [f2]  │
+   │                    │      │                    │
+   ├─ stop() ───────────┘      ├─ stop() ───────────┘
+   │                           │
+   └───────────────────────────┴─────────────────────→ times[]</code></pre>
+    <p>Each thread gets its own <code>TimerSession</code>. Results aggregate into shared <code>times</code> list protected by <code>_lock</code>.</p>
+    <h3><code>start()</code></h3>
+    <p>Start timing a new measurement.</p>
+    <pre><code class="language-python">def start(self) -&gt; float:
+    # warn if there&#x27;s already an active frame
+    if self._has_active_frame():
+        warnings.warn(
+            &quot;Sktimer.start() called while timing is already in progress. &quot;
+            &quot;This creates a nested timing frame.&quot;,
+            UserWarning,
+            stacklevel=2
+        )
+    
+    # get or create session for current thread
+    sess = self._get_or_create_session()
+    started = sess.start()
+    
+    with self._lock:
+        if self.original_start_time is None:
+            self.original_start_time = started
+    return started</code></pre>
+    <ol>
+        <li>Check if current thread already has an active timing frame</li>
+        <li>Warn if nesting (user might not intend this)</li>
+        <li>Get or create a <code>TimerSession</code> for current thread</li>
+        <li>Call <code>sess.start()</code> to push a new frame</li>
+        <li>Record <code>original_start_time</code> if this is the first ever start</li>
+    </ol>
+    <p>Returns <code>float</code>: Start timestamp from <code>perf_counter()</code>.</p>
+    <h3><code>stop()</code></h3>
+    <p>Stop timing and record the measurement.</p>
+    <pre><code class="language-python">def stop(self) -&gt; float:
+    sess = self._get_or_create_session()
+    elapsed, paused_total = sess.stop()
+    
+    with self._lock:
+        self.times.append(elapsed)
+        self._paused_durations.append(paused_total)
+        self._trim_to_max()
+    return elapsed</code></pre>
+    <ol>
+        <li>Get session for current thread</li>
+        <li>Call <code>sess.stop()</code> to pop frame and get elapsed time</li>
+        <li>Under lock: append to <code>times</code> and <code>_paused_durations</code></li>
+        <li>Trim to rolling window if configured</li>
+    </ol>
+    <p>Returns <code>float</code>: Elapsed time for this measurement.</p>
+    <p>Raises <code>RuntimeError</code>: If timer was not started.</p>
+    <h3><code>discard()</code></h3>
+    <p>Stop timing but do NOT record.</p>
+    <pre><code class="language-python">def discard(self) -&gt; float:
+    sess = self._get_or_create_session()
+    elapsed, _ = sess.stop()
+    # intentionally NOT appending to times or _paused_durations
+    return elapsed</code></pre>
+    <ol>
+        <li>Get session for current thread</li>
+        <li>Call <code>sess.stop()</code> to pop frame</li>
+        <li>Return elapsed time without recording</li>
+    </ol>
+    <p>Returns <code>float</code>: Elapsed time that was discarded.</p>
+    <h3><code>lap()</code></h3>
+    <p>Record a lap time (stop + start in one call).</p>
+    <pre><code class="language-python">def lap(self) -&gt; float:
+    sess = self._get_or_create_session()
+    elapsed, paused_total = sess.lap()
+    
+    with self._lock:
+        self.times.append(elapsed)
+        self._paused_durations.append(paused_total)
+        self._trim_to_max()
+    return elapsed</code></pre>
+    <ol>
+        <li>Get session for current thread</li>
+        <li>Call <code>sess.lap()</code> which records elapsed and restarts frame</li>
+        <li>Under lock: append to lists and trim</li>
+    </ol>
+    <p>Returns <code>float</code>: Elapsed time for this lap.</p>
+    <h3><code>pause()</code> / <code>resume()</code></h3>
+    <p>Pause and resume the current timing measurement.</p>
+    <pre><code class="language-python">def pause(self) -&gt; None:
+    sess = self._get_or_create_session()
+    sess.pause()
+
+def resume(self) -&gt; None:
+    sess = self._get_or_create_session()
+    sess.resume()</code></pre>
+    <p>Delegates to session which tracks pause state in the current frame.</p>
+    <h3><code>add_time()</code></h3>
+    <p>Manually add a timing measurement.</p>
+    <pre><code class="language-python">def add_time(self, elapsed_time: float) -&gt; None:
+    with self._lock:
+        self.times.append(elapsed_time)
+        self._paused_durations.append(0.0)
+        self._trim_to_max()</code></pre>
+    <p>Directly appends to <code>times</code> with zero paused duration.</p>
+    <h3><code>set_max_times()</code></h3>
+    <p>Set the rolling window size.</p>
+    <pre><code class="language-python">def set_max_times(self, max_times: Optional[int]) -&gt; None:
+    if max_times is not None and max_times &lt;= 0:
+        raise ValueError(&quot;max_times must be a positive integer or None&quot;)
+    
+    with self._lock:
+        self._max_times = max_times
+        self._trim_to_max()
+
+def _trim_to_max(self) -&gt; None:
+    if self._max_times is None:
+        return
+    excess = len(self.times) - self._max_times
+    if excess &lt;= 0:
+        return
+    del self.times[:excess]
+    del self._paused_durations[:excess]</code></pre>
+    <p>When <code>max_times</code> is set, oldest measurements are discarded to keep only the most recent N.</p>
+    <h3><code>reset()</code></h3>
+    <p>Clear all timing measurements.</p>
+    <pre><code class="language-python">def reset(self) -&gt; None:
+    with self._lock:
+        self.times.clear()
+        self.original_start_time = None
+        self._sessions.clear()
+        self._paused_durations.clear()</code></pre>
+    <p>Resets all state including per-thread sessions.</p>
+    <h3>Statistics Properties</h3>
+    <p>All statistics properties are computed live from <code>times</code> list under lock.</p>
+    <pre><code class="language-python">@property
+def mean(self) -&gt; Optional[float]:
+    with self._lock:
+        return statistics.mean(self.times) if self.times else None
+
+@property
+def stdev(self) -&gt; Optional[float]:
+    with self._lock:
+        if len(self.times) &lt;= 1:
+            return None
+        return statistics.stdev(self.times)</code></pre>
+    <p>Available properties:</p>
+    <ul>
+        <li><code>num_times</code>, <code>most_recent</code>, <code>result</code>, <code>most_recent_index</code></li>
+        <li><code>total_time</code>, <code>total_time_paused</code></li>
+        <li><code>mean</code>, <code>median</code>, <code>min</code>, <code>max</code></li>
+        <li><code>fastest_time</code>, <code>slowest_time</code>, <code>fastest_index</code>, <code>slowest_index</code></li>
+        <li><code>stdev</code>, <code>variance</code>, <code>max_times</code></li>
+    </ul>
+    <h3><code>percentile()</code></h3>
+    <p>Calculate any percentile using linear interpolation.</p>
+    <pre><code class="language-python">def percentile(self, percent: float) -&gt; Optional[float]:
+    with self._lock:
+        if not self.times:
+            return None
+        
+        if not 0 &lt;= percent &lt;= 100:
+            raise ValueError(&quot;Percentile must be between 0 and 100&quot;)
+        
+        sorted_times = sorted(self.times)
+        index = (percent / 100) * (len(sorted_times) - 1)
+        
+        if index == int(index):
+            return sorted_times[int(index)]
+        
+        # linear interpolation
+        lower_index = int(index)
+        upper_index = lower_index + 1
+        weight = index - lower_index
+        return (sorted_times[lower_index] * (1 - weight) + 
+                sorted_times[upper_index] * weight)</code></pre>
+    <h3><code>get_statistics()</code> / <code>get_stats()</code></h3>
+    <p>Get a frozen snapshot.</p>
+    <pre><code class="language-python">def get_statistics(self) -&gt; Optional[TimerStats]:
+    with self._lock:
+        if not self.times:
+            return None
+        return TimerStats(self.times, self.original_start_time, self._paused_durations)</code></pre>
+    <p>Returns a <code>TimerStats</code> object with copied data that won&#x27;t change.</p>
+    <h3>Share Integration</h3>
+    <p><code>Sktimer</code> defines <code>_shared_meta</code> for use with <code>suitkaise.processing.Share</code>:</p>
+    <pre><code class="language-python">_shared_meta = {
+    &#x27;methods&#x27;: {
+        &#x27;start&#x27;: {&#x27;writes&#x27;: [&#x27;_sessions&#x27;, &#x27;original_start_time&#x27;]},
+        &#x27;stop&#x27;: {&#x27;writes&#x27;: [&#x27;times&#x27;, &#x27;_paused_durations&#x27;]},
+        &#x27;discard&#x27;: {&#x27;writes&#x27;: []},
+        &#x27;lap&#x27;: {&#x27;writes&#x27;: [&#x27;times&#x27;, &#x27;_paused_durations&#x27;]},
+        &#x27;pause&#x27;: {&#x27;writes&#x27;: [&#x27;_sessions&#x27;]},
+        &#x27;resume&#x27;: {&#x27;writes&#x27;: [&#x27;_sessions&#x27;]},
+        &#x27;add_time&#x27;: {&#x27;writes&#x27;: [&#x27;times&#x27;, &#x27;_paused_durations&#x27;]},
+        &#x27;set_max_times&#x27;: {&#x27;writes&#x27;: [&#x27;times&#x27;, &#x27;_paused_durations&#x27;, &#x27;_max_times&#x27;]},
+        &#x27;reset&#x27;: {&#x27;writes&#x27;: [&#x27;times&#x27;, &#x27;_sessions&#x27;, &#x27;_paused_durations&#x27;, &#x27;original_start_time&#x27;]},
+        &#x27;get_statistics&#x27;: {&#x27;writes&#x27;: []},
+        &#x27;get_stats&#x27;: {&#x27;writes&#x27;: []},
+        &#x27;get_time&#x27;: {&#x27;writes&#x27;: []},
+        &#x27;percentile&#x27;: {&#x27;writes&#x27;: []},
+    },
+    &#x27;properties&#x27;: {
+        &#x27;num_times&#x27;: {&#x27;reads&#x27;: [&#x27;times&#x27;]},
+        &#x27;most_recent&#x27;: {&#x27;reads&#x27;: [&#x27;times&#x27;]},
+        # ... etc
+    }
+}</code></pre>
+    <p>This metadata declares which attributes each method/property reads or writes, enabling the Share to coordinate synchronization.</p>
+    <h2><code>TimerSession</code></h2>
+    <p>Per-thread timing session supporting nested frames.</p>
+    <pre><code class="language-python">class TimerSession:
+    def __init__(self, manager: Sktimer):
+        self._manager = manager
+        self._frames: Deque[Dict[str, Any]] = deque()
+        self._lock = threading.RLock()</code></pre>
+    <h3>Frame Structure</h3>
+    <p>Each timing frame is a dict:</p>
+    <pre><code class="language-python">frame = {
+    &#x27;start_time&#x27;: float,       # perf_counter() at start
+    &#x27;paused&#x27;: bool,            # currently paused?
+    &#x27;pause_started_at&#x27;: float, # when pause began (or None)
+    &#x27;total_paused&#x27;: float,     # accumulated paused time
+}</code></pre>
+    <h3><code>start()</code></h3>
+    <p>Push a new frame onto the stack.</p>
+    <pre><code class="language-python">def start(self) -&gt; float:
+    with self._lock:
+        frame = {
+            &#x27;start_time&#x27;: self._now(),
+            &#x27;paused&#x27;: False,
+            &#x27;pause_started_at&#x27;: None,
+            &#x27;total_paused&#x27;: 0.0,
+        }
+        self._frames.append(frame)
+        return frame[&#x27;start_time&#x27;]</code></pre>
+    <p>Uses <code>perf_counter()</code> for high-resolution monotonic timing.</p>
+    <h3><code>stop()</code></h3>
+    <p>Pop the top frame and return elapsed time.</p>
+    <pre><code class="language-python">def stop(self) -&gt; tuple[float, float]:
+    with self._lock:
+        frame = self._top()
+        elapsed = self._elapsed_from_frame(frame)
+        paused_total = self._paused_total_from_frame(frame)
+        self._frames.pop()
+        return elapsed, paused_total</code></pre>
+    <h3><code>lap()</code></h3>
+    <p>Record elapsed time and restart the frame.</p>
+    <pre><code class="language-python">def lap(self) -&gt; tuple[float, float]:
+    with self._lock:
+        frame = self._top()
+        elapsed = self._elapsed_from_frame(frame)
+        paused_total = self._paused_total_from_frame(frame)
+        # restart frame
+        frame[&#x27;start_time&#x27;] = self._now()
+        frame[&#x27;total_paused&#x27;] = 0.0
+        frame[&#x27;paused&#x27;] = False
+        frame[&#x27;pause_started_at&#x27;] = None
+        return elapsed, paused_total</code></pre>
+    <p>Keeps the frame but resets its timing state.</p>
+    <h3><code>pause()</code> / <code>resume()</code></h3>
+    <pre><code class="language-python">def pause(self) -&gt; None:
+    with self._lock:
+        frame = self._top()
+        if frame[&#x27;paused&#x27;]:
+            warnings.warn(&quot;Sktimer is already paused.&quot;, UserWarning, stacklevel=2)
+            return
+        frame[&#x27;paused&#x27;] = True
+        frame[&#x27;pause_started_at&#x27;] = self._now()
+
+def resume(self) -&gt; None:
+    with self._lock:
+        frame = self._top()
+        if not frame[&#x27;paused&#x27;]:
+            warnings.warn(&quot;Sktimer is not paused.&quot;, UserWarning, stacklevel=2)
+            return
+        pause_duration = self._now() - frame[&#x27;pause_started_at&#x27;]
+        frame[&#x27;total_paused&#x27;] += pause_duration
+        frame[&#x27;paused&#x27;] = False
+        frame[&#x27;pause_started_at&#x27;] = None</code></pre>
+    <h3>Elapsed Calculation</h3>
+    <pre><code class="language-python">def _elapsed_from_frame(self, frame: Dict[str, Any]) -&gt; float:
+    end = self._now()
+    paused_extra = 0.0
+    # if currently paused, add time since pause started
+    if frame[&#x27;paused&#x27;] and frame[&#x27;pause_started_at&#x27;] is not None:
+        paused_extra = end - frame[&#x27;pause_started_at&#x27;]
+    
+    return (end - frame[&#x27;start_time&#x27;]) - (frame[&#x27;total_paused&#x27;] + paused_extra)</code></pre>
+    <p>Total elapsed = (end - start) - total paused time.</p>
+    <h2><code>TimerStats</code></h2>
+    <p>Frozen snapshot of timer statistics.</p>
+    <pre><code class="language-python">class TimerStats:
+    def __init__(self, times: List[float], original_start_time: Optional[float], paused_durations: List[float]):
+        self.times = times.copy()  # copy for immutability
+        
+        self.original_start_time = original_start_time
+        self.num_times = len(times)
+        self.most_recent = times[-1] if times else None
+        self.most_recent_index = len(times) - 1 if times else None
+        self.total_time = sum(times) if times else None
+        self.total_time_paused = sum(paused_durations) if paused_durations else None
+        
+        self.mean = statistics.mean(times) if times else None
+        self.median = statistics.median(times) if times else None
+        self.min = min(times) if times else None
+        self.max = max(times) if times else None
+        self.stdev = statistics.stdev(times) if len(times) &gt; 1 else None
+        self.variance = statistics.variance(times) if len(times) &gt; 1 else None
+        # ... etc</code></pre>
+    <p>All values are computed once at construction time and stored as attributes.</p>
+    <h3><code>percentile()</code></h3>
+    <p>Same algorithm as <code>Sktimer.percentile()</code> but operates on the frozen <code>times</code> copy.</p>
+    <h2><code>TimeThis</code> Context Manager</h2>
+    <p>Context manager wrapper around <code>Sktimer</code>.</p>
+    <pre><code class="language-python">class TimeThis:
+    def __init__(self, timer: Optional[Sktimer] = None, threshold: float = 0.0):
+        self.timer = timer or Sktimer()
+        self.threshold = threshold
+
+    def __enter__(self):
+        self.timer.start()
+        return self.timer
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Get elapsed time without recording
+        elapsed = self.timer.discard()
+        
+        # Only record if above threshold
+        if elapsed &gt;= self.threshold:
+            self.timer.add_time(elapsed)</code></pre>
+    <h3>Flow</h3>
+    <ol>
+        <li><code>__enter__</code>: Call <code>timer.start()</code>, return timer for <code>as</code> clause</li>
+        <li>User code executes</li>
+        <li><code>__exit__</code>: Call <code>timer.discard()</code> to get elapsed without recording</li>
+        <li>Only record via <code>add_time()</code> if above threshold</li>
+    </ol>
+    <h3>Methods</h3>
+    <p>Delegates to the underlying timer:</p>
+    <pre><code class="language-python">def pause(self):
+    self.timer.pause()
+
+def resume(self):
+    self.timer.resume()
+
+def lap(self):
+    self.timer.lap()</code></pre>
+    <h2><code>timethis</code> Decorator</h2>
+    <p>Decorator that times function executions.</p>
+    <pre><code class="language-python">def timethis(
+    timer: Optional[Sktimer] = None,
+    threshold: float = 0.0,
+    max_times: Optional[int] = None,
+) -&gt; Callable:</code></pre>
+    <h3>With Explicit Timer</h3>
+    <pre><code class="language-python">def decorator(func: Callable) -&gt; Callable:
+    if timer is not None:
+        if max_times is not None:
+            timer.set_max_times(max_times)
+        wrapper = _timethis_decorator(timer, threshold)(func)
+    # ...
+    return wrapper</code></pre>
+    <p>Uses provided timer directly.</p>
+    <h3>With Auto-Created Timer</h3>
+    <pre><code class="language-python">def decorator(func: Callable) -&gt; Callable:
+    # ...
+    else:
+        # extract module name
+        frame = inspect.currentframe()
+        module_name = frame.f_back.f_globals.get(&#x27;__name__&#x27;, &#x27;unknown&#x27;)
+        if &#x27;.&#x27; in module_name:
+            module_name = module_name.split(&#x27;.&#x27;)[-1]
+        
+        # build timer name from function qualname
+        func_qualname = func.__qualname__
+        if &#x27;.&#x27; in func_qualname:
+            class_name, func_name = func_qualname.rsplit(&#x27;.&#x27;, 1)
+            timer_name = f&quot;{module_name}_{class_name}_{func_name}_timer&quot;
+        else:
+            timer_name = f&quot;{module_name}_{func_qualname}_timer&quot;
+        
+        # get or create global timer (thread-safe)
+        if not hasattr(timethis, &#x27;_global_timers&#x27;):
+            setattr(timethis, &#x27;_global_timers&#x27;, {})
+            setattr(timethis, &#x27;_timers_lock&#x27;, threading.RLock())
+        
+        lock = getattr(timethis, &#x27;_timers_lock&#x27;)
+        with lock:
+            global_timers = getattr(timethis, &#x27;_global_timers&#x27;)
+            if timer_name not in global_timers:
+                global_timers[timer_name] = Sktimer(max_times=max_times)
+        
+        wrapper = _timethis_decorator(global_timers[timer_name], threshold)(func)
+        setattr(wrapper, &#x27;timer&#x27;, global_timers[timer_name])
+    
+    return wrapper</code></pre>
+    <ol>
+        <li>Extract module name from caller&#x27;s frame</li>
+        <li>Build timer name from function&#x27;s <code>__qualname__</code></li>
+        <li>Get or create global timer (thread-safe with lock)</li>
+        <li>Attach timer to wrapped function as <code>.timer</code></li>
+    </ol>
+    <h3>Timer Naming Convention</h3>
+    <ul>
+        <li>Module-level function <code>foo()</code> in <code>mymodule.py</code>: <code>mymodule_foo_timer</code></li>
+        <li>Class method <code>Bar.baz()</code> in <code>mymodule.py</code>: <code>mymodule_Bar_baz_timer</code></li>
+    </ul>
+    <h3><code>_timethis_decorator()</code></h3>
+    <p>The actual timing wrapper:</p>
+    <pre><code class="language-python">def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
+    def decorator(func: Callable) -&gt; Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # avoid nested timing frames on the same timer
+            if timer._has_active_frame():
+                start = perf_counter()
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    elapsed = perf_counter() - start
+                    if elapsed &gt;= threshold:
+                        timer.add_time(elapsed)
+            else:
+                timer.start()
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                finally:
+                    elapsed = timer.discard()
+                    if elapsed &gt;= threshold:
+                        timer.add_time(elapsed)
+        return wrapper
+    return decorator</code></pre>
+    <p>Two paths:</p>
+    <ol>
+        <li><strong>Already timing</strong>: Use <code>perf_counter()</code> directly to avoid nested frames</li>
+        <li><strong>Not timing</strong>: Use <code>start()</code>/<code>discard()</code>/<code>add_time()</code> flow</li>
+    </ol>
+    <p>Both paths only record if elapsed &gt;= threshold.</p>
+    <h2><code>clear_global_timers()</code></h2>
+    <p>Clear auto-created timers.</p>
+    <pre><code class="language-python">def clear_global_timers() -&gt; None:
+    if hasattr(timethis, &#x27;_timers_lock&#x27;) and hasattr(timethis, &#x27;_global_timers&#x27;):
+        lock = getattr(timethis, &#x27;_timers_lock&#x27;)
+        with lock:
+            timers = getattr(timethis, &#x27;_global_timers&#x27;)
+            timers.clear()</code></pre>
+    <p>Thread-safe clearing of the global timer registry.</p>
+    <h2>Thread Safety</h2>
+    <p><code>Sktimer</code> is fully thread-safe:</p>
+    <ol>
+        <li><strong>Manager-level lock</strong> (<code>_lock</code>): Protects <code>times</code>, <code>_paused_durations</code>, <code>_sessions</code></li>
+        <li><strong>Session-level lock</strong>: Each <code>TimerSession</code> has its own lock for frame operations</li>
+        <li><strong>Global timer lock</strong>: <code>timethis._timers_lock</code> protects auto-created timer registry</li>
+    </ol>
+    <p><code>threading.RLock</code> (reentrant lock) is used because operations may call each other.</p>
+</section>

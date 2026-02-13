@@ -60,14 +60,14 @@ columns = 1
 
 ## 1.1: text = "Time a function every time it runs with 1 line of code."
 
-## 2.1: link = "<--- Learn More"(site/sktime/__sktime__.md)
+## 2.1: link = "<--- Learn More"(site/timing/__timing__.md)
 
 /*
 The learn more should be a button with the same background color as the home page.
 
 when this link is hovered, the arrow should move slightly to the left and stay there until the mouse is no longer hovering over the link.
 
-this link takes you to the sktime main page.
+this link takes you to the timing main page.
 */
 
 
@@ -81,16 +81,16 @@ image = __assets__/skpath-text-with-path-neon.png
 
 # 4.2
 
-text = "File path management + skpath == big win for you."
+text = "File path management + paths == big win for you."
 
-link = "Learn More --->"(site/skpath/__skpath__.md)
+link = "Learn More --->"(site/paths/__paths__.md)
 
 /*
 The learn more should be a button with the same background color as the home page.
 
 when this link is hovered, the arrow should move slightly to the right and stay there until the mouse is no longer hovering over the link.
 
-this link takes you to the skpath main page.
+this link takes you to the paths main page.
 */
 
 # 5.1
@@ -100,14 +100,14 @@ columns = 1
 
 ## 1.1: text = "Simple, readable code to manage resources and control flow."
 
-## 2.1: link = "<--- Learn More"(site/circuit/__circuit__.md)
+## 2.1: link = "<--- Learn More"(site/circuit/__circuits__.md)
 
 /*
 The learn more should be a button with the same background color as the home page.
 
 when this link is hovered, the arrow should move slightly to the left and stay there until the mouse is no longer hovering over the link.
 
-this link takes you to the circuit main page.
+this link takes you to the circuits main page.
 */
 
 

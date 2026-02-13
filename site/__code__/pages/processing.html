@@ -2,551 +2,881 @@
     <button class="module-bar-title">suitkaise.processing</button>
     <nav class="module-bar-nav">
         <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+        <a href="#processing-quick-start" class="module-bar-link" data-page="processing-quick-start">quick start</a>
         <a href="#processing" class="module-bar-link active" data-page="processing">how to use</a>
         <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
         <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
-        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+        <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1>How to use <code>processing</code></h1>
-
-    <p><code>processing</code> provides a much simpler way to run Python code in subprocesses.</p>
-
-    <p>Designed to make using multiple processes really easy.</p>
-
-    <p>By inheriting from the <code>Process</code> class, you can create a well organized process in a class structure.</p>
-
-    <p>Since <code>processing</code> uses <code>cucumber</code> (another <code>suitkaise</code> module) as its serializer, you can create these process classes with essentially any object you want.</p>
-
-    <p>You can also use the <code>Pool</code> class for batch processing.</p>
-
-    <p><code>Pool</code> also uses <code>cucumber</code> for serialization, so you can use it with any object you want, and it also allows you to use <code>Process</code> inheriting classes instead of just functions.</p>
-
-    <p>No more <code>PicklingError: Can't serialize object</code> errors when you start up your process!</p>
-
+    <p><code>processing</code> provides powerful subprocess execution, parallel processing, and shared memory across process boundaries.</p>
+    <p><code>Skprocess</code>: Base class for easy, class based subprocess execution.</p>
     <ul>
-        <li>no more manual serialization</li>
-        <li>no more queue management</li>
-        <li>lifecycle methods for setup and teardown including error handling</li>
-        <li>built in timing</li>
-        <li>automatic retries with <code>lives</code> system</li>
-    </ul><br>
-
-    <h2>Lifecycle Methods</h2>
-
-    <p>Classes that inherit from <code>Process</code> have access to 6 lifecycle methods.</p>
-
-    <p>These methods are what run the actual process when it is created.</p>
-
-    <p>Additionally, <code>__init__</code> is modified to automatically call <code>super().__init__()</code> for you.</p>
-
-    <p>In order for <code>Process</code> inheriting classes to run correctly, you must implement the <code>__run__</code> method.</p>
-
-<pre><code class="language-python">from suitkaise.processing import Process
-
-class MyProcess(Process):
-
-    def __init__(self):
-
-        # super().__init__() is called automatically for you
-        # setup your process here
-        # initalize attributes
-        # configure Process attributes
-
-
-    def __prerun__(self):
-
-        # here, you can setup before the main part
-        # connect to databases
-        # make API calls
-        # read files
-
-
-    def __run__(self): # REQUIRED
-
-        # this is the main part
-        # you can just write your code here
-        # it repeats for you, no need to write looping code
-
-
-    def __postrun__(self):
-
-        # this is where you clean up your work
-        # close connections
-        # add results to attributes
-
-    
-    def __onfinish__(self): 
-
-        # this is when you clean up the process
-        # calculate summaries
-        # save results to files
-        # send emails or do other actions
-
-
-    def __result__(self):
-
-        # this returns the result of the process
-        # don't have to worry about confusing returns
-        # store your results as instance attributes
-        # and return them here
-
-
-    def __error__(self):
-
-        # this is __result__() when an error occurs</code></pre>
-
+        <li>inherit from <code>Skprocess</code></li>
+        <li>implement the lifecycle methods</li>
+        <li>easy to make and use</li>
+        <li><code>tell()</code> and <code>listen()</code> for queue based communication</li>
+        <li>serializes with <code>cucumber</code></li>
+        <li>automatic reconnection of live resources with <code>autoreconnect</code></li>
+        <li>automatic timing</li>
+        <li>automatic retries</li>
+        <li>automatic timeouts</li>
+        <li>automatic looping</li>
+        <li>simple class pattern</li>
+    </ul>
+    <p><code>Pool</code>: Parallel batch processing.</p>
+    <ul>
+        <li><code>map</code>: returns a list, ordered by input</li>
+        <li><code>unordered_map</code>: returns an unordered list, fastest items first</li>
+        <li><code>imap</code>: returns an iterator, ordered by input</li>
+        <li><code>unordered_imap</code>: returns an iterator, unordered</li>
+        <li><code>.star()</code> modifier: unpacks tuples as function arguments</li>
+        <li>supports <code>sk</code> modifiers: <code>.timeout()</code>, <code>.background()</code>, <code>.asynced()</code></li>
+    </ul>
+    <p><code>Share</code>: Shared memory container that works across processes.</p>
+    <ul>
+        <li>best feature in the entire library</li>
+        <li>literally just create a <code>Share</code> and add any objects to it, like a regular class</li>
+        <li>pass the <code>Share</code> to your subprocesses</li>
+        <li>access and update the objects normally</li>
+        <li>everything remains in sync</li>
+    </ul>
+    <p><code>Pipe</code>: upgraded <code>multiprocessing.Pipe</code></p>
+    <ul>
+        <li>super fast cross process communication</li>
+        <li>uses <code>cucumber</code> for serialization</li>
+        <li>ensures one pipe endpoint remains locked in the parent process</li>
+        <li>easy to use and understand</li>
+    </ul>
+    <h2>Importing</h2>
+    <pre><code class="language-python">from suitkaise import processing</code></pre>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess, Pool, Share, Pipe, autoreconnect, ProcessTimers, ProcessError, PreRunError, RunError, PostRunError, OnFinishError, ResultError, ErrorHandlerError, ProcessTimeoutError, ResultTimeoutError</code></pre>
     <hr>
+    <details>
+        <summary><code>Skprocess</code></summary>
+        <div class="dropdown-content">
+    <p>Base class for subprocess execution. Inherit from this class and implement lifecycle methods.</p>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
 
-    <h2>Methods</h2>
-
-    <h3><code>start()</code></h3>
-
-    <p>Starts the process.</p>
-
-<pre><code class="language-python">p = MyProcess()
-p.start()</code></pre>
-
-    <h3><code>wait()</code></h3>
-
-    <p>Blocks until the process finishes.</p>
-
-<pre><code class="language-python">p = MyProcess()
-p.start()
-
-p.wait()
-
-# doesn't get called until p finishes
-something_else()</code></pre>
-
-    <h3><code>stop()</code></h3>
-
-    <p>Signals to the subprocess to finish its current run and clean up.</p>
-
-    <p>Does not block (so you can stop other processes without having to wait)</p>
-
-    <ul>
-        <li>finishes current run</li>
-        <li>calls <code>__onfinish__()</code></li>
-        <li>calls <code>__result__()</code> or <code>__error__()</code> depending on status</li>
-        <li>closes</li>
-    </ul>
-
-<pre><code class="language-python">p = MyProcess()
-p.start()
-
-# manually signal to stop
-p.stop()
-
-p.wait()</code></pre>
-
-<pre><code class="language-python">class MyProcess(Process):
-
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.counter = 0
+        self.process_config.runs = 10
+    
     def __run__(self):
+        self.counter += 1
+    
+    def __result__(self):
+        return self.counter
 
-        if found_what_we_need:
-            # exit early
-            self.stop()
-
-        else:
-            # ...</code></pre>
-
-    <h3><code>kill()</code></h3>
-
-    <p>Forcefully terminates the process immediately without cleanup.</p>
-
-    <p>Do not use this unless something goes wrong (like a process hanging).</p>
-
+process = MyProcess()
+process.start()
+process.wait()
+result = process.result()  # 10</code></pre>
+    <h3>Lifecycle Methods</h3>
+    <p>Define any of these methods in your subclass. All are optional except <code>__run__()</code>.</p>
+    <p><code>__run__()</code>: main work method</p>
     <ul>
-        <li>immediately closes</li>
-        <li>does not finish current run</li>
-        <li>does not call <code>__onfinish__()</code></li>
-        <li>does not call <code>__result__()</code> or <code>__error__()</code></li>
+        <li>required</li>
+        <li>no need to write looping code</li>
     </ul>
-
-<pre><code class="language-python">p = MyProcess()
-p.start()
- 
-p.kill() # Immediate termination
-
-# p.result() will be None</code></pre>
-
-    <h3><code>tell()</code></h3>
-
-    <p>Sends data to the other process.</p>
-
-    <p>If the other process calls <code>listen()</code>, it will receive the data from <code>tell()</code>.</p>
-
-    <p><code>tell()</code> is not a blocking method.</p>
-
-<pre><code class="language-python">p = MyProcess()
-p.start()
-
-# sends "data" to the subprocess
-p.tell("some data")
-
-p.wait()</code></pre>
-
-<pre><code class="language-python">class MyProcess(Process):
-
-    def __run__(self):
-
-        self.tell(("i have found a corrupt file", "corrupt_file.txt"))</code></pre>
-
-    <h3><code>listen()</code></h3>
-
-    <p>Blocks until data is received from the other process.</p>
-
-    <p>Optional timeout.</p>
-
-<pre><code class="language-python">corrupt_files = []
-
-p = MyProcess()
-p.start()
-
-data = p.listen(timeout=1.0)
-
-if data[0] == "i have found a corrupt file":
-    corrupt_files.append(data[1])</code></pre>
-
-<pre><code class="language-python">class MyProcess(Process):
-
-    def __run__(self):
-
-        command = self.listen(timeout=5.0)
-
-        if not command:
-            raise ProcessTimeoutError("No command received")
-        else:
-            run_command(command)</code></pre>
-
-    <h3><code>result()</code></h3>
-
-    <p>Retrieves the result from the process.</p>
-
+    <p><code>__prerun__()</code>: setup before each iteration (run)</p>
     <ul>
-        <li>blocks if not finished</li>
-        <li>raises if error occurred</li>
+        <li>optional</li>
+        <li>use for setup that needs to happen before each run</li>
     </ul>
+    <p><code>__postrun__()</code>: cleanup after each iteration (run)</p>
+    <ul>
+        <li>optional</li>
+        <li>use for cleanup that needs to happen after every run</li>
+    </ul>
+    <p><code>__onfinish__()</code>: cleanup/teardown after the process ends</p>
+    <ul>
+        <li>optional</li>
+        <li>use for cleanup that needs to happen before the process ends</li>
+    </ul>
+    <p><code>__result__()</code>: return data when the process completes</p>
+    <ul>
+        <li>optional</li>
+        <li>whatever is returned here is what <code>process.result()</code> returns</li>
+    </ul>
+    <p><code>__error__()</code>: return data when the process fails</p>
+    <ul>
+        <li>optional</li>
+        <li>allows you more flexibility when an error occurs</li>
+    </ul>
+    <h4><code>__prerun__()</code></h4>
+    <p>Called before each <code>__run__()</code> iteration.</p>
+    <pre><code class="language-python">def __prerun__(self):
+    self.data = fetch_next_batch()</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Fetching data for the next iteration</li>
+        <li>Setup that needs to happen before each run</li>
+        <li>Checking conditions before running</li>
+    </ul>
+    <h4><code>__run__()</code></h4>
+    <p>Main work method. Called each iteration.</p>
+    <pre><code class="language-python">def __run__(self):
+    for item in self.data:
+        process(item)</code></pre>
+    <p>This is where your core logic goes.</p>
+    <h4><code>__postrun__()</code></h4>
+    <p>Called after each <code>__run__()</code> iteration completes.</p>
+    <pre><code class="language-python">def __postrun__(self):
+    self.results.append(self.batch_result)
+    self.batch_result = None</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Cleanup after each iteration</li>
+        <li>Recording results</li>
+        <li>State transitions</li>
+    </ul>
+    <h4><code>__onfinish__()</code></h4>
+    <p>Called when the process ends (stop signal or run limit reached).</p>
+    <pre><code class="language-python">def __onfinish__(self):
+    self.cleanup_resources()
+    self.save_final_state()</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Final cleanup</li>
+        <li>Saving state</li>
+        <li>Closing connections</li>
+    </ul>
+    <h4><code>__result__()</code></h4>
+    <p>Return data when process completes. This is what <code>process.result()</code> returns.</p>
+    <pre><code class="language-python">def __result__(self):
+    return {
+        &#x27;count&#x27;: self.counter,
+        &#x27;results&#x27;: self.results,
+        &#x27;status&#x27;: &#x27;completed&#x27;
+    }</code></pre>
+    <p>NOTE: Your process will not return a result unless you define <code>__result__()</code>.</p>
+    <h4><code>__error__()</code></h4>
+    <p>Handle errors when all lives are exhausted. Receives the error via <code>self.error</code>.</p>
+    <pre><code class="language-python">def __error__(self):
+    log_error(self.error)
+    return {&#x27;status&#x27;: &#x27;failed&#x27;, &#x27;error&#x27;: str(self.error)}</code></pre>
+    <p>Default behavior: Returns <code>self.error</code>, which will be raised by <code>process.result()</code>.</p>
+    <h3><code>process_config</code></h3>
+    <p>Configuration object available in your <code>__init__</code>. Set these to control process behavior.</p>
+    <h4><code>runs</code></h4>
+    <p>Number of run iterations before auto-stopping.</p>
+    <pre><code class="language-python">def __init__(self):
+    # run 100 iterations, then stop
+    self.process_config.runs = 100</code></pre>
+    <ul>
+        <li><code>int</code>: Run this many iterations</li>
+        <li><code>None</code>: Run indefinitely until <code>stop()</code> is called</li>
+    </ul>
+    <h4><code>join_in</code></h4>
+    <p>Maximum total runtime in seconds before auto-stopping.</p>
+    <pre><code class="language-python">def __init__(self):
+    # stop after 60 seconds
+    self.process_config.join_in = 60.0 </code></pre>
+    <ul>
+        <li><code>float</code>: Maximum seconds to run</li>
+        <li><code>None</code>: No time limit</li>
+    </ul>
+    <h4><code>lives</code></h4>
+    <p>Number of times to retry after a crash before giving up.</p>
+    <pre><code class="language-python">def __init__(self):
+    # retry up to 2 times (3 total attempts)
+    self.process_config.lives = 3  </code></pre>
+    <ul>
+        <li><code>1</code>: No retries (fail on first error)</li>
+        <li><code>n &gt; 1</code>: Retry <code>n-1</code> times on error</li>
+    </ul>
+    <p>When the process crashes:</p>
+    <ol>
+        <li>Current run state is preserved</li>
+        <li>Process restarts from where it left off</li>
+        <li><code>lives</code> is decremented</li>
+        <li>If <code>lives</code> reaches 0, <code>__error__()</code> is called</li>
+    </ol>
+    <h4><code>timeouts</code></h4>
+    <p>Timeout settings for each lifecycle section.</p>
+    <pre><code class="language-python">def __init__(self):
+    self.process_config.timeouts.prerun = 5.0
+    self.process_config.timeouts.run = 30.0
+    self.process_config.timeouts.postrun = 5.0
+    self.process_config.timeouts.onfinish = 10.0
+    self.process_config.timeouts.result = 5.0
+    self.process_config.timeouts.error = 5.0</code></pre>
+    <p>All default to <code>None</code> (no timeout). Set a value to enable timeout for that section.</p>
+    <p>If a section times out, <code>ProcessTimeoutError</code> is raised. This counts against <code>lives</code>.</p>
+    <h3>Control Methods</h3>
+    <p>These are all of the methods you use to actually run and control <code>Skprocess</code> made subprocesses.</p>
+    <h4><code>start()</code></h4>
+    <p>Start the process in a new subprocess.</p>
+    <pre><code class="language-python">process = MyProcess()
+process.start()</code></pre>
+    <ul>
+        <li>Serializes the <code>Skprocess</code> object</li>
+        <li>Spawns a subprocess that runs your <code>Skprocess</code> object</li>
+        <li>Returns immediately (non-blocking)</li>
+    </ul>
+    <h4><code>stop()</code></h4>
+    <p>Signal the process to stop gracefully.</p>
+    <pre><code class="language-python">process.stop()</code></pre>
+    <ul>
+        <li>Non-blocking (returns immediately)</li>
+        <li>Process finishes current section</li>
+        <li>Then runs <code>__onfinish__()</code> and <code>__result__()</code></li>
+        <li>Use <code>wait()</code> after <code>stop()</code> to block until finished</li>
+    </ul>
+    <h4><code>kill()</code></h4>
+    <p>Forcefully terminate the process immediately.</p>
+    <pre><code class="language-python">process.kill()</code></pre>
+    <ul>
+        <li>Bypasses the lives system</li>
+        <li>No cleanup, no <code>__onfinish__()</code>, no result</li>
+        <li>Use only as a last resort</li>
+    </ul>
+    <h4><code>wait()</code></h4>
+    <p>Wait for the process to finish.</p>
+    <pre><code class="language-python">finished = process.wait() # blocks until done
 
-<pre><code class="language-python">p = MyProcess()
-p.start()
+finished = process.wait(timeout=10.0) # returns False if timeout</code></pre>
+    <p>Arguments <code>timeout</code>: Maximum seconds to wait.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li><code>None</code> = wait forever</li>
+    </ul>
+    <p>Returns <code>bool</code>: True if process finished, False if timeout reached.</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># async
+await process.wait.asynced()()</code></pre>
+    <p>If the process crashes and has lives remaining, <code>wait()</code> continues blocking during the restart.</p>
+    <h4><code>result()</code></h4>
+    <p>Get the result from the process.</p>
+    <p>Will block until the process finishes if not already done.</p>
+    <p>Returns whatever <code>__result__()</code> returned.</p>
+    <pre><code class="language-python">data = process.result()  # blocks until result ready</code></pre>
+    <p>Raises <code>ProcessError</code>: If the process failed (after exhausting lives).</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># with timeout
+data = process.result.timeout(10.0)()
+
+# background - returns Future
+future = process.result.background()()
+data = future.result()
+
+# async
+data = await process.result.asynced()()</code></pre>
+    <h4><code>run()</code></h4>
+    <p>Start, wait, and return the result in one call.</p>
+    <pre><code class="language-python">result = process.run()</code></pre>
+    <p>Equivalent to:</p>
+    <pre><code class="language-python">process.start()
+process.wait()
+result = process.result()</code></pre>
+    <p>Returns whatever <code>__result__()</code> returned.</p>
+    <p>Raises <code>ProcessError</code>: If the process failed (after exhausting lives).</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># with timeout
+result = process.run.timeout(30.0)()
+
+# background - returns Future
+future = process.run.background()()
+# ... do other work ...
+result = future.result()
+
+# async
+result = await process.run.asynced()()</code></pre>
+    <h3>Queue based communication with <code>tell()</code> and <code>listen()</code></h3>
+    <p>Bidirectional communication between parent and subprocess.</p>
+    <h4><code>tell()</code></h4>
+    <p>Send data to the other side.</p>
+    <pre><code class="language-python"># from parent
+process.tell({&quot;command&quot;: &quot;update_config&quot;, &quot;value&quot;: 100})
+
+# from subprocess (in lifecycle methods)
+def __postrun__(self):
+    self.tell({&quot;status&quot;: &quot;batch_complete&quot;, &quot;count&quot;: len(self.batch)})</code></pre>
+    <p>Arguments <code>data</code>: Any serializable data to send.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p>Non-blocking - returns immediately after queuing the data.</p>
+    <h4><code>listen()</code></h4>
+    <p>Receive data from the other side.</p>
+    <pre><code class="language-python"># from parent
+data = process.listen() # blocks until data received
+data = process.listen(timeout=5.0) # returns None if timeout
+
+# from subprocess (in lifecycle methods)
+def __prerun__(self):
+    command = self.listen(timeout=1.0)
+    if command:
+        self.handle_command(command)</code></pre>
+    <p>Arguments <code>timeout</code>: Maximum seconds to wait.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li><code>None</code> = wait forever</li>
+    </ul>
+    <p>Returns <code>Any | None</code>: Data sent by the other side, or <code>None</code> if timeout.</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># background
+future = process.listen.background()(timeout=5.0)
+
+# async
+data = await process.listen.asynced()()</code></pre>
+    <h3>Timing</h3>
+    <p>Every lifecycle method is automatically timed.</p>
+    <pre><code class="language-python">process.start()
+process.wait()
+
+# access timing data
+print(process.__run__.timer.mean)
+print(process.__prerun__.timer.total_time)
+print(process.__postrun__.timer.percentile(95))
+
+# aggregate timer for full iterations (prerun + run + postrun)
+print(process.process_timer.mean)</code></pre>
+    <p>Each timer is an <code>Sktimer</code> with full statistics: <code>mean</code>, <code>median</code>, <code>stdev</code>, <code>min</code>, <code>max</code>, <code>percentile()</code>, ...</p>
+    <h3>Properties</h3>
+    <p><code>current_run</code>: Current run iteration number (0-indexed).</p>
+    <ul>
+        <li><code>int</code></li>
+        <li>first run is run 0</li>
+    </ul>
+    <p><code>is_alive</code>: Whether the subprocess is currently running.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <p><code>timers</code>: Container with all lifecycle timers.</p>
+    <ul>
+        <li><code>ProcessTimers | None</code></li>
+    </ul>
+    <p><code>error</code>: The error that caused the process to fail (available in <code>__error__()</code>).</p>
+    <ul>
+        <li><code>BaseException | None</code></li>
+    </ul>
+        </div>
+    </details>
+    <details>
+        <summary><code>Pool</code></summary>
+        <div class="dropdown-content">
+    <p>Process pool for parallel batch processing.</p>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+pool = Pool(workers=4)
+
+# basic usage
+results = pool.map(process_item, items)</code></pre>
+    <h3>Constructor</h3>
+    <p>Arguments <code>workers</code>: Maximum concurrent workers.</p>
+    <ul>
+        <li><code>int | None = None</code></li>
+        <li><code>None</code> = number of CPUs</li>
+    </ul>
+    <h3><code>map</code></h3>
+    <p>Apply function to each item, return list of results.</p>
+    <pre><code class="language-python">results = pool.map(fn, items)</code></pre>
+    <ul>
+        <li>Blocks until all items are processed</li>
+        <li>Results are in the same order as inputs</li>
+        <li>Works with both functions and <code>Skprocess</code> classes</li>
+    </ul>
+    <p>Arguments <code>fn_or_process</code>: Function or <code>Skprocess</code> class to apply.</p>
+    <ul>
+        <li><code>Callable | type[Skprocess]</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>iterable</code>: Items to process.</p>
+    <ul>
+        <li><code>Iterable</code></li>
+        <li>required</li>
+    </ul>
+    <p>Returns <code>list</code>: Results in order.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+results = pool.star().map(fn, [(1, 2), (3, 4)])
+# fn(1, 2), fn(3, 4) instead of fn((1, 2), ), fn((3, 4), )
+
+# with timeout
+results = pool.map.timeout(30.0)(fn, items)
+
+# background - returns Future
+future = pool.map.background()(fn, items)
+results = future.result()
+
+# async
+results = await pool.map.asynced()(fn, items)
+
+# combine modifiers
+future = pool.map.timeout(30.0).background()(fn, items)
+results = await pool.map.asynced().timeout(30.0)(fn, items)
+
+# star composes with all modifiers
+results = pool.star().map.timeout(30.0)(fn, args_tuples)
+future = pool.star().map.background()(fn, args_tuples)
+results = await pool.star().map.asynced()(fn, args_tuples)</code></pre>
+    <h3><code>unordered_map</code></h3>
+    <p>Apply function to each item, return list in completion order.</p>
+    <pre><code class="language-python">results = pool.unordered_map(fn, items)</code></pre>
+    <ul>
+        <li>Returns a list (like <code>map</code>)</li>
+        <li>Results are in completion order, not input order (like <code>unordered_imap</code>)</li>
+        <li>Fastest when you need all results as a list but don&#x27;t care about order</li>
+    </ul>
+    <p>Arguments and returns same as <code>map</code>, but results are in completion order.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+results = pool.star().unordered_map(fn, [(1, 2), (3, 4)])
+
+# with timeout
+results = pool.unordered_map.timeout(30.0)(fn, items)
+
+# background - returns Future
+future = pool.unordered_map.background()(fn, items)
+results = future.result()
+
+# async
+results = await pool.unordered_map.asynced()(fn, items)
+
+# star composes with all modifiers
+results = pool.star().unordered_map.timeout(30.0)(fn, args_tuples)
+future = pool.star().unordered_map.background()(fn, args_tuples)
+results = await pool.star().unordered_map.asynced()(fn, args_tuples)</code></pre>
+    <h3><code>imap</code></h3>
+    <p>Apply function to each item, return iterator of results.</p>
+    <pre><code class="language-python">for result in pool.imap(fn, items):
+    process(result)</code></pre>
+    <ul>
+        <li>Results are yielded in order</li>
+        <li>Blocks on <code>next()</code> if the next result isn&#x27;t ready</li>
+        <li>Memory efficient for large datasets</li>
+    </ul>
+    <p>Arguments and returns same as <code>map</code>, but returns <code>Iterator</code> instead of <code>list</code>.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+for result in pool.star().imap(fn, [(1, 2), (3, 4)]):
+    process(result)
+
+# with timeout (per-item)
+for result in pool.imap.timeout(10.0)(fn, items):
+    process(result)
+
+# background - collects to list
+future = pool.imap.background()(fn, items)
+results = future.result()  # list
+
+# async - collects to list
+results = await pool.imap.asynced()(fn, items)  # list
+
+# star composes with all modifiers
+for result in pool.star().imap.timeout(10.0)(fn, args_tuples):
+    process(result)
+future = pool.star().imap.background()(fn, args_tuples)
+results = await pool.star().imap.asynced()(fn, args_tuples)</code></pre>
+    <h3><code>unordered_imap</code></h3>
+    <p>Apply function to each item, yield results as they complete.</p>
+    <pre><code class="language-python">for result in pool.unordered_imap(fn, items):
+    process(result)</code></pre>
+    <ul>
+        <li>Fastest way to get results</li>
+        <li>Order is NOT preserved</li>
+        <li>Results are yielded as soon as they&#x27;re ready</li>
+    </ul>
+    <p>Arguments and returns same as <code>imap</code>.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+for result in pool.star().unordered_imap(fn, [(1, 2), (3, 4)]):
+    process(result)
+
+# with timeout
+for result in pool.unordered_imap.timeout(30.0)(fn, items):
+    process(result)
+
+# background - collects to list
+future = pool.unordered_imap.background()(fn, items)
+results = future.result()  # list
+
+# async - collects to list
+results = await pool.unordered_imap.asynced()(fn, items)  # list
+
+# star composes with all modifiers
+for result in pool.star().unordered_imap.timeout(30.0)(fn, args_tuples):
+    process(result)
+future = pool.star().unordered_imap.background()(fn, args_tuples)
+results = await pool.star().unordered_imap.asynced()(fn, args_tuples)</code></pre>
+    <h3><code>star()</code> Modifier</h3>
+    <p>Unpack tuples as function arguments.</p>
+    <pre><code class="language-python"># without star: fn receives a single tuple argument
+pool.map(fn, [(1, 2), (3, 4)])
+# fn((1, 2), ), fn((3, 4), )
+
+# with star: fn receives unpacked arguments
+pool.star().map(fn, [(1, 2), (3, 4)])
+# fn(1, 2), fn(3, 4)</code></pre>
+    <p>Works with all methods:</p>
+    <pre><code class="language-python">pool.star().map(fn, args_tuples)
+pool.star().imap(fn, args_tuples)
+pool.star().unordered_imap(fn, args_tuples)
+pool.star().unordered_map(fn, args_tuples)</code></pre>
+    <p>Works with other modifiers:</p>
+    <pre><code class="language-python">pool.star().map.timeout(30.0)(fn, args_tuples)
+await pool.star().imap.asynced()(fn, args_tuples)</code></pre>
+    <h3>Using <code>Skprocess</code> with <code>Pool</code></h3>
+    <pre><code class="language-python">class ProcessItem(Skprocess):
+    def __init__(self, item):
+        self.item = item
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        self.result_data = heavy_computation(self.item)
+    
+    def __result__(self):
+        return self.result_data
+
+# Pool creates instances and runs them
+results = pool.map(ProcessItem, items)</code></pre>
+    <p>The pool:</p>
+    <ol>
+        <li>Creates a <code>ProcessItem</code> instance for each item</li>
+        <li>Runs each instance in a subprocess</li>
+        <li>Collects and returns the results</li>
+    </ol>
+    <h3>Context Manager</h3>
+    <pre><code class="language-python">with Pool(workers=4) as pool:
+
+    results = pool.map(fn, items)
+
+# pool is closed on exit</code></pre>
+    <h3><code>close()</code> and <code>terminate()</code></h3>
+    <pre><code class="language-python">pool.close()      # wait for all active processes to finish
+pool.terminate()  # forcefully terminate all processes</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>Share</code></summary>
+        <div class="dropdown-content">
+    <p>Container for shared memory across process boundaries.</p>
+    <p>The easiest and greatest way to share data between processes.</p>
+    <p>Uses <code>cucumber</code> for serialization, so now you can easily share anything you want.</p>
+    <pre><code class="language-python">from suitkaise.processing import Share
+from suitkaise.timing import Sktimer
+
+share = Share()
+share.timer = Sktimer()
+share.counter = 0</code></pre>
+    <h3>Basic Usage</h3>
+    <pre><code class="language-python">share = Share()
+share.counter = 0
+
+class IncrementProcess(Skprocess):
+    def __init__(self, share):
+        self.share = share
+        self.process_config.runs = 10
+    
+    def __postrun__(self):
+        self.share.counter += 1
+
+pool = Pool(workers=4)
+pool.map(IncrementProcess, [share] * 10)
+
+print(share.counter)  # 100 (10 processes × 10 runs each)</code></pre>
+    <h3>How It Works</h3>
+    <ol>
+        <li>Assign objects as Share attributes</li>
+        <li>Pass Share to processes</li>
+        <li>Access/update attributes normally</li>
+        <li>Share coordinates reads and writes across processes</li>
+    </ol>
+    <p>Share uses a coordinator-proxy system:</p>
+    <ul>
+        <li><strong>Coordinator</strong>: Background process that handles all writes</li>
+        <li><strong>Proxy</strong>: Intercepts attribute access and queues commands</li>
+        <li><strong>Source of Truth</strong>: Serialized state in shared memory</li>
+    </ul>
+    <h3>Supported Objects</h3>
+    <p><strong>With <code>_shared_meta</code></strong> (suitkaise objects):</p>
+    <ul>
+        <li><code>Sktimer</code>, <code>Circuit</code>, <code>BreakingCircuit</code>, ...</li>
+        <li>Full method and property tracking</li>
+        <li>Efficient barrier waits</li>
+    </ul>
+    <p><strong>User classes</strong>:</p>
+    <ul>
+        <li>Auto-wrapped with <code>Skclass</code> to generate <code>_shared_meta</code></li>
+        <li>Works automatically</li>
+    </ul>
+    <p><strong>Primitives</strong>:</p>
+    <ul>
+        <li><code>int</code>, <code>str</code>, <code>float</code>, <code>bool</code>, <code>list</code>, <code>dict</code>, ...</li>
+        <li>Stored directly in source of truth</li>
+        <li>No proxy needed</li>
+    </ul>
+    <p><strong>Iterators</strong> (<code>enumerate</code>, <code>zip</code>, <code>map</code>, ...):</p>
+    <ul>
+        <li>Serialized by <code>cucumber</code> by exhausting remaining values</li>
+        <li>Reconstruction returns a plain iterator over remaining values (not the original iterator type)</li>
+    </ul>
+    <p><strong>Not Supported</strong>:</p>
+    <ul>
+        <li><code>multiprocessing.*</code> objects (queues, managers, events, shared_memory, connections)</li>
+        <li>These are process-bound IPC primitives; use <code>Share</code> primitives instead</li>
+        <li><code>os.pipe()</code> file handles / pipe-backed <code>io.FileIO</code></li>
+    </ul>
+    <h3>Start and Stop</h3>
+    <pre><code class="language-python">share = Share()  # auto-starts
+
+# stop sharing (frees resources)
+share.stop()
+# or
+share.exit()
+
+# start again
+share.start()</code></pre>
+    <p>While stopped, changes are queued but won&#x27;t take effect until <code>start()</code> is called.</p>
+    <h3>Reconnect All</h3>
+    <p><code>Share.reconnect_all()</code> reconnects all <code>cucumber</code> Reconnector objects currently stored in Share and returns a dict of reconnected objects by name.</p>
+    <pre><code class="language-python">share = Share()
+share.db = sqlite3.connect(&quot;:memory:&quot;)
+
+# share.db is a Reconnector in Share
+reconnected = share.reconnect_all()
+
+# now it&#x27;s a live connection again
+conn = reconnected[&quot;db&quot;]</code></pre>
+    <h3>Context Manager</h3>
+    <pre><code class="language-python">with Share() as share:
+    share.counter = 0
+    # ... use share ...
+# automatically stopped on exit</code></pre>
+    <h3>Properties</h3>
+    <p><code>is_running</code>: Whether the coordinator is running.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <p><code>has_error</code>: Whether the coordinator encountered an error.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <h3>Methods</h3>
+    <p><code>start()</code>: Start the coordinator.</p>
+    <p><code>stop(timeout=5.0)</code>: Stop the coordinator gracefully.</p>
+    <ul>
+        <li>Returns <code>True</code> if stopped cleanly, <code>False</code> if timed out.</li>
+    </ul>
+    <p><code>exit(timeout=5.0)</code>: Alias for <code>stop()</code>.</p>
+    <p><code>clear()</code>: Clear all shared objects and counters.</p>
+        </div>
+    </details>
+    <details>
+        <summary><code>Pipe</code></summary>
+        <div class="dropdown-content">
+    <p>Fast, direct parent/child communication using <code>multiprocessing.Pipe</code>.</p>
+    <p>This is the fastest way to communicate between processes.</p>
+    <pre><code class="language-python">from suitkaise.processing import Pipe
+
+# create a pipe pair
+anchor, point = Pipe.pair()</code></pre>
+    <h3>Creating Pipes</h3>
+    <pre><code class="language-python"># bidirectional (default)
+anchor, point = Pipe.pair()
+
+# one-way
+anchor, point = Pipe.pair(one_way=True)</code></pre>
+    <p>For one-way pipes, the anchor is the send-only end (parent), and the point is the receive-only end (child).</p>
+    <h3>Anchor vs Point</h3>
+    <p><strong>Anchor</strong>:</p>
+    <ul>
+        <li>Stays in the parent process</li>
+        <li>Always locked (cannot be transferred)</li>
+        <li>Use for the &quot;stable&quot; end of the pipe</li>
+    </ul>
+    <p><strong>Point</strong>:</p>
+    <ul>
+        <li>Can be transferred to a subprocess</li>
+        <li>Unlocked by default</li>
+        <li>Use for the &quot;mobile&quot; end</li>
+    </ul>
+    <h3>Sending and Receiving</h3>
+    <pre><code class="language-python"># from anchor (parent)
+anchor.send({&quot;data&quot;: [1, 2, 3]})
+response = anchor.recv()
+
+# from point (subprocess)
+data = point.recv()
+point.send({&quot;status&quot;: &quot;received&quot;})</code></pre>
+    <p><code>send(obj)</code>: Serialize with <code>cucumber</code> and send.</p>
+    <ul>
+        <li>Non-blocking</li>
+    </ul>
+    <p><code>recv()</code>: Receive and deserialize with <code>cucumber</code>.</p>
+    <ul>
+        <li>Blocking</li>
+    </ul>
+    <p><code>close()</code>: Close the connection.</p>
+    <h3>Usage with Skprocess</h3>
+    <pre><code class="language-python">class PipeProcess(Skprocess):
+    def __init__(self, pipe_point):
+        self.pipe = pipe_point
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        # receive command
+        command = self.pipe.recv()
+        
+        # process it
+        result = process_command(command)
+        
+        # send result back
+        self.pipe.send(result)
+
+# parent
+anchor, point = Pipe.pair()
+
+process = PipeProcess(point)
+process.start()
+
+anchor.send({&quot;action&quot;: &quot;compute&quot;, &quot;value&quot;: 42})
+result = anchor.recv()
+
+process.wait()</code></pre>
+    <h3>Lock/Unlock</h3>
+    <pre><code class="language-python">point.lock()    # prevent transfer
+point.unlock()  # allow transfer
+
+anchor.lock()   # always locked
+anchor.unlock() # raises PipeEndpointError</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>autoreconnect</code></summary>
+        <div class="dropdown-content">
+    <h2><code>autoreconnect</code> Decorator</h2>
+    <p>Automatically reconnect resources (database connections, sockets, ...) when an <code>Skprocess</code> is deserialized in the child process.</p>
+    <p>Since <code>Skprocess</code> is serialized with <code>cucumber</code>, it gives you placeholders for live resources that can be reconnected.</p>
+    <p>Usually, you need to call <code>cucumber.reconnect_all()</code> to reconnect all resources in an object.</p>
+    <p>However, with <code>@autoreconnect</code>, you can decorate a <code>Skprocess</code> class and it will automatically reconnect all resources when the <code>Skprocess</code> is deserialized in the child process.</p>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess, autoreconnect
+
+@autoreconnect(
+    start_threads=True,
+    **{
+        &quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;secret&quot;},
+        &quot;redis.Redis&quot;: {&quot;*&quot;: &quot;redis_pass&quot;},
+    }
+)
+class MyProcess(Skprocess):
+    def __init__(self, db_connection, cache_connection):
+        self.db = db_connection
+        self.cache = cache_connection
+    
+    def __run__(self):
+        # db and cache are automatically reconnected
+        self.db.execute(...)
+        self.cache.get(...)</code></pre>
+    <p>Arguments: <code>start_threads</code>: If <code>True</code>, auto-start any deserialized threads.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>**auth</code>: Reconnection parameters keyed by type, then by attribute name.</p>
+    <ul>
+        <li>Use <code>&quot;*&quot;</code> as the attr key for defaults that apply to all instances</li>
+    </ul>
+    <p>When <code>cucumber</code> deserializes the <code>Skprocess</code>:</p>
+    <ol>
+        <li>Resources like database connections become <code>Reconnector</code> objects</li>
+        <li><code>@autoreconnect</code> calls <code>reconnect_all()</code> automatically</li>
+        <li>Each <code>Reconnector</code> is replaced with a live connection using the provided auth</li>
+    </ol>
+    <h3>Multiple Connections</h3>
+    <pre><code class="language-python">@autoreconnect(**{
+    &quot;psycopg2.Connection&quot;: {
+        &quot;*&quot;: &quot;default_password&quot;,           # default for all psycopg2 connections
+        &quot;analytics_db&quot;: &quot;analytics_secret&quot;, # specific override for analytics_db attr
+    },
+})
+class MyProcess(Skprocess):
+    def __init__(self):
+        self.main_db = psycopg2.connect(...)      # uses &quot;*&quot; auth
+        self.analytics_db = psycopg2.connect(...) # uses &quot;analytics_db&quot; auth</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Other features you should know about</summary>
+        <div class="dropdown-content">
+    <h2><code>ProcessTimers</code></h2>
+    <p>Container for timing lifecycle sections.</p>
+    <pre><code class="language-python">from suitkaise.processing import ProcessTimers
+
+# usually accessed via process.timers
+process.start()
+process.wait()
+
+timers = process.timers
+print(timers.run.mean)
+print(timers.prerun.total_time)
+print(timers.full_run.percentile(95))</code></pre>
+    <h3>Properties</h3>
+    <p>Each property is an <code>Sktimer | None</code>:</p>
+    <p><code>prerun</code>: Timer for <code>__prerun__()</code> calls.</p>
+    <p><code>run</code>: Timer for <code>__run__()</code> calls.</p>
+    <p><code>postrun</code>: Timer for <code>__postrun__()</code> calls.</p>
+    <p><code>onfinish</code>: Timer for <code>__onfinish__()</code> call.</p>
+    <p><code>result</code>: Timer for <code>__result__()</code> call.</p>
+    <p><code>error</code>: Timer for <code>__error__()</code> call.</p>
+    <p><code>full_run</code>: Aggregate timer for complete iterations (prerun + run + postrun).</p>
+    <hr>
+    <h2>Exceptions</h2>
+    <p>All exceptions inherit from <code>ProcessError</code>.</p>
+    <h3><code>ProcessError</code></h3>
+    <p>Base class for all Process-related errors.</p>
+    <pre><code class="language-python">from suitkaise.processing import ProcessError
 
 try:
-    # blocks until process finishes and returns __result__() output
-    data = p.result()
-
+    result = process.result()
 except ProcessError as e:
-    print(f"{e}")</code></pre>
-
-    <hr>
-
-    <h2>Configuration</h2>
-
-    <p><code>Process</code> also has a <code>config</code> attribute that allows you to configure the process in the inheriting class.</p>
-
-    <p>The config can only be updated in the <code>__init__()</code> method.</p>
-
-    <p>All values assigned in the code block below are the defaults.</p>
-
-<pre><code class="language-python">from suitkaise.processing import Process
-
-class MyProcess(Process):
-
-    # CAN ONLY BE UPDATED IN __INIT__
-    def __init__(self):
-
-        # None = infinite number of runs
-        self.config.runs = None
-
-        # None = no time limit before auto-joining
-        self.config.join_in = None
-
-        # 1 = no retries
-        self.config.lives = 1
-
-        # None = no timeout
-        self.config.timeouts.prerun = None
-        self.config.timeouts.run = None
-        self.config.timeouts.postrun = None
-        self.config.timeouts.onfinish = None
-        self.config.timeouts.result = None
-        self.config.timeouts.error = None</code></pre>
-
-    <p>Setting any of these numbers to zero or lower will reset them to the default value.</p>
-
-    <hr>
-
-    <h2>Timing</h2>
-
-<pre><code class="language-python">from suitkaise.processing import Process
-
-class MyProcess(Process):
-
-    def __init__(self):
-
-        # ...
-
-    def __prerun__(self):
-
-        # ...
-    
-    def __run__(self):
-
-        # ...
-
-    def __postrun__(self):
-
-        # ...
-
-    def __onfinish__(self):
-
-        # ...
-
-    def __result__(self):
-
-        # ...
-
-    def __error__(self):
-
-        # ...
-
-
-p = MyProcess()
-p.start()
-
-p.wait()
-
-prerun_timer = p.__prerun__.timer
-run_timer = p.__run__.timer
-postrun_timer = p.__postrun__.timer
-onfinish_timer = p.__onfinish__.timer
-result_timer = p.__result__.timer
-error_timer = p.__error__.timer
-
-# adds prerun, run, and postrun times together
-full_run_timer = p.timer</code></pre>
-
-    <p>The <code>p.timer</code> adds up the times from the <code>__prerun__</code>, <code>__run__</code>, and <code>__postrun__</code> method timers into one value, and records that value. It does this every iteration/run.</p>
-
-    <p>All timers are <code>suitkaise.sktime.Timer</code> objects, and function exactly the same.</p>
-
-    <p>Timers will not be accessible unless you define their respective lifecycle methods yourself.</p>
-
-    <hr>
-
-    <h2><code>lives</code> system</h2>
-
-    <p>Setting <code>self.config.lives</code> to a number greater than 1 will automatically retry the process if an error occurs, as long as there are still lives left.</p>
-
-<pre><code class="language-python">from suitkaise.processing import Process
-
-class MyProcess(Process):
-    def __init__(self):
-
-        # 3 attempts total
-        self.config.lives = 3</code></pre>
-
-    <p>When a process needs to retry, it retries the current run starting from <code>__prerun__</code>. (Does not fully reset to run 0)</p>
-
-    <p>Using <code>kill()</code> will ignore <code>lives</code> and immediately terminate the process.</p>
-
-    <p><code>wait()</code> will block until the process finishes successfully. It will not return if the process fails and restarts with remaining lives.</p>
-
-    <hr>
-
-    <h2>Error Handling</h2>
-
-    <p>All errors are caught and handled by the process.</p>
-
-    <p>If an error occurs, the process will call <code>__error__()</code> instead of <code>__result__()</code>.</p>
-
-    <p>All errors inherit from a <code>ProcessError</code> class, and wrap the actual error that happened.</p>
-
-    <h3><code>ProcessError</code></h3>
-
-    <p>Base class for all process errors.</p>
-
-    <p>If an error occurs outside of one of the inherited <code>Process</code> methods, it will be wrapped in a <code>ProcessError</code>.</p>
-
-    <h3>Error Classes</h3>
-
+    print(f&quot;Process failed: {e}&quot;)</code></pre>
+    <p>Properties:</p>
     <ul>
-        <li><code>PreRunError</code> — error raised when an error occurs in the <code>__prerun__</code> method.</li>
-        <li><code>RunError</code> — error raised when an error occurs in the <code>__run__</code> method.</li>
-        <li><code>PostRunError</code> — error raised when an error occurs in the <code>__postrun__</code> method.</li>
-        <li><code>OnFinishError</code> — error raised when an error occurs in the <code>__onfinish__</code> method.</li>
-        <li><code>ResultError</code> — error raised when an error occurs in the <code>__result__</code> method.</li>
+        <li><code>current_run</code>: Run iteration where error occurred</li>
+        <li><code>original_error</code>: The underlying exception</li>
     </ul>
+    <h3><code>PreRunError</code></h3>
+    <p>Raised when <code>__prerun__()</code> fails.</p>
+    <h3><code>RunError</code></h3>
+    <p>Raised when <code>__run__()</code> fails.</p>
+    <h3><code>PostRunError</code></h3>
+    <p>Raised when <code>__postrun__()</code> fails.</p>
+    <h3><code>OnFinishError</code></h3>
+    <p>Raised when <code>__onfinish__()</code> fails.</p>
+    <h3><code>ResultError</code></h3>
+    <p>Raised when <code>__result__()</code> fails.</p>
+    <h3><code>ErrorHandlerError</code></h3>
+    <p>Raised when <code>__error__()</code> fails.</p>
+    <h3><code>ProcessTimeoutError</code></h3>
+    <p>Raised when a lifecycle section times out.</p>
+    <pre><code class="language-python">from suitkaise.processing import ProcessTimeoutError
 
-    <h3>Timeout Errors</h3>
-
-    <p>If a timeout occurs, a <code>ProcessTimeoutError</code> will be raised. It contains the section name, timeout value, and current run number.</p>
-
-    <details>
-        <summary><strong>Error Examples</strong></summary>
-
-<pre><code>Traceback (most recent call last):
-  File "my_script.py", line 25, in &lt;module&gt;
-    result = p.result()
-             ^^^^^^^^
-  ...
-suitkaise.processing.RunError: Error in __run__ on run 5
-
-The above exception was caused by:
-
-Traceback (most recent call last):
-  File "my_script.py", line 14, in __run__
-    data = fetch_from_api()
-  File "my_script.py", line 8, in fetch_from_api
-    raise ConnectionError("Failed to connect to server")
-ConnectionError: Failed to connect to server</code></pre>
-
-<pre><code>suitkaise.processing.ProcessTimeoutError: Timeout in run after 5.0s on run 3</code></pre>
-
-    </details><br>
-
-    <h3>Accessing the Original Error</h3>
-
-    <p>All <code>ProcessError</code> subclasses store the original exception:</p>
-
-<pre><code class="language-python">try:
-    result = p.result()
-except ProcessError as e:
-    print(f"Process error: {e}")
-    print(f"Original error: {e.original_error}")
-    print(f"Run number: {e.current_run}")
-
-# Output:
-# Process error: Error in __run__ on run 5
-# Original error: ConnectionError('Failed to connect to server')
-# Run number: 5</code></pre>
-
-    <hr>
-
-    <h2><code>Pool</code></h2>
-
-    <p><code>Pool</code> allows you to run multiple processes in parallel.</p>
-
-    <p>It does 2 things differently.</p>
-
+try:
+    result = process.result()
+except ProcessTimeoutError as e:
+    print(f&quot;Timeout in {e.section} after {e.timeout}s on run {e.current_run}&quot;)</code></pre>
+    <p>Properties:</p>
     <ul>
-        <li>uses <code>cucumber</code> for serialization of complex objects between processes</li>
-        <li>allows for the use of the <code>Process</code> inheriting classes mentioned above</li>
+        <li><code>section</code>: Which lifecycle method timed out</li>
+        <li><code>timeout</code>: The timeout value that was exceeded</li>
     </ul>
+    <h3><code>ResultTimeoutError</code></h3>
+    <p>Raised when <code>result()</code>, <code>wait()</code>, or <code>listen()</code> times out via <code>.timeout()</code> modifier.</p>
+    <pre><code class="language-python">from suitkaise.processing import ResultTimeoutError
 
-<pre><code class="language-python">from suitkaise.processing import Pool
-
-# a class of type ["processing.Process"]
-p = MyProcess()
-data_set = get_data()
-
-pool = Pool(workers=8)</code></pre>
-
-    <h3><code>map()</code></h3>
-
-    <p>Takes a function and a list of arguments.</p>
-
-    <p>Blocks until all processes finish, and then returns a list of results in the same order as the arguments.</p>
-
-<pre><code class="language-python">results = pool.map(p, data_set)</code></pre>
-
-    <h3><code>imap()</code></h3>
-
-    <p>Returns an iterator of results.</p>
-
-    <p>Each result is returned in order. If the next result is not ready, it will block until it is.</p>
-
-<pre><code class="language-python">def upscale_image_section(image_data):
-
-    # ... upscale image data ...
-    return upscaled_image_data
-
-full_image_data = []
-
-# call function to upscale chunk of image data
-for result in pool.imap(upscale_image_section, data_set):
-
-    full_image_data.append(result)</code></pre>
-
-    <h3><code>async_map()</code></h3>
-
-    <p>Non-blocking version of <code>map()</code>.</p>
-
-    <p>It returns immediately, with several methods to check and get the results.</p>
-
-<pre><code class="language-python">results = pool.async_map(p, data_set)
-
-# check if results are ready
-if results.ready():
-    # ...
-
-# block and wait for results to be ready but don't get them
-results.wait()
-
-# block until results are ready and get them
-actual_results = results.get()
-
-# block until results are ready and get them or until timeout
-actual_results = results.get(timeout=1.0)</code></pre>
-
-    <h4><code>unordered_imap()</code></h4>
-
-    <p>Returns an iterator of results.</p>
-
-    <p>Each result is returned as it is ready, regardless of order.</p>
-
-    <p>Fastest way to get results, but not in order.</p>
-
-<pre><code class="language-python"># use Process inheriting class UpscaleImage to process each image in data_set
-for processed_image in pool.unordered_imap(UpscaleImage, data_set):
-
-    upscaled_images.append(processed_image)</code></pre>
-
-    <h3><code>star()</code></h3>
-
-    <p>Modifier of <code>map()</code>, <code>imap()</code>, <code>async_map()</code>, and <code>unordered_imap()</code>.</p>
-
-    <p>When used, it makes iterators of tuples spread across multiple arguments instead of the entire tuple being passed as a single argument.</p>
-
-<pre><code class="language-python"># map - always passes item as single argument
-pool.map(fn or Process, [(1, 2), (3, 4)])  # fn((1, 2), ), fn((3, 4), )
-
-# star map - unpacks tuples as arguments (but only tuples!)
-pool.star().map(fn or Process, [(1, 2), (3, 4)])  # fn(1, 2), fn(3, 4)</code></pre>
-
-<pre><code class="language-python"># imap - always passes item as single argument
-for result in pool.imap(fn or Process, [(1, 2), (3, 4)]): # fn((1, 2), ), fn((3, 4), )
-
-# star imap - unpacks tuples as arguments (but only tuples!)
-for result in pool.star().imap(fn or Process, [(1, 2), (3, 4)]): # fn(1, 2), fn(3, 4)</code></pre>
-
-    <h3>Using <code>Pool</code> with <code>Process</code> inheriting classes</h3>
-
-    <p>When using <code>Pool</code> with <code>Process</code> inheriting classes, pass the class itself (not an instance) as the first argument to <code>map()</code> or <code>imap()</code>.</p>
-
-    <p>The second argument will be an argument (or arguments) to <code>__init__()</code>.</p>
-
-    <p>Classes run as they would normally, including ones that don't have a run or time limit (you can still use <code>stop()</code> to stop them in <code>Pools</code>).</p>
-
-<pre><code class="language-python">class UpscaleImage(Process):
-
-    def __init__(self, image):
-        self.image_data = image
-
-for result in pool.unordered_imap(UpscaleImage, data_set):
-
-    upscaled_images.append(result)</code></pre>
-
-<pre><code class="language-python">class ColorImage(Process):
-
-    def __init__(self, image, color, percent_change):
-        self.image_data = image
-        self.color = color
-        self.percent_change = percent_change
-
-colored_images = pool.star().map(ColorImage, zip(images, colors, percent_changes))</code></pre>
-
+try:
+    result = process.result.timeout(10.0)()
+except ResultTimeoutError as e:
+    print(&quot;Timed out waiting for result&quot;)</code></pre>
+        </div>
+    </details>
 </section>

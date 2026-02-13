@@ -17,6 +17,7 @@
 
 `Pool`: Parallel batch processing.
 - `map`: returns a list, ordered by input
+- `unordered_map`: returns an unordered list, fastest items first
 - `imap`: returns an iterator, ordered by input
 - `unordered_imap`: returns an iterator, unordered
 - `.star()` modifier: unpacks tuples as function arguments
@@ -24,11 +25,10 @@
 
 `Share`: Shared memory container that works across processes.
 - best feature in the entire library
-- literally just create a Share and add any objects to it, like a regular class
-- pass the Share to your subprocesses
+- literally just create a `Share` and add any objects to it, like a regular class
+- pass the `Share` to your subprocesses
 - access and update the objects normally
 - everything remains in sync
-
 
 `Pipe`: upgraded `multiprocessing.Pipe`
 - super fast cross process communication

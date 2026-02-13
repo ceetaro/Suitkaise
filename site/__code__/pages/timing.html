@@ -1,0 +1,507 @@
+<div class="module-bar" data-module="timing">
+    <button class="module-bar-title">suitkaise.timing</button>
+    <nav class="module-bar-nav">
+        <a href="#timing-why" class="module-bar-link" data-page="timing-why">why</a>
+        <a href="#timing-quick-start" class="module-bar-link" data-page="timing-quick-start">quick start</a>
+        <a href="#timing" class="module-bar-link active" data-page="timing">how to use</a>
+        <a href="#timing-how-it-works" class="module-bar-link" data-page="timing-how-it-works">how it works</a>
+        <a href="#timing-examples" class="module-bar-link" data-page="timing-examples">examples</a>
+        <a href="#timing-videos" class="module-bar-link" data-page="timing-videos">videos</a>
+        <a href="#timing-tests" class="module-bar-link" data-page="timing-tests">tests</a>
+        <a href="#timing-learn" class="module-bar-link" data-page="timing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>How to use <code>timing</code></h1>
+    <p><code>timing</code> provides simple and powerful timing utilities for measuring execution time, collecting statistics, and analyzing performance.</p>
+    <ul>
+        <li>Everything runs using <code>Sktimer</code></li>
+    </ul>
+    <p>Statistical timer that collects timing measurements and provides comprehensive statistics (mean, median, stdev, percentiles). Has more statistics that <code>timeit</code>.</p>
+    <ul>
+        <li><code>timethis</code></li>
+    </ul>
+    <p>Decorator for timing function executions with automatic statistics collection.</p>
+    <ul>
+        <li><code>TimeThis</code></li>
+    </ul>
+    <p>Context manager for timing code blocks with automatic start/stop.</p>
+    <p>With <code>timethis</code> and <code>TimeThis</code> you have 100% coverage. Anything and everything can be timed with one line of code.</p>
+    <p>Includes:</p>
+    <ul>
+        <li>thread safety</li>
+        <li>deep statistical analysis</li>
+        <li>one-line setup</li>
+        <li>native async support</li>
+    </ul>
+    <h2>Importing</h2>
+    <pre><code class="language-python">from suitkaise import timing</code></pre>
+    <pre><code class="language-python">from suitkaise.timing import Sktimer, TimeThis, timethis, time, sleep, elapsed, clear_global_timers</code></pre>
+    <h2>Simple Functions</h2>
+    <h3><code>time()</code></h3>
+    <p>Get the current Unix timestamp.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+start_time = timing.time()</code></pre>
+    <p>Wraps <code>time.time()</code> so that you don&#x27;t have to import both <code>timing</code> and <code>time</code>.</p>
+    <p>Returns <code>float</code>: Current Unix timestamp.</p>
+    <h3><code>sleep()</code></h3>
+    <p>Sleep the current thread for a given number of seconds.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+# sleep for 2 seconds
+timing.sleep(2)
+
+# returns current time after sleeping
+end_time = timing.sleep(2)</code></pre>
+    <p>Arguments <code>seconds</code>: Number of seconds to sleep.</p>
+    <ul>
+        <li><code>float</code></li>
+        <li>required</li>
+    </ul>
+    <p>Returns <code>float</code>: Current time after sleeping.</p>
+    <h4>Async Support</h4>
+    <p>Use <code>.asynced()</code> for async contexts.</p>
+    <pre><code class="language-python"># in an async function
+end_time = await timing.sleep.asynced()(2)</code></pre>
+    <p>Uses <code>asyncio.sleep</code> internally.</p>
+    <h3><code>elapsed()</code></h3>
+    <p>Get the elapsed time between two timestamps.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+start_time = timing.time()
+timing.sleep(2)
+end_time = timing.time()
+
+# with two times
+elapsed = timing.elapsed(start_time, end_time)  # 2.0
+
+# with one time (uses current time as end)
+elapsed = timing.elapsed(start_time)</code></pre>
+    <p>Arguments <code>time1</code>: First timestamp.</p>
+    <ul>
+        <li><code>float</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>time2</code>: Second timestamp.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li>if <code>None</code>, uses current time</li>
+    </ul>
+    <p>Returns <code>float</code>: Absolute elapsed time in seconds.</p>
+    <p>Note: Order doesn&#x27;t matter - always returns positive elapsed time.</p>
+    <details>
+        <summary><code>Sktimer</code></summary>
+        <div class="dropdown-content">
+    <p>Statistical timer for collecting and analyzing execution times.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+timer = timing.Sktimer()
+
+for i in range(100):
+    timer.start()
+    do_work()
+    timer.stop()
+
+print(f&quot;Mean: {timer.mean:.3f}s&quot;)
+print(f&quot;Std Dev: {timer.stdev:.3f}s&quot;)
+print(f&quot;95th percentile: {timer.percentile(95):.3f}s&quot;)</code></pre>
+    <h3>Constructor</h3>
+    <p>Arguments <code>max_times</code>: Keep only the most recent N measurements (rolling window).</p>
+    <ul>
+        <li><code>int | None = None</code></li>
+        <li>if <code>None</code>, keeps all measurements</li>
+    </ul>
+    <details>
+        <summary>Control Methods</summary>
+        <div class="dropdown-content">
+    <h4><code>start()</code></h4>
+    <p>Start timing a new measurement.</p>
+    <pre><code class="language-python">timer.start()</code></pre>
+    <p>Returns <code>float</code>: Start timestamp.</p>
+    <p>Raises <code>UserWarning</code>: If called while timing is already in progress (creates nested frame).</p>
+    <h4><code>stop()</code></h4>
+    <p>Stop timing and record the measurement.</p>
+    <pre><code class="language-python">timer.start()
+do_work()
+elapsed = timer.stop()  # returns elapsed time, records it</code></pre>
+    <p>Returns <code>float</code>: Elapsed time for this measurement.</p>
+    <p>Raises <code>RuntimeError</code>: If timer was not started.</p>
+    <h4><code>discard()</code></h4>
+    <p>Stop timing but do NOT record the measurement.</p>
+    <pre><code class="language-python">timer.start()
+try:
+    result = risky_operation()
+    timer.stop()  # record successful timing
+except Exception:
+    timer.discard()  # don&#x27;t record failed timing</code></pre>
+    <p>Use when you want to abandon the current timing without polluting statistics.</p>
+    <p>Returns <code>float</code>: Elapsed time that was discarded.</p>
+    <p>Raises <code>RuntimeError</code>: If timer was not started.</p>
+    <h4><code>lap()</code></h4>
+    <p>Record a lap time (stop + start in one call).</p>
+    <pre><code class="language-python">timer.start()
+
+for i in range(100):
+    do_work()
+    timer.lap()  # records time since last lap/start, continues timing
+
+timer.discard()  # don&#x27;t record the 101st measurement still running
+
+print(timer.mean)  # 100 measurements recorded</code></pre>
+    <p>Returns <code>float</code>: Elapsed time for this lap.</p>
+    <p>Raises <code>RuntimeError</code>: If timer was not started.</p>
+    <h4><code>pause()</code></h4>
+    <p>Pause the current timing measurement.</p>
+    <pre><code class="language-python">timer.start()
+do_work()
+
+timer.pause()
+user_input = input(&quot;Continue? &quot;)  # not counted in timing
+timer.resume()
+
+do_more_work()
+elapsed = timer.stop()  # only counts work, not user input</code></pre>
+    <p>Time spent paused is excluded from the final elapsed time.</p>
+    <p>Raises <code>RuntimeError</code>: If timer is not running. <code>UserWarning</code>: If already paused.</p>
+    <h4><code>resume()</code></h4>
+    <p>Resume a paused timing measurement.</p>
+    <pre><code class="language-python">timer.resume()</code></pre>
+    <p>Raises <code>RuntimeError</code>: If timer is not running. <code>UserWarning</code>: If not currently paused.</p>
+    <h4><code>add_time()</code></h4>
+    <p>Manually add a timing measurement to the <code>Sktimer</code>.</p>
+    <pre><code class="language-python">timer.add_time(1.5)
+timer.add_time(2.3)
+timer.add_time(1.8)
+
+print(timer.mean)  # 1.867</code></pre>
+    <p>Arguments <code>elapsed_time</code>: Time to add to statistics (in seconds).</p>
+    <ul>
+        <li><code>float</code></li>
+        <li>required</li>
+    </ul>
+    <h4><code>set_max_times()</code></h4>
+    <p>Set the rolling window size for stored measurements.</p>
+    <pre><code class="language-python">timer.set_max_times(100)  # keep only last 100 measurements
+timer.set_max_times(None)  # keep all measurements</code></pre>
+    <p>Arguments <code>max_times</code>: Keep only the most recent N times.</p>
+    <ul>
+        <li><code>int | None</code></li>
+        <li><code>None</code> keeps all</li>
+    </ul>
+    <h4><code>reset()</code></h4>
+    <p>Clear all timing measurements.</p>
+    <pre><code class="language-python">timer.reset()  # clears all measurements, like a new Sktimer()</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Statistics Properties</summary>
+        <div class="dropdown-content">
+    <p>All statistics are accessed directly on the timer and are always up-to-date.</p>
+    <p><code>num_times</code>: Number of recorded measurements.</p>
+    <ul>
+        <li><code>int</code></li>
+    </ul>
+    <p><code>most_recent</code>: Most recent timing measurement.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>result</code>: Alias for <code>most_recent</code>.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>total_time</code>: Sum of all times.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>total_time_paused</code>: Total time spent paused across all measurements.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>mean</code>: Average of all times.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>median</code>: Median of all times.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>min</code>: Minimum (fastest) time.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>max</code>: Maximum (slowest) time.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>fastest_time</code>: Alias for <code>min</code>.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>slowest_time</code>: Alias for <code>max</code>.</p>
+    <ul>
+        <li><code>float | None</code></li>
+    </ul>
+    <p><code>fastest_index</code>: Index of fastest measurement.</p>
+    <ul>
+        <li><code>int | None</code></li>
+    </ul>
+    <p><code>slowest_index</code>: Index of slowest measurement.</p>
+    <ul>
+        <li><code>int | None</code></li>
+    </ul>
+    <p><code>stdev</code>: Standard deviation.</p>
+    <ul>
+        <li><code>float | None</code></li>
+        <li>requires at least 2 measurements</li>
+    </ul>
+    <p><code>variance</code>: Variance.</p>
+    <ul>
+        <li><code>float | None</code></li>
+        <li>requires at least 2 measurements</li>
+    </ul>
+    <p><code>max_times</code>: Current rolling window size.</p>
+    <ul>
+        <li><code>int | None</code></li>
+    </ul>
+        </div>
+    </details>
+    <h3>Statistics Methods</h3>
+    <h4><code>get_time()</code></h4>
+    <p>Get a specific measurement by index.</p>
+    <pre><code class="language-python">first_time = timer.get_time(0)
+last_time = timer.get_time(-1)</code></pre>
+    <p>Arguments <code>index</code>: 0-based index of measurement.</p>
+    <ul>
+        <li><code>int</code></li>
+    </ul>
+    <p>Returns <code>float | None</code>: Timing measurement or <code>None</code> if index is invalid.</p>
+    <h4><code>percentile()</code></h4>
+    <p>Calculate any percentile of timing measurements.</p>
+    <pre><code class="language-python">p50 = timer.percentile(50)   # median
+p95 = timer.percentile(95)   # 95th percentile
+p99 = timer.percentile(99)   # 99th percentile</code></pre>
+    <p>Arguments <code>percent</code>: Percentile to calculate (0-100).</p>
+    <ul>
+        <li><code>float</code></li>
+    </ul>
+    <p>Returns <code>float | None</code>: Percentile value or <code>None</code> if no measurements.</p>
+    <p>Raises <code>ValueError</code>: If percent is not between 0 and 100.</p>
+    <h4><code>get_statistics()</code> / <code>get_stats()</code></h4>
+    <p>Get a frozen snapshot of all timing statistics.</p>
+    <pre><code class="language-python">snapshot = timer.get_statistics()
+
+# snapshot won&#x27;t change even if timer continues
+timer.start()
+do_more_work()
+timer.stop()
+
+# snapshot still has old values
+print(snapshot.mean)</code></pre>
+    <p>Returns a <code>TimerStats</code> object containing all statistics calculated at the moment the method was called.</p>
+    <p>Returns <code>TimerStats | None</code>: Snapshot or <code>None</code> if no measurements.</p>
+    <h3><code>TimerStats</code></h3>
+    <p>Frozen snapshot of <code>Sktimer</code> statistics returned by <code>Sktimer.get_statistics()</code>.</p>
+    <p>All values are pre-computed and won&#x27;t change even if the timer continues recording.</p>
+    <h3>Properties</h3>
+    <p>All properties from <code>Sktimer</code> are available:</p>
+    <ul>
+        <li><code>times</code>, <code>num_times</code>, <code>most_recent</code>, <code>most_recent_index</code></li>
+        <li><code>total_time</code>, <code>total_time_paused</code></li>
+        <li><code>mean</code>, <code>median</code>, <code>min</code>, <code>max</code></li>
+        <li><code>slowest_time</code>, <code>fastest_time</code>, <code>slowest_index</code>, <code>fastest_index</code></li>
+        <li><code>stdev</code>, <code>variance</code></li>
+    </ul>
+    <h3>Methods</h3>
+    <h4><code>percentile()</code></h4>
+    <p>Same as <code>Sktimer.percentile()</code>.</p>
+    <pre><code class="language-python">p95 = snapshot.percentile(95)</code></pre>
+    <h4><code>get_time()</code></h4>
+    <p>Same as <code>Sktimer.get_time()</code>.</p>
+    <pre><code class="language-python">first = snapshot.get_time(0)</code></pre>
+        </div>
+    </details>
+    <h2><code>timethis</code> Decorator</h2>
+    <p>Decorator that times function executions and records results in a <code>Sktimer</code>.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+@timing.timethis()
+def quick_function():
+    # ...
+    pass
+
+quick_function()
+
+# access the auto-created timer
+print(f&quot;Last time: {quick_function.timer.most_recent:.3f}s&quot;)
+
+# calling multiple times builds statistics
+for i in range(100):
+    quick_function()
+
+print(f&quot;Mean: {quick_function.timer.mean:.3f}s&quot;)</code></pre>
+    <h3>Arguments</h3>
+    <p><code>timer</code>: Sktimer to accumulate timing data in.</p>
+    <ul>
+        <li><code>Sktimer | None = None</code></li>
+        <li>if <code>None</code>, creates an auto-named global timer attached to the function</li>
+    </ul>
+    <p><code>threshold</code>: Minimum elapsed time to record.</p>
+    <ul>
+        <li><code>float = 0.0</code></li>
+        <li>times below this threshold are discarded</li>
+    </ul>
+    <p><code>max_times</code>: Keep only the most recent N measurements.</p>
+    <ul>
+        <li><code>int | None = None</code></li>
+    </ul>
+    <h3>Auto-Created Timers</h3>
+    <p>When no timer is provided, the decorator creates a global timer with a naming convention:</p>
+    <ul>
+        <li>Module-level functions: <code>module_function_timer</code></li>
+        <li>Class methods: <code>module_ClassName_method_timer</code></li>
+    </ul>
+    <p>The timer is attached to the function as <code>.timer</code>:</p>
+    <pre><code class="language-python">@timing.timethis()
+def my_function():
+    pass
+
+my_function()
+print(my_function.timer.mean)</code></pre>
+    <h3>Shared Timer</h3>
+    <p>Use a single timer across multiple functions:</p>
+    <pre><code class="language-python">perf_timer = timing.Sktimer()
+perf_timer.set_max_times(1000)
+
+@timing.timethis(perf_timer)
+def multiply(a, b):
+    return a * b
+
+@timing.timethis(perf_timer)
+def divide(a, b):
+    return a / b
+
+for a, b in zip(range(1000), range(1, 1001)):
+    multiply(a, b)
+    divide(a, b)
+
+print(f&quot;Combined mean: {perf_timer.mean:.6f}s&quot;)</code></pre>
+    <h3>Stacked Decorators</h3>
+    <p>Use both a shared timer and a function-specific timer:</p>
+    <pre><code class="language-python">perf_timer = timing.Sktimer()
+overall_timer = timing.Sktimer()
+
+# 2 stacked decorators on the same function
+@timing.timethis(perf_timer)
+@timing.timethis()
+def multiply(a, b):
+    return a * b
+
+# supports infinite stacking
+@timing.timethis(overall_timer)
+@timing.timethis(perf_timer)
+@timing.timethis()
+def divide(a, b):
+    return a / b
+
+# ... call functions ...
+
+# combined stats
+print(f&quot;Combined mean: {perf_timer.mean:.6f}s&quot;)
+
+# individual stats
+print(f&quot;Multiply mean: {multiply.timer.mean:.6f}s&quot;)
+print(f&quot;Divide mean: {divide.timer.mean:.6f}s&quot;)</code></pre>
+    <h2><code>TimeThis</code> Context Manager</h2>
+    <p>Context manager for timing code blocks with automatic timer management.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+with timing.TimeThis() as timer:
+    do_work()
+
+print(f&quot;Time taken: {timer.most_recent:.3f}s&quot;)</code></pre>
+    <h3>Constructor</h3>
+    <p>Arguments <code>timer</code>: Sktimer instance to use.</p>
+    <ul>
+        <li><code>Sktimer | None = None</code></li>
+        <li>if <code>None</code>, creates a new Sktimer</li>
+    </ul>
+    <p><code>threshold</code>: Minimum elapsed time to record.</p>
+    <ul>
+        <li><code>float = 0.0</code></li>
+        <li>times below this threshold are discarded</li>
+    </ul>
+    <h3>One-Use Timer</h3>
+    <p>For quick, one-off measurements:</p>
+    <pre><code class="language-python">with timing.TimeThis() as timer:
+    compress_file_with_gzip(&quot;data.csv&quot;)
+
+print(f&quot;Compression took: {timer.most_recent:.3f}s&quot;)</code></pre>
+    <h3>Shared Timer</h3>
+    <p>For accumulating statistics across multiple runs:</p>
+    <pre><code class="language-python">api_timer = timing.Sktimer()
+
+with timing.TimeThis(api_timer):
+    response = requests.get(&quot;https://api.example.com/users&quot;)
+
+with timing.TimeThis(api_timer):
+    response = requests.get(&quot;https://api.example.com/posts&quot;)
+
+print(f&quot;Average API time: {api_timer.mean:.3f}s&quot;)</code></pre>
+    <h3>Pause and Resume</h3>
+    <pre><code class="language-python">with timing.TimeThis() as timer:
+    results = database.query(&quot;SELECT * FROM users&quot;)
+    
+    timer.pause()
+    user_wants_export = input(&quot;Export to CSV? (y/n): &quot;)
+    timer.resume()
+    
+    if user_wants_export.lower() == &#x27;y&#x27;:
+        export_to_csv(results)
+
+print(f&quot;Database operation took: {timer.most_recent:.3f}s (excluding user input)&quot;)</code></pre>
+    <h3>Methods</h3>
+    <p><code>pause()</code>: Pause timing.</p>
+    <p><code>resume()</code>: Resume timing.</p>
+    <p><code>lap()</code>: Record a lap and continue timing.</p>
+    <h2><code>clear_global_timers()</code></h2>
+    <p>Clear all auto-created global timers used by the <code>@timethis()</code> decorator.</p>
+    <pre><code class="language-python">from suitkaise import timing
+
+# ... many @timethis() decorated functions called ...
+
+# clear data from auto-created timers to save resources
+timing.clear_global_timers()</code></pre>
+    <p>Useful for:</p>
+    <ul>
+        <li>Long-lived processes</li>
+        <li>Test environments</li>
+        <li>Releasing references and starting fresh</li>
+    </ul>
+    <h2>Thread Safety</h2>
+    <p>All <code>Sktimer</code> operations are thread-safe.</p>
+    <ul>
+        <li>Each thread gets its own timing session</li>
+        <li>Multiple threads can time concurrently</li>
+        <li>Statistics are aggregated across all threads</li>
+    </ul>
+    <pre><code class="language-python">import threading
+
+timer = timing.Sktimer()
+
+def worker():
+    for _ in range(100):
+        timer.start()
+        do_work()
+        timer.stop()
+
+threads = [threading.Thread(target=worker) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# 400 total measurements across all threads (4 threads * 100 iterations)
+print(f&quot;Total measurements: {timer.num_times}&quot;)
+print(f&quot;Mean: {timer.mean:.3f}s&quot;)</code></pre>
+</section>

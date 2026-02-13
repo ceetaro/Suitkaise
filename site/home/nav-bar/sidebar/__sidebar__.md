@@ -10,7 +10,7 @@ the sidebar will also close if the user clicks outside of it.
 
 */
 
-rows = 6
+rows = 7
 columns = 1
 
 # 1.1 = site/home/nav-bar/sidebar/close-button.md
@@ -37,19 +37,26 @@ list item that links to the cucumber module page.
 # 4.1 = site/home/nav-bar/sidebar/sktime-list-item.md
 
 /*
-list item that links to the sktime module page.
+list item that links to the timing module page.
 */
 
 
-# 5.1 = site/home/nav-bar/sidebar/skpath-list-item.md
+# 5.1 = site/home/nav-bar/sidebar/sk-list-item.md
 
 /*
-list item that links to the skpath module page.
+list item that links to the sk module page.
 */
 
 
-# 6.1 = site/home/nav-bar/sidebar/circuit-list-item.md
+# 6.1 = site/home/nav-bar/sidebar/skpath-list-item.md
 
 /*
-list item that links to the circuit module page.
+list item that links to the paths module page.
+*/
+
+
+# 7.1 = site/home/nav-bar/sidebar/circuit-list-item.md
+
+/*
+list item that links to the circuits module page.
 */

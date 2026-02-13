@@ -1,0 +1,332 @@
+<div class="module-bar" data-module="sk">
+    <button class="module-bar-title">suitkaise.sk</button>
+    <nav class="module-bar-nav">
+        <a href="#sk-why" class="module-bar-link" data-page="sk-why">why</a>
+        <a href="#sk-quick-start" class="module-bar-link" data-page="sk-quick-start">quick start</a>
+        <a href="#sk" class="module-bar-link active" data-page="sk">how to use</a>
+        <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
+        <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
+        <a href="#sk-blocking-calls" class="module-bar-link" data-page="sk-blocking-calls">blocking calls</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
+        <a href="#sk-tests" class="module-bar-link" data-page="sk-tests">tests</a>
+        <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>How to use <code>sk</code></h1>
+    <p><code>sk</code> adds powerful modifiers to your functions and classes. No wrapper objects, no changed calls.</p>
+    <p><code>sk</code>: works as a decorator or a regular function.</p>
+    <ul>
+        <li>works on functions and classes</li>
+        <li>adds <code>.asynced()</code>, <code>.retry()</code>, <code>.timeout()</code>, <code>.background()</code>, <code>.rate_limit()</code></li>
+        <li>generates <code>_shared_meta</code> for Share compatibility</li>
+        <li>auto-detects blocking code</li>
+    </ul>
+    <p><code>@blocking</code> decorator: explicitly mark blocking code.</p>
+    <ul>
+        <li>use when AST detection misses CPU-intensive work</li>
+        <li>skips AST analysis (faster)</li>
+    </ul>
+    <h2>Importing</h2>
+    <pre><code class="language-python">from suitkaise import sk, blocking</code></pre>
+    <pre><code class="language-python">from suitkaise.sk import FunctionTimeoutError, SkModifierError</code></pre>
+    <h2><code>sk</code> on Functions</h2>
+    <p>Use as a decorator or call directly.</p>
+    <pre><code class="language-python">from suitkaise import sk
+import requests
+
+# as a decorator
+@sk
+def fetch_data(url):
+    return requests.get(url).json()
+
+# or as a function
+def fetch_data(url):
+    return requests.get(url).json()
+
+fetch_data = sk(fetch_data)</code></pre>
+    <p>The function works exactly as before:</p>
+    <pre><code class="language-python">data = fetch_data(&quot;https://api.example.com/data&quot;)</code></pre>
+    <p>But now you have modifiers:</p>
+    <pre><code class="language-python"># async version
+data = await fetch_data.asynced()(&quot;https://api.example.com/data&quot;)</code></pre>
+    <pre><code class="language-python"># with retry
+data = fetch_data.retry(times=3, delay=1.0)(&quot;https://api.example.com/data&quot;)</code></pre>
+    <pre><code class="language-python"># with timeout
+data = fetch_data.timeout(5.0)(&quot;https://api.example.com/data&quot;)</code></pre>
+    <pre><code class="language-python"># run in background (returns Future)
+future = fetch_data.background()(&quot;https://api.example.com/data&quot;)
+result = future.result()</code></pre>
+    <pre><code class="language-python"># rate limited
+data = fetch_data.rate_limit(2.0)(&quot;https://api.example.com/data&quot;)</code></pre>
+    <h3>Chaining Modifiers</h3>
+    <p>Modifiers can be chained in any order. The execution order is always consistent:</p>
+    <pre><code class="language-python"># these are equivalent
+data = fetch_data.retry(3).timeout(5.0)(&quot;https://example.com&quot;)
+data = fetch_data.timeout(5.0).retry(3)(&quot;https://example.com&quot;)</code></pre>
+    <p>Both will retry up to 3 times, with a 5-second timeout per attempt.</p>
+    <h3>Checking for Blocking Calls</h3>
+    <pre><code class="language-python">@sk
+def slow_fetch(url):
+    return requests.get(url).text
+
+print(slow_fetch.has_blocking_calls) # True
+print(slow_fetch.blocking_calls) # [&#x27;requests.get&#x27;]</code></pre>
+    <h2><code>sk</code> on Classes</h2>
+    <p>Use as a decorator or call directly.</p>
+    <pre><code class="language-python">from suitkaise import sk
+
+# as a decorator
+@sk
+class DataProcessor:
+    def __init__(self, config):
+        self.config = config
+        self.results = []
+    
+    def process(self, data):
+        # heavy processing
+        return transform(data)
+    
+    def save(self, path):
+        with open(path, &#x27;w&#x27;) as f:
+            f.write(json.dumps(self.results))
+
+# or as a function
+class DataProcessor:
+    ...
+
+DataProcessor = sk(DataProcessor)</code></pre>
+    <p>Use normally:</p>
+    <pre><code class="language-python">processor = DataProcessor(config)
+processor.process(data)
+processor.save(&quot;output.json&quot;)</code></pre>
+    <p>Use with modifiers:</p>
+    <pre><code class="language-python"># async
+await processor.process.asynced()(data)
+
+# with timeout
+processor.save.timeout(10.0)(&quot;output.json&quot;)
+
+# with retry
+processor.process.retry(3)(data)
+
+# in background
+future = processor.save.background()(&quot;output.json&quot;)</code></pre>
+    <h3>Class Level Async</h3>
+    <p>Get an async version of the entire class:</p>
+    <pre><code class="language-python">AsyncProcessor = DataProcessor.asynced()
+processor = AsyncProcessor(config)
+
+# all blocking methods are now async
+await processor.process(data)
+await processor.save(&quot;output.json&quot;)</code></pre>
+    <p>Only available if the class has blocking calls:</p>
+    <pre><code class="language-python">@sk
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self):
+        self.value += 1
+
+Counter.asynced()  # raises SkModifierError - no blocking calls</code></pre>
+    <h3><code>Share</code> Compatibility</h3>
+    <p><code>@sk</code> generates <code>_shared_meta</code> automatically.</p>
+    <pre><code class="language-python">from suitkaise.processing import Share
+
+@sk
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self):
+        self.value += 1
+
+share = Share()
+share.counter = Counter()
+
+# works across processes
+share.counter.increment()
+print(share.counter.value)</code></pre>
+    <h2><code>@blocking</code> Decorator</h2>
+    <p>Explicitly mark code as blocking when AST detection doesn&#x27;t catch it.</p>
+    <h3>On Functions</h3>
+    <pre><code class="language-python">from suitkaise import sk, blocking
+
+@sk
+@blocking
+def heavy_computation():
+    # CPU intensive work that AST can&#x27;t detect
+    return sum(x**2 for x in range(10_000_000))
+
+# now .asynced() and .background() are available
+result = await heavy_computation.asynced()()</code></pre>
+    <h3>On Methods</h3>
+    <pre><code class="language-python">@sk
+class Worker:
+    @blocking
+    def compute(self):
+        # CPU-intensive work
+        return complex_calculation()
+    
+    def quick_check(self):
+        # not blocking
+        return self.ready
+
+# compute is blocking, quick_check is not
+print(Worker._blocking_methods)  # {&#x27;compute&#x27;: [&#x27;@blocking&#x27;]}</code></pre>
+    <h3>Why use <code>@blocking</code>?</h3>
+    <p>AST detection looks for known patterns like <code>time.sleep()</code>, <code>requests.get()</code>, file I/O, database calls, etc.</p>
+    <p>But it can&#x27;t detect:</p>
+    <ul>
+        <li>pure CPU work (tight loops, number crunching)</li>
+        <li>C extensions that block</li>
+        <li>Custom blocking functions</li>
+    </ul>
+    <p>Use <code>@blocking</code> when you know code will block the event loop.</p>
+    <h2>Modifiers reference</h2>
+    <h3><code>.asynced()</code></h3>
+    <p>Run the function asynchronously using <code>asyncio.to_thread()</code>.</p>
+    <pre><code class="language-python">result = await fetch_data.asynced()(&quot;https://example.com&quot;)</code></pre>
+    <p>Requirements:</p>
+    <ul>
+        <li>Function must have blocking calls</li>
+        <li>Or be decorated with <code>@blocking</code></li>
+    </ul>
+    <p>Raises:</p>
+    <ul>
+        <li><code>SkModifierError</code> if function has no blocking calls</li>
+    </ul>
+    <h3><code>.retry(times, delay, backoff_factor, exceptions)</code></h3>
+    <p>Retry on failure with configurable backoff.</p>
+    <pre><code class="language-python"># basic: 3 attempts, 1 second delay
+result = fetch_data.retry(times=3)(&quot;https://example.com&quot;)
+
+# with exponential backoff
+result = fetch_data.retry(
+    times=5,
+    delay=1.0,
+    backoff_factor=2.0,  # 1s, 2s, 4s, 8s between retries
+)(&quot;https://example.com&quot;)
+
+# only retry specific exceptions
+result = fetch_data.retry(
+    times=3,
+    exceptions=(ConnectionError, TimeoutError),
+)(&quot;https://example.com&quot;)</code></pre>
+    <p>Arguments:</p>
+    <ul>
+        <li><code>times</code>: Maximum attempts (default: 3)</li>
+        <li><code>delay</code>: Initial delay between retries in seconds (default: 1.0)</li>
+        <li><code>backoff_factor</code>: Multiply delay after each retry (default: 1.0)</li>
+        <li><code>exceptions</code>: Exception types to retry on (default: all)</li>
+    </ul>
+    <h3><code>.timeout(seconds)</code></h3>
+    <p>Raise error if execution exceeds time limit.</p>
+    <pre><code class="language-python">try:
+    result = fetch_data.timeout(5.0)(&quot;https://slow-api.com&quot;)
+except FunctionTimeoutError:
+    print(&quot;Request timed out&quot;)</code></pre>
+    <p>Arguments:</p>
+    <ul>
+        <li><code>seconds</code>: Maximum execution time</li>
+    </ul>
+    <p>Raises:</p>
+    <ul>
+        <li><code>FunctionTimeoutError</code> if timeout exceeded</li>
+    </ul>
+    <h3><code>.background()</code></h3>
+    <p>Run in a background thread, return <code>Future</code> immediately.</p>
+    <pre><code class="language-python">future = fetch_data.background()(&quot;https://example.com&quot;)
+
+# do other work...
+
+# block when you need the result
+result = future.result()</code></pre>
+    <p>Returns:</p>
+    <ul>
+        <li><code>concurrent.futures.Future</code></li>
+    </ul>
+    <h3><code>.rate_limit(per_second)</code></h3>
+    <p>Throttle calls to a maximum rate.</p>
+    <pre><code class="language-python"># max 2 calls per second
+result = fetch_data.rate_limit(2.0)(&quot;https://example.com&quot;)</code></pre>
+    <p>Arguments:</p>
+    <ul>
+        <li><code>per_second</code>: Maximum calls per second</li>
+    </ul>
+    <h2>Async Modifiers</h2>
+    <p>When using <code>.asynced()</code>, you can chain async-compatible modifiers:</p>
+    <pre><code class="language-python"># async with timeout
+result = await fetch_data.asynced().timeout(5.0)(&quot;https://example.com&quot;)
+
+# async with retry
+result = await fetch_data.asynced().retry(3)(&quot;https://example.com&quot;)
+
+# async with rate limit
+result = await fetch_data.asynced().rate_limit(2.0)(&quot;https://example.com&quot;)
+
+# chain multiple
+result = await fetch_data.asynced().retry(3).timeout(10.0)(&quot;https://example.com&quot;)</code></pre>
+    <h2>Modifier Execution Order</h2>
+    <p>Modifiers always execute in this order, regardless of chain order:</p>
+    <ol>
+        <li>Rate limit (outermost) - throttle before each attempt</li>
+        <li>Retry - retry loop</li>
+        <li>Timeout - per-attempt timeout</li>
+        <li>Function call (innermost)</li>
+    </ol>
+    <p>This means:</p>
+    <pre><code class="language-python"># both of these:
+fn.retry(3).timeout(5.0)
+fn.timeout(5.0).retry(3)
+
+# execute as:
+# 1. for each of 3 attempts:
+# 2.   start 5-second timer
+# 3.   call function
+# 4.   if timeout or error, retry</code></pre>
+    <h2>Error Handling</h2>
+    <h3><code>SkModifierError</code></h3>
+    <p>Raised when an invalid modifier is used.</p>
+    <pre><code class="language-python">from suitkaise.sk import SkModifierError
+
+@sk
+def quick_fn():
+    return 42
+
+try:
+    await quick_fn.asynced()()
+except SkModifierError as e:
+    print(e)  # &quot;quick_fn has no blocking calls&quot;</code></pre>
+    <h3><code>FunctionTimeoutError</code></h3>
+    <p>Raised when <code>.timeout()</code> is exceeded.</p>
+    <pre><code class="language-python">from suitkaise.sk import FunctionTimeoutError
+
+try:
+    result = slow_fn.timeout(1.0)()
+except FunctionTimeoutError as e:
+    print(e)  # &quot;slow_fn timed out after 1.0 seconds&quot;</code></pre>
+    <h2>Properties</h2>
+    <h3>On Functions</h3>
+    <p>After <code>@sk</code>:</p>
+    <pre><code class="language-python">@sk
+def my_fn():
+    time.sleep(1)
+
+my_fn.has_blocking_calls # True
+my_fn.blocking_calls # [&#x27;time.sleep&#x27;]</code></pre>
+    <h3>On Classes</h3>
+    <p>After <code>@sk</code>:</p>
+    <pre><code class="language-python">@sk
+class MyClass:
+    def blocking_method(self):
+        time.sleep(1)
+    
+    def quick_method(self):
+        return 42
+
+MyClass.has_blocking_calls # True
+MyClass._blocking_methods # {&#x27;blocking_method&#x27;: [&#x27;time.sleep&#x27;]}
+MyClass._shared_meta # {&#x27;methods&#x27;: {...}, &#x27;properties&#x27;: {...}}</code></pre>
+</section>

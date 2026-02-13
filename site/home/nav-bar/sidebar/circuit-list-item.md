@@ -1,1 +1,1 @@
-link = "Circuit" (site/circuit/circuit-how-to-use.md)
+link = "Circuits" (site/circuit/circuits-how-to-use.md)

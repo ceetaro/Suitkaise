@@ -2,168 +2,139 @@
     <button class="module-bar-title">suitkaise.processing</button>
     <nav class="module-bar-nav">
         <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+        <a href="#processing-quick-start" class="module-bar-link" data-page="processing-quick-start">quick start</a>
         <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
         <a href="#processing-how-it-works" class="module-bar-link active" data-page="processing-how-it-works">how it works</a>
+        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
         <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
-        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+        <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>How <code>processing</code> actually works</h1>
-
-    <p><code>processing</code> has no dependencies outside of the standard library.</p>
-
-    <ul>
-        <li>uses Python's <code>multiprocessing</code> module for subprocess spawning</li>
-        <li>uses <code>suitkaise.cucumber</code> for serialization of complex objects between processes</li>
-        <li>all lifecycle methods are timed using <code>suitkaise.sktime.Timer</code></li>
-        <li>communication between parent and subprocess happens via <code>multiprocessing.Queue</code> and <code>multiprocessing.Event</code></li>
-    </ul>
-
+    <h1>How <code>processing</code> works</h1>
+    <p><code>processing</code> is built around subprocess execution with several key components.</p>
+    <h2>Architecture Overview</h2>
+    <p>The <code>processing</code> module is built around subprocess execution with several key components:</p>
+    <pre><code class="language-python">┌────────────────────────────────────────────────────────────────────────────┐
+│                              Parent Process                                │
+│                                                                            │
+│  ┌──────────────┐   ┌─────────────┐   ┌─────────────┐   ┌───────────────┐  │
+│  │  Skprocess   │   │    Pool     │   │    Share    │   │     Pipe      │  │
+│  │  (instance)  │   │  (workers)  │   │(coordinator)│   │(anchor/point) │  │
+│  └──────┬───────┘   └──────┬──────┘   └──────┬──────┘   └───────┬───────┘  │
+│         │                  │                 │                  │          │
+│         │  cucumber        │  cucumber       │  manager         │  pickle  │
+│         │  serialize       │  serialize      │  proxies         │  handles │
+│         ▼                  ▼                 ▼                  ▼          │
+└─────────┼──────────────────┼─────────────────┼──────────────────┼──────────┘
+          │                  │                 │                  │
+          │                  │                 │                  │
+┌─────────┼──────────────────┼─────────────────┼──────────────────┼──────────┐
+│         ▼                  ▼                 ▼                  ▼          │
+│  ┌──────────────┐   ┌─────────────┐   ┌─────────────┐   ┌───────────────┐  │
+│  │   Engine     │   │   Worker    │   │ Coordinator │   │    Point      │  │
+│  │  (lifecycle) │   │  (inline)   │   │  (process)  │   │  (endpoint)   │  │
+│  └──────────────┘   └─────────────┘   └─────────────┘   └───────────────┘  │
+│                                                                            │
+│                           Subprocess(es)                                   │
+└────────────────────────────────────────────────────────────────────────────┘</code></pre>
     <hr>
-
-    <h2>Overview</h2>
-
-    <p><code>processing</code> uses a subprocess-based architecture.</p>
-
-    <p>The parent process creates the <code>Process</code> instance, starts the subprocess, waits for results.</p>
-
-    <p>The subprocess runs the engine, executing your lifecycle methods.</p>
-
-    <hr>
-
-    <h2>Process Lifecycle</h2>
-
-    <h3>Lifecycle Methods</h3>
-
-    <p>The <code>Process</code> class defines six lifecycle methods that users can override in their inheriting class.</p>
-
+    <h2><code>Skprocess</code></h2>
+    <h3>Class Hierarchy and Initialization</h3>
+    <p>When you define a subclass of <code>Skprocess</code>:</p>
+    <pre><code class="language-python">class MyProcess(Skprocess):
+    def __init__(self):
+        self.counter = 0</code></pre>
+    <p>The <code>__init_subclass__</code> hook runs automatically when your class is defined. What happens when you define a Skprocess subclass</p>
     <ol>
-        <li><code>__prerun__()</code> — Called before each run iteration</li>
-        <li><code>__run__()</code> — <strong>REQUIRED</strong> - main work — called each iteration</li>
-        <li><code>__postrun__()</code> — Called after each run iteration</li>
-        <li><code>__onfinish__()</code> — Called when process ends (stop/limit reached)</li>
-        <li><code>__result__()</code> — Returns data when process completes successfully</li>
-        <li><code>__error__()</code> — Returns data when process fails and has no lives remaining</li>
+        <li>Python calls <code>__init_subclass__</code> on the parent class (<code>Skprocess</code>)</li>
+        <li>Skprocess wraps your <code>__init__</code> method to call <code>_setup()</code> first</li>
+        <li>Skprocess creates <code>__serialize__</code> and <code>__deserialize__</code> methods for <code>cucumber</code> to use</li>
+        <li>These serialization methods capture your class&#x27;s lifecycle methods (<code>__run__</code>, etc.)</li>
     </ol>
-
-    <h3>How the cycle works</h3>
-
-<pre><code>start()
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│  while _should_continue():              │
-│      __prerun__()                       │
-│      __run__()                          │
-│      __postrun__()                      │
-│      _current_run += 1                  │
-└─────────────────────────────────────────┘
-    │
-    ▼
-__onfinish__()
-    │
-    ▼
-__result__() or __error__()
-    │
-    ▼
-send result via Queue
-    │
-    ▼
-cleanup queues and exit</code></pre>
-
-    <h3>Stop Conditions</h3>
-
-    <p>The run loop stops when any of these conditions are met:</p>
-
-    <ol>
-        <li><code>stop_event</code> is set (via <code>stop()</code> or <code>kill()</code>)</li>
-        <li><code>config.runs</code> limit reached (<code>_current_run >= config.runs</code>)</li>
-        <li><code>config.join_in</code> time limit reached (elapsed time since start)</li>
-    </ol>
-
-    <hr>
-
-    <h2>Serialization</h2>
-
-    <h3>How <code>cucumber</code> is used</h3>
-
-    <p><code>processing</code> uses another <code>suitkaise</code> module, <code>cucumber</code>, to serialize the entire <code>Process</code> instance.</p>
-
-    <p>Serializes:</p>
-    <ul>
-        <li>All user-defined attributes from <code>__init__</code></li>
-        <li>Configuration attributes</li>
-        <li>Cycle method references (captured as class attributes)</li>
-    </ul>
-
-    <p>This allows complex objects (database connections, loggers, custom classes) to be passed to the subprocess without a <code>PicklingError</code>.</p>
-
-    <h3>Flow</h3>
-
-    <ol>
-        <li><strong>Before start()</strong> — <code>cucumber.serialize()</code> captures the entire Process instance.
-            <ul>
-                <li><code>instance.__dict__</code> (all attributes)</li>
-                <li>Class name and lifecycle methods</li>
-                <li>User's custom <code>__serialize__</code> if defined</li>
-            </ul>
-        </li>
-        <li><strong>Subprocess</strong> — <code>cucumber.deserialize()</code> reconstructs.
-            <ul>
-                <li>Creates new instance via class reconstruction</li>
-                <li>Restores all attributes from serialized state</li>
-                <li>Re-attaches lifecycle methods</li>
-                <li>Sets up timed method wrappers</li>
-            </ul>
-        </li>
-        <li><strong>When Complete</strong> — Result and timers serialized back via Queue</li>
-    </ol>
-
-    <h3>Custom Serialization</h3>
-
-    <p>If a class defines <code>__serialize__</code> and <code>__deserialize__</code>, those are called alongside the Process serialization:</p>
-
-<pre><code class="language-python">class MyProcess(Process):
-    def __serialize__(self):
-        return {"custom": self.custom_data}
+    <pre><code class="language-python"># what happens under the hood
+def __init_subclass__(cls, **kwargs):
+    super().__init_subclass__(**kwargs)
     
-    @classmethod
-    def __deserialize__(cls, state):
-        obj = cls.__new__(cls)
-        obj.custom_data = state["custom"]
-        return obj</code></pre>
-
-    <hr>
-
-    <h2>Timer System</h2>
-
-    <h3>Using <code>sktime</code></h3>
-
-    <p><code>processing</code> uses another <code>suitkaise</code> module, <code>sktime</code>, to time the lifecycle methods.</p>
-
-    <p><code>sktime</code> is a time-tracking module that provides a simple interface for timing code.</p>
-
-    <p>The base <code>Timer</code> class is used to time the lifecycle methods, the same one that is used in the <code>@timethis</code> decorator.</p>
-
-    <h3>Automatic Timer Attachment</h3>
-
-    <p>When a user defines a lifecycle method, <code>processing</code> automatically wraps it to provide timer access:</p>
-
-<pre><code class="language-python">class MyProcess(Process):
-    def __run__(self):
-        # do work
-        pass
-
-# After start()/wait():
-p.__run__.timer  # → Timer object</code></pre>
-
-    <h3>TimedMethod Wrapper</h3>
-
-    <p>The <code>TimedMethod</code> class wraps lifecycle methods:</p>
-
-<pre><code class="language-python">class TimedMethod:
+    # wrap __init__ if defined
+    if &#x27;__init__&#x27; in cls.__dict__:
+        original_init = cls.__dict__[&#x27;__init__&#x27;]
+        
+        def wrapped_init(self, *args, **kwargs):
+            Skprocess._setup(self)       # parent setup first
+            original_init(self, *args, **kwargs)  # then user&#x27;s __init__
+        
+        cls.__init__ = wrapped_init
+    
+    # set up serialization methods
+    cls.__serialize__ = make_serialize(user_serialize)
+    cls.__deserialize__ = make_deserialize(user_deserialize)</code></pre>
+    <ol>
+        <li>When <code>class MyProcess(Skprocess)</code> is parsed, Python triggers <code>Skprocess.__init_subclass__</code></li>
+        <li>Your original <code>__init__</code> is saved and replaced with a wrapper</li>
+        <li>The wrapper ensures <code>_setup()</code> runs before your code, initializing all internal state</li>
+        <li>Custom <code>__serialize__</code>/<code>__deserialize__</code> methods are generated that know how to capture your specific lifecycle methods</li>
+    </ol>
+    <h3>Internal State (<code>_setup</code>)</h3>
+    <p><code>Skprocess._setup()</code> initializes all internal state before your <code>__init__</code> runs.</p>
+    <p>What <code>_setup()</code> creates</p>
+    <ol>
+        <li><strong>Configuration</strong> - <code>process_config</code> holds <code>runs</code>, <code>join_in</code>, <code>lives</code>, and <code>timeouts</code></li>
+        <li><strong>Timing</strong> - <code>timers</code> container (created lazily when first needed)</li>
+        <li><strong>Runtime tracking</strong> - <code>_current_run</code> counter and <code>_start_time</code> timestamp</li>
+        <li><strong>Error state</strong> - <code>error</code> attribute for <code>__error__</code> to access</li>
+        <li><strong>Communication queues</strong> - <code>_tell_queue</code> (parent→child) and <code>_listen_queue</code> (child→parent)</li>
+        <li><strong>Process handle</strong> - <code>_subprocess</code> holds the <code>multiprocessing.Process</code> object</li>
+        <li><strong>Result storage</strong> - <code>_result</code> and <code>_has_result</code> for retrieving the final value</li>
+        <li><strong>TimedMethod wrappers</strong> - Wraps lifecycle methods so <code>process.__run__.timer</code> works</li>
+    </ol>
+    <pre><code class="language-python">def _setup(instance):
+    # configuration with defaults
+    instance.process_config = ProcessConfig()
+    
+    # timers container (created when needed)
+    instance.timers = None
+    
+    # runtime state
+    instance._current_run = 0
+    instance._start_time = None
+    
+    # error state (set when error occurs)
+    instance.error = None
+    
+    # communication primitives (created on start)
+    instance._stop_event = None
+    instance._result_queue = None
+    instance._tell_queue = None      # Parent → Child
+    instance._listen_queue = None    # Child → Parent
+    
+    # subprocess handle
+    instance._subprocess = None
+    
+    # result storage
+    instance._result = None
+    instance._has_result = False
+    
+    # set up TimedMethod wrappers
+    Skprocess._setup_timed_methods(instance)</code></pre>
+    <h3>TimedMethod Wrappers</h3>
+    <p>Each lifecycle method is wrapped in a <code>TimedMethod</code> to enable timer access.</p>
+    <p>Why wrap lifecycle methods?</p>
+    <ol>
+        <li>Allow <code>process.__run__.timer</code> syntax to get the timer for <code>__run__</code></li>
+        <li>Keep the method callable as normal (<code>process.__run__()</code>)</li>
+        <li>Provide a uniform interface for the engine to access the underlying method</li>
+    </ol>
+    <p>What <code>TimedMethod</code> does</p>
+    <ol>
+        <li>Stores reference to the original method</li>
+        <li>Stores reference to the process (for timer access)</li>
+        <li>Stores the timer name (e.g., <code>&quot;run&quot;</code> for <code>__run__</code>)</li>
+        <li>On call, delegates to the original method</li>
+        <li>On <code>.timer</code> access, looks up the <code>Sktimer</code> from <code>process.timers</code></li>
+    </ol>
+    <pre><code class="language-python">class TimedMethod:
     def __init__(self, method, process, timer_name):
         self._method = method
         self._process = process
@@ -174,461 +145,1337 @@ p.__run__.timer  # → Timer object</code></pre>
     
     @property
     def timer(self):
+        # returns the Sktimer for this method
+        if self._process.timers is None:
+            return None
         return getattr(self._process.timers, self._timer_name, None)</code></pre>
-
-    <p>The wrapper is created in <code>_setup_timed_methods()</code> during <code>Process._setup()</code>.</p>
-
-    <h3>How Timing Works</h3>
-
-    <p>Timing happens in the subprocess (engine), not in the wrapper:</p>
-
-<pre><code class="language-python"># In engine._run_section_timed():
-timer = process.timers._ensure_timer(timer_name)
-timer.start()
-try:
-    run_with_timeout(method, timeout, section, current_run)
-    timer.stop()  # Only record on success
-except ProcessTimeoutError:
-    timer.discard()  # Discard failed timing
-    raise
-except Exception as e:
-    timer.discard()  # Discard failed timing
-    raise error_class(current_run, e) from e</code></pre>
-
-    <p>This is the same <code>start()</code>/<code>stop()</code> pattern used by <code>sktime.timethis</code>, with <code>discard()</code> for failures.</p>
-
-    <h3>ProcessTimers</h3>
-
-    <p>The <code>ProcessTimers</code> class holds all timers:</p>
-
-    <ul>
-        <li><code>prerun</code> — Timer for <code>__prerun__</code></li>
-        <li><code>run</code> — Timer for <code>__run__</code></li>
-        <li><code>postrun</code> — Timer for <code>__postrun__</code></li>
-        <li><code>onfinish</code> — Timer for <code>__onfinish__</code></li>
-        <li><code>result</code> — Timer for <code>__result__</code></li>
-        <li><code>error</code> — Timer for <code>__error__</code></li>
-        <li><code>full_run</code> — Aggregates prerun + run + postrun per iteration</li>
-    </ul>
-
-    <p>The <code>full_run</code> timer is updated after each complete iteration:</p>
-
-<pre><code class="language-python">def _update_full_run(self):
-    total = 0.0
-    for timer in [self.prerun, self.run, self.postrun]:
-        if timer and timer.num_times > 0:
-            total += timer.most_recent or 0.0
-    if total > 0:
-        self.full_run.add_time(total)</code></pre>
-
-    <hr>
-
-    <h2>Lives System</h2>
-
-    <h3>Retry Mechanism</h3>
-
-    <p>When an error occurs in <code>__prerun__</code>, <code>__run__</code>, or <code>__postrun__</code>:</p>
-
+    <p>This enables the <code>process.__run__.timer</code> access pattern:</p>
+    <pre><code class="language-python">process.run()
+print(process.__run__.timer.elapsed)  # Get timing for __run__ method
+print(process.__prerun__.timer.elapsed)  # Get timing for __prerun__ method</code></pre>
+    <h3>Serialization for Subprocess Transfer</h3>
+    <p>When <code>start()</code> is called, the entire <code>Skprocess</code> object must be transferred to the subprocess. This uses <code>cucumber</code> serialization.</p>
+    <p>Serialization</p>
     <ol>
+        <li>Extract all instance attributes (except <code>TimedMethod</code> wrappers which aren&#x27;t serializable)</li>
+        <li>Capture the class name for reconstruction</li>
+        <li>Extract all lifecycle method definitions (<code>__run__</code>, <code>__prerun__</code>, etc.) as actual function objects</li>
+        <li>Package into a dict that <code>cucumber</code> can serialize</li>
+    </ol>
+    <pre><code class="language-python">def __serialize__(self):
+    return {
+        &#x27;instance_dict&#x27;: {k: v for k, v in self.__dict__.items() 
+                          if not isinstance(v, TimedMethod)},
+        &#x27;class_name&#x27;: cls.__name__,
+        &#x27;lifecycle_methods&#x27;: {
+            name: cls.__dict__[name] 
+            for name in [&#x27;__prerun__&#x27;, &#x27;__run__&#x27;, &#x27;__postrun__&#x27;, 
+                        &#x27;__onfinish__&#x27;, &#x27;__result__&#x27;, &#x27;__error__&#x27;]
+            if name in cls.__dict__
+        },
+        &#x27;class_attrs&#x27;: {...},
+    }</code></pre>
+    <p>Deserialization</p>
+    <ol>
+        <li>Dynamically recreate the class using <code>type()</code> with the saved lifecycle methods</li>
+        <li>Create an instance using <code>object.__new__()</code> to skip <code>__init__</code> (state already captured)</li>
+        <li>Restore all instance attributes from the serialized dict</li>
+        <li>Re-wrap lifecycle methods with <code>TimedMethod</code> for timer access</li>
+        <li>If <code>@autoreconnect</code> was used, call <code>reconnect_all()</code> to restore live connections</li>
+    </ol>
+    <pre><code class="language-python">@staticmethod
+def __deserialize__(state):
+    # rebuild class with lifecycle methods
+    new_class = type(
+        state[&#x27;class_name&#x27;],
+        (Skprocess,),
+        state[&#x27;lifecycle_methods&#x27;] | state[&#x27;class_attrs&#x27;]
+    )
+    
+    # create instance without calling __init__
+    obj = object.__new__(new_class)
+    obj.__dict__.update(state[&#x27;instance_dict&#x27;])
+    
+    # set up timed methods
+    Skprocess._setup_timed_methods(obj)
+    
+    # handle @autoreconnect
+    if getattr(new_class, &#x27;_auto_reconnect_enabled&#x27;, False):
+        obj = reconnect_all(obj, **reconnect_kwargs)
+    
+    return obj</code></pre>
+    <h3><code>start()</code> flow</h3>
+    <p>What happens when you call <code>process.start()</code></p>
+    <ol>
+        <li><strong>Initialize timers</strong> - Create <code>ProcessTimers</code> if not already present</li>
+        <li><strong>Serialize the process</strong> - Convert entire object to bytes using <code>cucumber</code></li>
+        <li><strong>Create communication primitives</strong> (manager-backed, shared across processes):</li>
+    </ol>
+    <ul>
+        <li><code>_stop_event</code> - Signal to tell subprocess to stop</li>
+        <li><code>_result_queue</code> - Subprocess sends final result/error here</li>
+        <li><code>_tell_queue</code> - Parent sends messages to child</li>
+        <li><code>_listen_queue</code> - Child sends messages to parent</li>
+    </ul>
+    <ol start="4">
+        <li><strong>Record start time</strong> - For <code>join_in</code> time limit checking</li>
+        <li><strong>Spawn subprocess</strong> - Create <code>multiprocessing.Process</code> targeting the engine</li>
+        <li><strong>Start the subprocess</strong> - Control returns immediately to parent</li>
+        <li><strong>IPC cleanup</strong> - Manager/queues are cleaned up when <code>result()</code> completes</li>
+    </ol>
+    <pre><code class="language-python">def start(self):
+    from .engine import _engine_main
+    from suitkaise import cucumber
+    
+    # ensure timers exist
+    if self.timers is None:
+        self.timers = ProcessTimers()
+    
+    # serialize current state
+    serialized = cucumber.serialize(self)
+    
+    # create communication primitives (manager-backed to avoid SemLock issues)
+    manager = _get_ipc_manager()  # shared manager for all Skprocess instances
+    self._stop_event = manager.Event()
+    self._result_queue = manager.Queue()
+    self._tell_queue = manager.Queue()   # Parent → Child
+    self._listen_queue = manager.Queue() # Child → Parent
+    
+    # record start time
+    from suitkaise import timing
+    self._start_time = timing.time()
+    
+    # spawn subprocess
+    self._subprocess = multiprocessing.Process(
+        target=_engine_main,
+        args=(serialized, self._stop_event, self._result_queue,
+              serialized, self._tell_queue, self._listen_queue)
+    )
+    self._subprocess.start()</code></pre>
+    <p>After <code>start()</code> returns:</p>
+    <ul>
+        <li>Parent process continues executing (non-blocking)</li>
+        <li>Subprocess begins deserializing and running the engine</li>
+        <li>Communication queues are active between both processes</li>
+    </ul>
+    <hr>
+    <h2>Engine (Subprocess Execution)</h2>
+    <p>The engine runs in the subprocess and orchestrates the lifecycle.</p>
+    <h3>Main Loop</h3>
+    <p>Engine startup sequence</p>
+    <ol>
+        <li><strong>Deserialize the process</strong> - Reconstruct the <code>Skprocess</code> object from bytes</li>
+        <li><strong>Initialize timers</strong> - Ensure <code>ProcessTimers</code> exists</li>
+        <li><strong>Track lives</strong> - Copy <code>lives</code> from config for retry tracking</li>
+        <li><strong>Swap communication queues</strong> - See &quot;Queue Swapping&quot; below</li>
+        <li><strong>Record subprocess start time</strong> - For <code>join_in</code> tracking</li>
+    </ol>
+    <p>Main execution loop</p>
+    <ol>
+        <li><strong>Check continuation</strong> - Should we keep running? (runs limit, join_in, stop signal)</li>
+        <li><strong>Run <code>__prerun__</code></strong> - Timed, with configured timeout</li>
+        <li><strong>Check stop</strong> - Exit early if stop signal received</li>
+        <li><strong>Run <code>__run__</code></strong> - Your main work, timed with configured timeout</li>
+        <li><strong>Check stop</strong> - Exit early if stop signal received</li>
+        <li><strong>Run <code>__postrun__</code></strong> - Cleanup after each run, timed</li>
+        <li><strong>Increment run counter</strong> - Track how many iterations completed</li>
+        <li><strong>Update full_run timer</strong> - Aggregate timing for this iteration</li>
+        <li><strong>Loop back to step 1</strong> - Until continuation check fails</li>
+    </ol>
+    <p>On success (loop exits normally)</p>
+    <ul>
+        <li>Run finish sequence (<code>__onfinish__</code> → <code>__result__</code>)</li>
+        <li>Send result to parent via queue</li>
+    </ul>
+    <p>On failure (exception in lifecycle method)</p>
+    <ul>
         <li>Decrement <code>lives_remaining</code></li>
-        <li>If lives remain:
-            <ul>
-                <li>Failed timing already discarded via <code>timer.discard()</code></li>
-                <li>Restart from <code>__prerun__</code> of the current run</li>
-            </ul>
-        </li>
-        <li>If no lives remain:
-            <ul>
-                <li>Call <code>__error__()</code></li>
-                <li>Send error result via Queue</li>
-            </ul>
-        </li>
-    </ol>
-
-    <h3>On Retry</h3>
-
-    <p>On retry, everything is preserved except the failed timing (discarded via <code>timer.discard()</code>).</p>
-
-<pre><code class="language-python"># In engine._engine_main_inner():
-if lives_remaining > 0:
-    # Keep user state and run counter - retry current iteration
-    # Failed timings already discarded via timer.discard()
-    process.config.lives = lives_remaining
-    continue  # retry current iteration</code></pre>
-
-    <p>User state, run counter, and previous times are preserved.</p>
-
-    <p><code>config.lives</code> is decremented.</p>
-
-    <hr>
-
-    <h2>Timeout System</h2>
-
-    <h3>Platform Specifics</h3>
-
-    <p><code>processing</code> uses different timeout strategies per platform.</p>
-
-    <p><strong>Unix (Linux/mac)</strong> — Signal-based (<code>SIGALRM</code>):</p>
-    <ul>
-        <li>Actually interrupts blocking code</li>
-        <li>Uses <code>signal.alarm()</code> to trigger after timeout</li>
-        <li>Handler raises <code>ProcessTimeoutError</code></li>
+        <li>If lives left: retry from step 1</li>
+        <li>If no lives: run <code>__error__</code>, send error to parent</li>
     </ul>
-
-    <p><strong>Windows</strong> — Thread-based (fallback):</p>
+    <pre><code class="language-python">def _engine_main_inner(serialized_process, stop_event, result_queue, 
+                       original_state, tell_queue, listen_queue):
+    # deserialize the process
+    process = cucumber.deserialize(serialized_process)
+    
+    # ensure timers exist
+    if process.timers is None:
+        process.timers = ProcessTimers()
+    
+    # track lives
+    lives_remaining = process.process_config.lives
+    
+    # set up communication (SWAPPED for symmetric API)
+    process._stop_event = stop_event
+    process._tell_queue = listen_queue   # subprocess tell() → parent listen()
+    process._listen_queue = tell_queue   # parent tell() → subprocess listen()
+    
+    process._start_time = timing.time()
+    
+    while lives_remaining &gt; 0:
+        try:
+            # main execution loop
+            while _should_continue(process, stop_event):
+                _run_section_timed(process, &#x27;__prerun__&#x27;, &#x27;prerun&#x27;, PreRunError, stop_event)
+                if stop_event.is_set(): break
+                
+                _run_section_timed(process, &#x27;__run__&#x27;, &#x27;run&#x27;, RunError, stop_event)
+                if stop_event.is_set(): break
+                
+                _run_section_timed(process, &#x27;__postrun__&#x27;, &#x27;postrun&#x27;, PostRunError, stop_event)
+                
+                process._current_run += 1
+                process.timers._update_full_run()
+            
+            # success - run finish sequence
+            _run_finish_sequence(process, stop_event, result_queue)
+            return
+            
+        except (PreRunError, RunError, PostRunError, ProcessTimeoutError) as e:
+            lives_remaining -= 1
+            
+            if lives_remaining &gt; 0:
+                # retry with current state
+                process.process_config.lives = lives_remaining
+                continue
+            else:
+                # no lives - send error
+                _send_error(process, e, result_queue)
+                return</code></pre>
+    <h3>Queue Swapping Explanation</h3>
+    <p>The tell/listen queues are swapped in the subprocess to create a symmetric API.</p>
+    <p>Without swapping:</p>
     <ul>
-        <li>Runs function in daemon thread</li>
-        <li>Waits for completion with timeout</li>
-        <li>Cannot interrupt blocking code (function thread continues running)</li>
-        <li>Detects timeout and raises <code>ProcessTimeoutError</code></li>
-        <li>Function thread dies when subprocess terminates</li>
+        <li>Parent creates two queues: <code>tell_queue</code> and <code>listen_queue</code></li>
+        <li>Parent&#x27;s <code>tell()</code> writes to <code>tell_queue</code></li>
+        <li>Parent&#x27;s <code>listen()</code> reads from <code>listen_queue</code></li>
+        <li>If subprocess uses same assignment, <code>tell()</code> would write to... <code>tell_queue</code> (same as parent!)</li>
+        <li>Both would write to same queue, both would read from same queue = broken</li>
     </ul>
+    <p>Swap in subprocess to maintain symmetry.</p>
+    <pre><code class="language-python">Parent Process:
+    process._tell_queue = Queue()      # Parent → Child (parent writes here)
+    process._listen_queue = Queue()    # Child → Parent (parent reads from here)
 
-    <h3>Timeout Enforcement</h3>
-
-    <p>Each lifecycle method can have its own timeout.</p>
-
-<pre><code class="language-python">self.config.timeouts.prerun = 5.0   # 5 second timeout
-self.config.timeouts.run = 10.0     # 10 second timeout
-self.config.timeouts.result = 2.0   # 2 second timeout</code></pre>
-
-    <p>When timeout is reached, <code>ProcessTimeoutError</code> is raised with:</p>
+Subprocess (after deserialization):
+    process._tell_queue = listen_queue   # Child writes here → Parent reads
+    process._listen_queue = tell_queue   # Child reads from here ← Parent writes</code></pre>
+    <p>Result - symmetric API.</p>
+    <p>This means both sides use the same mental model:</p>
     <ul>
-        <li>Section name (e.g., "run")</li>
-        <li>Timeout value</li>
-        <li>Current run number</li>
+        <li><code>tell()</code> always sends TO the other side</li>
+        <li><code>listen()</code> always receives FROM the other side</li>
     </ul>
-
-    <hr>
-
-    <h2>Error Handling</h2>
-
-    <p>All errors inherit from <code>ProcessError</code>.</p>
-
-    <ul>
-        <li><code>ProcessError</code> — Base class, wraps errors outside lifecycle methods</li>
-        <li><code>PreRunError</code> — Error in <code>__prerun__</code></li>
-        <li><code>RunError</code> — Error in <code>__run__</code></li>
-        <li><code>PostRunError</code> — Error in <code>__postrun__</code></li>
-        <li><code>OnFinishError</code> — Error in <code>__onfinish__</code></li>
-        <li><code>ResultError</code> — Error in <code>__result__</code></li>
-        <li><code>ErrorError</code> — Error in <code>__error__</code> itself</li>
-        <li><code>ProcessTimeoutError</code> — Timeout reached in any section</li>
-    </ul>
-
-    <p>Each error wraps the original exception and includes:</p>
-    <ul>
-        <li><code>original_error</code> — The actual exception that was raised</li>
-        <li><code>current_run</code> — Which run number the error occurred on</li>
-    </ul>
-
-    <h3>Error Wrapping</h3>
-
-    <p>Errors in lifecycle methods are caught and wrapped.</p>
-
-<pre><code class="language-python"># In engine._run_section_timed():
-timer.start()
-try:
-    run_with_timeout(method, timeout, method_name, current_run)
-    timer.stop()  # Record successful timing
-except ProcessTimeoutError:
-    timer.discard()  # Don't record failed timing
-    raise
-except Exception as e:
-    timer.discard()  # Don't record failed timing
-    raise error_class(current_run, e) from e</code></pre>
-
-    <p>The original error is accessible via <code>e.original_error</code> when caught.</p>
-
-<pre><code class="language-python">except ProcessError as e:
-    print(e.original_error)  # The original exception
-    print(e.current_run)     # Which run it failed on</code></pre>
-
-    <h3>Error Flow</h3>
-
+    <h3>Continuation Checks</h3>
+    <p>Checked before each iteration of the main loop</p>
     <ol>
-        <li>Error occurs in lifecycle method</li>
-        <li>Engine catches and wraps in appropriate error class</li>
-        <li>If lives remain → retry</li>
-        <li>If no lives → call <code>__error__()</code>, send error via Queue</li>
-        <li>Parent process raises error when <code>result()</code> is called</li>
+        <li><strong>Stop signal</strong> - Has the parent called <code>stop()</code>? Check the multiprocessing event.</li>
+        <li><strong>Run count</strong> - Have we completed <code>process_config.runs</code> iterations? (If <code>runs=None</code>, skip this check - run indefinitely)</li>
+        <li><strong>Time limit</strong> - Have we exceeded <code>process_config.join_in</code> seconds? (If <code>join_in=None</code>, skip this check)</li>
     </ol>
-
-    <hr>
-
-    <h2>Subprocess Communication</h2>
-
-    <h3>Queue-Based Messaging</h3>
-
-    <p>Communication uses <code>multiprocessing.Queue</code>. There are three queues:</p>
-
+    <p><strong>Evaluation order matters:</strong></p>
+    <ul>
+        <li>Stop signal checked first (highest priority - explicit user request)</li>
+        <li>Run count checked second (natural completion)</li>
+        <li>Time limit checked last (graceful timeout)</li>
+    </ul>
+    <pre><code class="language-python">def _should_continue(process, stop_event):
+    # check stop signal
+    if stop_event.is_set():
+        return False
+    
+    # check run count limit
+    if process.process_config.runs is not None:
+        if process._current_run &gt;= process.process_config.runs:
+            return False
+    
+    # check time limit (join_in)
+    if process.process_config.join_in is not None:
+        elapsed = timing.elapsed(process._start_time)
+        if elapsed &gt;= process.process_config.join_in:
+            return False
+    
+    return True</code></pre>
+    <h3>Section Timing</h3>
+    <p>Each lifecycle section is timed individually.</p>
+    <p>How section timing works</p>
     <ol>
-        <li><strong>result_queue</strong> — Subprocess → Parent (results and errors)</li>
-        <li><strong>tell_queue</strong> — Parent → Subprocess (via <code>tell()</code>)</li>
-        <li><strong>listen_queue</strong> — Subprocess → Parent (via <code>listen()</code>)</li>
+        <li><strong>Get the method</strong> - Unwrap from <code>TimedMethod</code> if necessary to get the raw function</li>
+        <li><strong>Get the timeout</strong> - Look up configured timeout for this section (e.g., <code>timeouts.run</code>)</li>
+        <li><strong>Get or create timer</strong> - Ensure an <code>Sktimer</code> exists for this section</li>
+        <li><strong>Start the timer</strong> - Begin measuring</li>
+        <li><strong>Execute with timeout</strong> - Run the method with platform-appropriate timeout handling</li>
+        <li><strong>Stop the timer</strong> - Record elapsed time on success</li>
+        <li><strong>Handle failures</strong>:</li>
     </ol>
-
-<pre><code class="language-python"># Subprocess sends result:
-result_queue.put({
-    'type': 'result',       # or 'error'
-    'data': serialized,     # cucumber-serialized result
-    'timers': timer_bytes,  # cucumber-serialized ProcessTimers
-})</code></pre>
-
-    <h3>tell() and listen()</h3>
-
-    <p>Parent and subprocess can exchange data during execution:</p>
-
-<pre><code class="language-python"># Parent sends data to subprocess:
-p.tell(some_data)
-
-# Subprocess receives in __run__:
-def __run__(self):
-    data = self.listen(timeout=1.0)  # blocks until data arrives</code></pre>
-
-    <p>Internally, queues are swapped in the subprocess for symmetric API:</p>
     <ul>
-        <li>Parent's <code>tell()</code> puts in <code>tell_queue</code> → subprocess's <code>listen()</code> gets from it</li>
-        <li>Subprocess's <code>tell()</code> puts in <code>listen_queue</code> → parent's <code>listen()</code> gets from it</li>
+        <li>Timeout: Discard timing (don&#x27;t pollute stats), re-raise <code>ProcessTimeoutError</code></li>
+        <li>Exception: Discard timing, wrap in section-specific error (e.g., <code>RunError</code>)</li>
     </ul>
-
-    <h3>Message Types</h3>
-
+    <pre><code class="language-python">def _run_section_timed(process, method_name, timer_name, error_class, stop_event):
+    # get method (unwrap TimedMethod if needed)
+    method_attr = getattr(process, method_name)
+    method = method_attr._method if hasattr(method_attr, &#x27;_method&#x27;) else method_attr
+    
+    # get timeout
+    timeout = getattr(process.process_config.timeouts, timer_name, None)
+    
+    # get or create timer
+    timer = process.timers._ensure_timer(timer_name)
+    
+    timer.start()
+    try:
+        run_with_timeout(method, timeout, method_name, process._current_run)
+        timer.stop()
+    except ProcessTimeoutError:
+        timer.discard()  # don&#x27;t record failed timing
+        raise
+    except Exception as e:
+        timer.discard()
+        raise error_class(process._current_run, e) from e</code></pre>
+    <h3>Timeout Implementation</h3>
+    <p>Platform-specific timeout handling.</p>
+    <p>Unix/Linux/macOS (signal-based):</p>
+    <p>How signal-based timeout works:</p>
+    <ol>
+        <li>If no timeout configured, just run the function directly</li>
+        <li>Install a custom <code>SIGALRM</code> handler that raises <code>ProcessTimeoutError</code></li>
+        <li>Set an alarm to fire after <code>timeout</code> seconds</li>
+        <li>Run the function</li>
+        <li>Cancel the alarm when done (success or exception)</li>
+        <li>Restore the original signal handler</li>
+    </ol>
+    <p>This approach can interrupt <strong>any</strong> code, including blocking I/O.</p>
+    <pre><code class="language-python">def _signal_based_timeout(func, timeout, section, current_run):
+    if timeout is None:
+        return func()
+    
+    def handler(signum, frame):
+        raise ProcessTimeoutError(section, timeout, current_run)
+    
+    old_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(int(timeout) + 1)
+    
+    try:
+        return func()
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)</code></pre>
+    <p>Windows (thread-based fallback):</p>
+    <p>How thread-based timeout works</p>
+    <ol>
+        <li>If no timeout configured, just run the function directly</li>
+        <li>Create shared containers for result and exception (lists for mutability)</li>
+        <li>Create a completion event</li>
+        <li>Spawn a daemon thread to run the function</li>
+        <li>Wait on the completion event with timeout</li>
+        <li>If event fires before timeout: return result or re-raise exception</li>
+        <li>If timeout elapses first: raise <code>ProcessTimeoutError</code></li>
+    </ol>
+    <p>Limitation: The thread-based approach cannot interrupt blocking code. The thread continues running as a &quot;zombie&quot; but the timeout is detected and raised.</p>
+    <pre><code class="language-python">def _thread_based_timeout(func, timeout, section, current_run):
+    if timeout is None:
+        return func()
+    
+    result = [None]
+    exception = [None]
+    completed = threading.Event()
+    
+    def wrapper():
+        try:
+            result[0] = func()
+        except BaseException as e:
+            exception[0] = e
+        finally:
+            completed.set()
+    
+    thread = threading.Thread(target=wrapper, daemon=True)
+    thread.start()
+    
+    finished = completed.wait(timeout=timeout)
+    
+    if not finished:
+        raise ProcessTimeoutError(section, timeout, current_run)
+    
+    if exception[0] is not None:
+        raise exception[0]
+    
+    return result[0]</code></pre>
+    <h3>Finish Sequence</h3>
+    <p>What happens when the process completes successfully</p>
+    <ol>
+        <li><strong>Run <code>__onfinish__</code></strong> - Final cleanup, timed with configured timeout</li>
+    </ol>
     <ul>
-        <li><code>result</code> — Successful completion with <code>__result__()</code> output</li>
-        <li><code>error</code> — Failure with exception object or <code>__error__()</code> return value</li>
+        <li>If it fails: Send <code>OnFinishError</code> to parent, abort</li>
     </ul>
-
-    <h3>Result Retrieval</h3>
-
-    <p>The <code>wait()</code> method drains the result queue before waiting for subprocess exit.</p>
-    <p>This prevents deadlock where the subprocess can't exit because its QueueFeederThread is blocked.</p>
-
-<pre><code class="language-python">def wait(self, timeout=None):
-    # Must drain result queue BEFORE waiting for subprocess
-    # Otherwise deadlock: subprocess can't exit until queue is drained
-    self._drain_result_queue(timeout)
+    <ol start="2">
+        <li><strong>Run <code>__result__</code></strong> - Extract the return value, timed</li>
+    </ol>
+    <ul>
+        <li>If it fails: Send <code>ResultError</code> to parent, abort</li>
+    </ul>
+    <ol start="3">
+        <li><strong>Serialize the result</strong> - Convert return value to bytes</li>
+        <li><strong>Serialize the timers</strong> - Include all timing data for parent access</li>
+        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;result&quot;, ...}</code></li>
+    </ol>
+    <pre><code class="language-python">def _run_finish_sequence(process, stop_event, result_queue):
+    # run __onfinish__
+    method = unwrap(process.__onfinish__)
+    timeout = process.process_config.timeouts.onfinish
+    timer = process.timers._ensure_timer(&#x27;onfinish&#x27;)
+    
+    timer.start()
+    try:
+        run_with_timeout(method, timeout, &#x27;__onfinish__&#x27;, process._current_run)
+    except Exception as e:
+        _send_error(process, OnFinishError(process._current_run, e), result_queue)
+        return
+    finally:
+        timer.stop()
+    
+    # run __result__
+    result_method = unwrap(process.__result__)
+    result_timeout = process.process_config.timeouts.result
+    result_timer = process.timers._ensure_timer(&#x27;result&#x27;)
+    
+    result_timer.start()
+    try:
+        result = run_with_timeout(result_method, result_timeout, &#x27;__result__&#x27;, process._current_run)
+    except Exception as e:
+        _send_error(process, ResultError(process._current_run, e), result_queue)
+        return
+    finally:
+        result_timer.stop()
+    
+    # send success result with timers
+    result_queue.put({
+        &quot;type&quot;: &quot;result&quot;,
+        &quot;data&quot;: cucumber.serialize(result),
+        &quot;timers&quot;: cucumber.serialize(process.timers)
+    })</code></pre>
+    <h3>Error Handling</h3>
+    <p>What happens when the process fails (no lives remaining)</p>
+    <ol>
+        <li><strong>Set <code>process.error</code></strong> - Make the error accessible to <code>__error__</code> method</li>
+        <li><strong>Run <code>__error__</code></strong> - Give user a chance to handle/transform the error</li>
+    </ol>
+    <ul>
+        <li>Timed with configured timeout</li>
+        <li>If <code>__error__</code> itself fails: use the original error</li>
+    </ul>
+    <ol start="3">
+        <li><strong>Serialize the error result</strong> - Whatever <code>__error__</code> returned (or original error)</li>
+        <li><strong>Serialize the timers</strong> - Include all timing data collected so far</li>
+        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;error&quot;, ...}</code></li>
+    </ol>
+    <pre><code class="language-python">def _send_error(process, error, result_queue):
+    # set error for __error__ to access
+    process.error = error
+    
+    error_method = unwrap(process.__error__)
+    error_timeout = process.process_config.timeouts.error
+    error_timer = process.timers._ensure_timer(&#x27;error&#x27;)
+    
+    error_timer.start()
+    try:
+        error_result = run_with_timeout(error_method, error_timeout, &#x27;__error__&#x27;, process._current_run)
+    except Exception:
+        # if __error__ fails, send original error
+        error_result = error
+    finally:
+        error_timer.stop()
+    
+    # send error result
+    result_queue.put({
+        &quot;type&quot;: &quot;error&quot;,
+        &quot;data&quot;: cucumber.serialize(error_result),
+        &quot;timers&quot;: cucumber.serialize(process.timers)
+    })</code></pre>
+    <h3>Result Queue Draining</h3>
+    <p>The parent must drain the result queue BEFORE joining the subprocess to avoid deadlock.</p>
+    <p>Why deadlock can occur</p>
+    <ol>
+        <li>Subprocess puts result on queue and tries to exit</li>
+        <li>Multiprocessing queues use a background thread to flush data</li>
+        <li>If the queue isn&#x27;t drained, the flush blocks waiting for space</li>
+        <li>Parent calls <code>join()</code> waiting for subprocess to exit</li>
+        <li>Subprocess can&#x27;t exit because queue flush is blocked</li>
+        <li><strong>Deadlock</strong>: Parent waits for subprocess, subprocess waits for queue drain</li>
+    </ol>
+    <p>How <code>_sync_wait()</code> avoids deadlock</p>
+    <ol>
+        <li><strong>Drain first</strong> - Try to get result from queue before joining</li>
+        <li><strong>Join with timeout</strong> - Wait for subprocess to exit</li>
+        <li><strong>Drain again</strong> - Get any remaining data</li>
+        <li><strong>Return status</strong> - Whether subprocess has exited</li>
+    </ol>
+    <p>How <code>_drain_result_queue()</code> works</p>
+    <ol>
+        <li>Skip if result already received</li>
+        <li>Try non-blocking <code>get_nowait()</code> first</li>
+        <li>Fall back to short timeout <code>get(timeout=0.5)</code></li>
+        <li>Deserialize timers and update parent&#x27;s timer state</li>
+        <li>Deserialize result/error data</li>
+        <li>Mark <code>_has_result = True</code> so subsequent calls skip</li>
+    </ol>
+    <pre><code class="language-python">def _sync_wait(self, timeout=None):
+    if self._subprocess is None:
+        return True
+    
+    # MUST drain result queue BEFORE waiting
+    # otherwise: subprocess can&#x27;t exit until queue is drained,
+    # but we can&#x27;t drain until subprocess exits = deadlock
+    self._drain_result_queue()
     
     self._subprocess.join(timeout=timeout)
+    self._drain_result_queue()
     return not self._subprocess.is_alive()
 
-def _drain_result_queue(self, timeout=None):
-    """Read result from queue and store internally."""
+def _drain_result_queue(self):
     if self._has_result or self._result_queue is None:
         return
     
     try:
-        message = self._result_queue.get(timeout=timeout or 1.0)
-        
-        # Update timers from subprocess
-        if message.get('timers'):
-            self.timers = cucumber.deserialize(message['timers'])
-        
-        if message["type"] == "error":
-            error_data = cucumber.deserialize(message["data"])
-            if isinstance(error_data, BaseException):
-                self._result = error_data
-            else:
-                self._result = ProcessError(f"Process failed: {error_data}")
-        else:
-            self._result = cucumber.deserialize(message["data"])
-        
-        self._has_result = True
+        message = self._result_queue.get_nowait()
     except queue.Empty:
-        pass  # No result yet
-
-def result(self):
-    """Get result - calls wait() first, then returns stored result."""
-    self.wait()
+        message = self._result_queue.get(timeout=0.5)
+    except:
+        return
     
-    if self._has_result:
-        if isinstance(self._result, BaseException):
-            raise self._result
-        return self._result
+    # update timers from subprocess
+    if message.get(&#x27;timers&#x27;):
+        self.timers = cucumber.deserialize(message[&#x27;timers&#x27;])
+        Skprocess._setup_timed_methods(self)
     
-    return None</code></pre>
-
-    <h3>Queue Cleanup</h3>
-
-    <p>Before the subprocess exits, it cancels feeder threads on <code>tell_queue</code> and <code>listen_queue</code> to allow clean exit:</p>
-
-<pre><code class="language-python"># In engine._engine_main():
-for q in [tell_queue, listen_queue]:
-    if q is not None:
+    if message[&quot;type&quot;] == &quot;error&quot;:
+        self._result = cucumber.deserialize(message[&quot;data&quot;])
+    else:
+        self._result = cucumber.deserialize(message[&quot;data&quot;])
+    
+    self._has_result = True</code></pre>
+    <hr>
+    <h2><code>Pool</code></h2>
+    <h3>Internal Structure</h3>
+    <p>What Pool creates on initialization</p>
+    <ol>
+        <li><strong>Worker count</strong> - Use provided count or default to CPU count</li>
+        <li><strong>Active process tracking</strong> - List to track spawned workers</li>
+        <li><strong>Multiprocessing pool</strong> - Built-in pool for efficient batch execution</li>
+    </ol>
+    <pre><code class="language-python">class Pool:
+    def __init__(self, workers=None):
+        self._workers = workers or multiprocessing.cpu_count()
+        self._active_processes = []
+        self._mp_pool = multiprocessing.Pool(processes=self._workers)</code></pre>
+    <h3>Map Implementation</h3>
+    <p>Two execution paths</p>
+    <ol>
+        <li><strong>Fast path (no timeout)</strong> - Use built-in <code>multiprocessing.Pool.map()</code> for efficiency</li>
+        <li><strong>Timeout path</strong> - Manual worker management with individual timeouts</li>
+    </ol>
+    <p>Fast path</p>
+    <ol>
+        <li>Convert iterable to list (need length and multiple passes)</li>
+        <li>Return early if empty</li>
+        <li>Serialize the function/Skprocess once (reused for all items)</li>
+        <li>Build argument tuples: <code>(serialized_fn, serialized_item, is_star)</code></li>
+        <li>Use <code>multiprocessing.Pool.map()</code> to distribute work</li>
+        <li>Deserialize results, raise if any worker returned an error</li>
+        <li>Return results in input order</li>
+    </ol>
+    <p>Timeout path</p>
+    <ol>
+        <li>Create result array pre-sized to input length</li>
+        <li>Track active workers and next item index</li>
+        <li><strong>Spawn loop</strong>: Start workers up to <code>self._workers</code> limit</li>
+        <li><strong>Collect loop</strong>: Wait for any worker to finish</li>
+    </ol>
+    <ul>
+        <li>If worker times out: terminate it and raise <code>TimeoutError</code></li>
+        <li>If worker succeeds: deserialize result into correct position</li>
+        <li>If worker fails: raise the deserialized exception</li>
+    </ul>
+    <ol start="5">
+        <li>Remove finished worker from active list</li>
+        <li>Repeat until all items processed</li>
+        <li>Return results in input order</li>
+    </ol>
+    <pre><code class="language-python">def _map_impl(self, fn_or_process, iterable, is_star, timeout=None):
+    items = list(iterable)
+    if not items:
+        return []
+    
+    # serialize function once
+    serialized_fn = cucumber.serialize(fn_or_process)
+    
+    # use built-in multiprocessing.Pool for efficiency when no timeout
+    if timeout is None and self._mp_pool is not None:
+        args = [
+            (serialized_fn, cucumber.serialize(item), is_star)
+            for item in items
+        ]
+        messages = self._mp_pool.map(_pool_worker_bytes_args, args)
+        results = []
+        for message in messages:
+            if message[&quot;type&quot;] == &quot;error&quot;:
+                raise cucumber.deserialize(message[&quot;data&quot;])
+            results.append(cucumber.deserialize(message[&quot;data&quot;]))
+        return results
+    
+    # manual worker management with timeout
+    results = [None] * len(items)
+    active = []
+    next_index = 0
+    
+    while active or next_index &lt; len(items):
+        # start workers up to limit
+        while next_index &lt; len(items) and len(active) &lt; self._workers:
+            serialized_item = cucumber.serialize(items[next_index])
+            queue, worker = self._spawn_worker(serialized_fn, serialized_item, is_star)
+            active.append((next_index, queue, worker))
+            next_index += 1
+        
+        # collect finished workers
+        for idx, queue, worker in list(active):
+            worker.join(timeout=timeout)
+            
+            if worker.is_alive():
+                worker.terminate()
+                raise TimeoutError(f&quot;Worker {idx} timed out&quot;)
+            
+            message = queue.get()
+            if message[&quot;type&quot;] == &quot;error&quot;:
+                raise cucumber.deserialize(message[&quot;data&quot;])
+            results[idx] = cucumber.deserialize(message[&quot;data&quot;])
+            active.remove((idx, queue, worker))
+            break
+    
+    return results</code></pre>
+    <h3>Worker Function</h3>
+    <p>What runs in each pool worker subprocess</p>
+    <ol>
+        <li><strong>Deserialize function</strong> - Reconstruct the function or Skprocess class</li>
+        <li><strong>Deserialize item</strong> - Reconstruct the input data for this worker</li>
+        <li><strong>Handle star mode</strong> - If <code>is_star=True</code>, unpack tuple as positional args</li>
+        <li><strong>Detect Skprocess</strong> - Check if <code>fn_or_process</code> is an Skprocess subclass</li>
+        <li><strong>Execute</strong>:</li>
+    </ol>
+    <ul>
+        <li>If Skprocess: Instantiate with args, run inline (already in subprocess)</li>
+        <li>If function: Call directly with args</li>
+    </ul>
+    <ol start="6">
+        <li><strong>Send result</strong> - Serialize and put on result queue</li>
+        <li><strong>Handle errors</strong> - Catch exceptions, serialize, send as error</li>
+    </ol>
+    <pre><code class="language-python">def _pool_worker(serialized_fn, serialized_item, is_star, result_queue):
+    try:
+        fn_or_process = cucumber.deserialize(serialized_fn)
+        item = cucumber.deserialize(serialized_item)
+        
+        # unpack if star mode
+        if is_star:
+            args = item if isinstance(item, tuple) else (item,)
+        else:
+            args = (item,)
+        
+        # check if Skprocess class
+        if isinstance(fn_or_process, type) and issubclass(fn_or_process, Skprocess):
+            process_instance = fn_or_process(*args)
+            result = _run_process_inline(process_instance)
+        else:
+            result = fn_or_process(*args) if is_star else fn_or_process(item)
+        
+        result_queue.put({
+            &quot;type&quot;: &quot;result&quot;,
+            &quot;data&quot;: cucumber.serialize(result)
+        })
+    except Exception as e:
+        result_queue.put({
+            &quot;type&quot;: &quot;error&quot;,
+            &quot;data&quot;: cucumber.serialize(e)
+        })</code></pre>
+    <h3>Inline Process Execution</h3>
+    <p>When <code>Pool</code> runs a <code>Skprocess</code>, it runs inline since it&#x27;s already in a subprocess. No need to spawn another subprocess.</p>
+    <p>Key differences from normal <code>Skprocess</code> execution</p>
+    <ol>
+        <li><strong>No subprocess</strong> - Already in a worker process</li>
+        <li><strong><code>threading.Event</code></strong> - Uses thread event instead of multiprocessing event</li>
+        <li><strong>Direct return</strong> - Returns result directly instead of via queue</li>
+    </ol>
+    <p>Inline execution</p>
+    <ol>
+        <li><strong>Initialize timers</strong> - Create <code>ProcessTimers</code> if needed</li>
+        <li><strong>Initialize state</strong> - Set run counter to 0, record start time</li>
+        <li><strong>Create stop event</strong> - <code>threading.Event</code> for potential early termination</li>
+        <li><strong>Copy lives</strong> - For retry tracking</li>
+    </ol>
+    <p>Main loop (same as engine)</p>
+    <ol>
+        <li>Check continuation conditions</li>
+        <li>Run <code>__prerun__</code> → <code>__run__</code> → <code>__postrun__</code> cycle</li>
+        <li>Increment run counter, update timers</li>
+        <li>On success: run <code>__onfinish__</code> → <code>__result__</code>, return result</li>
+        <li>On failure: decrement lives, retry or run <code>__error__</code></li>
+    </ol>
+    <pre><code class="language-python">def _run_process_inline(process):
+    # ensure timers exist
+    if process.timers is None:
+        process.timers = ProcessTimers()
+    
+    # initialize state
+    process._current_run = 0
+    process._start_time = timing.time()
+    
+    # create threading.Event (not multiprocessing.Event - already in subprocess)
+    stop_event = threading.Event()
+    process._stop_event = stop_event
+    
+    lives_remaining = process.process_config.lives
+    
+    while lives_remaining &gt; 0:
         try:
-            q.cancel_join_thread()
+            while _should_continue_inline():
+                _run_section_timed(&#x27;__prerun__&#x27;, &#x27;prerun&#x27;, PreRunError)
+                if stop_event.is_set(): break
+                
+                _run_section_timed(&#x27;__run__&#x27;, &#x27;run&#x27;, RunError)
+                if stop_event.is_set(): break
+                
+                _run_section_timed(&#x27;__postrun__&#x27;, &#x27;postrun&#x27;, PostRunError)
+                
+                process._current_run += 1
+                process.timers._update_full_run()
+            
+            return _run_finish_sequence_inline(process)
+            
+        except (PreRunError, RunError, PostRunError, ProcessTimeoutError) as e:
+            lives_remaining -= 1
+            if lives_remaining &gt; 0:
+                continue
+            else:
+                return _run_error_sequence_inline(process, e)</code></pre>
+    <h3>Modifier System</h3>
+    <p>Pool methods return modifier objects that allow chaining.</p>
+    <p>Modifier chaining</p>
+    <ol>
+        <li><code>pool.map</code> returns <code>_PoolMapModifier</code> instance</li>
+        <li>Calling it directly (<code>pool.map(fn, items)</code>) runs synchronously</li>
+        <li>Calling <code>.timeout(30)</code> returns <code>_PoolMapTimeoutModifier</code> with timeout stored</li>
+        <li>Calling <code>.background()</code> returns <code>_PoolMapBackgroundModifier</code> that returns a Future</li>
+        <li>Calling <code>.asynced()</code> returns <code>_PoolMapAsyncModifier</code> that returns a coroutine</li>
+    </ol>
+    <p>Modifier pattern</p>
+    <pre><code class="language-python">pool.map                     → _PoolMapModifier          → sync execution
+pool.map.timeout(30)         → _PoolMapTimeoutModifier   → sync with timeout
+pool.map.background()        → _PoolMapBackgroundModifier→ returns Future
+pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine</code></pre>
+    <pre><code class="language-python">class _PoolMapModifier:
+    def __init__(self, pool, is_star=False):
+        self._pool = pool
+        self._is_star = is_star
+    
+    def __call__(self, fn_or_process, iterable):
+        return self._pool._map_impl(fn_or_process, iterable, self._is_star)
+    
+    def timeout(self, seconds):
+        return _PoolMapTimeoutModifier(self._pool, self._is_star, seconds)
+    
+    def background(self):
+        return _PoolMapBackgroundModifier(self._pool, self._is_star)
+    
+    def asynced(self):
+        return _PoolMapAsyncModifier(self._pool, self._is_star)</code></pre>
+    <p><code>star()</code> modifier Returns a <code>StarModifier</code> that configures <code>is_star=True</code> for all methods. This makes each method unpack tuples as positional arguments.</p>
+    <pre><code class="language-python">class StarModifier:
+    def __init__(self, pool):
+        self._pool = pool
+    
+    @property
+    def map(self):
+        return _PoolMapModifier(self._pool, is_star=True)
+    
+    @property
+    def imap(self):
+        return _PoolImapModifier(self._pool, is_star=True)
+    
+    @property
+    def unordered_imap(self):
+        return _PoolUnorderedImapModifier(self._pool, is_star=True)
+    
+    @property
+    def unordered_map(self):
+        return _PoolUnorderedMapModifier(self._pool, is_star=True)</code></pre>
+    <hr>
+    <h2><code>Share</code></h2>
+    <h3>Architecture</h3>
+    <p><code>Share</code> uses a coordinator-proxy system to enable safe concurrent access to shared objects.</p>
+    <p>All writes go through a single queue to a coordinator process, ensuring serialized (one-at-a-time) execution. Reads wait for pending writes to complete before fetching.</p>
+    <pre><code class="language-python">┌─────────────────────────────────────────────────────────────────────────┐
+│                           Share Container                               │
+│                                                                         │
+│  ┌────────────┐   ┌────────────┐   ┌────────────┐                       │
+│  │   timer    │   │  counter   │   │   config   │   (user objects)      │
+│  │   (proxy)  │   │  (proxy)   │   │  (direct)  │                       │
+│  └─────┬──────┘   └─────┬──────┘   └─────┬──────┘                       │
+│        │                │                │                              │
+│        │ getattr()      │ setattr()      │ fetch                        │
+│        ▼                ▼                ▼                              │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                         Coordinator                              │   │
+│  │                                                                  │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐              │   │
+│  │  │  Command Q  │  │  Counters   │  │ Source Store │              │   │
+│  │  │  (Manager)  │  │  (Atomic)   │  │  (Manager)   │              │   │
+│  │  └─────────────┘  └─────────────┘  └──────────────┘              │   │
+│  │                                                                  │   │
+│  │  Background Process:                                             │   │
+│  │  - Consumes commands                                             │   │
+│  │  - Executes on mirrors                                           │   │
+│  │  - Commits to source                                             │   │
+│  │  - Updates counters                                              │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘</code></pre>
+    <h3>Object Registration</h3>
+    <p>What happens when you assign to a Share attribute (<code>share.timer = Sktimer()</code>)</p>
+    <ol>
+        <li><strong>Check if internal</strong> - Skip internal attributes (<code>_SHARE_ATTRS</code>)</li>
+        <li><strong>Check for <code>_shared_meta</code></strong> - Does the object&#x27;s class have sharing metadata?</li>
+        <li><strong>Auto-wrap user classes</strong> - If no metadata, wrap with <code>Skclass()</code> to generate it</li>
+        <li><strong>Extract read/write dependencies</strong> - From <code>_shared_meta</code>, determine which attributes each method reads/writes</li>
+        <li><strong>Register with coordinator</strong> - Send serialized object to background process</li>
+        <li><strong>Create proxy</strong> - If has metadata, create <code>_ObjectProxy</code> to intercept access</li>
+        <li><strong>Store proxy</strong> - Future attribute access returns the proxy, not the real object</li>
+    </ol>
+    <p>Note: When <code>Share</code> is deserialized inside a subprocess, it is reconstructed in client mode from a snapshot. In that mode it does not re-register objects or allocate new counters; it simply restores the serialized snapshots and proxies so reads/writes go through the existing coordinator.</p>
+    <pre><code class="language-python">def __setattr__(self, name, value):
+    if name in self._SHARE_ATTRS:
+        object.__setattr__(self, name, value)
+        return
+    
+    # check for _shared_meta (suitkaise objects)
+    has_meta = hasattr(type(value), &#x27;_shared_meta&#x27;)
+    
+    # auto-wrap user classes
+    if not has_meta and self._is_user_class_instance(value):
+        Skclass(type(value))  # generates _shared_meta
+        has_meta = True
+    
+    # extract read/write attrs from _shared_meta
+    attrs = set()
+    if has_meta:
+        meta = getattr(type(value), &#x27;_shared_meta&#x27;, {})
+        for method_meta in meta.get(&#x27;methods&#x27;, {}).values():
+            attrs.update(method_meta.get(&#x27;writes&#x27;, []))
+            attrs.update(method_meta.get(&#x27;reads&#x27;, []))
+        for prop_meta in meta.get(&#x27;properties&#x27;, {}).values():
+            attrs.update(prop_meta.get(&#x27;reads&#x27;, []))
+            attrs.update(prop_meta.get(&#x27;writes&#x27;, []))
+    
+    # register with coordinator
+    self._coordinator.register_object(name, value, attrs=attrs)
+    
+    # create proxy or direct reference
+    if has_meta:
+        proxy = _ObjectProxy(name, self._coordinator, type(value))
+        self._proxies[name] = proxy
+    else:
+        self._proxies[name] = None  # fetch directly</code></pre>
+    <h3>Coordinator</h3>
+    <p>The coordinator is a background process that serializes all writes.</p>
+    <pre><code class="language-python">class _Coordinator:
+    def __init__(self, manager=None):
+        self._manager = manager or Manager()
+        self._command_queue = self._manager.Queue()
+        self._counter_registry = _AtomicCounterRegistry(self._manager)
+        self._source_store = self._manager.dict()
+        self._source_lock = self._manager.Lock()
+        self._object_names = self._manager.list()</code></pre>
+    <h4>Command Queue</h4>
+    <p>All writes go through the command queue.</p>
+    <pre><code class="language-python">def queue_command(self, object_name, method_name, args=(), kwargs=None, written_attrs=None):
+    serialized_args = cucumber.serialize(args)
+    serialized_kwargs = cucumber.serialize(kwargs or {})
+    
+    command = (object_name, method_name, serialized_args, serialized_kwargs, written_attrs or [])
+    self._command_queue.put(command)</code></pre>
+    <h4>Counter System</h4>
+    <p>The counter system ensures reads see consistent state by tracking pending writes.</p>
+    <p>Two counters per attribute</p>
+    <ul>
+        <li><strong>Pending count</strong>: Incremented when a write is <strong>queued</strong></li>
+        <li><strong>Completed count</strong>: Incremented when a write is <strong>processed</strong></li>
+    </ul>
+    <p>How it prevents stale reads</p>
+    <ol>
+        <li>Write queued: <code>pending = 5, completed = 3</code></li>
+        <li>Read starts: captures <code>target = pending = 5</code></li>
+        <li>Read waits until <code>completed &gt;= 5</code></li>
+        <li>Once coordinator processes all queued writes, <code>completed = 5</code></li>
+        <li>Read proceeds with fresh data</li>
+    </ol>
+    <p>Why this works</p>
+    <ul>
+        <li>Writes increment pending <strong>before</strong> queueing (guarantees we capture all prior writes)</li>
+        <li>Coordinator increments completed <strong>after</strong> committing to source</li>
+        <li>Reads see all writes that were queued before the read started</li>
+    </ul>
+    <pre><code class="language-python">def increment_pending(self, key):
+    return self._counter_registry.increment_pending(key)
+
+def get_read_target(self, key):
+    targets = self._counter_registry.get_read_targets([key])
+    return targets.get(key, 0)
+
+def wait_for_read(self, keys, timeout=1.0):
+    return self._counter_registry.wait_for_read(keys, timeout=timeout)</code></pre>
+    <h4>Background Process Loop</h4>
+    <pre><code class="language-python">def _coordinator_main(command_queue, counter_registry, source_store, 
+                      source_lock, stop_event, error_event, poll_timeout):
+    mirrors = {}  # local cache of deserialized objects
+    
+    while not stop_event.is_set():
+        try:
+            command = command_queue.get(timeout=poll_timeout)
+        except queue.Empty:
+            continue
+        
+        object_name, method_name, ser_args, ser_kwargs, written_attrs = command
+        
+        # special commands
+        if object_name == &quot;__clear__&quot;:
+            mirrors.clear()
+            continue
+        if object_name == &quot;__remove__&quot;:
+            mirrors.pop(method_name, None)
+            continue
+        
+        # deserialize args
+        args = cucumber.deserialize(ser_args)
+        kwargs = cucumber.deserialize(ser_kwargs)
+        
+        # get mirror (from cache or source)
+        mirror = mirrors.get(object_name)
+        if mirror is None:
+            with source_lock:
+                serialized = source_store.get(object_name)
+                if serialized:
+                    mirror = cucumber.deserialize(serialized)
+                    mirrors[object_name] = mirror
+        
+        if mirror is None:
+            _update_counters_after_write(counter_registry, object_name, written_attrs)
+            continue
+        
+        # execute method on mirror
+        try:
+            method = getattr(mirror, method_name)
+            method(*args, **kwargs)
         except Exception:
-            pass</code></pre>
-
-    <p>This prevents the subprocess from hanging if the parent isn't consuming from these queues.</p>
-    <p>The <code>result_queue</code> is NOT canceled — the parent must call <code>result()</code> to get the data.</p>
-
+            traceback.print_exc()
+        
+        # commit to source of truth
+        with source_lock:
+            serialized = cucumber.serialize(mirror)
+            source_store[object_name] = serialized
+        
+        # update counters
+        _update_counters_after_write(counter_registry, object_name, written_attrs)</code></pre>
+    <h3>Proxy</h3>
+    <p>The proxy intercepts all attribute access and routes it through the coordinator.</p>
+    <p>What the proxy does on attribute access (<code>share.timer.start()</code>)</p>
+    <ol>
+        <li><strong>Check if internal</strong> - Proxy&#x27;s own attributes bypass interception</li>
+        <li><strong>Check if method</strong> - If in <code>_shared_meta[&#x27;methods&#x27;]</code>, return <code>_MethodProxy</code></li>
+        <li><strong>Check if property</strong> - If in <code>_shared_meta[&#x27;properties&#x27;]</code>, wait for writes then fetch</li>
+        <li><strong>Fallback</strong> - Fetch object from source and get attribute directly</li>
+    </ol>
+    <p>What the proxy does on attribute assignment (<code>share.timer.count = 5</code>)</p>
+    <ol>
+        <li><strong>Check if internal</strong> - Proxy&#x27;s own attributes bypass interception</li>
+        <li><strong>Increment pending counter</strong> - Signal that a write is queued</li>
+        <li><strong>Queue setattr command</strong> - Send to coordinator to execute later</li>
+    </ol>
+    <pre><code class="language-python">class _ObjectProxy:
+    _PROXY_ATTRS = frozenset({&#x27;_object_name&#x27;, &#x27;_coordinator&#x27;, &#x27;_wrapped_class&#x27;, &#x27;_shared_meta&#x27;})
+    
+    def __init__(self, object_name, coordinator, wrapped_class):
+        object.__setattr__(self, &#x27;_object_name&#x27;, object_name)
+        object.__setattr__(self, &#x27;_coordinator&#x27;, coordinator)
+        object.__setattr__(self, &#x27;_wrapped_class&#x27;, wrapped_class)
+        object.__setattr__(self, &#x27;_shared_meta&#x27;, getattr(wrapped_class, &#x27;_shared_meta&#x27;, None))
+    
+    def __getattr__(self, name):
+        # method calls -&gt; return callable that queues commands
+        if self._shared_meta and name in self._shared_meta.get(&#x27;methods&#x27;, {}):
+            return _MethodProxy(self, name)
+        
+        # properties -&gt; wait for writes, then fetch
+        if self._shared_meta and name in self._shared_meta.get(&#x27;properties&#x27;, {}):
+            return self._read_property(name)
+        
+        # fallback -&gt; fetch and get attr
+        return self._read_attr(name)
+    
+    def __setattr__(self, name, value):
+        if name in self._PROXY_ATTRS:
+            object.__setattr__(self, name, value)
+            return
+        
+        # queue setattr command
+        self._coordinator.increment_pending(f&quot;{self._object_name}.{name}&quot;)
+        self._coordinator.queue_command(
+            self._object_name,
+            &#x27;__setattr__&#x27;,
+            (name, value),
+            {},
+            [name]
+        )</code></pre>
+    <h4>Method Proxy</h4>
+    <p>What happens when you call a method (<code>share.timer.start()</code>)</p>
+    <ol>
+        <li><strong>Get write dependencies</strong> - From <code>_shared_meta</code>, which attributes will this method modify?</li>
+        <li><strong>Increment pending counters</strong> - For each written attribute, signal a pending write</li>
+        <li><strong>Queue the command</strong> - Send method name, args, kwargs to coordinator</li>
+        <li><strong>Return immediately</strong> - Fire-and-forget, don&#x27;t wait for execution</li>
+    </ol>
+    <p>This is why writes are &quot;fire-and-forget&quot; - the method call returns before the coordinator processes it.</p>
+    <pre><code class="language-python">class _MethodProxy:
+    def __init__(self, object_proxy, method_name):
+        self._object_proxy = object_proxy
+        self._method_name = method_name
+    
+    def __call__(self, *args, **kwargs):
+        proxy = self._object_proxy
+        meta = proxy._shared_meta
+        
+        # get write attrs from _shared_meta
+        method_meta = meta[&#x27;methods&#x27;].get(self._method_name, {})
+        write_attrs = method_meta.get(&#x27;writes&#x27;, [])
+        
+        # increment pending counters
+        for attr in write_attrs:
+            key = f&quot;{proxy._object_name}.{attr}&quot;
+            proxy._coordinator.increment_pending(key)
+        
+        # queue command (fire-and-forget)
+        proxy._coordinator.queue_command(
+            proxy._object_name,
+            self._method_name,
+            args,
+            kwargs,
+            write_attrs
+        )</code></pre>
+    <h4>Property Reading</h4>
+    <p>What happens when you read a property (<code>share.timer.elapsed</code>)</p>
+    <ol>
+        <li><strong>Get read dependencies</strong> - From <code>_shared_meta</code>, which attributes does this property depend on?</li>
+        <li><strong>Build counter keys</strong> - For each dependency, create <code>&quot;object_name.attr_name&quot;</code> key</li>
+        <li><strong>Wait for writes</strong> - Block until all pending writes to those attributes complete</li>
+        <li><strong>Fetch fresh snapshot</strong> - Deserialize latest state from source store</li>
+        <li><strong>Return property value</strong> - Get attribute from the fresh snapshot</li>
+    </ol>
+    <p>This is why reads block on pending writes - to ensure you see consistent state.</p>
+    <pre><code class="language-python">def _read_property(self, name):
+    # get read dependencies from _shared_meta
+    prop_meta = self._shared_meta[&#x27;properties&#x27;].get(name, {})
+    read_attrs = prop_meta.get(&#x27;reads&#x27;, [])
+    
+    keys = [f&quot;{self._object_name}.{attr}&quot; for attr in read_attrs]
+    
+    # wait for all writes to complete
+    if keys:
+        self._coordinator.wait_for_read(keys, timeout=10.0)
+    
+    # fetch fresh snapshot
+    obj = self._coordinator.get_object(self._object_name)
+    return getattr(obj, name)</code></pre>
     <hr>
-
-    <h2>Process Control</h2>
-
-    <h3>start()</h3>
-
+    <h2><code>Pipe</code></h2>
+    <h3>Endpoint Structure</h3>
+    <p>What a pipe endpoint does</p>
     <ol>
-        <li>Validates process not already started</li>
-        <li>Serializes process instance with <code>cucumber</code></li>
-        <li>Creates <code>multiprocessing.Event</code> for stop signaling</li>
-        <li>Creates <code>multiprocessing.Queue</code> for results</li>
-        <li>Creates <code>multiprocessing.Queue</code> for tell (parent → subprocess)</li>
-        <li>Creates <code>multiprocessing.Queue</code> for listen (subprocess → parent)</li>
-        <li>Spawns subprocess with <code>_engine_main</code> as target</li>
-        <li>Records start time</li>
+        <li><strong>Holds connection</strong> - <code>_conn</code> is a <code>multiprocessing.Pipe</code> connection object</li>
+        <li><strong>Tracks lock state</strong> - <code>_locked</code> prevents serialization (transfer to subprocess)</li>
+        <li><strong>Tracks role</strong> - <code>&quot;anchor&quot;</code> (parent side) or <code>&quot;point&quot;</code> (transferable side)</li>
     </ol>
-
-    <h3>stop()</h3>
-
+    <p>*How <code>send()</code> works</p>
     <ol>
-        <li>Sets the stop event</li>
-        <li>Does NOT block (returns immediately)</li>
-        <li>Subprocess checks event in <code>_should_continue()</code></li>
-        <li>Subprocess finishes current section, runs <code>__onfinish__()</code>, then exits gracefully</li>
+        <li>Ensure connection is valid</li>
+        <li>Serialize the object using <code>cucumber</code></li>
+        <li>Send raw bytes over the connection</li>
     </ol>
-
-    <h3>kill()</h3>
-
+    <p>How <code>recv()</code> works</p>
     <ol>
-        <li>Calls <code>subprocess.terminate()</code></li>
-        <li>Bypasses lives system</li>
-        <li>No cleanup methods called</li>
-        <li><code>result()</code> will return <code>None</code></li>
+        <li>Ensure connection is valid</li>
+        <li>Read raw bytes from the connection</li>
+        <li>Deserialize using <code>cucumber</code> and return</li>
     </ol>
-
-    <h3>wait()</h3>
-
+    <p>How serialization works</p>
     <ol>
-        <li>Drains result queue first (prevents deadlock)</li>
-        <li>Calls <code>subprocess.join(timeout)</code></li>
-        <li>Blocks until subprocess completes</li>
-        <li>Returns <code>True</code> if finished, <code>False</code> if still running</li>
-        <li>Will not return during retries (subprocess keeps running)</li>
+        <li>Check if locked - locked endpoints <strong>cannot</strong> be serialized</li>
+        <li>Pickle the connection handle (uses <code>multiprocessing.reduction.ForkingPickler</code>)</li>
+        <li>Package with lock state and role for reconstruction</li>
     </ol>
-
-    <h3>result()</h3>
-
+    <pre><code class="language-python">@dataclass
+class _PipeEndpoint:
+    _conn: Optional[Any]
+    _locked: bool = False
+    _role: str = &quot;point&quot;
+    
+    def send(self, obj):
+        conn = self._ensure_conn()
+        conn.send_bytes(cucumber.serialize(obj))
+    
+    def recv(self):
+        conn = self._ensure_conn()
+        data = conn.recv_bytes()
+        return cucumber.deserialize(data)
+    
+    def __serialize__(self):
+        if self._locked:
+            raise PipeEndpointError(&quot;Locked endpoint cannot be serialized&quot;)
+        
+        # pickle the connection handle for multiprocessing
+        payload = ForkingPickler.dumps(self._conn)
+        return {
+            &quot;conn_pickle&quot;: payload,
+            &quot;locked&quot;: self._locked,
+            &quot;role&quot;: self._role
+        }</code></pre>
+    <h3><code>Anchor</code> vs <code>Point</code></h3>
+    <p>Design</p>
+    <ul>
+        <li><strong>Anchor</strong> - The &quot;fixed&quot; end that stays in the parent process. Always locked, cannot be serialized.</li>
+        <li><strong>Point</strong> - The &quot;transferable&quot; end that gets passed to a subprocess. Can be locked/unlocked.</li>
+    </ul>
+    <p>Why this separation?</p>
     <ol>
-        <li>Calls <code>wait()</code> (which drains queue)</li>
-        <li>If result stored, returns it (or raises if it's an exception)</li>
-        <li>Returns <code>None</code> if no result available</li>
+        <li>Prevents accidentally serializing both ends (which would break the connection)</li>
+        <li>Makes ownership clear - anchor stays, point goes</li>
+        <li>Explicit <code>lock()</code> on point after transfer prevents re-transfer</li>
     </ol>
-
+    <p>How <code>pair()</code> works</p>
+    <ol>
+        <li>Create a <code>multiprocessing.Pipe</code> with two connection objects</li>
+        <li>If <code>one_way=True</code>, ensure anchor is the send-only end and point is the recv-only end</li>
+        <li>Wrap one in <code>Anchor</code> (automatically locked)</li>
+        <li>Wrap other in <code>Point</code> (unlocked, ready to transfer)</li>
+        <li>Return both for parent to use anchor and pass point to subprocess</li>
+    </ol>
+    <pre><code class="language-python">class Pipe:
+    class Anchor(_PipeEndpoint):
+        def __init__(self, conn, locked=True, role=&quot;anchor&quot;):
+            super().__init__(conn, True, role)  # always locked
+        
+        def unlock(self):
+            raise PipeEndpointError(&quot;Anchor endpoints are always locked&quot;)
+    
+    class Point(_PipeEndpoint):
+        pass
+    
+    @staticmethod
+    def pair(one_way=False):
+        conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
+        if one_way:
+            # conn1 is recv-only, conn2 is send-only
+            anchor = Pipe.Anchor(conn2)
+            point = Pipe.Point(conn1, False, &quot;point&quot;)
+        else:
+            anchor = Pipe.Anchor(conn1)
+            point = Pipe.Point(conn2, False, &quot;point&quot;)
+        return anchor, point</code></pre>
     <hr>
+    <h2><code>ProcessConfig</code></h2>
+    <h3>Structure</h3>
+    <pre><code class="language-python">@dataclass
+class TimeoutConfig:
+    prerun: float | None = None
+    run: float | None = None
+    postrun: float | None = None
+    onfinish: float | None = None
+    result: float | None = None
+    error: float | None = None
 
+@dataclass
+class ProcessConfig:
+    runs: int | None = None      # None = indefinite
+    join_in: float | None = None # None = no time limit
+    lives: int = 1               # 1 = no retries
+    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)</code></pre>
+    <hr>
+    <h2><code>ProcessTimers</code></h2>
+    <h3>Structure</h3>
+    <pre><code class="language-python">class ProcessTimers:
+    def __init__(self):
+        # individual section timers (created lazily)
+        self.prerun: Sktimer | None = None
+        self.run: Sktimer | None = None
+        self.postrun: Sktimer | None = None
+        self.onfinish: Sktimer | None = None
+        self.result: Sktimer | None = None
+        self.error: Sktimer | None = None
+        
+        # aggregate for full iterations
+        self.full_run: Sktimer = Sktimer()
+    
+    def _ensure_timer(self, section):
+        current = getattr(self, section, None)
+        if current is None:
+            new_timer = Sktimer()
+            setattr(self, section, new_timer)
+            return new_timer
+        return current
+    
+    def _update_full_run(self):
+        total = 0.0
+        for timer in [self.prerun, self.run, self.postrun]:
+            if timer and timer.num_times &gt; 0 and timer.most_recent:
+                total += timer.most_recent
+        
+        if total &gt; 0:
+            self.full_run.add_time(total)</code></pre>
+    <hr>
+    <h2><code>autoreconnect()</code> Decorator</h2>
+    <h3>Implementation</h3>
+    <p>What <code>@autoreconnect</code> does at class definition time</p>
+    <ol>
+        <li>Mark the class as requiring reconnection (<code>_auto_reconnect_enabled = True</code>)</li>
+        <li>Store authentication credentials for each connection type</li>
+        <li>Store thread start preference</li>
+    </ol>
+    <p>The decorator does NOT reconnect anything - it just marks the class so deserialization knows to reconnect.</p>
+    <pre><code class="language-python">def autoreconnect(*, start_threads=False, **auth):
+    def decorator(cls):
+        # mark class for reconnect on deserialize
+        cls._auto_reconnect_enabled = True
+        cls._auto_reconnect_kwargs = dict(auth) if auth else {}
+        cls._auto_reconnect_start_threads = bool(start_threads)
+        return cls
+    return decorator</code></pre>
+    <h3>Triggered in Deserialization</h3>
+    <p>What happens when a marked class is deserialized in a subprocess</p>
+    <ol>
+        <li>Check if <code>_auto_reconnect_enabled</code> is True</li>
+        <li>Get stored auth credentials</li>
+        <li>Call <code>reconnect_all()</code> which recursively finds <code>Reconnector</code> objects</li>
+        <li>Each <code>Reconnector</code> calls its <code>reconnect(auth)</code> method to restore the live connection</li>
+        <li>If <code>start_threads=True</code>, find all <code>Thread</code> objects and start them</li>
+    </ol>
+    <p>Reconnect Flow</p>
+    <ol>
+        <li><code>Skprocess</code> serialized with a database connection</li>
+        <li><code>cucumber</code> converts connection to <code>PostgresReconnector</code> (stores connection params)</li>
+        <li>Subprocess deserializes the process</li>
+        <li><code>__deserialize__</code> sees <code>_auto_reconnect_enabled</code></li>
+        <li><code>reconnect_all()</code> finds the <code>PostgresReconnector</code></li>
+        <li>Calls <code>reconnector.reconnect(&quot;password&quot;)</code> → returns new live connection</li>
+        <li>Replaces reconnector with live connection in the object</li>
+    </ol>
+    <pre><code class="language-python"># in Skprocess.__deserialize__
+if getattr(new_class, &#x27;_auto_reconnect_enabled&#x27;, False):
+    reconnect_kwargs = getattr(new_class, &#x27;_auto_reconnect_kwargs&#x27;, {})
+    start_threads = getattr(new_class, &#x27;_auto_reconnect_start_threads&#x27;, False)
+    
+    obj = reconnect_all(obj, **reconnect_kwargs)
+    
+    if start_threads:
+        # recursively find and start Thread objects
+        _start_threads(obj)</code></pre>
+    <hr>
+    <h2>Error Hierarchy</h2>
+    <pre><code class="language-python">ProcessError (base)
+├── PreRunError
+├── RunError
+├── PostRunError
+├── OnFinishError
+├── ResultError
+├── ErrorHandlerError
+├── ProcessTimeoutError
+├── ResultTimeoutError
+└── DuplicateTimeoutError</code></pre>
+    <h3>Error Structure</h3>
+    <pre><code class="language-python">class ProcessError(Exception):
+    def __init__(self, message, current_run=0, original_error=None):
+        self.current_run = current_run
+        self.original_error = original_error
+        super().__init__(message)
+
+class PreRunError(ProcessError):
+    def __init__(self, current_run, original_error=None):
+        super().__init__(
+            f&quot;Error in __prerun__ on run {current_run}&quot;,
+            current_run,
+            original_error
+        )
+
+class ProcessTimeoutError(ProcessError):
+    def __init__(self, section, timeout, current_run):
+        self.section = section
+        self.timeout = timeout
+        super().__init__(
+            f&quot;Timeout in {section} after {timeout}s on run {current_run}&quot;,
+            current_run,
+            None
+        )</code></pre>
+    <hr>
     <h2>Thread Safety</h2>
-
-    <h3>Parent Process</h3>
-
+    <h3><code>Skprocess</code></h3>
+    <p>Each <code>Skprocess</code> runs in its own subprocess, providing process isolation.</p>
     <ul>
-        <li><code>result()</code> is thread-safe (uses Queue)</li>
-        <li>Multiple threads can call <code>stop()</code> (Event is thread-safe)</li>
-        <li><code>wait()</code> can be called from any thread</li>
-        <li><code>tell()</code> is thread-safe (Queue is thread-safe)</li>
-        <li><code>listen()</code> is thread-safe (Queue is thread-safe)</li>
+        <li><strong>No shared memory</strong> - Each subprocess has its own memory space</li>
+        <li><strong>Communication via queues</strong> - All cross-process data goes through serialization</li>
+        <li><strong>Stop signals</strong> - <code>multiprocessing.Event</code> for parent→child signaling</li>
     </ul>
-
-    <h3>Subprocess</h3>
-
+    <p>Within the subprocess:</p>
     <ul>
-        <li>Single-threaded execution</li>
-        <li>No locks needed in engine</li>
-        <li>Timers use their own internal locks (from <code>sktime.Timer</code>)</li>
+        <li><code>threading.Event</code> used for stop signaling (in Pool inline execution)</li>
+        <li><code>multiprocessing.Event</code> used for cross-process signaling</li>
     </ul>
-
-    <hr>
-
-    <h2>Memory Considerations</h2>
-
-    <h3>In Parent Process</h3>
-
+    <h3><code>Pool</code></h3>
+    <p><code>Pool</code> thread safety</p>
     <ul>
-        <li>Process instance kept in memory for result retrieval</li>
-        <li>Queue holds serialized result until retrieved</li>
-        <li>Timers transferred from subprocess after completion</li>
+        <li><strong>Built-in pool</strong> - Uses <code>multiprocessing.Pool</code> which handles worker management internally</li>
+        <li><strong>Manual mode</strong> - For timeout scenarios, tracks workers in <code>_active_processes</code> list</li>
+        <li><strong>Result isolation</strong> - Each worker writes to its own result queue</li>
     </ul>
-
-    <h3>In Subprocess</h3>
-
-    <ul>
-        <li>Full Process instance deserialized</li>
-        <li>Timers accumulate measurements in memory</li>
-        <li>All state released when subprocess exits</li>
-    </ul>
-
-    <h3>Large Results</h3>
-
-    <p>For large results, consider:</p>
-    <ul>
-        <li>Streaming to files instead of returning directly</li>
-        <li>Using shared memory (<code>multiprocessing.shared_memory</code>)</li>
-        <li>Chunking results across multiple runs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Pool</h2>
-
-    <h3>Overview</h3>
-
-    <p>The <code>Pool</code> class provides batch parallel processing using multiple worker subprocesses.</p>
-
-    <p>Like <code>Process</code>, it uses <code>cucumber</code> for serialization, allowing complex objects and <code>Process</code> classes.</p>
-
-    <h3>Methods</h3>
-
-    <p><code>fc = function or class of type ["processing.Process"]</code></p>
-
-    <ul>
-        <li><code>map(fc, items)</code> — Blocking, returns <code>[results]</code></li>
-        <li><code>imap(fc, items)</code> — Blocking iterator, yields results in order</li>
-        <li><code>async_map(fc, items)</code> — Non-blocking, returns <code>AsyncResult</code></li>
-        <li><code>unordered_imap(fc, items)</code> — Blocking iterator, yields results as completed</li>
-        <li><code>star(fc)</code> — Modifier to unpack tuple arguments</li>
-    </ul>
-
-    <h3>How It Works</h3>
-
-<pre><code class="language-python">pool = Pool(workers=4)
-
-# Each item is processed in a separate subprocess
-results = pool.map(fc, [1, 2, 3, 4])</code></pre>
-
-    <p>Internally, Pool:</p>
+    <h3><code>Share</code></h3>
+    <p><code>Share</code> thread safety</p>
     <ol>
-        <li>Creates worker subprocesses</li>
-        <li>Serializes function and arguments with <code>cucumber</code></li>
-        <li>Distributes work across workers</li>
-        <li>Collects and deserializes results</li>
-        <li>Returns results in the same order as input</li>
+        <li><strong>Single writer</strong> - All writes go through one coordinator process (no write conflicts)</li>
+        <li><strong>Command queue</strong> - All writes serialized through a single queue</li>
+        <li><strong>Atomic counters</strong> - Pending/completed counters use shared memory atomics</li>
+        <li><strong>Source lock</strong> - Single lock protects source of truth access</li>
+        <li><strong>Manager-backed primitives</strong> - <code>Manager.dict()</code>, <code>Manager.Queue()</code> handle inter-process sync</li>
     </ol>
-
-    <h3>Process Classes in Pool</h3>
-
-    <p>You can use <code>Process</code> subclasses in Pool:</p>
-
-<pre><code class="language-python">class MyProcess(Process):
-    def __init__(self, value):
-        self.value = value
-        self.config.runs = 3
-    
-    def __run__(self):
-        self.value *= 2
-    
-    def __result__(self):
-        return self.value
-
-pool = Pool(workers=2)
-results = pool.map(MyProcess, [1, 2, 3, 4])
-# → [8, 16, 24, 32] (each ran 3 times, doubling each time)</code></pre>
-
-    <p>When using <code>Process</code> classes:</p>
+    <p>Reads wait for pending writes to complete before fetching, ensuring you see effects of prior writes from the same logical sequence.</p>
+    <hr>
+    <h2>Serialization</h2>
+    <p>All cross-process communication uses <code>cucumber</code> for serialization.</p>
+    <p>What gets serialized and where</p>
     <ul>
-        <li>Full lifecycle is respected (<code>config.runs</code>, <code>config.lives</code>, <code>stop()</code>)</li>
-        <li>Each instance runs as it normally would</li>
-        <li>Results collected via <code>__result__()</code></li>
+        <li><code>Skprocess</code> - Full state + lifecycle methods</li>
+        <li><code>Pool</code> - Function/class + each item</li>
+        <li><code>Share</code> - Registered objects</li>
+        <li><code>Pipe</code> - Any object via <code>send()</code></li>
     </ul>
-
+    <p>Why <code>cucumber</code> instead of <code>pickle</code></p>
+    <ol>
+        <li><strong>Locally-defined classes</strong> - <code>pickle</code> fails on <code>&lt;locals&gt;</code> classes, <code>cucumber</code> reconstructs them</li>
+        <li><strong>Live resources</strong> - Database connections become <code>Reconnector</code> objects that can restore themselves</li>
+        <li><strong>Circular references</strong> - Handled correctly during serialization</li>
+        <li><strong>Complex nested structures</strong> - Recursively handles arbitrary object graphs</li>
+        <li><strong>Custom handlers</strong> - Extensible for any type</li>
+    </ol>
+    <p>Serialization flow</p>
+    <ol>
+        <li>Object passed to <code>cucumber.serialize()</code></li>
+        <li>Handlers match by type and extract state</li>
+        <li>State converted to bytes</li>
+        <li>Bytes sent over queue/pipe/store</li>
+        <li>Receiving side calls <code>cucumber.deserialize()</code></li>
+        <li>Handlers reconstruct objects from state</li>
+    </ol>
 </section>

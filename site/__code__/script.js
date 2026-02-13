@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function styleDecoratorLines() {
         // Find all code blocks
-        const codeBlocks = document.querySelectorAll('.module-page pre code');
+        const codeBlocks = document.querySelectorAll('.module-page pre code, .about-page pre code, .why-page pre code');
         
         codeBlocks.forEach(codeBlock => {
             // Split content into lines by looking at the HTML structure
@@ -100,16 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function styleLineCountComments() {
-        // Find all comment tokens in code blocks
-        const comments = document.querySelectorAll('.module-page pre code .token.comment');
-        
-        comments.forEach(comment => {
-            const text = comment.textContent;
-            // Match "# N" pattern (e.g., "# 1", "# 2", etc.)
-            if (/^#\s*\d+$/.test(text.trim())) {
-                comment.classList.add('line-count');
-            }
-        });
+        // Disabled: numeric line comments should not receive special highlight.
     }
 
     // Global state for API highlight toggle
@@ -129,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Update module page content
-        const modulePage = document.querySelector('.module-page, .about-page');
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
         if (modulePage) {
             if (apiHighlightEnabled) {
                 modulePage.classList.add('highlight-active');
@@ -152,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Set initial state on module page
-        const modulePage = document.querySelector('.module-page, .about-page');
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
         if (modulePage && apiHighlightEnabled) {
             modulePage.classList.add('highlight-active');
         }
@@ -173,21 +164,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiClasses = new Set([
             // paths
             'Skpath', 'AnyPath', 'CustomRoot', 'PathDetectionError',
+            'NotAFileError',
             // timing
             'Sktimer', 'TimeThis',
             // circuits
             'Circuit', 'BreakingCircuit',
             // cucumber
-            'Serializer', 'Deserializer', 'SerializationError', 'DeserializationError',
+            'SerializationError', 'DeserializationError',
             // processing
-            'Skprocess', 'Process', 'Pool', 'Share', 'ProcessTimers',
+            'Skprocess', 'Pool', 'Share', 'Pipe', 'ProcessTimers',
             'ProcessError', 'PreRunError', 'RunError', 'PostRunError', 'OnFinishError',
             'ResultError', 'ErrorHandlerError', 'ProcessTimeoutError', 'ResultTimeoutError',
             // sk
-            'Skclass', 'Skfunction', 'AsyncSkfunction', 'SkModifierError', 'FunctionTimeoutError',
+            'AsyncSkfunction', 'SkModifierError', 'FunctionTimeoutError',
         ]);
-        // Note: 'time' and 'sleep' are NOT included here because they conflict with time.time() and time.sleep()
-        // They still get highlighted as part of sktime.time() chains since 'sktime' is in apiModules
+        // Keep ambiguous names ('time', 'sleep') out of standalone highlighting
+        // to avoid false positives with Python stdlib usage. They still highlight
+        // in module chains (e.g. timing.time()) because module names are tracked.
         const apiMethods = new Set([
             // timing
             'elapsed', 'timethis', 'clear_global_timers',
@@ -195,11 +188,35 @@ document.addEventListener('DOMContentLoaded', () => {
             'autopath', 'get_project_root', 'set_custom_root', 'get_custom_root', 'clear_custom_root',
             'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
             'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
-            'is_valid_filename', 'streamline_path',
+            'is_valid_filename', 'streamline_path', 'streamline_path_quick',
             // cucumber
-            'serialize', 'deserialize',
+            'serialize', 'serialize_ir', 'deserialize', 'reconnect_all',
+            'ir_to_jsonable', 'ir_to_json', 'to_jsonable', 'to_json',
+            // processing
+            'autoreconnect',
             // sk
-            'sk',
+            'sk', 'blocking',
+        ]);
+        // Members that often appear after API roots in docs/examples.
+        // We do not highlight these as standalone identifiers to avoid
+        // generic-word false positives; they are used for smarter root
+        // detection and chain propagation only.
+        const apiMembers = new Set([
+            // timing / Sktimer
+            'start', 'stop', 'lap', 'pause', 'resume', 'discard', 'add_time', 'reset',
+            'set_max_times', 'most_recent', 'total_time', 'mean', 'stdev', 'variance',
+            'times', 'num_times', 'percentile',
+            // processing / Pool / Skprocess
+            'map', 'imap', 'unordered_map', 'unordered_imap', 'star',
+            'wait', 'result', 'tell', 'listen',
+            // circuits
+            'short', 'trip', 'reset_backoff', 'broken', 'times_shorted', 'total_trips',
+            'current_sleep_time', 'num_shorts_to_trip',
+            // sk / wrapped functions
+            'asynced', 'retry', 'timeout', 'background', 'rate_limit', 'has_blocking_calls',
+            'blocking_calls', 'timer',
+            // paths / skpath-ish usage
+            'id', 'root', 'parent',
         ]);
         
         // Overrides: properties that should highlight word.property.chain patterns
@@ -209,11 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         // Find all code blocks
-        const codeBlocks = document.querySelectorAll('.module-page pre code, .about-page pre code');
+        const codeBlocks = document.querySelectorAll('.module-page pre code, .about-page pre code, .why-page pre code');
         
         codeBlocks.forEach(codeBlock => {
             // Track variables assigned to API objects in this block
             const apiVariables = new Set();
+            // Roots inferred from member-chain usage (no import/assignment context)
+            // should only be highlighted when actually connected to a chain.
+            const inferredApiRoots = new Set();
             
             // Get the text content to analyze for variable assignments
             const textContent = codeBlock.textContent;
@@ -229,13 +249,116 @@ document.addEventListener('DOMContentLoaded', () => {
             // Build dynamic patterns from our API sets
             const classesPattern = [...apiClasses].join('|');
             const methodsPattern = [...apiMethods].join('|');
+            const membersPattern = [...apiMembers].join('|');
+            const modulesPattern = [...apiModules].join('|');
             
-            // Find variable assignments like: varname = sktime.Timer()
+            // Detect imported aliases and imported API names, e.g.:
+            //   import suitkaise as sks
+            //   from suitkaise import timing as tm, Sktimer
+            //   from suitkaise.paths import Skpath as P
+            const importAsPattern = /\bimport\s+suitkaise\s+as\s+(\w+)/g;
+            let importMatch;
+            while ((importMatch = importAsPattern.exec(textContent)) !== null) {
+                apiVariables.add(importMatch[1]);
+            }
+            
+            const fromSuitkaiseImportPattern = /\bfrom\s+suitkaise(?:\.\w+)?\s+import\s+([^\n#]+)/g;
+            while ((importMatch = fromSuitkaiseImportPattern.exec(textContent)) !== null) {
+                const rawImports = importMatch[1].split(',');
+                rawImports.forEach(part => {
+                    const trimmed = part.trim();
+                    if (!trimmed) return;
+                    const aliasMatch = trimmed.match(/^(\w+)\s+as\s+(\w+)$/);
+                    const importedName = aliasMatch ? aliasMatch[1] : trimmed;
+                    const localName = aliasMatch ? aliasMatch[2] : importedName;
+                    if (apiModules.has(importedName) || apiClasses.has(importedName) || apiMethods.has(importedName)) {
+                        apiVariables.add(localName);
+                    }
+                });
+            }
+            
+            // Infer API roots from member-chain usage when imports/assignments
+            // are not present in the snippet. Example:
+            //   pool.star().unordered_map.timeout(...)
+            const rootInferenceMembers = new Set([
+                // high-signal processing chains
+                'map', 'imap', 'unordered_map', 'unordered_imap', 'star',
+                // high-signal sk/timing chains
+                'asynced', 'background', 'retry', 'timethis',
+                // high-signal module-specific helpers
+                'autopath', 'serialize_ir', 'reconnect_all',
+                // high-signal timer/circuit properties
+                'percentile', 'num_times', 'most_recent',
+                'total_trips', 'times_shorted', 'current_sleep_time', 'reset_backoff',
+            ]);
+            const ambiguousInferenceMembers = new Set([
+                // useful, but can be generic in arbitrary code
+                'broken', 'result', 'wait', 'start', 'stop', 'mean', 'stdev', 'variance', 'timer',
+            ]);
+            const memberChainPattern = /\b([A-Za-z_]\w*)((?:\.[A-Za-z_]\w*)+)\s*(?:\(|$)/g;
+            let chainMatch;
+            while ((chainMatch = memberChainPattern.exec(textContent)) !== null) {
+                const root = chainMatch[1];
+                const segments = chainMatch[2]
+                    .split('.')
+                    .filter(Boolean);
+                const hasStrongSignal = segments.some(segment => rootInferenceMembers.has(segment));
+                const hasAmbiguousSignal = segments.some(segment => ambiguousInferenceMembers.has(segment));
+                const rootLooksApiLike = /(?:pool|process|proc|timer|timing|circ|circuit|breaker|share|pipe|worker|future)/i.test(root);
+                if (hasStrongSignal || (hasAmbiguousSignal && rootLooksApiLike)) {
+                    apiVariables.add(root);
+                    inferredApiRoots.add(root);
+                }
+            }
+            
+            // Detect user classes that inherit from API classes, e.g.:
+            //   class Doubler(Skprocess):
+            //   class MyWorker(processing.Skprocess):
+            //   class MyProc(BaseSkprocessAlias):
+            const apiDerivedClasses = new Set();
+            const classInheritancePattern = /\bclass\s+(\w+)\s*\(([^)]*)\)\s*:/g;
+            let classMatch;
+            while ((classMatch = classInheritancePattern.exec(textContent)) !== null) {
+                const className = classMatch[1];
+                const baseList = classMatch[2];
+                const bases = baseList.split(',').map(base => base.trim()).filter(Boolean);
+                
+                let inheritsFromApi = false;
+                for (const base of bases) {
+                    // Strip simple generic syntax (e.g., Base[T]) for matching.
+                    const noGenerics = base.replace(/\[.*$/, '');
+                    const parts = noGenerics.split('.');
+                    const first = parts[0];
+                    const last = parts[parts.length - 1];
+                    
+                    if (
+                        apiClasses.has(noGenerics) || apiClasses.has(last) ||
+                        apiVariables.has(noGenerics) || apiVariables.has(last) ||
+                        apiModules.has(first)
+                    ) {
+                        inheritsFromApi = true;
+                        break;
+                    }
+                }
+                
+                if (inheritsFromApi) {
+                    apiDerivedClasses.add(className);
+                    // Treat subclasses of API types as API roots for chain highlighting.
+                    apiVariables.add(className);
+                }
+            }
+            
+            const knownClassesPattern = [...apiClasses, ...apiDerivedClasses].join('|');
+            
+            // Find variable assignments like: varname = timing.Sktimer()
             const assignmentPatterns = [
-                /(\w+)\s*=\s*(?:suitkaise|timing|paths|circuits|cucumber|processing|sk)\.\w+/g,
-                new RegExp(`(\\w+)\\s*=\\s*(?:${classesPattern})\\s*\\(`, 'g'),
+                new RegExp(`(\\w+)\\s*=\\s*(?:${modulesPattern})\\.\\w+`, 'g'),
+                new RegExp(`(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${modulesPattern})\\.\\w+`, 'g'),
+                new RegExp(`(\\w+)\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
+                new RegExp(`(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
                 new RegExp(`(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
-                /with\s+(?:suitkaise|timing|paths|circuits|cucumber|processing|sk)\.\w+[^:]*\s+as\s+(\w+)/g,
+                new RegExp(`with\\s+(?:${modulesPattern}|\\w+)\\.\\w+[^:]*\\s+as\\s+(\\w+)`, 'g'),
+                new RegExp(`with\\s+(?:${knownClassesPattern}|${methodsPattern})[^:]*\\s+as\\s+(\\w+)`, 'g'),
             ];
             
             assignmentPatterns.forEach(pattern => {
@@ -282,6 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const allIdentifiers = [
                     ...apiModules,
                     ...apiClasses, 
+                    ...apiDerivedClasses,
                     ...apiMethods,
                     ...apiVariables,
                     ...activeOverrides  // Add active override properties (like 'timer') as identifiers
@@ -293,6 +417,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (text.includes(id)) {
                         hasMatch = true;
                         break;
+                    }
+                }
+                // Check for inferred API roots only when used as chains (e.g., pool.star)
+                if (!hasMatch && apiVariables.size > 0) {
+                    for (const variable of apiVariables) {
+                        if (text.includes(variable + '.')) {
+                            hasMatch = true;
+                            break;
+                        }
                     }
                 }
                 // Also check for @ decorator
@@ -309,6 +442,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Create pattern to match identifiers
                 const identifierPattern = allIdentifiers
+                    .sort((a, b) => b.length - a.length)
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .join('|');
+                
+                // Only allow chain segments that we know are part of Suitkaise API.
+                // This guards against over-highlighting arbitrary properties/methods.
+                const chainSegmentPattern = [
+                    ...apiMembers,
+                    ...apiMethods,
+                    ...apiClasses,
+                    ...apiModules,
+                    ...apiDerivedClasses,
+                    ...activeOverrides,
+                ]
+                    .sort((a, b) => b.length - a.length)
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .join('|');
+                
+                const variablePattern = [...apiVariables]
+                    .sort((a, b) => b.length - a.length)
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
                 
@@ -319,21 +472,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Match patterns:
                 // 1. Decorators: @identifier.method()
-                // 2. Module.something chains: sktime.Timer(), skpath.get_project_root()
-                // 3. Standalone classes: SKPath(), Timer()
+                // 2. Module.something chains: timing.Sktimer(), paths.get_project_root()
+                // 3. Standalone classes/functions: Skpath(), timethis()
                 // 4. Variables with chains: t.mean, timer.stdev, circ.flowing
                 // 5. Override patterns: word.timer.chain... (1 word before, all words after connected by dots)
-                let regexPattern = `(@(?:${identifierPattern})(?:\\.\\w+)*(?:\\(\\))?)|` +  // decorators with empty ()
-                    `\\b(${identifierPattern})(?:\\.\\w+)*(\\(\\))?`;  // identifiers with chains and optional ()
+                let regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
+                    `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                
+                // Inferred variables (like pool, timer, breaker) only highlight when
+                // connected to known API chain segments.
+                if (variablePattern) {
+                    regexPattern += `|\\b(${variablePattern})(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
+                }
                 
                 // Add override pattern only if there are active overrides
                 if (activeOverrides.size > 0) {
-                    regexPattern = `(@(?:${identifierPattern})(?:\\.\\w+)*(?:\\(\\))?)|` +  // decorators with empty ()
-                        `(\\b\\w+)\\.(${overridesPattern})(?:\\.\\w+)*(\\(\\))?|` +  // override: word.timer.chain...()
-                        `\\b(${identifierPattern})(?:\\.\\w+)*(\\(\\))?`;  // identifiers with chains and optional ()
+                    regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
+                        `(\\b\\w+)\\.(${overridesPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?|` +
+                        `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                    if (variablePattern) {
+                        regexPattern += `|\\b(${variablePattern})(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
+                    }
                 }
                 
-                const regex = new RegExp(regexPattern, 'gi');
+                // Case-sensitive matching prevents lowercase `sk` from
+                // consuming the `Sk` prefix in class names (e.g. Skprocess).
+                const regex = new RegExp(regexPattern, 'g');
                 
                 const parts = [];
                 let lastIndex = 0;
@@ -733,6 +897,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+            
+            // Sixth pass: for inferred roots (like `pool`), keep highlight only
+            // when connected to a chain (root.member...). If not chained, unwrap.
+            if (inferredApiRoots.size > 0) {
+                const inferredHighlights = codeBlock.querySelectorAll('.api-highlight');
+                inferredHighlights.forEach(highlight => {
+                    const text = highlight.textContent;
+                    if (!inferredApiRoots.has(text)) return;
+                    // If already part of a merged chain, keep it.
+                    if (text.includes('.')) return;
+                    
+                    let prev = highlight.previousSibling;
+                    let next = highlight.nextSibling;
+                    
+                    // Skip whitespace text nodes.
+                    while (prev && prev.nodeType === Node.TEXT_NODE && !prev.textContent.trim()) {
+                        prev = prev.previousSibling;
+                    }
+                    while (next && next.nodeType === Node.TEXT_NODE && !next.textContent.trim()) {
+                        next = next.nextSibling;
+                    }
+                    
+                    const prevIsDot = prev && (
+                        (prev.nodeType === Node.TEXT_NODE && prev.textContent.endsWith('.')) ||
+                        (prev.nodeType === Node.ELEMENT_NODE && prev.textContent === '.')
+                    );
+                    const nextIsDot = next && (
+                        (next.nodeType === Node.TEXT_NODE && next.textContent.startsWith('.')) ||
+                        (next.nodeType === Node.ELEMENT_NODE && next.textContent === '.')
+                    );
+                    
+                    if (prevIsDot || nextIsDot) return;
+                    
+                    // Unwrap the span to plain text.
+                    const parent = highlight.parentNode;
+                    if (parent) {
+                        parent.replaceChild(document.createTextNode(text), highlight);
+                    }
+                });
+            }
         });
     }
 
@@ -784,15 +988,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Site pages
         'about',
         // Processing
-        'processing', 'processing-how-it-works', 'processing-examples', 'processing-why',
+        'processing', 'processing-quick-start', 'processing-how-it-works', 'processing-examples', 'processing-why', 'processing-learn',
         // Cucumber
-        'cucumber', 'cucumber-how-it-works', 'cucumber-examples', 'cucumber-why', 'cucumber-supported-types', 'cucumber-learn',
-        // Sktime
-        'sktime', 'sktime-how-it-works', 'sktime-examples', 'sktime-why',
-        // Skpath
-        'skpath', 'skpath-how-it-works', 'skpath-examples', 'skpath-why',
-        // Circuit
-        'circuit', 'circuit-how-it-works', 'circuit-examples', 'circuit-why'
+        'cucumber', 'cucumber-quick-start', 'cucumber-how-it-works', 'cucumber-why', 'cucumber-supported-types', 'cucumber-performance', 'cucumber-worst-possible-object', 'cucumber-learn',
+        // Timing
+        'timing', 'timing-quick-start', 'timing-how-it-works', 'timing-examples', 'timing-why', 'timing-learn',
+        // Paths
+        'paths', 'paths-quick-start', 'paths-how-it-works', 'paths-examples', 'paths-why', 'paths-learn',
+        // Sk
+        'sk', 'sk-quick-start', 'sk-how-it-works', 'sk-examples', 'sk-blocking-calls', 'sk-why', 'sk-learn',
+        // Circuits
+        'circuits', 'circuits-quick-start', 'circuits-how-it-works', 'circuits-examples', 'circuits-why', 'circuits-learn'
     ];
     
     // Cache for all fetched pages (module pages loaded at startup, lazy pages loaded on demand)
@@ -844,17 +1050,21 @@ document.addEventListener('DOMContentLoaded', () => {
         'cucumber-videos': async () => await fetchPage('cucumber-videos'),
         'cucumber-tests': async () => await fetchPage('cucumber-tests'),
         
-        // Sktime
-        'sktime-videos': async () => await fetchPage('sktime-videos'),
-        'sktime-tests': async () => await fetchPage('sktime-tests'),
+        // Timing
+        'timing-videos': async () => await fetchPage('timing-videos'),
+        'timing-tests': async () => await fetchPage('timing-tests'),
         
-        // Skpath
-        'skpath-videos': async () => await fetchPage('skpath-videos'),
-        'skpath-tests': async () => await fetchPage('skpath-tests'),
+        // Paths
+        'paths-videos': async () => await fetchPage('paths-videos'),
+        'paths-tests': async () => await fetchPage('paths-tests'),
+
+        // Sk
+        'sk-videos': async () => await fetchPage('sk-videos'),
+        'sk-tests': async () => await fetchPage('sk-tests'),
         
-        // Circuit
-        'circuit-videos': async () => await fetchPage('circuit-videos'),
-        'circuit-tests': async () => await fetchPage('circuit-tests'),
+        // Circuits
+        'circuits-videos': async () => await fetchPage('circuits-videos'),
+        'circuits-tests': async () => await fetchPage('circuits-tests'),
     };
     
     // Check if a page is available (core, preloaded module, or cached lazy page)
@@ -1105,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const noNavPages = ['password', 'error'];
     
     // Module names for scroll position memory
-    const moduleNames = ['skpath', 'sktime', 'circuit', 'cucumber', 'processing'];
+    const moduleNames = ['sk', 'paths', 'timing', 'circuits', 'cucumber', 'processing'];
     
     // Store scroll positions per module
     const moduleScrollPositions = {};
@@ -1456,8 +1666,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
             
-            // Handle dropdowns separately - simple visibility check
-            // A dropdown is highlighted if any part of it is visible in the viewport
+            // Handle dropdowns separately.
+            // Summary follows visibility, and open dropdown content gets section-based
+            // opacity treatment similar to regular page content.
             dropdownElements.forEach(details => {
                 const summary = details.querySelector('summary');
                 if (!summary) {
@@ -1497,11 +1708,125 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 
-                if (isVisible || isNearActiveSection) {
-                    details.style.opacity = 1;
-                } else {
-                    details.style.opacity = 0.3;
+                const detailsActive = isVisible || isNearActiveSection;
+                
+                // Keep container fully opaque; we control summary/content directly.
+                details.style.opacity = 1;
+                summary.style.opacity = detailsActive ? 1 : 0.3;
+                
+                // Closed dropdown: only summary is visible.
+                if (!details.open) {
+                    return;
                 }
+                
+                // Prefer the generated dropdown content container if present.
+                const contentRoot = details.querySelector(':scope > .dropdown-content') || details;
+                const rootSelector = contentRoot === details ? ':scope' : '';
+                const selectorPrefix = rootSelector ? `${rootSelector} > ` : ':scope > ';
+                
+                const dropdownFlow = Array.from(contentRoot.querySelectorAll(
+                    `${selectorPrefix}h1, ${selectorPrefix}h2, ${selectorPrefix}h3, ${selectorPrefix}h4, ${selectorPrefix}h5, ${selectorPrefix}h6, ${selectorPrefix}p, ${selectorPrefix}ul, ${selectorPrefix}ol, ${selectorPrefix}pre, ${selectorPrefix}hr`
+                ));
+                
+                if (dropdownFlow.length === 0) {
+                    // Fallback: keep entire dropdown content aligned with summary state.
+                    Array.from(contentRoot.children).forEach(child => {
+                        if (child !== summary) child.style.opacity = detailsActive ? 1 : 0.3;
+                    });
+                    return;
+                }
+                
+                // Build sections inside the dropdown, mirroring top-level logic.
+                const dropdownSections = [];
+                let currentDropdownSection = null;
+                const dropdownSectionHasOnlyHeaders = (section) => (
+                    !!section && section.elements.every(el => /^h[1-6]$/i.test(el.tagName))
+                );
+                
+                dropdownFlow.forEach(el => {
+                    const tagName = el.tagName.toLowerCase();
+                    if (/^h[2-6]$/.test(tagName)) {
+                        if (dropdownSectionHasOnlyHeaders(currentDropdownSection)) {
+                            currentDropdownSection.elements.push(el);
+                        } else {
+                            if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
+                                dropdownSections.push(currentDropdownSection);
+                            }
+                            currentDropdownSection = { elements: [el] };
+                        }
+                    } else if (tagName === 'hr') {
+                        if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
+                            dropdownSections.push(currentDropdownSection);
+                        }
+                        currentDropdownSection = null;
+                    } else {
+                        if (!currentDropdownSection) currentDropdownSection = { elements: [] };
+                        currentDropdownSection.elements.push(el);
+                    }
+                });
+                if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
+                    dropdownSections.push(currentDropdownSection);
+                }
+                
+                if (dropdownSections.length === 0) {
+                    dropdownFlow.forEach(el => {
+                        el.style.opacity = detailsActive ? 1 : 0.3;
+                    });
+                    return;
+                }
+                
+                const dropdownInfo = dropdownSections.map((section, index) => {
+                    const firstEl = section.elements[0];
+                    const lastEl = section.elements[section.elements.length - 1];
+                    const firstRect = firstEl.getBoundingClientRect();
+                    const lastRect = lastEl.getBoundingClientRect();
+                    const sectionTop = firstRect.top;
+                    const sectionBottom = lastRect.bottom;
+                    const isVisible = sectionBottom > contentTop && sectionTop < contentBottom;
+                    const isFullyVisible = sectionTop >= contentTop && sectionBottom <= contentBottom;
+                    const isInSafeZone = sectionTop >= safeZoneTop && sectionBottom <= safeZoneBottom;
+                    return { index, isVisible, isFullyVisible, isInSafeZone };
+                });
+                
+                const activeDropdownIndices = new Set();
+                dropdownInfo.forEach(info => {
+                    if (info.isFullyVisible && info.isInSafeZone) {
+                        activeDropdownIndices.add(info.index);
+                    }
+                });
+                
+                if (activeDropdownIndices.size === 0) {
+                    let bestIndex = -1;
+                    let bestVisibility = 0;
+                    dropdownInfo.forEach(info => {
+                        if (!info.isVisible) return;
+                        const section = dropdownSections[info.index];
+                        const firstRect = section.elements[0].getBoundingClientRect();
+                        const lastRect = section.elements[section.elements.length - 1].getBoundingClientRect();
+                        const visibleTop = Math.max(firstRect.top, contentTop);
+                        const visibleBottom = Math.min(lastRect.bottom, contentBottom);
+                        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+                        if (visibleHeight > bestVisibility) {
+                            bestVisibility = visibleHeight;
+                            bestIndex = info.index;
+                        }
+                    });
+                    if (bestIndex >= 0) activeDropdownIndices.add(bestIndex);
+                }
+                
+                dropdownSections.forEach((section, index) => {
+                    const isActive = detailsActive && activeDropdownIndices.has(index);
+                    section.elements.forEach(el => {
+                        el.style.opacity = isActive ? 1 : 0.3;
+                    });
+                });
+                
+                // Keep non-flow children aligned with dropdown active state.
+                Array.from(contentRoot.children).forEach(child => {
+                    if (!dropdownFlow.includes(child)) {
+                        child.style.opacity = detailsActive ? 1 : 0.3;
+                    }
+                });
             });
         }
         

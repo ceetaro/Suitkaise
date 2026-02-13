@@ -1,0 +1,197 @@
+<div class="module-bar" data-module="sk">
+    <button class="module-bar-title">suitkaise.sk</button>
+    <nav class="module-bar-nav">
+        <a href="#sk-why" class="module-bar-link active" data-page="sk-why">why</a>
+        <a href="#sk-quick-start" class="module-bar-link" data-page="sk-quick-start">quick start</a>
+        <a href="#sk" class="module-bar-link" data-page="sk">how to use</a>
+        <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
+        <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
+        <a href="#sk-blocking-calls" class="module-bar-link" data-page="sk-blocking-calls">blocking calls</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
+        <a href="#sk-tests" class="module-bar-link" data-page="sk-tests">tests</a>
+        <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page why-page">
+    <h1>Why you should use <code>sk</code></h1>
+    <h2>TLDR</h2>
+    <ul>
+        <li><strong>One decorator, five superpowers</strong> - Add <code>.retry()</code>, <code>.timeout()</code>, <code>.background()</code>, <code>.rate_limit()</code>, and <code>.asynced()</code> to any function or class</li>
+        <li><strong>Modify at the call site, not the definition</strong> - Define your function once, decide how to call it each time</li>
+        <li><strong>Chain modifiers in any order</strong> - <code>fn.retry(3).timeout(5.0)</code> and <code>fn.timeout(5.0).retry(3)</code> do the same thing</li>
+        <li><strong>Auto-detects blocking code</strong> - AST analysis identifies I/O, network calls, and sleep patterns automatically</li>
+        <li><strong><code>Share</code> metadata generation</strong> - The kicker. Makes your classes work efficiently inside <code>Share</code></li>
+        <li><strong>Classes too</strong> - Works on entire classes, giving every method the same modifier capabilities, and an async class pattern as well</li>
+    </ul>
+    <hr>
+    <h2>The problem with retry, timeout, and async libraries</h2>
+    <p>You probably already use something for retry logic. Maybe <code>tenacity</code>. Maybe a hand-rolled decorator.</p>
+    <pre><code class="language-python">from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential())
+def fetch_data(url):
+    return requests.get(url).json()</code></pre>
+    <p>This works. But now your function always retries. Every call. Every time.</p>
+    <p>What if you want to retry in production but not in tests? What if one call site needs a timeout but another doesn&#x27;t? What if you want to run it in the background just this once?</p>
+    <p>You end up with multiple wrapped versions of the same function, or you start passing flags and config around.</p>
+    <h2><code>sk</code> — modify at the call site, not the definition</h2>
+    <p><code>sk</code> takes a different approach. You define your function once, cleanly. Then you decide how to call it each time.</p>
+    <pre><code class="language-python">from suitkaise import sk
+
+@sk
+def fetch_data(url):
+    return requests.get(url).json()</code></pre>
+    <p>The function works exactly like before:</p>
+    <pre><code class="language-python">data = fetch_data(&quot;https://api.example.com&quot;)</code></pre>
+    <p>But now you have modifiers available at every call site:</p>
+    <pre><code class="language-python"># retry 3 times with exponential backoff
+data = fetch_data.retry(times=3, delay=1.0, backoff_factor=2.0)(&quot;https://api.example.com&quot;)
+
+# timeout after 5 seconds
+data = fetch_data.timeout(5.0)(&quot;https://api.example.com&quot;)
+
+# run in background, get a Future
+future = fetch_data.background()(&quot;https://api.example.com&quot;)
+result = future.result()
+
+# rate limit to 2 calls per second
+data = fetch_data.rate_limit(2.0)(&quot;https://api.example.com&quot;)
+
+# make it async
+data = await fetch_data.asynced()(&quot;https://api.example.com&quot;)</code></pre>
+    <p>The function definition stays clean. The call site says exactly what&#x27;s happening. No wrapper functions, no config objects, no multiple versions.</p>
+    <h2>Chain modifiers</h2>
+    <p>Modifiers can be chained in any order:</p>
+    <pre><code class="language-python"># retry 3 times, with a 5-second timeout per attempt
+data = fetch_data.retry(3).timeout(5.0)(&quot;https://api.example.com&quot;)
+
+# same thing, different order — identical behavior
+data = fetch_data.timeout(5.0).retry(3)(&quot;https://api.example.com&quot;)</code></pre>
+    <p>The execution order is always consistent regardless of how you chain them:</p>
+    <ol>
+        <li>Rate limit (outermost) — throttle before each attempt</li>
+        <li>Retry — retry loop</li>
+        <li>Timeout — per-attempt timeout</li>
+        <li>Function call (innermost)</li>
+    </ol>
+    <p>This means you don&#x27;t have to think about ordering. Just add what you need.</p>
+    <pre><code class="language-python"># all five modifiers, chained
+result = await (
+    fetch_data.asynced()
+    .retry(times=3, delay=0.5)
+    .timeout(10.0)
+    .rate_limit(5.0)
+)(&quot;https://api.example.com&quot;)</code></pre>
+    <h2>The double parentheses look a little confusing</h2>
+    <p>They do! But it&#x27;s actually really simple.</p>
+    <p>This is intentional. The actual function arguments are always at the end of the chain:</p>
+    <pre><code class="language-python">fetch_data.retry(3).timeout(5.0)(&quot;https://api.example.com&quot;)
+#         ^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^
+#         modifier   modifier      actual function args</code></pre>
+    <p>You might notice the pattern: <code>fn.modifier()(&quot;args&quot;)</code>. The first call sets up the modifier. The second call runs the function.</p>
+    <p>Once you see it, it&#x27;s easy to read: everything before the last parentheses is configuration, the last parentheses are the call.</p>
+    <p>But now when reviewing code, you can quickly see how it is being modified without sifting through 5 extra args in the main function call.</p>
+    <h2>Works on classes too</h2>
+    <p><code>@sk</code> isn&#x27;t just for functions. Put it on a class and every method gets modifiers:</p>
+    <pre><code class="language-python">@sk
+class DataProcessor:
+    def __init__(self, config):
+        self.config = config
+        self.results = []
+
+    def process(self, data):
+        return transform(data)
+
+    def save(self, path):
+        with open(path, &#x27;w&#x27;) as f:
+            f.write(json.dumps(self.results))
+
+processor = DataProcessor(config)
+
+# normal call
+processor.process(data)
+
+# with timeout
+processor.save.timeout(10.0)(&quot;output.json&quot;)
+
+# with retry
+processor.process.retry(3)(data)
+
+# in background
+future = processor.save.background()(&quot;output.json&quot;)</code></pre>
+    <p>You can even get an async version of the entire class:</p>
+    <pre><code class="language-python">AsyncProcessor = DataProcessor.asynced()
+processor = AsyncProcessor(config)
+
+# all blocking methods are now async
+await processor.process(data)
+await processor.save(&quot;output.json&quot;)</code></pre>
+    <h2>Auto-detects blocking code</h2>
+    <p><code>sk</code> uses AST analysis to inspect your function&#x27;s source code and detect blocking patterns — <code>time.sleep()</code>, <code>requests.get()</code>, file I/O, database calls, subprocess calls, and many more.</p>
+    <pre><code class="language-python">@sk
+def slow_fetch(url):
+    return requests.get(url).text
+
+slow_fetch.has_blocking_calls  # True
+slow_fetch.blocking_calls      # [&#x27;requests.get&#x27;]</code></pre>
+    <p>This detection controls which modifiers are available. <code>.asynced()</code> and <code>.background()</code> are only allowed on functions that actually block — preventing you from wrapping pure CPU code in <code>asyncio.to_thread()</code> where it wouldn&#x27;t help.</p>
+    <p>If the AST can&#x27;t detect your blocking code (C extensions, custom blocking functions, tight CPU loops), use <code>@blocking</code> to explicitly mark it:</p>
+    <pre><code class="language-python">@sk
+@blocking
+def heavy_computation():
+    return sum(x**2 for x in range(10_000_000))
+
+# now .asynced() and .background() are available
+result = await heavy_computation.asynced()()</code></pre>
+    <h2>The hidden killer feature: <code>_shared_meta</code></h2>
+    <p>This is what makes <code>sk</code> essential to the <code>suitkaise</code> ecosystem.</p>
+    <p>When you put <code>@sk</code> on a class, it analyzes every method&#x27;s AST to figure out which instance attributes each method reads and writes. It stores this as <code>_shared_meta</code>:</p>
+    <pre><code class="language-python">@sk
+class Counter:
+    def __init__(self):
+        self.value = 0
+
+    def increment(self):
+        self.value += 1
+
+print(Counter._shared_meta)
+# {
+#     &#x27;methods&#x27;: {
+#         &#x27;increment&#x27;: {&#x27;reads&#x27;: [&#x27;value&#x27;], &#x27;writes&#x27;: [&#x27;value&#x27;]}
+#     },
+#     &#x27;properties&#x27;: {}
+# }</code></pre>
+    <p>Why does this matter? Because <code>Share</code> uses <code>_shared_meta</code> to know exactly which attributes to sync after each method call.</p>
+    <p>Without <code>_shared_meta</code>, <code>Share</code> would have to sync everything after every operation — slow and wasteful.</p>
+    <p>With <code>_shared_meta</code>, <code>Share</code> only syncs the attributes that actually changed. This is what makes <code>Share</code> practical at scale: the overhead is proportional to what you actually touch, not to the total size of the shared object.</p>
+    <pre><code class="language-python">from suitkaise.processing import Share
+
+@sk
+class Counter:
+    def __init__(self):
+        self.value = 0
+
+    def increment(self):
+        self.value += 1
+
+share = Share()
+share.counter = Counter()
+
+# works across processes — Share knows to sync only &#x27;value&#x27; after increment()
+share.counter.increment()</code></pre>
+    <p>If you&#x27;re using <code>Share</code> with custom classes, <code>@sk</code> is what makes it efficient. Without it, <code>Share</code> still works, but you lose time every time <code>Share</code> needs to calculate <code>_shared_meta</code> for each object of that class.</p>
+    <h2>Compared to alternatives</h2>
+    <p><strong>vs <code>tenacity</code></strong> — Tenacity is a great retry library with more retry strategies and conditions than <code>sk</code>. But tenacity only does retry, and it bakes the retry config into the function definition. <code>sk</code> gives you retry + timeout + background + rate_limit + async in one decorator, and lets you choose per call site.</p>
+    <p><strong>vs <code>asyncio.to_thread</code></strong> — What <code>.asynced()</code> uses under the hood. <code>sk</code> wraps it in a consistent API and prevents you from using it on non-blocking code.</p>
+    <p><strong>vs <code>concurrent.futures</code></strong> — What <code>.background()</code> uses under the hood. <code>sk</code> wraps it in the same chaining API as everything else.</p>
+    <p><strong>vs writing it yourself</strong> — You could absolutely implement retry + timeout + background manually. The value of <code>sk</code> is that all five modifiers share a consistent interface, chain naturally, and — most importantly — generate <code>_shared_meta</code> for <code>Share</code> compatibility, which you would never build yourself.</p>
+    <h2>Works with the rest of <code>suitkaise</code></h2>
+    <ul>
+        <li><code>processing</code> — <code>Pool</code> methods use <code>sk</code> modifiers. <code>Pool.map.timeout(20).asynced()</code> works because of <code>sk</code>.</li>
+        <li><code>Share</code> — <code>_shared_meta</code> from <code>sk</code> is what makes <code>Share</code> efficient with custom classes.</li>
+        <li><code>circuits</code> — <code>Circuit.short()</code> has <code>.asynced()</code> because <code>circuits</code> uses <code>sk</code> internally.</li>
+        <li><code>timing</code> — <code>timing.sleep</code> has <code>.asynced()</code> via <code>sk</code>.</li>
+        <li><code>paths</code> — <code>@autopath()</code> can be combined with <code>@sk</code> on the same function.</li>
+    </ul>
+    <p><code>sk</code> is the glue. All <code>suitkaise</code> modules use it internally when applicable, and now your own code benefits from the same modifier system.</p>
+</section>

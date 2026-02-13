@@ -1,17 +1,13 @@
 /*
 
-this is the bar for the processing module.
-
-it stays on the screen as long as the user is on a processing related page.
-
-this bar goes below the nav bar.
+module bar for suitkaise.processing
 
 */
 
 rows = 1
-columns = 7
+columns = 9
 
-how to use, how it works, videos, tests, examples, why
+order = [why, quick start, how to use, how it works, examples, videos, tests, learn]
 
 # 1.1
 
@@ -19,60 +15,40 @@ text = "suitkaise.processing"
 
 # 1.2
 
-button = "how to use" (site/processing/processing-how-to-use.md)
-
-/*
-
-if the user is on the processing-how-to-use page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "why"
+link = "processing-why.md"
 
 # 1.3
 
-button = "how it works" (site/processing/processing-how-it-works.md)
-
-/*
-
-if the user is on the processing-how-it-works page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "quick start"
+link = "processing-quick-start.md"
 
 # 1.4
 
-button = "videos" (site/processing/processing-videos.md)
-
-/*
-
-if the user is on the processing-videos page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how to use"
+link = "processing-skprocess.md"
 
 # 1.5
 
-button = "tests" (site/processing/processing-tests.md)
-
-/*
-
-if the user is on the processing-tests page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how it works"
+link = "processing-how-it-works.md"
 
 # 1.6
 
-button = "examples" (site/processing/processing-examples.md)
-
-/*
-
-if the user is on the processing-examples page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "examples"
+link = "processing-examples.md"
 
 # 1.7
 
-button = "why" (site/processing/processing-why.md)
+button = "videos"
+link = "processing-videos.md"
 
-/*
+# 1.8
 
-if the user is on the processing-why page, the button should not do anything, and be slightly highlighted to show that it is the current page.
+button = "tests"
+link = "processing-tests.md"
 
-*/
+# 1.9
+
+button = "learn"
+link = "processing-learn.md"

@@ -1,0 +1,92 @@
+<div class="module-bar" data-module="timing">
+    <button class="module-bar-title">suitkaise.timing</button>
+    <nav class="module-bar-nav">
+        <a href="#timing-why" class="module-bar-link" data-page="timing-why">why</a>
+        <a href="#timing-quick-start" class="module-bar-link active" data-page="timing-quick-start">quick start</a>
+        <a href="#timing" class="module-bar-link" data-page="timing">how to use</a>
+        <a href="#timing-how-it-works" class="module-bar-link" data-page="timing-how-it-works">how it works</a>
+        <a href="#timing-examples" class="module-bar-link" data-page="timing-examples">examples</a>
+        <a href="#timing-videos" class="module-bar-link" data-page="timing-videos">videos</a>
+        <a href="#timing-tests" class="module-bar-link" data-page="timing-tests">tests</a>
+        <a href="#timing-learn" class="module-bar-link" data-page="timing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>Quick Start: <code>timing</code></h1>
+    <pre><code class="language-bash">pip install suitkaise</code></pre>
+    <h2>Time a function</h2>
+    <pre><code class="language-python">from suitkaise.timing import timethis
+
+@timethis()
+def process_data():
+    do_work()
+
+process_data()
+print(process_data.timer.most_recent)  # time for the last call</code></pre>
+    <h2>Get statistics over multiple calls</h2>
+    <pre><code class="language-python">for _ in range(100):
+    process_data()
+
+print(process_data.timer.mean)
+print(process_data.timer.median)
+print(process_data.timer.stdev)
+print(process_data.timer.percentile(95))
+print(process_data.timer.min)
+print(process_data.timer.max)</code></pre>
+    <h2>Time a code block</h2>
+    <pre><code class="language-python">from suitkaise.timing import TimeThis
+
+with TimeThis() as timer:
+    do_work()
+
+print(timer.most_recent)</code></pre>
+    <h2>Use a timer directly</h2>
+    <pre><code class="language-python">from suitkaise.timing import Sktimer
+
+timer = Sktimer()
+
+timer.start()
+do_work()
+elapsed = timer.stop()
+
+print(elapsed)
+print(timer.mean)</code></pre>
+    <h2>Pause timing (exclude user input, delays, etc.)</h2>
+    <pre><code class="language-python">timer = Sktimer()
+timer.start()
+
+results = database.query(&quot;SELECT * FROM users&quot;)
+
+timer.pause()
+answer = input(&quot;Export? (y/n): &quot;)
+timer.resume()
+
+if answer == &#x27;y&#x27;:
+    export(results)
+
+timer.stop()  # user input time excluded</code></pre>
+    <h2>Discard failed measurements</h2>
+    <pre><code class="language-python">timer = Sktimer()
+
+for _ in range(100):
+    timer.start()
+    try:
+        result = unreliable_operation()
+        timer.stop()
+    except Exception:
+        timer.discard()  # don&#x27;t pollute stats with failures</code></pre>
+    <h2>Rolling window for long-running processes</h2>
+    <pre><code class="language-python">timer = Sktimer(max_times=1000)  # keep only last 1000 measurements</code></pre>
+    <h2>Only record slow operations</h2>
+    <pre><code class="language-python">@timethis(threshold=0.1)
+def handle_request():
+    # only records times &gt;= 0.1 seconds
+    process_request()</code></pre>
+    <h2>Want to learn more?</h2>
+    <ul>
+        <li><strong>Why page</strong> — why <code>timing</code> exists and what it does better than <code>timeit</code></li>
+        <li><strong>How to use</strong> — full API reference for <code>Sktimer</code>, <code>timethis</code>, <code>TimeThis</code></li>
+        <li><strong>Examples</strong> — progressively complex examples into a full script</li>
+        <li><strong>How it works</strong> — internal architecture (per-thread sessions, statistics) (level: intermediate)</li>
+    </ul>
+</section>

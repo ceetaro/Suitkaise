@@ -1,1 +1,1 @@
-link = "SKTime" (site/sktime/sktime-how-to-use.md)
+link = "Timing" (site/timing/timing-how-to-use.md)

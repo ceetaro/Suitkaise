@@ -1,17 +1,13 @@
 /*
 
-this is the bar for the cucumber module.
-
-it stays on the screen as long as the user is on a cucumber related page.
-
-this bar goes below the nav bar.
+module bar for suitkaise.cucumber
 
 */
 
 rows = 1
-columns = 9
+columns = 11
 
-order = [why, how to use, how it works, supported types, tests, examples, videos, learn]
+order = [why, quick start, how to use, how it works, supported types, performance, worst possible object, videos, tests, learn]
 
 # 1.1
 
@@ -24,35 +20,45 @@ link = "cucumber-why.md"
 
 # 1.3
 
+button = "quick start"
+link = "cucumber-quick-start.md"
+
+# 1.4
+
 button = "how to use"
 link = "cucumber-how-to-use.md"
 
-# 1.4
+# 1.5
 
 button = "how it works"
 link = "cucumber-how-it-works.md"
 
-# 1.5
+# 1.6
 
 button = "supported types"
 link = "cucumber-supported-types.md"
 
-# 1.6
-
-button = "tests"
-link = "cucumber-tests.md"
-
 # 1.7
 
-button = "examples"
-link = "cucumber-examples.md"
+button = "performance"
+link = "cucumber-performance.md"
 
 # 1.8
+
+button = "worst possible object"
+link = "cucumber-worst-possible-object.md"
+
+# 1.9
 
 button = "videos"
 link = "cucumber-videos.md"
 
-# 1.9
+# 1.10
+
+button = "tests"
+link = "cucumber-tests.md"
+
+# 1.11
 
 button = "learn"
 link = "cucumber-learn.md"

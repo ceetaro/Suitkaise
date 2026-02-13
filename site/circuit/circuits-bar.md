@@ -1,78 +1,54 @@
 /*
 
-this is the bar for the circuit module.
-
-it stays on the screen as long as the user is on a circuit related page.
-
-this bar goes below the nav bar.
+module bar for suitkaise.circuits
 
 */
 
 rows = 1
-columns = 7
+columns = 9
 
-how to use, how it works, videos, tests, examples, why
+order = [why, quick start, how to use, how it works, examples, videos, tests, learn]
 
 # 1.1
 
-text = "suitkaise.circuit"
+text = "suitkaise.circuits"
 
 # 1.2
 
-button = "how to use" (site/circuit/circuit-how-to-use.md)
-
-/*
-
-if the user is on the circuit-how-to-use page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "why"
+link = "circuits-why.md"
 
 # 1.3
 
-button = "how it works" (site/circuit/circuit-how-it-works.md)
-
-/*
-
-if the user is on the circuit-how-it-works page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "quick start"
+link = "circuits-quick-start.md"
 
 # 1.4
 
-button = "videos" (site/circuit/circuit-videos.md)
-
-/*
-
-if the user is on the circuit-videos page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how to use"
+link = "circuits-how-to-use.md"
 
 # 1.5
 
-button = "tests" (site/circuit/circuit-tests.md)
-
-/*
-
-if the user is on the circuit-tests page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "how it works"
+link = "circuits-how-it-works.md"
 
 # 1.6
 
-button = "examples" (site/circuit/circuit-examples.md)
-
-/*
-
-if the user is on the circuit-examples page, the button should not do anything, and be slightly highlighted to show that it is the current page.
-
-*/
+button = "examples"
+link = "circuits-examples.md"
 
 # 1.7
 
-button = "why" (site/circuit/circuit-why.md)
+button = "videos"
+link = "circuits-videos.md"
 
-/*
+# 1.8
 
-if the user is on the circuit-why page, the button should not do anything, and be slightly highlighted to show that it is the current page.
+button = "tests"
+link = "circuits-tests.md"
 
-*/
+# 1.9
+
+button = "learn"
+link = "circuits-learn.md"

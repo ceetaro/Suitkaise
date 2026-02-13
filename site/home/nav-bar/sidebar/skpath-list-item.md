@@ -1,1 +1,1 @@
-link = "SKPath" (site/skpath/skpath-how-to-use.md)
+link = "Paths" (site/paths/paths-how-to-use.md)

@@ -1,0 +1,361 @@
+<div class="module-bar" data-module="circuits">
+    <button class="module-bar-title">suitkaise.circuits</button>
+    <nav class="module-bar-nav">
+        <a href="#circuits-why" class="module-bar-link active" data-page="circuits-why">why</a>
+        <a href="#circuits-quick-start" class="module-bar-link" data-page="circuits-quick-start">quick start</a>
+        <a href="#circuits" class="module-bar-link" data-page="circuits">how to use</a>
+        <a href="#circuits-how-it-works" class="module-bar-link" data-page="circuits-how-it-works">how it works</a>
+        <a href="#circuits-examples" class="module-bar-link" data-page="circuits-examples">examples</a>
+        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
+        <a href="#circuits-tests" class="module-bar-link" data-page="circuits-tests">tests</a>
+        <a href="#circuits-learn" class="module-bar-link" data-page="circuits-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page why-page">
+    <h1>Why you should use <code>circuits</code></h1>
+    <h2>TLDR</h2>
+    <ul>
+        <li><strong>Prevent cascading failures</strong> - Stop hammering a failing service</li>
+        <li><strong>Built-in exponential backoff</strong> - Automatic retry delay increase</li>
+        <li><strong>Jitter</strong> - Prevent thundering herd when multiple clients retry simultaneously</li>
+        <li><strong>Two patterns</strong> - Auto-reset (<code>Circuit</code>) vs manual control (<code>BreakingCircuit</code>)</li>
+        <li><strong>Thread-safe</strong> - Safe for concurrent use without manual locking</li>
+        <li><strong>Native async support</strong> - <code>.asynced()</code> for async/await contexts</li>
+        <li><strong>Rate limiting</strong> - Natural fit for API rate limits</li>
+    </ul>
+    <hr>
+    <h2>What makes <code>circuits</code> different</h2>
+    <p>Most circuit breaker libraries handle a single use case: retry an external service with backoff. <code>circuits</code> does that, but it also does something others can&#x27;t: <strong>coordinate failure handling across threads and processes</strong>.</p>
+    <pre><code class="language-python">from suitkaise import BreakingCircuit
+import threading
+
+shutdown = BreakingCircuit(num_shorts_to_trip=1)
+
+def worker(worker_id):
+    while not shutdown.broken:
+        try:
+            process_next_item()
+        except FatalError:
+            shutdown.short()  # all workers see this immediately
+    print(f&quot;Worker {worker_id}: shutting down gracefully&quot;)
+
+threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+for t in threads:
+    t.start()</code></pre>
+    <p>One worker hits a fatal error. All four workers see <code>shutdown.broken</code> and stop gracefully. Thread-safe out of the box.</p>
+    <p>And with <code>Share</code> from <code>processing</code>, this works across processes too -- not just threads. More on that below.</p>
+    <hr>
+    <p>Your code calls an external service. Sometimes that service fails.</p>
+    <p>What do you do?</p>
+    <ol>
+        <li>The naive approach: retry immediately</li>
+    </ol>
+    <pre><code class="language-python">while True:
+    try:
+        result = call_external_service()
+        break
+    except ServiceError:
+        pass  # retry immediately</code></pre>
+    <p>This hammers the failing service with requests. If it&#x27;s overloaded, you&#x27;re making it worse. If it&#x27;s rate-limiting you, you&#x27;ll get banned.</p>
+    <ol start="2">
+        <li>The slightly better approach: add a delay</li>
+    </ol>
+    <pre><code class="language-python">import time
+
+while True:
+    try:
+        result = call_external_service()
+        break
+    except ServiceError:
+        time.sleep(1)</code></pre>
+    <p>Better, sort of.</p>
+    <ul>
+        <li>Fixed delay is either too long (wasting time) or too short (still hammering)</li>
+        <li>No escalation if failures continue</li>
+        <li>No limit on retries</li>
+    </ul>
+    <ol start="3">
+        <li>Actually use exponential backoff</li>
+    </ol>
+    <pre><code class="language-python">import time
+import random
+
+max_retries = 5
+base_delay = 1.0
+max_delay = 30.0
+
+for attempt in range(max_retries):
+    try:
+        result = call_external_service()
+        break
+    except ServiceError:
+        if attempt == max_retries - 1:
+            raise
+        
+        # exponential backoff with jitter
+        delay = min(base_delay * (2 ** attempt), max_delay)
+        jitter = random.uniform(0, delay * 0.1)
+        time.sleep(delay + jitter)</code></pre>
+    <p>This is dozens of lines of boilerplate. And, you have to do it every time, or create a helper function.</p>
+    <p>Also, you still need to handle:</p>
+    <ul>
+        <li>Thread safety if multiple threads share the retry logic</li>
+        <li>Async support if you&#x27;re using asyncio</li>
+        <li>Different backoff strategies for different services</li>
+    </ul>
+    <p>You are far away from being done. You are far away from a professional level solution.</p>
+    <ol start="4">
+        <li>The Solution</li>
+    </ol>
+    <p>The solution is <code>circuits</code>.</p>
+    <pre><code class="language-python">from suitkaise import Circuit
+
+circuit = Circuit(
+    num_shorts_to_trip=5,
+    sleep_time_after_trip=1.0,
+    backoff_factor=2.0,
+    max_sleep_time=30.0,
+    jitter=0.1
+)
+
+while True:
+    try:
+        result = call_external_service()
+        break
+    except ServiceError:
+        circuit.short()  # handles everything</code></pre>
+    <p>One object. Clear and simple API.</p>
+    <hr>
+    <h2><code>Circuit</code> vs <code>BreakingCircuit</code>: the difference</h2>
+    <h3><code>Circuit</code> - Auto-resets</h3>
+    <p>After N failures, sleeps and continues. The counter resets automatically.</p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+for request in requests:
+    try:
+        process(request)
+    except RateLimitError:
+        circuit.short()  # after 5 shorts, sleeps 1s and continues</code></pre>
+    <ul>
+        <li>Rate limit requests</li>
+        <li>Throttle request rates</li>
+        <li>When you have temporary failures that resolve themselves</li>
+    </ul>
+    <h3><code>BreakingCircuit</code> - Manual Reset</h3>
+    <p>After N failures, stays broken until you manually reset.</p>
+    <pre><code class="language-python">breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+
+while not breaker.broken:
+    try:
+        result = risky_operation()
+    except CriticalError:
+        breaker.short()  # after 3 failures, circuit breaks
+
+if breaker.broken:
+    # decide what to do - fail gracefully, alert, etc.
+    handle_failure()
+    breaker.reset()  # manually reset when ready</code></pre>
+    <ul>
+        <li>Operations where you need to decide how to proceed</li>
+        <li>Coordinating multiple workers (one breaks, others see it)</li>
+        <li>Graceful degradation with human or programmatic intervention</li>
+    </ul>
+    <hr>
+    <h2>Exponential Backoff</h2>
+    <p>Each trip increases the sleep time.</p>
+    <p>Without <code>circuits</code></p>
+    <pre><code class="language-python">delay = 1.0
+max_delay = 30.0
+backoff_factor = 2.0
+
+# somewhere in your retry loop
+delay = min(delay * backoff_factor, max_delay)
+time.sleep(delay)
+
+# don&#x27;t forget to track this state!
+# don&#x27;t forget thread safety!
+# don&#x27;t forget to reset it so it doesn&#x27;t snowball!</code></pre>
+    <p>With <code>circuits</code></p>
+    <pre><code class="language-python">circuit = Circuit(
+    num_shorts_to_trip=5,
+    sleep_time_after_trip=1.0,
+    backoff_factor=2.0,
+    max_sleep_time=30.0
+)
+
+# backoff is automatic
+# 1st trip: 1.0s
+# 2nd trip: 2.0s
+# 3rd trip: 4.0s
+# 4th trip: 8.0s
+# 5th trip: 16.0s
+# 6th trip: 30.0s (capped)
+# 7th+ trip: 30.0s (capped)</code></pre>
+    <p>Need to reset the backoff after a successful operation?</p>
+    <pre><code class="language-python">circuit.reset_backoff()  # back to original sleep time</code></pre>
+    <hr>
+    <h2>Jitter</h2>
+    <p>When many clients fail at the same time, they all retry at the same time. This causes a &quot;thundering herd&quot; that overwhelms the recovering service. This is especially bad if the service call needs to be rate limited.</p>
+    <p>Jitter adds randomness to the sleep time.</p>
+    <p>Without <code>circuits</code></p>
+    <pre><code class="language-python">import random
+
+delay = 5.0
+jitter_percent = 0.1
+
+jittered_delay = delay + random.uniform(-delay * jitter_percent, delay * jitter_percent)
+time.sleep(jittered_delay)</code></pre>
+    <p>With <code>circuits</code></p>
+    <pre><code class="language-python">circuit = Circuit(
+    num_shorts_to_trip=5,
+    sleep_time_after_trip=5.0,
+    jitter=0.1  # +/- 10% randomness
+)
+
+# delays will be between 4.5s and 5.5s
+# clients naturally spread out their retries</code></pre>
+    <hr>
+    <h2>Thread Safety</h2>
+    <p>Multiple threads calling the same circuit? No problem.</p>
+    <p>Without <code>circuits</code></p>
+    <pre><code class="language-python">import threading
+
+lock = threading.Lock()
+failure_count = 0
+max_failures = 5
+
+def handle_failure():
+    global failure_count
+    with lock:  # don&#x27;t forget!
+        failure_count += 1
+        if failure_count &gt;= max_failures:
+            # do something
+            failure_count = 0</code></pre>
+    <p>With <code>circuits</code></p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+def worker():
+    # multiple threads can call this safely
+    circuit.short()</code></pre>
+    <p><code>Circuit</code> and <code>BreakingCircuit</code> use <code>threading.RLock</code> internally. All operations are atomic.</p>
+    <hr>
+    <h2>Native Async Support</h2>
+    <p>Using asyncio? Just add <code>.asynced()</code>.</p>
+    <p>Without <code>circuits</code></p>
+    <pre><code class="language-python">import asyncio
+
+# you need separate sync and async implementations
+def sync_sleep_with_backoff():
+    time.sleep(delay)
+
+async def async_sleep_with_backoff():
+    await asyncio.sleep(delay)</code></pre>
+    <p>With <code>circuits</code></p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+# sync
+circuit.short()
+
+# async
+await circuit.short.asynced()()</code></pre>
+    <p>Same circuit, same state, works in both contexts.</p>
+    <hr>
+    <h2>Rate Limiting</h2>
+    <p><code>Circuit</code> is perfect for rate limiting.</p>
+    <pre><code class="language-python">rate_limiter = Circuit(
+    num_shorts_to_trip=100,      # 100 requests per window
+    sleep_time_after_trip=60.0,  # wait 60s when limit hit
+)
+
+for request in requests:
+    rate_limiter.short()  # counts each request
+    process(request)</code></pre>
+    <p>Every 100 requests, it pauses for 60 seconds. No external rate limit tracking needed.</p>
+    <hr>
+    <h2>Immediate Trip</h2>
+    <p>Sometimes you know something is catastrophically wrong and want to trip immediately.</p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=10, sleep_time_after_trip=5.0)
+
+try:
+    result = call_service()
+except CriticalError:
+    circuit.trip()  # skip the counter, trip immediately
+except MinorError:
+    circuit.short()  # increment counter normally</code></pre>
+    <hr>
+    <h2>Custom Sleep Per Call</h2>
+    <p>Override the sleep time for a specific failure.</p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+try:
+    result = call_service()
+except RateLimitError as e:
+    # API told us to wait 30 seconds
+    circuit.short(custom_sleep=e.retry_after)
+except OtherError:
+    circuit.short()  # use default</code></pre>
+    <hr>
+    <h2>Coordinated Shutdown</h2>
+    <p><code>BreakingCircuit</code> is great for coordinating multiple workers.</p>
+    <pre><code class="language-python">import threading
+
+shutdown_circuit = BreakingCircuit(num_shorts_to_trip=1)
+
+def worker(worker_id):
+    while not shutdown_circuit.broken:
+        try:
+            process_next_item()
+        except FatalError:
+            shutdown_circuit.short()  # signals all workers to stop
+    
+    print(f&quot;Worker {worker_id} shutting down&quot;)
+
+# start workers
+threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+for t in threads:
+    t.start()
+
+# one worker hits a fatal error
+# all workers see shutdown_circuit.broken and stop gracefully</code></pre>
+    <hr>
+    <h2>Tracking State</h2>
+    <p>Both circuits track useful state:</p>
+    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+circuit.times_shorted      # failures since last trip
+circuit.total_trips        # lifetime trip count
+circuit.current_sleep_time # current backoff delay
+
+breaker = BreakingCircuit(num_shorts_to_trip=3)
+
+breaker.broken             # is it broken?
+breaker.times_shorted      # failures since last reset
+breaker.total_trips        # lifetime trip count</code></pre>
+    <hr>
+    <h2>Cross-process circuit breaking with <code>Share</code></h2>
+    <p>The coordinated shutdown example above works with threads. But with <code>Share</code> from <code>processing</code>, it works across entirely separate processes.</p>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+from suitkaise import BreakingCircuit
+
+share = Share()
+share.circuit = BreakingCircuit(num_shorts_to_trip=3)
+
+class ResilientWorker(Skprocess):
+    def __init__(self, share):
+        self.share = share
+
+    def __run__(self):
+        if self.share.circuit.broken:
+            self.stop()
+            return
+        
+        try:
+            result = call_flaky_service()
+        except ServiceError:
+            self.share.circuit.short()
+
+pool = Pool(workers=8)
+pool.map(ResilientWorker, [share] * 8)</code></pre>
+    <p>Eight separate processes, each with their own GIL, their own memory space -- and they all see the same circuit state. When three failures accumulate from any combination of workers, the circuit trips and all workers can respond.</p>
+    <p>This is the kind of cross-process coordination that normally requires Redis or a database. With <code>circuits</code> + <code>Share</code>, it&#x27;s zero infrastructure.</p>
+</section>

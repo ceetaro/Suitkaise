@@ -1,0 +1,112 @@
+<div class="module-bar" data-module="processing">
+    <button class="module-bar-title">suitkaise.processing</button>
+    <nav class="module-bar-nav">
+        <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+        <a href="#processing-quick-start" class="module-bar-link active" data-page="processing-quick-start">quick start</a>
+        <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
+        <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+        <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+        <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+        <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>Quick Start: <code>processing</code></h1>
+    <pre><code class="language-bash">pip install suitkaise</code></pre>
+    <h2>Run a process</h2>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class Doubler(Skprocess):
+    def __init__(self, value):
+        self.value = value
+
+    def __run__(self):
+        self.value *= 2
+
+    def __result__(self):
+        return self.value
+
+process = Doubler(5)
+result = process.run() # start, wait, return result
+print(result) # 10</code></pre>
+    <h2>Run it multiple times</h2>
+    <pre><code class="language-python">class Doubler(Skprocess):
+    def __init__(self, value):
+        self.value = value
+        self.process_config.runs = 3 # loop 3 times
+
+    def __run__(self):
+        self.value *= 2
+
+    def __result__(self):
+        return self.value
+
+result = Doubler(5).run()
+print(result) # 40 (5 → 10 → 20 → 40)</code></pre>
+    <h2>Batch processing with Pool</h2>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+def double(x):
+    return x * 2
+
+pool = Pool(workers=4)
+results = pool.map(double, [1, 2, 3, 4, 5])
+print(results) # [2, 4, 6, 8, 10]</code></pre>
+    <h2>Share state across processes</h2>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+
+share = Share()
+share.counter = 0
+share.results = []
+
+class Worker(Skprocess):
+    def __init__(self, share, item):
+        self.share = share
+        self.item = item
+
+    def __run__(self):
+        self.share.results.append(self.item * 2)
+        self.share.counter += 1
+
+pool = Pool(workers=4)
+pool.star().map(Worker, [(share, x) for x in range(10)])
+
+print(share.counter) # 10
+print(share.results) # [0, 2, 4, ..., 18]</code></pre>
+    <h2>Communicate between parent and process</h2>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class Echo(Skprocess):
+    def __prerun__(self):
+        self.msg = self.listen(timeout=1.0)
+
+    def __run__(self):
+        if self.msg:
+            self.tell(f&quot;echo: {self.msg}&quot;)
+
+process = Echo()
+process.start()
+
+process.tell(&quot;hello&quot;)
+response = process.listen(timeout=2.0)
+print(response) # &quot;echo: hello&quot;
+
+process.stop()
+process.wait()</code></pre>
+    <h2>Add retries and timeouts</h2>
+    <pre><code class="language-python">class ReliableWorker(Skprocess):
+    def __init__(self):
+        self.process_config.lives = 3 # retry up to 2 times on crash
+        self.process_config.timeouts.run = 10.0 # 10 second timeout per run
+
+    def __run__(self):
+        do_work()</code></pre>
+    <h2>Want to learn more?</h2>
+    <ul>
+        <li><strong>Why page</strong> — why <code>processing</code> exists and what problems it solves</li>
+        <li><strong>How to use</strong> — full API reference for <code>Skprocess</code>, <code>Pool</code>, <code>Share</code>, <code>Pipe</code></li>
+        <li><strong>Examples</strong> — progressively complex examples into a full script</li>
+        <li><strong>How it works</strong> — internal architecture (level: advanced)</li>
+    </ul>
+</section>

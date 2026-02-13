@@ -1,0 +1,1023 @@
+<div class="module-bar" data-module="paths">
+    <button class="module-bar-title">suitkaise.paths</button>
+    <nav class="module-bar-nav">
+        <a href="#paths-why" class="module-bar-link" data-page="paths-why">why</a>
+        <a href="#paths-quick-start" class="module-bar-link" data-page="paths-quick-start">quick start</a>
+        <a href="#paths" class="module-bar-link" data-page="paths">how to use</a>
+        <a href="#paths-how-it-works" class="module-bar-link" data-page="paths-how-it-works">how it works</a>
+        <a href="#paths-examples" class="module-bar-link active" data-page="paths-examples">examples</a>
+        <a href="#paths-videos" class="module-bar-link" data-page="paths-videos">videos</a>
+        <a href="#paths-tests" class="module-bar-link" data-page="paths-tests">tests</a>
+        <a href="#paths-learn" class="module-bar-link" data-page="paths-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1><code>paths</code> examples</h1>
+    <details>
+        <summary>Basic Examples</summary>
+        <div class="dropdown-content">
+    <h3>Get the current file&#x27;s path</h3>
+    <p>Getting the path of the file you&#x27;re currently writing code in - usually a pain with <code>__file__</code> and <code>Path</code>.</p>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+# Skpath() with no arguments returns the caller&#x27;s file path
+# this is the file where this line of code is written
+current_file = Skpath()
+
+# get the absolute path (always uses forward slashes)
+print(current_file.ap)
+# &quot;/Users/me/myproject/src/utils/helpers.py&quot;
+
+# get the path relative to project root
+# (empty if the caller is outside the detected project root)
+print(current_file.rp)
+# &quot;src/utils/helpers.py&quot;
+
+# get just the filename
+print(current_file.name)
+# &quot;helpers.py&quot;</code></pre>
+    <h3>Get the current directory</h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+# Skpath().parent gives you the directory containing the current file
+current_dir = Skpath().parent
+
+# now you can access sibling files easily using truediv
+config_file = current_dir / &quot;config.json&quot;
+data_dir = current_dir / &quot;data&quot;
+
+# check if they exist
+if config_file.exists:
+    print(f&quot;Config found at: {config_file.rp}&quot;)</code></pre>
+    <h3>Alternative: use the helper functions</h3>
+    <pre><code class="language-python">from suitkaise import paths
+
+# get_caller_path() is equivalent to Skpath()
+current_file = paths.get_caller_path()
+
+# get_current_dir() is equivalent to Skpath().parent
+current_dir = paths.get_current_dir()
+
+# get_cwd() returns the current working directory (where you ran python from)
+cwd = paths.get_cwd()
+
+# these are different!
+# - current_dir: directory containing THIS file
+# - cwd: directory where `python script.py` was run from</code></pre>
+    <h3>Project root detection</h3>
+    <pre><code class="language-python">from suitkaise import paths
+from suitkaise.paths import Skpath
+
+# get the project root (auto-detected)
+root = paths.get_project_root()
+print(root.ap)
+# &quot;/Users/me/myproject&quot;
+
+# project root is detected by looking for:
+# 1. setup.sk (suitkaise marker - highest priority)
+# 2. setup.py, setup.cfg, pyproject.toml
+# 3. .git, .gitignore
+# 4. LICENSE, README files
+# 5. requirements.txt
+
+# you can also access root from any Skpath
+some_file = Skpath(&quot;src/main.py&quot;)
+print(some_file.root.ap)
+# &quot;/Users/me/myproject&quot;</code></pre>
+    <h3>Override project root detection</h3>
+    <pre><code class="language-python">from suitkaise import paths
+from suitkaise.paths import CustomRoot
+
+# set a custom root manually
+paths.set_custom_root(&quot;/my/custom/root&quot;)
+
+# now all Skpath objects use this root
+path = paths.get_project_root()
+print(path.ap)
+# &quot;/my/custom/root&quot;
+
+# clear it to go back to auto-detection
+paths.clear_custom_root()
+
+# or use a context manager for temporary override
+with CustomRoot(&quot;/temp/project&quot;):
+    # inside this block, root is /temp/project
+    root = paths.get_project_root()
+    print(root.ap)
+    # &quot;/temp/project&quot;
+
+# outside the block, root is auto-detected again</code></pre>
+    <h3>Path joining with <code>/</code></h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+# Skpath supports the / operator like pathlib.Path
+root = Skpath().root
+data_file = root / &quot;data&quot; / &quot;users.json&quot;
+
+# the result is always an Skpath
+print(type(data_file))
+# &lt;class &#x27;suitkaise.paths._int.skpath.Skpath&#x27;&gt;
+
+print(data_file.ap)
+# &quot;/Users/me/myproject/data/users.json&quot;
+
+print(data_file.rp)
+# &quot;data/users.json&quot;</code></pre>
+    <h3>Core properties: <code>ap</code>, <code>rp</code>, <code>id</code>, <code>platform</code></h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+path = Skpath(&quot;src/utils/helpers.py&quot;)
+
+# ap: absolute path (always forward slashes, even on Windows)
+print(path.ap)
+# &quot;/Users/me/myproject/src/utils/helpers.py&quot;
+
+# rp: relative path to project root
+print(path.rp)
+# &quot;src/utils/helpers.py&quot;
+
+# platform: absolute path with platform-native separators
+print(path.platform)
+# &quot;C:\\Users\\me\\project\\src\\utils\\helpers.py&quot; on Windows 
+# &quot;/Users/me/project/src/utils/helpers.py&quot; on Mac/Linux
+
+# id: reversible base64url encoded ID
+print(path.id)
+# &quot;c3JjL3V0aWxzL2hlbHBlcnMucHk&quot;
+
+# you can recreate the path from its ID!
+same_path = Skpath(path.id)
+print(same_path.rp)
+# &quot;src/utils/helpers.py&quot;</code></pre>
+    <h3><code>pathlib</code> compatibility</h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+path = Skpath(&quot;src/main.py&quot;)
+
+# all the familiar pathlib properties work
+print(path.name)      # &quot;main.py&quot;
+print(path.stem)      # &quot;main&quot;
+print(path.suffix)    # &quot;.py&quot;
+print(path.parent)    # Skpath(&quot;src&quot;)
+print(path.exists)    # True or False
+
+# pathlib methods work too
+for py_file in path.parent.glob(&quot;*.py&quot;):
+    print(py_file.name)
+
+# recursive glob
+for py_file in Skpath().root.rglob(&quot;*.py&quot;):
+    print(py_file.rp)</code></pre>
+    <h3>File operations</h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+root = Skpath().root
+
+# create directories
+new_dir = root / &quot;output/reports&quot;
+new_dir.mkdir(parents=True, exist_ok=True)
+
+# create files
+new_file = new_dir / &quot;report.txt&quot;
+new_file.touch()
+
+# copy files
+source = root / &quot;data/input.csv&quot;
+dest = source.copy_to(root / &quot;backup/input.csv&quot;, parents=True)
+# dest is an Skpath pointing to the copied file
+
+# move files
+temp_file = root / &quot;temp/data.json&quot;
+final = temp_file.move_to(root / &quot;data/final.json&quot;, overwrite=True)
+
+# delete files
+old_file = root / &quot;temp/old.txt&quot;
+old_file.unlink(missing_ok=True)
+
+# delete empty directories
+empty_dir = root / &quot;temp/empty&quot;
+empty_dir.rmdir()</code></pre>
+    <h3>Cross-platform compatibility</h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+
+# Skpath always uses forward slashes internally
+# this works on Windows, Mac, and Linux
+path = Skpath(&quot;data\\subdir\\file.txt&quot;)  # Windows-style input
+print(path.ap)
+# &quot;/Users/me/project/data/subdir/file.txt&quot; (forward slashes)
+
+# when you need OS-native separators (ex. for subprocess calls)
+print(path.platform)
+# Windows: &quot;C:\\Users\\me\\project\\data\\subdir\\file.txt&quot;
+# Mac/Linux: &quot;/Users/me/project/data/subdir/file.txt&quot;
+
+# works with open() and os functions automatically
+with open(path, &quot;r&quot;) as f:  # uses __fspath__()
+    content = f.read()</code></pre>
+    <h3>Path validation</h3>
+    <pre><code class="language-python">from suitkaise.paths import is_valid_filename, streamline_path, streamline_path_quick
+
+# check if a filename is valid on all platforms
+print(is_valid_filename(&quot;my_file.txt&quot;))      # True
+print(is_valid_filename(&quot;file&lt;name&gt;.txt&quot;))   # False (&lt; and &gt; are invalid)
+print(is_valid_filename(&quot;CON&quot;))              # False (Windows reserved name)
+print(is_valid_filename(&quot;&quot;))                 # False (empty)
+
+# sanitize a filename
+clean = streamline_path(&quot;My File&lt;1&gt;.txt&quot;, chars_to_replace=&quot; &quot;)
+print(clean)
+# &quot;My_File_1_.txt&quot;
+
+# streamline_path_quick: simple version with common defaults
+# - strips whitespace
+# - replaces spaces
+# - removes unicode
+clean = streamline_path_quick(&quot;My File наме.txt&quot;)
+print(clean)
+# &quot;My_File_____.txt&quot;
+
+# limit length (preserves file extension)
+short = streamline_path(&quot;Very Long Filename That Needs Truncating.txt&quot;, max_len=10, chars_to_replace=&quot; &quot;)
+print(short)
+# &quot;Very_Long_.txt&quot;</code></pre>
+    <h3>Get project structure</h3>
+    <pre><code class="language-python">from suitkaise import paths
+
+# get all paths in the project (respects .gitignore)
+all_paths = paths.get_project_paths()
+for p in all_paths[:5]:
+    print(p.rp)
+
+# get as strings (more memory efficient for large projects)
+all_paths_str = paths.get_project_paths(as_strings=True)
+
+# exclude certain directories
+paths_filtered = paths.get_project_paths(exclude=[&quot;node_modules&quot;, &quot;dist&quot;, &quot;.git&quot;])
+
+# get nested dictionary structure for something like a UI tree
+structure = paths.get_project_structure()
+# {
+#     &quot;myproject&quot;: {
+#         &quot;src&quot;: {
+#             &quot;main.py&quot;: {},
+#             &quot;utils&quot;: {
+#                 &quot;helpers.py&quot;: {}
+#             }
+#         }
+#     }
+# }
+
+# get formatted tree string for something like a README
+tree = paths.get_formatted_project_tree(depth=2)
+print(tree)
+# myproject/
+# ├── src/
+# │   ├── main.py
+# │   └── utils/
+# └── tests/</code></pre>
+    <h3>Get module path</h3>
+    <pre><code class="language-python">from suitkaise import paths
+import json
+
+# get the file path where a module is defined
+json_path = paths.get_module_path(json)
+print(json_path.ap)
+# &quot;/usr/lib/python3.11/json/__init__.py&quot;
+
+# works with classes too
+from collections import OrderedDict
+od_path = paths.get_module_path(OrderedDict)
+print(od_path.ap)
+
+# works with your own modules
+from myapp.utils import MyClass
+my_path = paths.get_module_path(MyClass)
+print(my_path.rp)
+# &quot;myapp/utils.py&quot;</code></pre>
+    <h3>Thread safety</h3>
+    <pre><code class="language-python">import threading
+from suitkaise.paths import Skpath, CustomRoot
+from suitkaise import paths
+
+# Skpath and root management functions are thread-safe
+# multiple threads can safely:
+# - create Skpath objects
+# - access project root
+# - use CustomRoot context manager
+
+results = []
+
+def worker(worker_id: int):
+    # each thread can safely create paths
+    path = Skpath(f&quot;data/file_{worker_id}.txt&quot;)
+    
+    # thread-safe access to properties
+    results.append({
+        &quot;id&quot;: worker_id,
+        &quot;ap&quot;: path.ap,
+        &quot;rp&quot;: path.rp,
+    })
+
+# start multiple threads
+threads = []
+for i in range(10):
+    t = threading.Thread(target=worker, args=(i,))
+    t.start()
+    threads.append(t)
+
+for t in threads:
+    t.join()
+
+print(f&quot;Processed {len(results)} paths safely&quot;)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Advanced Examples</summary>
+        <div class="dropdown-content">
+    <h3>Using <code>autopath</code> decorator</h3>
+    <p>The <code>autopath</code> decorator automatically converts path parameters based on type hints.</p>
+    <pre><code class="language-python"># WITHOUT autopath - you have to handle type conversion manually
+def process_file_manual(path):
+    if isinstance(path, str):
+        path = Path(path)
+    elif isinstance(path, Skpath):
+        path = Path(path.ap)
+    # ... now path is a Path
+    return path.read_text()</code></pre>
+    <pre><code class="language-python">from suitkaise.paths import autopath, Skpath, AnyPath
+from pathlib import Path
+
+# WITH autopath - conversion is automatic based on type hints
+@autopath()
+def process_file(path: Skpath) -&gt; str:
+    # path is guaranteed to be an Skpath
+    # you can pass str, Path, or Skpath - all get converted
+    return path.ap
+
+# all of these work:
+process_file(&quot;src/main.py&quot;)            # str → Skpath
+process_file(Path(&quot;src/main.py&quot;))      # Path → Skpath
+process_file(Skpath(&quot;src/main.py&quot;))    # Skpath → Skpath (no conversion needed)</code></pre>
+    <h3><code>autopath</code> with different target types</h3>
+    <pre><code class="language-python">from suitkaise.paths import autopath, Skpath, AnyPath
+from pathlib import Path
+
+@autopath()
+def needs_skpath(path: Skpath) -&gt; str:
+    # input is converted to Skpath
+    return path.rp
+
+@autopath()
+def needs_path(path: Path) -&gt; str:
+    # input is normalized through Skpath, then converted to Path
+    return str(path)
+
+@autopath()
+def needs_string(path: str) -&gt; str:
+    # input is normalized through Skpath, returns absolute path string
+    return path
+
+@autopath()
+def needs_anypath(path: AnyPath) -&gt; str:
+    # AnyPath is a union of str | Path | Skpath
+    # autopath converts to Skpath (the richest type in the union)
+    return path.rp  # path is Skpath</code></pre>
+    <h3><code>autopath</code> with lists</h3>
+    <pre><code class="language-python">from suitkaise.paths import autopath, Skpath
+from pathlib import Path
+
+@autopath()
+def process_files(paths: list[Skpath]) -&gt; list[str]:
+    # each element in the list is converted to Skpath
+    return [p.rp for p in paths]
+
+# works with mixed input types
+result = process_files([
+    &quot;src/a.py&quot;,              # str
+    Path(&quot;src/b.py&quot;),        # Path
+    Skpath(&quot;src/c.py&quot;),      # Skpath
+])
+print(result)
+# [&quot;src/a.py&quot;, &quot;src/b.py&quot;, &quot;src/c.py&quot;]
+
+# also works with tuple, set, frozenset
+@autopath()
+def process_set(paths: set[Skpath]) -&gt; int:
+    return len(paths)</code></pre>
+    <h3><code>autopath</code> with <code>use_caller</code> option</h3>
+    <pre><code class="language-python">from suitkaise.paths import autopath, Skpath
+
+# use_caller=True fills in missing path arguments with caller&#x27;s file
+@autopath(use_caller=True)
+def log_location(message: str, path: Skpath = None):
+    # if path is not provided, it becomes the file where log_location() was called
+    print(f&quot;[{path.rp}] {message}&quot;)
+
+# called without path argument
+log_location(&quot;Starting process&quot;)
+# prints: [src/main.py] Starting process
+
+# called with explicit path
+log_location(&quot;Found file&quot;, Skpath(&quot;data/input.csv&quot;))
+# prints: [data/input.csv] Found file</code></pre>
+    <h3><code>autopath</code> with <code>only</code> option</h3>
+    <pre><code class="language-python">from suitkaise.paths import autopath, Skpath
+
+# only convert specific parameters (faster for large lists)
+@autopath(only=&quot;file_path&quot;)
+def process(file_path: str, tags: list[str], ids: list[str]):
+    # only file_path is normalized
+    # tags and ids are left unchanged (no conversion overhead)
+    return file_path
+
+# useful when you have list[str] that aren&#x27;t paths
+result = process(
+    file_path=&quot;src/main.py&quot;,
+    tags=[&quot;python&quot;, &quot;backend&quot;],
+    ids=[&quot;abc123&quot;, &quot;def456&quot;]
+)</code></pre>
+    <h3>Storing paths as IDs in a database</h3>
+    <p>Path IDs are perfect for database storage - they&#x27;re URL-safe, reversible, and cross-platform.</p>
+    <pre><code class="language-python">import sqlite3
+from suitkaise.paths import Skpath
+from suitkaise import paths
+
+# SETUP
+
+conn = sqlite3.connect(&quot;:memory:&quot;)
+conn.execute(&quot;&quot;&quot;
+    CREATE TABLE files (
+        id TEXT PRIMARY KEY,  -- path ID (base64url encoded)
+        name TEXT,
+        size INTEGER,
+        processed BOOLEAN
+    )
+&quot;&quot;&quot;)
+
+# STORING PATHS
+
+def store_file(path: Skpath, size: int):
+    &quot;&quot;&quot;Store a file record using its path ID.&quot;&quot;&quot;
+    conn.execute(
+        &quot;INSERT INTO files (id, name, size, processed) VALUES (?, ?, ?, ?)&quot;,
+        (path.id, path.name, size, False)
+    )
+
+# store some files
+for file_path in paths.get_project_paths():
+    if file_path.is_file and file_path.suffix == &quot;.py&quot;:
+        store_file(file_path, file_path.stat.st_size)
+
+conn.commit()
+
+# RETRIEVING PATHS
+
+def get_unprocessed_files() -&gt; list[Skpath]:
+    &quot;&quot;&quot;Get all unprocessed files as Skpath objects.&quot;&quot;&quot;
+    cursor = conn.execute(
+        &quot;SELECT id FROM files WHERE processed = 0&quot;
+    )
+    
+    # reconstruct Skpath from stored ID
+    return [Skpath(row[0]) for row in cursor.fetchall()]
+
+# get files and process them
+for file_path in get_unprocessed_files():
+    print(f&quot;Processing: {file_path.rp}&quot;)
+    
+    # mark as processed
+    conn.execute(
+        &quot;UPDATE files SET processed = 1 WHERE id = ?&quot;,
+        (file_path.id,)
+    )
+
+conn.commit()</code></pre>
+    <h3>Caching with path IDs</h3>
+    <pre><code class="language-python">import json
+from pathlib import Path
+from suitkaise.paths import Skpath
+
+CACHE_DIR = Path(&quot;.cache&quot;)
+CACHE_DIR.mkdir(exist_ok=True)
+
+def get_cached_result(source_path: Skpath) -&gt; dict | None:
+    &quot;&quot;&quot;Get cached result for a file, or None if not cached.&quot;&quot;&quot;
+    
+    # use path.id as cache key - it&#x27;s safe for filenames
+    cache_file = CACHE_DIR / f&quot;{source_path.id}.json&quot;
+    
+    if cache_file.exists():
+        # check if cache is still valid (source hasn&#x27;t changed)
+        cache_mtime = cache_file.stat().st_mtime
+        source_mtime = source_path.stat.st_mtime
+        
+        if cache_mtime &gt; source_mtime:
+            # cache is newer than source - use it
+            return json.loads(cache_file.read_text())
+    
+    return None
+
+def save_cached_result(source_path: Skpath, result: dict):
+    &quot;&quot;&quot;Save result to cache.&quot;&quot;&quot;
+    cache_file = CACHE_DIR / f&quot;{source_path.id}.json&quot;
+    cache_file.write_text(json.dumps(result))
+
+def process_with_cache(path: Skpath) -&gt; dict:
+    &quot;&quot;&quot;Process a file with caching.&quot;&quot;&quot;
+    
+    # try cache first
+    cached = get_cached_result(path)
+    if cached is not None:
+        print(f&quot;Cache hit: {path.rp}&quot;)
+        return cached
+    
+    # cache miss - do expensive processing
+    print(f&quot;Processing: {path.rp}&quot;)
+    result = expensive_processing(path)
+    
+    # save to cache
+    save_cached_result(path, result)
+    return result</code></pre>
+    <h3>Building a file index</h3>
+    <pre><code class="language-python">from suitkaise.paths import Skpath
+from suitkaise import paths
+from dataclasses import dataclass
+from datetime import datetime
+
+@dataclass
+class FileInfo:
+    path: Skpath
+    size: int
+    modified: datetime
+    
+    def to_dict(self) -&gt; dict:
+        return {
+            &quot;id&quot;: self.path.id,
+            &quot;rp&quot;: self.path.rp,
+            &quot;name&quot;: self.path.name,
+            &quot;size&quot;: self.size,
+            &quot;modified&quot;: self.modified.isoformat(),
+        }
+    
+    @classmethod
+    def from_path(cls, path: Skpath) -&gt; &quot;FileInfo&quot;:
+        stat = path.stat
+        return cls(
+            path=path,
+            size=stat.st_size,
+            modified=datetime.fromtimestamp(stat.st_mtime),
+        )
+
+def build_index(root: Skpath = None, extensions: list[str] = None) -&gt; list[FileInfo]:
+    &quot;&quot;&quot;Build an index of files in the project.&quot;&quot;&quot;
+    
+    # use provided root or auto-detect
+    if root is None:
+        root = paths.get_project_root()
+    
+    index = []
+    
+    # get all project paths (respects .gitignore)
+    for file_path in paths.get_project_paths(root=root):
+        # skip directories
+        if not file_path.is_file:
+            continue
+        
+        # filter by extension if specified
+        if extensions and file_path.suffix not in extensions:
+            continue
+        
+        # add to index
+        index.append(FileInfo.from_path(file_path))
+    
+    return index
+
+# build index of Python files
+py_index = build_index(extensions=[&quot;.py&quot;])
+for info in py_index[:5]:
+    print(f&quot;{info.path.rp}: {info.size} bytes&quot;)</code></pre>
+    <h3>Config file loader with relative paths</h3>
+    <pre><code class="language-python">import json
+from suitkaise.paths import Skpath, autopath, AnyPath
+
+class ConfigLoader:
+    &quot;&quot;&quot;Load config files with paths relative to config location.&quot;&quot;&quot;
+    
+    def __init__(self, config_path: AnyPath):
+        # convert to Skpath for easy path manipulation
+        self.config_path = Skpath(config_path)
+        self.config_dir = self.config_path.parent
+        self.config = self._load()
+    
+    def _load(self) -&gt; dict:
+        &quot;&quot;&quot;Load the config file.&quot;&quot;&quot;
+        with open(self.config_path, &quot;r&quot;) as f:
+            return json.load(f)
+    
+    def resolve_path(self, relative_path: str) -&gt; Skpath:
+        &quot;&quot;&quot;Resolve a path relative to the config file location.&quot;&quot;&quot;
+        return self.config_dir / relative_path
+    
+    def get_data_dir(self) -&gt; Skpath:
+        &quot;&quot;&quot;Get the data directory from config.&quot;&quot;&quot;
+        # config might specify: &quot;data_dir&quot;: &quot;./data&quot;
+        # we need to resolve it relative to config location
+        data_dir = self.config.get(&quot;data_dir&quot;, &quot;data&quot;)
+        return self.resolve_path(data_dir)
+    
+    def get_input_files(self) -&gt; list[Skpath]:
+        &quot;&quot;&quot;Get input file paths from config.&quot;&quot;&quot;
+        # config might specify: &quot;input_files&quot;: [&quot;input1.csv&quot;, &quot;input2.csv&quot;]
+        input_files = self.config.get(&quot;input_files&quot;, [])
+        data_dir = self.get_data_dir()
+        return [data_dir / f for f in input_files]
+
+
+# usage
+config = ConfigLoader(&quot;configs/production.json&quot;)
+print(f&quot;Data dir: {config.get_data_dir().rp}&quot;)
+for input_file in config.get_input_files():
+    print(f&quot;Input: {input_file.rp}&quot;)</code></pre>
+        </div>
+    </details>
+    <p>(no dropdown for the full script needed)</p>
+    <h2>Full Script Using <code>paths</code></h2>
+    <p>A complete file organizer that demonstrates cross-platform compatibility, advanced Skpath usage, <code>autopath</code>, and <code>AnyPath</code>.</p>
+    <pre><code class="language-python">&quot;&quot;&quot;
+File Organizer
+
+Organizes files by type into categorized directories.
+Demonstrates:
+- Cross-platform path handling
+- autopath decorator
+- AnyPath type hints
+- Project root detection
+- Path ID encoding
+- File operations
+&quot;&quot;&quot;
+
+import json
+import shutil
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from suitkaise import paths
+from suitkaise.paths import (
+    Skpath,
+    AnyPath,
+    autopath,
+    PathDetectionError,
+    streamline_path_quick,
+)
+
+
+# CONFIGURATION
+
+# file type categories
+FILE_CATEGORIES = {
+    &quot;images&quot;: [&quot;.jpg&quot;, &quot;.jpeg&quot;, &quot;.png&quot;, &quot;.gif&quot;, &quot;.webp&quot;, &quot;.svg&quot;, &quot;.ico&quot;],
+    &quot;documents&quot;: [&quot;.pdf&quot;, &quot;.doc&quot;, &quot;.docx&quot;, &quot;.txt&quot;, &quot;.md&quot;, &quot;.rst&quot;],
+    &quot;code&quot;: [&quot;.py&quot;, &quot;.js&quot;, &quot;.ts&quot;, &quot;.html&quot;, &quot;.css&quot;, &quot;.json&quot;, &quot;.yaml&quot;, &quot;.yml&quot;],
+    &quot;data&quot;: [&quot;.csv&quot;, &quot;.xlsx&quot;, &quot;.xls&quot;, &quot;.sql&quot;, &quot;.db&quot;],
+    &quot;archives&quot;: [&quot;.zip&quot;, &quot;.tar&quot;, &quot;.gz&quot;, &quot;.rar&quot;, &quot;.7z&quot;],
+}
+
+
+# DATA CLASSES
+
+@dataclass
+class OrganizedFile:
+    &quot;&quot;&quot;Record of a file that was organized.&quot;&quot;&quot;
+    original_path: str      # original relative path
+    new_path: str           # new relative path
+    category: str           # file category
+    size: int               # file size in bytes
+    organized_at: str       # ISO timestamp
+    path_id: str            # reversible path ID
+
+
+@dataclass
+class OrganizeResult:
+    &quot;&quot;&quot;Result of an organize operation.&quot;&quot;&quot;
+    source_dir: str
+    output_dir: str
+    files_organized: int = 0
+    files_skipped: int = 0
+    errors: list[str] = field(default_factory=list)
+    organized_files: list[OrganizedFile] = field(default_factory=list)
+
+
+# HELPER FUNCTIONS
+@autopath()
+def get_category(file_path: Skpath) -&gt; str | None:
+    &quot;&quot;&quot;
+    Get the category for a file based on its extension.
+    Returns None if file doesn&#x27;t match any category.
+    &quot;&quot;&quot;
+    suffix = file_path.suffix.lower()
+    
+    for category, extensions in FILE_CATEGORIES.items():
+        if suffix in extensions:
+            return category
+    
+    return None
+
+
+@autopath()
+def ensure_directory(path: Skpath) -&gt; Skpath:
+    &quot;&quot;&quot;
+    Ensure a directory exists, creating it if necessary.
+    Uses autopath so you can pass str, Path, or Skpath.
+    &quot;&quot;&quot;
+    if not path.exists:
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@autopath()
+def safe_copy(source: Skpath, dest: Skpath, overwrite: bool = False) -&gt; Skpath | None:
+    &quot;&quot;&quot;
+    Safely copy a file, handling name conflicts.
+    Returns the destination path, or None if skipped.
+    &quot;&quot;&quot;
+    # check if destination already exists
+    if dest.exists and not overwrite:
+        # generate unique name
+        stem = dest.stem
+        suffix = dest.suffix
+        parent = dest.parent
+        counter = 1
+        
+        while dest.exists:
+            new_name = f&quot;{stem}_{counter}{suffix}&quot;
+            dest = parent / new_name
+            counter += 1
+    
+    # ensure parent directory exists
+    ensure_directory(dest.parent)
+    
+    # copy the file
+    return source.copy_to(dest, overwrite=overwrite)
+
+
+# MAIN ORGANIZER CLASS
+
+class FileOrganizer:
+    &quot;&quot;&quot;
+    Organizes files from a source directory into categorized folders.
+    
+    Cross-platform compatible:
+    - Uses Skpath for normalized path handling
+    - Works on Windows, Mac, and Linux
+    - Stores path IDs for database compatibility
+    &quot;&quot;&quot;
+    
+    def __init__(self, output_dir: AnyPath = None):
+        &quot;&quot;&quot;
+        Initialize the organizer.
+        
+        Args:
+            output_dir: Where to organize files to.
+                       If None, uses &quot;organized&quot; in project root.
+        &quot;&quot;&quot;
+        # get project root for default paths
+        try:
+            self.project_root = paths.get_project_root()
+        except PathDetectionError:
+            # no project root found - use current directory
+            self.project_root = paths.get_cwd()
+        
+        # set output directory
+        if output_dir is None:
+            self.output_dir = self.project_root / &quot;organized&quot;
+        else:
+            self.output_dir = Skpath(output_dir)
+        
+        # ensure output directory exists
+        ensure_directory(self.output_dir)
+        
+        # manifest file to track organized files
+        self.manifest_path = self.output_dir / &quot;manifest.json&quot;
+        self.manifest: list[OrganizedFile] = []
+        
+        # load existing manifest if present
+        self._load_manifest()
+    
+    def _load_manifest(self):
+        &quot;&quot;&quot;Load the manifest file if it exists.&quot;&quot;&quot;
+        if self.manifest_path.exists:
+            with open(self.manifest_path, &quot;r&quot;) as f:
+                data = json.load(f)
+                self.manifest = [
+                    OrganizedFile(**item) for item in data
+                ]
+    
+    def _save_manifest(self):
+        &quot;&quot;&quot;Save the manifest file.&quot;&quot;&quot;
+        with open(self.manifest_path, &quot;w&quot;) as f:
+            json.dump(
+                [vars(item) for item in self.manifest],
+                f,
+                indent=2
+            )
+    
+    @autopath()
+    def organize(
+        self,
+        source_dir: Skpath,
+        recursive: bool = True,
+        dry_run: bool = False
+    ) -&gt; OrganizeResult:
+        &quot;&quot;&quot;
+        Organize files from source directory into categories.
+        
+        Args:
+            source_dir: Directory to organize files from.
+                       Accepts str, Path, or Skpath (via autopath).
+            recursive: Whether to process subdirectories.
+            dry_run: If True, don&#x27;t actually move files.
+        
+        Returns:
+            OrganizeResult with summary of operations.
+        &quot;&quot;&quot;
+        result = OrganizeResult(
+            source_dir=source_dir.rp,
+            output_dir=self.output_dir.rp,
+        )
+        
+        # get files to organize
+        if recursive:
+            files = list(source_dir.rglob(&quot;*&quot;))
+        else:
+            files = list(source_dir.iterdir())
+        
+        for file_path in files:
+            # skip directories
+            if not file_path.is_file:
+                continue
+            
+            # skip hidden files
+            if file_path.name.startswith(&quot;.&quot;):
+                result.files_skipped += 1
+                continue
+            
+            # get category
+            category = get_category(file_path)
+            if category is None:
+                result.files_skipped += 1
+                continue
+            
+            # build destination path
+            # sanitize filename for cross-platform compatibility
+            safe_name = streamline_path_quick(file_path.name)
+            dest_path = self.output_dir / category / safe_name
+            
+            if dry_run:
+                # just record what would happen
+                print(f&quot;Would organize: {file_path.rp} → {dest_path.rp}&quot;)
+                result.files_organized += 1
+                continue
+            
+            # actually copy the file
+            try:
+                copied = safe_copy(file_path, dest_path)
+                
+                if copied:
+                    # record the operation
+                    record = OrganizedFile(
+                        original_path=file_path.rp,
+                        new_path=copied.rp,
+                        category=category,
+                        size=file_path.stat.st_size,
+                        organized_at=datetime.now().isoformat(),
+                        path_id=copied.id,  # store path ID for database
+                    )
+                    self.manifest.append(record)
+                    result.organized_files.append(record)
+                    result.files_organized += 1
+                else:
+                    result.files_skipped += 1
+                    
+            except Exception as e:
+                result.errors.append(f&quot;{file_path.rp}: {str(e)}&quot;)
+        
+        # save manifest
+        if not dry_run:
+            self._save_manifest()
+        
+        return result
+    
+    def get_file_by_id(self, path_id: str) -&gt; Skpath | None:
+        &quot;&quot;&quot;
+        Get an organized file by its path ID.
+        
+        Path IDs are reversible - you can reconstruct the full path.
+        This is useful for database storage.
+        &quot;&quot;&quot;
+        # find in manifest
+        for record in self.manifest:
+            if record.path_id == path_id:
+                return Skpath(path_id)
+        return None
+    
+    def get_files_by_category(self, category: str) -&gt; list[Skpath]:
+        &quot;&quot;&quot;Get all organized files in a category.&quot;&quot;&quot;
+        return [
+            Skpath(record.path_id)
+            for record in self.manifest
+            if record.category == category
+        ]
+    
+    def print_summary(self):
+        &quot;&quot;&quot;Print a summary of organized files.&quot;&quot;&quot;
+        print(f&quot;\n{&#x27;=&#x27;*50}&quot;)
+        print(&quot;File Organizer Summary&quot;)
+        print(f&quot;{&#x27;=&#x27;*50}&quot;)
+        print(f&quot;Output directory: {self.output_dir.rp}&quot;)
+        print(f&quot;Total files: {len(self.manifest)}&quot;)
+        print()
+        
+        # count by category
+        by_category = {}
+        for record in self.manifest:
+            by_category[record.category] = by_category.get(record.category, 0) + 1
+        
+        print(&quot;By category:&quot;)
+        for category, count in sorted(by_category.items()):
+            print(f&quot;  {category}: {count} files&quot;)
+        
+        # show directory tree
+        print()
+        print(&quot;Directory structure:&quot;)
+        tree = paths.get_formatted_project_tree(
+            root=self.output_dir,
+            depth=2,
+            include_files=False
+        )
+        print(tree)
+
+
+# MAIN
+
+def main():
+    &quot;&quot;&quot;Main entry point (self-contained).&quot;&quot;&quot;
+    import tempfile
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_root = Skpath(tmpdir)
+        source_dir = tmp_root / &quot;downloads&quot;
+        output_dir = tmp_root / &quot;organized&quot;
+        
+        # seed some sample files
+        (source_dir / &quot;notes.txt&quot;).write_text(&quot;notes\n&quot; * 10)
+        (source_dir / &quot;script.py&quot;).write_text(&quot;print(&#x27;hello&#x27;)\n&quot;)
+        (source_dir / &quot;data.json&quot;).write_text(&#x27;{&quot;ok&quot;: true}\n&#x27;)
+        (source_dir / &quot;image.png&quot;).write_bytes(b&quot;\x89PNG\r\n\x1a\n&quot;)
+        
+        # create organizer with temp output directory
+        organizer = FileOrganizer(output_dir=output_dir)
+        
+        print(f&quot;Organizing files from: {source_dir.rp}&quot;)
+        print(f&quot;Output directory: {organizer.output_dir.rp}&quot;)
+        print()
+        
+        # dry run
+        print(&quot;Dry run:&quot;)
+        result = organizer.organize(source_dir, dry_run=True)
+        print(f&quot;Would organize {result.files_organized} files&quot;)
+        print(f&quot;Would skip {result.files_skipped} files&quot;)
+        print()
+        
+        # actually organize
+        print(&quot;Organizing...&quot;)
+        result = organizer.organize(source_dir, dry_run=False)
+    
+    # print results
+        print(f&quot;Organized: {result.files_organized} files&quot;)
+        print(f&quot;Skipped: {result.files_skipped} files&quot;)
+        
+        if result.errors:
+            print(f&quot;Errors: {len(result.errors)}&quot;)
+            for error in result.errors[:5]:
+                print(f&quot;  - {error}&quot;)
+        
+        # show summary
+        organizer.print_summary()
+        
+        # demonstrate path ID retrieval
+        if organizer.manifest:
+            print()
+            print(&quot;Path ID demonstration:&quot;)
+            record = organizer.manifest[0]
+            print(f&quot;  Original: {record.original_path}&quot;)
+            print(f&quot;  Path ID: {record.path_id}&quot;)
+            
+            # reconstruct path from ID
+            reconstructed = Skpath(record.path_id)
+            print(f&quot;  Reconstructed: {reconstructed.rp}&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
+</section>

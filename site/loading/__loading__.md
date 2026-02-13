@@ -63,12 +63,12 @@ __code__/
     ├── processing-tests.html
     ├── cucumber-videos.html
     ├── cucumber-tests.html
-    ├── sktime-videos.html
-    ├── sktime-tests.html
-    ├── skpath-videos.html
-    ├── skpath-tests.html
-    ├── circuit-videos.html
-    └── circuit-tests.html
+    ├── timing-videos.html
+    ├── timing-tests.html
+    ├── paths-videos.html
+    ├── paths-tests.html
+    ├── circuits-videos.html
+    └── circuits-tests.html
 
 ## 6. Adding New Lazy Pages
 

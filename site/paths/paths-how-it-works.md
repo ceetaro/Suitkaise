@@ -1,6 +1,6 @@
 /*
 
-how the skpath module actually works.
+synced from suitkaise-docs/paths/how-it-works.md
 
 */
 
@@ -9,335 +9,352 @@ columns = 1
 
 # 1.1
 
-title = "How `skpath` actually works"
+title = "How `paths` actually works"
+
+# 1.2
 
 text = "
+`paths` provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.
 
-`skpath` has no dependencies outside of the standard library.
+- `Skpath` - enhanced path object with automatic project root detection
+- `autopath` - decorator for automatic path type conversion
+- `AnyPath` - streamline path handling using this union type
+- utility functions for project paths, validation, and sanitization
 
-- uses forward slashes (`/`) for all paths internally, regardless of operating system
-- automatically detects project root by walking up directories looking for indicator files
-- all shared state is thread-safe using `threading.RLock()`
+All paths use normalized separators (`/`) internally for cross-platform consistency.
 
----
+## `Skpath`
 
-## `SKPath` class
+Enhanced path object that wraps `pathlib.Path`.
 
-The `SKPath` class is an enhanced path object that wraps Python's `pathlib.Path` while adding project-aware normalization.
+Arguments
+`path`: Path to wrap.
+- `str | Path | Skpath | None = None`
+- If `None`, uses the caller's file path
 
-Initialize with:
-- `path`: a string, `Path`, `SKPath`, or `None` (uses caller's file path)
+Returns
+`Skpath`: A new `Skpath` object.
+
+When you create an `Skpath`, it automatically:
+1. Detects the project root
+2. Computes the absolute path (`ap`)
+3. Computes the relative path to root (`rp`)
+4. Generates a reversible encoded ID (`id`)
+
+```
+Skpath("feature/file.txt") → detects root → computes ap, rp, id
+```
+
+`Skpath` defines a module-level `threading.RLock` (`_skpath_lock`) for potential thread-safe operations.
+
+### Tracking state
+
+`_path: Path`
+The underlying `pathlib.Path` object. Always resolved to an absolute path.
+
+`_root: Path | None`
+Cached project root. Lazily detected on first access.
+
+`_ap: str | None`
+Cached absolute path with normalized separators. Lazily computed.
+
+`_rp: str | None`
+Cached relative path to project root. Lazily computed.
+
+`_id: str | None`
+Cached base64url encoded ID. Lazily computed.
+
+`_hash: int | None`
+Cached hash value for use in sets and dicts.
+
+### `__init__(path: str | Path | Skpath | None = None)`
+
+The constructor handles four input types.
 
 ```python
-from suitkaise.skpath import SKPath
-
-# From string
-path = SKPath("myproject/feature/file.txt")
-
-# From Path
-path = SKPath(Path("myproject/feature/file.txt"))
-
-# From caller's file (no argument)
-path = SKPath()
-
-# From encoded ID
-path = SKPath(encoded_id_string)
+def __init__(self, path: str | Path | Skpath | None = None):
+    # initialize cached values
+    self._path: Path
+    self._root: Path | None = None
+    self._ap: str | None = None
+    self._rp: str | None = None
+    self._id: str | None = None
+    self._hash: int | None = None
+    
+    if path is None:
+        # detect caller's file path using frame inspection
+        self._path = detect_caller_path()
+    
+    elif isinstance(path, Skpath):
+        # copy all values from source (avoids recomputation)
+        self._path = path._path
+        self._root = path._root
+        self._ap = path._ap
+        self._rp = path._rp
+        self._id = path._id
+        self._hash = path._hash
+    
+    elif isinstance(path, Path):
+        # resolve to absolute path
+        self._path = path.resolve()
+    
+    elif isinstance(path, str):
+        # try multiple interpretations
+        self._path = self._resolve_string_path(path)
 ```
 
-### `SKPath.__init__()`
+If `path` is `None`:
+Uses `detect_caller_path()` which inspects the call stack to find the file that called `Skpath()`. This allows `Skpath()` to return a path to "this file" without passing any argument.
 
-1. If `path` is `None`:
-   - Inspects the call stack using `inspect.stack()`
-   - Skips all frames from within the suitkaise package
-   - Returns the file path of the first external caller
-   - Raises `PathDetectionError` if no external caller found
+If `path` is `Skpath`:
+Copies all cached values directly. This is an optimization - if someone passes an existing Skpath, we don't recompute `ap`, `rp`, `id`, etc.
 
-2. If `path` is an `SKPath`:
-   - Copies all cached values (`_path`, `_root`, `_ap`, `_np`, `_id`, `_hash`)
-   - This is efficient because computed values are preserved
+If `path` is `Path`:
+Calls `.resolve()` to get an absolute path with symlinks resolved.
 
-3. If `path` is a `Path`:
-   - Calls `.resolve()` to get the absolute path
-   - Stores as `_path`
+If `path` is `str`:
+Calls `_resolve_string_path()` which tries multiple interpretations (see below).
 
-4. If `path` is a `str`:
-   - Calls `_resolve_string_path()` which:
-     - If it contains `/` or `\` → treats as path
-     - If it exists on disk → treats as path
-     - If it looks like base64url (no separators, valid chars) → tries to decode as ID
-     - Falls back to treating as path
+### String path resolution
 
-### Core Properties
+`_resolve_string_path()` tries multiple interpretations.
 
-#### `SKPath.ap` (absolute path)
+1. If string contains `/` or `\`:
+   - Treat as path, resolve to absolute
+2. If string exists as a file/directory:
+   - Treat as relative path, resolve to absolute
+3. If string looks like a base64url encoded ID:
+   - Try to decode it
+   - If decoded path is relative, resolve from project root
+   - Use the resolved path even if it doesn't exist yet
+4. Fall back to treating as path (may not exist)
 
-Returns the absolute path with normalized separators (`/`).
+### Core properties
 
-1. Checks if `_ap` is cached
-2. If not cached:
-   - Converts `_path` to string
-   - Replaces all `\` with `/`
-   - Caches the result
-3. Returns the cached value
+#### `ap` (absolute path)
 
-Always available, even for paths outside the project root.
-
-#### `SKPath.np` (normalized path)
-
-Returns the path relative to the project root.
-
-1. Checks if `_np` is cached
-2. If not cached:
-   - Gets the project root via `root_path` property
-   - Calculates `_path.relative_to(root)`
-   - Normalizes separators to `/`
-   - If path is outside root, returns empty string `""`
-   - Caches the result
-3. Returns the cached value
-
-Returns `""` (empty string) if the path is outside the project root.
-
-#### `SKPath.platform` (platform-native path)
-
-Returns the absolute path with platform-native separators.
-
-1. Gets `ap` (absolute path with forward slashes)
-2. On Windows (`os.sep == "\\"`):
-   - Converts `/` to `\`
-3. On Mac/Linux:
-   - Returns as-is (already uses `/`)
-
-Use this when you need to:
-- Pass paths to OS-specific tools or APIs
-- Display paths to users in their native format
-- Integrate with platform-specific libraries
-
-#### `SKPath.id` (encoded ID)
-
-Returns a reversible base64url-encoded ID for the path.
-
-1. Checks if `_id` is cached
-2. If not cached:
-   - Uses `np` if available, otherwise uses `ap`
-   - Encodes using `base64.urlsafe_b64encode()`
-   - Strips padding (`=`) for cleaner IDs
-   - Caches the result
-3. Returns the cached value
-
-The ID can be used to reconstruct the path later: `SKPath(encoded_id)`
-
-#### `SKPath.root`, `SKPath.root_str`, and `SKPath.root_path`
-
-Three ways to access the project root:
-
-- `root` returns the project root as an `SKPath` object
-- `root_str` returns the project root as a string with normalized separators (`/`)
-- `root_path` returns the project root as a `Path` object
-
-All three use the same cached `_root` value internally:
-
-1. Checks if `_root` is cached
-2. If not cached:
-   - Calls `detect_project_root(from_path=self._path)`
-   - Caches the result as a `Path`
-3. Returns the cached value, converted to the appropriate type:
-   - `root` wraps the `Path` in an `SKPath`
-   - `root_str` normalizes separators and returns as string
-   - `root_path` returns the `Path` directly
-
-### `__hash__` and `__eq__`
-
-#### `SKPath.__hash__()`
-
-Returns an integer hash for use in sets and dict keys.
-
-1. Checks if `_hash` is cached
-2. If not cached:
-   - Uses `np` if available, otherwise uses `ap`
-   - Computes MD5 hash of the normalized path string
-   - Converts first 16 hex characters to integer
-   - Caches the result
-3. Returns the cached value
-
-MD5 is used (not the encoded ID) because:
-- Fixed length output
-- Fast computation
-- Returns an integer (required for `__hash__`)
-
-#### `SKPath.__eq__(other)`
-
-Compares two paths for equality.
-
-1. If `other` is `None`, returns `False`
-2. Converts `other` to `SKPath` if it's a string or `Path`
-3. Compares `np` first:
-   - If both have non-empty `np` and they match → return `True`
-4. Falls back to comparing `ap`:
-   - If `ap` values match → return `True`
-5. Returns `False` otherwise
-
-The fallback to `ap` handles paths outside the project root (where `np` is empty).
-
-### `__fspath__` and `__str__`
-
-#### `SKPath.__fspath__()`
-
-Returns the path for `os.fspath()` compatibility (used by `open()`, etc.).
-
-1. Gets `ap` (absolute path with forward slashes)
-2. If on Windows (`os.sep == "\\"`):
-   - Converts `/` back to `\` for OS compatibility
-3. Returns the OS-native path string
-
-#### `SKPath.__str__()`
-
-Returns `ap` (absolute path with normalized separators).
-
-This means `str(skpath)` always gives you a cross-platform compatible path string.
-
-### `__truediv__` (path joining)
-
-Supports the `/` operator for joining paths.
+Absolute path with normalized separators (`/`).
 
 ```python
-child = path / "subdir" / "file.txt"
+@property
+def ap(self) -> str:
+    if self._ap is None:
+        self._ap = normalize_separators(str(self._path))
+    return self._ap
 ```
 
-1. If `other` is an `SKPath`:
-   - Uses just the name if it's an absolute path
-   - Uses the full path otherwise
-2. Creates new `SKPath` from `self._path / other_str`
+Always available, even for paths outside project root.
 
----
+#### `rp` (relative path)
 
-## Root Detection
-
-The root detection system finds your project's root directory automatically.
-
-### Detection Priority
-
-1. **Custom root** — if set via `set_custom_root()`, always used
-2. **setup.sk file** — highest priority indicator (Suitkaise marker)
-3. **Standard indicators** — walks up looking for project files
-
-### Indicator Files
-
-**Definitive Indicators** (if found, this IS the root):
-- `setup.sk`
-- `setup.py`
-- `setup.cfg`
-- `pyproject.toml`
-
-**Strong Indicators**:
-- `.gitignore`
-- `.git`
-
-**Pattern Indicators** (case-insensitive):
-- License files: `LICENSE`, `LICENSE.txt`, `license.md`, etc.
-- README files: `README`, `README.md`, `readme.txt`, etc.
-- Requirements: `requirements.txt`, `requirements.pip`, etc.
-
-### `detect_project_root()`
-
-Arguments:
-- `from_path`: Path to start searching from (default: current working directory)
-- `expected_name`: If provided, detected root must have this name
-
-Returns:
-- `Path` object pointing to project root
-
-1. Checks for custom root:
-   - If set and matches `expected_name` (or no name required) → return it
-   - If set but doesn't match → raise `PathDetectionError`
-
-2. Checks cache:
-   - If we've detected a root before and `from_path` is within it → return cached
-
-3. First pass — looks for `setup.sk`:
-   - Walks up from `from_path` to filesystem root
-   - If `setup.sk` found → return that directory immediately
-
-4. Second pass — looks for any indicator:
-   - Walks up from `from_path`
-   - Tracks the "best" root found (outermost directory with indicators)
-   - This handles nested projects correctly
-
-5. If no root found → raise `PathDetectionError`
-
-6. Caches the result for future calls
-
-### Custom Root Management
-
-#### `set_custom_root(path)`
-
-Sets a custom project root, overriding automatic detection.
-
-1. Converts to `Path` if string
-2. Calls `.resolve()` for absolute path
-3. Validates path exists and is a directory
-4. Acquires lock and stores in `_custom_root`
-
-Thread-safe operation.
-
-#### `get_custom_root()`
-
-Returns the current custom root as a string (or `None`).
-
-#### `clear_custom_root()`
-
-Clears the custom root, reverting to automatic detection.
-
-### `CustomRoot` Context Manager
-
-Temporarily sets a custom root for a code block.
+Path relative to project root with normalized separators.
 
 ```python
-with CustomRoot("/path/to/project"):
-    # All SKPath operations use this root
-    path = SKPath("feature/file.txt")
-# Original root restored
+@property
+def rp(self) -> str:
+    if self._rp is None:
+        self._rp = self._compute_rp()
+    return self._rp
+
+def _compute_rp(self) -> str:
+    try:
+        root = self.root_path
+        rel_path = self._path.relative_to(root)
+        return normalize_separators(str(rel_path))
+    except (ValueError, PathDetectionError):
+        return ""  # outside project root
 ```
 
-1. `__enter__`:
-   - Saves the current `_custom_root`
-   - Calls `set_custom_root()` with new path
+Returns empty string if path is outside project root.
 
-2. `__exit__`:
-   - Restores the previous `_custom_root`
+#### `id` (encoded ID)
 
-Uses `RLock` so it can be nested from the same thread.
+Reversible base64url encoded ID.
 
----
+```python
+@property
+def id(self) -> str:
+    if self._id is None:
+        path_to_encode = self.rp if self.rp else self.ap
+        self._id = encode_path_id(path_to_encode)
+    return self._id
+```
 
-## `@autopath` Decorator
+Uses `rp` if available (for cross-platform compatibility), otherwise `ap`.
 
-The `@autopath` decorator automatically normalizes paths and converts them to the types that a function expects.
+Can be used to reconstruct the path: `Skpath(encoded_id)`.
 
-### How It Works
+#### `root`, `root_str`, `root_path`
 
-At decoration time:
-1. Analyzes the function's signature and type annotations
-2. For each parameter, determines:
-   - Is it a path type? (`str`, `Path`, `SKPath`, or `AnyPath`)
-   - Is it an iterable of path types? (`list[AnyPath]`, etc.)
-   - What's the target type to convert to?
-3. If `only` is specified, filters to only those parameter names
+Project root access in different formats.
 
-At call time:
-1. If `use_caller=True` and a path parameter is missing:
-   - Inspects call stack to find caller's file
-   - Uses that as the default value
-2. For each path parameter:
-   - Normalizes the value through SKPath (resolves path, normalizes separators)
-   - Converts to the target type
-3. Calls the original function with converted values
+- `root` → `Skpath` object
+- `root_str` → `str` with normalized separators
+- `root_path` → `pathlib.Path` object
 
-### Path Normalization
+### pathlib compatibility
 
-All path-like inputs flow through SKPath before conversion to the target type:
+`Skpath` mirrors most `pathlib.Path` properties and methods, including file IO helpers like `read_text()`, `write_text()`, `read_bytes()`, and `write_bytes()`.
+
+Properties: `name`, `stem`, `suffix`, `suffixes`, `parent`, `parents`, `parts`, `exists`, `is_file`, `is_dir`, `is_symlink`, `is_empty`, `stat`, `lstat`
+
+Methods: `iterdir()`, `glob()`, `rglob()`, `relative_to()`, `with_name()`, `with_stem()`, `with_suffix()`, `mkdir()`, `touch()`, `rmdir()`, `unlink()`, `resolve()`, `absolute()`
+
+Additional methods: `copy_to()`, `move_to()` (with `overwrite` and `parents` options)
+
+Additional properties:
+- `as_dict`: Dictionary representation with `ap`, `rp`, `root`, `name`, `exists`
+- `platform`: Absolute path with OS-native separators (backslash on Windows)
+
+### Path joining
+
+`Skpath` supports the `/` operator for joining paths.
+
+```python
+def __truediv__(self, other: str | Path | Skpath) -> Skpath:
+    return Skpath(self._path / other_str)
+```
+
+### Equality and hashing
+
+Equality compares `rp` first (for cross-platform consistency), then falls back to `ap`.
+
+```python
+def __eq__(self, other: Any) -> bool:
+    if self.rp and other_skpath.rp and self.rp == other_skpath.rp:
+        return True
+    return self.ap == other_skpath.ap
+```
+
+Hashing uses MD5 of `rp` (or `ap` if outside project root).
+
+### `__fspath__` compatibility
+
+`Skpath` implements `__fspath__()` to work with `open()`, `os.path`, etc.:
+
+```python
+def __fspath__(self) -> str:
+    return to_os_separators(self.ap)
+```
+
+Returns OS-native separators (`\` on Windows, `/` elsewhere).
+
+## Project Root Detection
+
+Root detection walks up from a path looking for project indicators.
+
+### Detection priority
+
+1. Custom root (if set via `set_custom_root()`)
+2. `setup.sk` file (`suitkaise` marker - highest priority)
+3. Definitive indicators: `setup.py`, `setup.cfg`, `pyproject.toml`
+4. Strong indicators: `.git`, `.gitignore`
+5. License files: `LICENSE`, `LICENSE.txt`, etc. (case-insensitive)
+6. README files: `README.md`, `README.txt`, etc. (case-insensitive)
+7. Requirements files: `requirements.txt`, etc.
+
+### Algorithm
+
+```python
+def _find_root_from_path(start_path: Path) -> Path | None:
+    # First pass: look for setup.sk specifically
+    check_path = current
+    while check_path != check_path.parent:
+        if (check_path / "setup.sk").exists():
+            return check_path
+        check_path = check_path.parent
+    
+    # Second pass: look for any indicator
+    # Keep going up to find outermost root (handles nested projects)
+    check_path = current
+    best_root = None
+    while check_path != check_path.parent:
+        if _has_indicator(check_path):
+            best_root = check_path
+        check_path = check_path.parent
+    
+    return best_root
+```
+
+### Caching
+
+Detected roots are cached to avoid repeated filesystem walks.
+
+```python
+_cached_root: Path | None = None
+_cached_root_source: Path | None = None  # path used to detect cached root
+```
+
+Cache is invalidated when searching from a path outside the cached root.
+
+Use `clear_root_cache()` to manually clear the cache.
+
+### Custom root management
+
+`set_custom_root(path)`: Override automatic detection.
+
+`get_custom_root()`: Get current custom root (or `None`).
+
+`clear_custom_root()`: Revert to automatic detection.
+
+`CustomRoot(path)`: Context manager for temporary override.
+
+All operations are thread-safe using `threading.RLock`.
+
+## `autopath` Decorator
+
+Decorator that automatically converts path parameters based on type annotations.
+
+Arguments
+`use_caller`: If True, parameters that accept `Skpath` or `Path` will use the caller's file path if no value was provided.
+- `bool = False`
+- keyword only
+
+`debug`: If True, print messages when conversions occur.
+- `bool = False`
+- keyword only
+
+`only`: Only apply autopath to specific params.
+- `str | list[str] | None = None`
+- If None, all path-like params are normalized (strs, Paths, Skpaths). If a param accepts str or list[str] and is listed in only, autopath will apply. If only is not None AND a param is not listed in only, autopath will not be applied to values being passed into that param.
+
+### How it works
+
+1. Inspects function signature and type hints
+2. Identifies parameters annotated with path types
+3. Wraps the function to convert inputs before calling
+
+```python
+@autopath()
+def process(path: Skpath):
+    # path is guaranteed to be Skpath
+    ...
+
+# Equivalent to:
+def process(path):
+    path = Skpath(path) # conversion happens here
+    ...
+```
+
+### Type detection
+
+The decorator recognizes:
+- Direct types: `Skpath`, `Path`, `str`
+- Union types: `str | Path | Skpath` (AnyPath)
+- Iterables: `list[Skpath]`, `tuple[Path, ...]`, `set[str]`
+
+For union types, it picks the richest type.
+
+- If `Skpath` is in the union → convert to `Skpath`
+- Else if `Path` is in the union → convert to `Path`
+- Else if `str` is in the union → convert to `str`
+
+### Conversion
+
+All path-like inputs flow through `Skpath` for normalization.
 
 ```
-input → SKPath → best target type
+input → Skpath → target type
 ```
 
 This ensures:
@@ -345,262 +362,512 @@ This ensures:
 - Normalized separators (always `/`)
 - Cross-platform consistency
 
-For example, `"./data\\file.txt"` becomes `"/abs/path/data/file.txt"`.
+```python
+def _convert_value(value, target_type, ...):
+    if target_type is Skpath:
+        return Skpath(value)
+    elif target_type is Path:
+        return Path(Skpath(value).ap)
+    elif target_type is str:
+        return Skpath(value).ap
+```
 
-### Type Conversion Priority
+### `use_caller` option
 
-When determining what type to convert to, `@autopath` picks the "best" type:
+When `use_caller=True`, missing path parameters are filled with the caller's file path.
 
-1. `SKPath` — if `SKPath` is in the annotation (including `AnyPath`)
-2. `Path` — if `Path` is in the annotation (but not `SKPath`)
-3. `str` — if only `str` is in the annotation
+```python
+@autopath(use_caller=True)
+def log_from(path: Skpath = None):
+    print(f"Logging from: {path.rp}")
 
-Examples:
-- `path: AnyPath` → converts to `SKPath`
-- `path: SKPath` → converts to `SKPath`
-- `path: Path` → converts to `Path`
-- `path: str` → converts to `str` (normalized absolute path)
-- `path: Path | SKPath` → converts to `SKPath`
-- `path: str | Path` → converts to `Path`
+# Called without argument - uses caller's file
+log_from() # logs the file that called log_from()
+```
 
-### Iterable Handling
+### `only` option
 
-Works with common iterables:
-- `list[AnyPath]` → each element converted
-- `tuple[Path, ...]` → each element converted
-- `set[SKPath]` → each element converted
-
-The container type is preserved (list → list, tuple → tuple, etc.).
-
-### `only` Option
-
-Restricts normalization to specific parameters. Use this when you have `str` or `list[str]` parameters that aren't actually file paths.
+Restrict conversion to specific parameters.
 
 ```python
 @autopath(only="file_path")
 def process(file_path: str, names: list[str]):
-    # Only file_path is normalized
-    # names is passed through unchanged
+    # only file_path is normalized
+    # names is left unchanged (faster for large lists)
+    ...
 ```
+
+## General Utility Functions
+
+### `get_project_root()`
+
+Get the project root directory.
 
 ```python
-@autopath(only=["input", "output"])
-def copy(input: str, output: str, tags: list[str]):
-    # input and output are normalized
-    # tags is left unchanged
+def get_project_root(expected_name: str | None = None) -> Skpath:
+    root_path = detect_project_root(expected_name=expected_name)
+    return Skpath(root_path)
 ```
 
-### Performance Benchmarks
+Arguments
+`expected_name`: If provided, detected root must have this name.
+- `str | None = None`
+- positional or keyword
 
-`@autopath` costs about 17-18 microseconds per path. 
+Returns
+`Skpath`: Project root directory.
 
-When you have a large collection of strings that aren't paths, using `only` to only work on the correct parameters will increase performance.
+Raises
+`PathDetectionError`: If root cannot be detected or doesn't match expected name.
 
-### `use_caller` Option
+### `get_caller_path()`
 
-When `use_caller=True`:
-1. Gets the caller's file path by inspecting the stack
-2. For parameters that accept `SKPath` or `Path` and have no value:
-   - Uses the caller's file path as the default
+Get the file path of the caller.
 
-This lets you write functions like:
 ```python
-@autopath(use_caller=True)
-def log_from(path: AnyPath):
-    print(f"Log from: {path.np}")
-
-log_from()  # Uses caller's file automatically
+def get_caller_path() -> Skpath:
+    caller = detect_caller_path(skip_frames=1)
+    return Skpath(caller)
 ```
 
-### `debug` Option
+Uses `detect_caller_path()` which inspects the call stack, skipping internal frames to find the actual caller.
 
-When `debug=True`:
-- Prints a message for each conversion or normalization
-- Format: `"@autopath: Converted {param}: {from_type} → {to_type}"`
-- For same-type normalization: `"@autopath: Normalized {param}: '{old}' → '{new}'"`
+Returns
+`Skpath`: Caller's file path.
 
----
+Raises
+`PathDetectionError`: If caller detection fails.
 
-## Caller Detection
+### `get_current_dir()`
 
-The caller detection system finds the file path of the code that called a function.
+Get the directory containing the caller's file.
 
-### `get_caller_path()` / `detect_caller_path()`
+```python
+def get_current_dir() -> Skpath:
+    caller = detect_caller_path(skip_frames=1)
+    return Skpath(caller.parent)
+```
 
-1. Calls `inspect.stack()` to get the call stack
-2. Iterates through frames
-3. Skips all frames from within the suitkaise package:
-   - Determines suitkaise path at import time
-   - Compares each frame's filename
-4. Skips built-in/frozen modules (filenames starting with `<`)
-5. Returns the first external frame's filename as a `Path`
-6. Raises `PathDetectionError` if no external caller found
+Returns
+`Skpath`: Caller's directory.
 
-The suitkaise package path is cached at module load time for efficiency.
+### `get_cwd()`
 
-### `get_module_path(obj)`
+Get the current working directory.
 
-Gets the file path where an object is defined.
+```python
+def get_cwd() -> Skpath:
+    return Skpath(get_cwd_path())
+```
 
-1. If `obj` is a string:
-   - Looks up in `sys.modules`
-   - If not found, tries `importlib.import_module()`
+Uses `Path.cwd()` internally.
 
-2. If `obj` is a module:
-   - Uses it directly
+Returns
+`Skpath`: Current working directory.
 
-3. If `obj` has `__module__` attribute:
-   - Looks up that module name in `sys.modules`
+### `get_module_path()`
 
-4. Gets `__file__` from the module
-5. Returns as `Path`, or `None` if not found
+Get the file path where an object is defined.
 
----
+```python
+def get_module_path(obj: Any) -> Skpath | None:
+    path = get_module_file_path(obj)
+    if path is None:
+        return None
+    return Skpath(path)
+```
 
-## ID Encoding/Decoding
+Arguments
+`obj`: Object to inspect (module, class, function, etc.).
+- `Any`
+- required
 
-### `encode_path_id(path_str)`
+The function handles:
+- Module objects: Uses `__file__` attribute
+- Module name strings: Imports the module, then uses `__file__`
+- Objects with `__module__`: Gets the module, then uses `__file__`
 
-1. Normalizes separators to `/`
-2. Encodes to bytes using UTF-8
-3. Base64url encodes (`urlsafe_b64encode`)
-4. Strips padding (`=`) for cleaner IDs
-5. Returns as string
+Returns
+`Skpath | None`: Module file path, or None if not found.
 
-### `decode_path_id(encoded_id)`
+Raises
+`ImportError`: If obj is a module name string that cannot be imported.
 
-1. Adds back padding if needed
-2. Base64url decodes
-3. Decodes bytes to string using UTF-8
-4. Returns the path string (or `None` if decoding fails)
+### `get_id()`
 
-### `is_valid_encoded_id(s)`
+Get the reversible encoded ID for a path.
 
-Heuristic check for whether a string looks like an encoded ID:
-- Not empty
-- No path separators (`/` or `\`)
-- No spaces
-- All characters are valid base64url (`A-Za-z0-9-_=`)
+```python
+def get_id(path: str | Path | Skpath) -> str:
+    if isinstance(path, Skpath):
+        return path.id
+    return Skpath(path).id
+```
 
----
+Arguments
+`path`: Path to generate ID for.
+- `str | Path | Skpath`
+- required
 
-## Project Utilities
+Returns
+`str`: Base64url encoded ID.
 
 ### `get_project_paths()`
 
-Returns all paths in the project.
+Get all paths in the project.
 
-1. Resolves root (custom or auto-detected)
-2. Collects ignore patterns from `.*ignore` files
-3. Walks directory tree with `os.walk()`
-4. For each file/directory:
-   - Checks against exclude list
-   - Checks against ignore patterns
-   - Adds to results (as `SKPath` or string)
-5. Returns the list
+```python
+def get_project_paths(
+    root: str | Path | Skpath | None = None,
+    exclude: str | Path | Skpath | list[...] | None = None,
+    as_strings: bool = False,
+    use_ignore_files: bool = True,
+) -> list[Skpath] | list[str]:
+    return _get_project_paths(
+        root=root,
+        exclude=exclude,
+        as_strings=as_strings,
+        use_ignore_files=use_ignore_files,
+    )
+```
 
-### Ignore File Parsing
+Arguments
+`root`: Custom root directory (defaults to detected project root).
+- `str | Path | Skpath | None = None`
+- keyword only
 
-Supports gitignore-style patterns:
-- Comments (`#`)
-- Directory patterns (`dir/`)
-- Wildcard patterns (`*.txt`)
-- Path patterns (`src/*.py`)
+`exclude`: Paths to exclude (single path or list).
+- `str | Path | Skpath | list[...] | None = None`
+- keyword only
 
-Reads all files ending in `ignore` (`.gitignore`, `.cursorignore`, etc.).
+`as_strings`: Return string paths instead of Skpath objects.
+- `bool = False`
+- keyword only
+
+`use_ignore_files`: Respect .gitignore, .cursorignore, etc.
+- `bool = True`
+- keyword only
+
+The function:
+1. Detects or uses provided root
+2. Walks the directory tree
+3. Filters out paths matching `.*ignore` patterns (if enabled)
+4. Filters out explicitly excluded paths
+5. Returns as Skpath objects or strings
+
+Returns
+`list[Skpath] | list[str]`: All project paths.
+
+Raises
+`PathDetectionError`: If project root cannot be detected.
 
 ### `get_project_structure()`
 
-Returns a nested dict representing the project hierarchy.
+Get a nested dict representing the project structure.
 
-1. Gets all paths using `get_project_paths()`
-2. For each path:
-   - Splits into parts
-   - Builds nested dict structure
-3. Returns the structure
+```python
+def get_project_structure(
+    root: str | Path | Skpath | None = None,
+    exclude: str | Path | Skpath | list[...] | None = None,
+    use_ignore_files: bool = True,
+) -> dict:
+    return _get_project_structure(
+        root=root,
+        exclude=exclude,
+        use_ignore_files=use_ignore_files,
+    )
+```
+
+Arguments
+`root`: Custom root directory.
+- `str | Path | Skpath | None = None`
+- keyword only
+
+`exclude`: Paths to exclude.
+- `str | Path | Skpath | list[...] | None = None`
+- keyword only
+
+`use_ignore_files`: Respect .gitignore, .cursorignore, etc.
+- `bool = True`
+- keyword only
+
+Returns a nested dict where:
+- Keys are directory/file names
+- Values are empty dicts for files, nested dicts for directories
+
+```python
+{
+    "myproject": {
+        "src": {
+            "main.py": {},
+            "utils.py": {}
+        },
+        "tests": {...}
+    }
+}
+```
+
+Returns
+`dict`: Nested dictionary of project structure.
+
+Raises
+`PathDetectionError`: If project root cannot be detected.
 
 ### `get_formatted_project_tree()`
 
-Returns a visual tree string.
+Get a formatted tree string for the project structure.
 
-1. Resolves root and ignore patterns
-2. Recursively formats using tree characters:
-   - `├──` for non-last items
-   - `└──` for last items
-   - `│   ` for continuation lines
-   - `    ` for spacing after last items
-3. Respects `depth` limit
-4. Optionally includes/excludes files
+```python
+def get_formatted_project_tree(
+    root: str | Path | Skpath | None = None,
+    exclude: str | Path | Skpath | list[...] | None = None,
+    use_ignore_files: bool = True,
+    depth: int | None = None,
+    include_files: bool = True,
+) -> str:
+    return _get_formatted_project_tree(
+        root=root,
+        exclude=exclude,
+        use_ignore_files=use_ignore_files,
+        depth=depth,
+        include_files=include_files,
+    )
+```
 
----
+Arguments
+`root`: Custom root directory.
+- `str | Path | Skpath | None = None`
+- keyword only
 
-## Thread Safety
+`exclude`: Paths to exclude.
+- `str | Path | Skpath | list[...] | None = None`
+- keyword only
 
-All shared state uses `threading.RLock()` (reentrant locks):
+`use_ignore_files`: Respect .gitignore, .cursorignore, etc.
+- `bool = True`
+- keyword only
 
-- `_root_lock` — protects custom root state
-- `_cache_lock` — protects root detection cache
-- `_caller_lock` — protects suitkaise path cache
-- `_autopath_lock` — available for future use
-- `_project_lock` — available for future use
+`depth`: Maximum depth to display (None = no limit).
+- `int | None = None`
+- keyword only
 
-(this is a dropdown)
-### What is a reentrant lock?
+`include_files`: Include files in the tree.
+- `bool = True`
+- keyword only
 
-A reentrant lock can be acquired multiple times by the same thread without deadlocking. This is important because:
-- SKPath operations often call other SKPath operations
-- The same thread might need to acquire a lock it already holds
-- Regular locks would deadlock in this situation
+Uses box-drawing characters (`│`, `├─`, `└─`) to create visual hierarchy:
 
-(end of dropdown)
+```
+myproject/
+├── src/
+│   ├── main.py
+│   └── utils/
+└── tests/
+    └── test_main.py
+```
 
----
+Returns
+`str`: Formatted tree string.
 
-## Memory and Caching
+Raises
+`PathDetectionError`: If project root cannot be detected.
 
-### SKPath Caching
+## Path ID Encoding
 
-Each `SKPath` instance caches computed values:
-- `_ap` — computed on first access to `ap`
-- `_np` — computed on first access to `np`
-- `_id` — computed on first access to `id`
-- `_hash` — computed on first access to `__hash__`
-- `_root` — computed on first access to `root_path`
+Path IDs use base64url encoding for safe transport.
 
-This means repeated access to properties is fast (no recomputation).
+```python
+def encode_path_id(path_str: str) -> str:
+    # normalize path separators first
+    normalized = normalize_separators(path_str)
+    encoded = base64.urlsafe_b64encode(normalized.encode("utf-8"))
+    # remove padding for cleaner IDs
+    return encoded.decode("utf-8").rstrip("=")
 
-### Root Detection Caching
+def decode_path_id(encoded_id: str) -> str | None:
+    try:
+        # add back padding if needed
+        padding = 4 - (len(encoded_id) % 4)
+        if padding != 4:
+            encoded_id += "=" * padding
+        
+        decoded = base64.urlsafe_b64decode(encoded_id.encode("utf-8"))
+        return decoded.decode("utf-8")
+    except Exception:
+        return None
+```
 
-The detected project root is cached at module level:
-- `_cached_root` — the detected root
-- `_cached_root_source` — the path used for detection
+The encoding is:
+- URL-safe (uses `-` and `_` instead of `+` and `/`)
+- Reversible (can reconstruct original path)
+- Padding-stripped (for cleaner IDs)
+- Path separators normalized to `/` before encoding
 
-Cache is invalidated when:
-- A new path outside the cached root is used
-- `clear_root_cache()` is called
+## Path Validation and Sanitization
 
-### Suitkaise Path Caching
+### `is_valid_filename()`
 
-The suitkaise package path (for caller detection) is computed once at first use and cached for the lifetime of the process.
+Arguments
+`filename`: Filename to validate.
+- `str`
+- required
 
----
+Returns
+`bool`: True if valid, False otherwise.
 
-## Error Handling
+Checks if a filename is valid across common operating systems.
+
+1. Not empty or whitespace-only
+2. No invalid characters: `<>:"/\|?*\0`
+3. No problematic characters: `\t\n\r`
+4. Not a Windows reserved name: `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`
+5. Doesn't end with space or period
+
+### `streamline_path()`
+
+Sanitizes a path by replacing invalid characters.
+
+Arguments
+`path`: Path to sanitize.
+- `str`
+- required
+
+`max_len`: Maximum length to truncate to.
+- `int | None = None`
+- keyword only
+- If None, no truncation is performed.
+
+`replacement_char`: Character to replace invalid characters with.
+- `str = "_"`
+- keyword only
+
+`lowercase`: Convert to lowercase.
+- `bool = False`
+- keyword only
+
+`strip_whitespace`: Strip whitespace.
+- `bool = True`
+- keyword only
+
+`chars_to_replace`: Extra characters to replace.
+- `str | list[str] | None = None`
+- keyword only
+
+`allow_unicode`: Allow unicode characters.
+- `bool = True`
+- keyword only
+
+Returns
+`str`: Sanitized path.
+
+1. Strip whitespace (if enabled)
+2. Replace extra specified characters
+3. Replace invalid characters with replacement char
+4. Replace problematic characters
+5. Replace non-ASCII characters (if `allow_unicode=False`)
+6. Lowercase (if enabled)
+7. Truncate to max length (preserving suffix)
+8. Clean up trailing spaces/periods
+
+### `streamline_path_quick()`
+
+Simple version of `streamline_path` with common defaults.
+
+```python
+def streamline_path_quick(
+    path: str,
+    max_len: int | None = None,
+    replacement_char: str = "_",
+    lowercase: bool = False
+) -> str:
+    return streamline_path(
+        path,
+        max_len=max_len,
+        replacement_char=replacement_char,
+        lowercase=lowercase,
+        strip_whitespace=True,
+        chars_to_replace=" ",
+        allow_unicode=False,
+    )
+```
+
+Arguments
+`path`: Path to sanitize.
+- `str`
+- required
+
+`max_len`: Maximum length.
+- `int | None = None`
+- positional or keyword
+
+`replacement_char`: Character to replace invalid chars with.
+- `str = "_"`
+- positional or keyword
+
+`lowercase`: Convert to lowercase.
+- `bool = False`
+- positional or keyword
+
+Returns
+`str`: Sanitized path.
+
+This version:
+- Always strips whitespace
+- Replaces spaces with replacement char
+- Disallows unicode (ASCII only)
+
+## Exceptions
 
 ### `PathDetectionError`
 
-Raised when:
-- Project root cannot be detected
-- Caller file cannot be determined
+Raised when path or project root detection fails.
+
+Examples:
+- Project root cannot be detected (no indicators found)
 - Custom root path doesn't exist or isn't a directory
-- A string cannot be interpreted as a path or valid encoded ID
 - Expected root name doesn't match detected root
 
-### Silent Failures
+### `NotAFileError`
 
-Some operations return `None` instead of raising:
-- `get_module_path()` — returns `None` if module has no `__file__`
-- `decode_path_id()` — returns `None` if decoding fails
-- Properties like `np` — return `""` if outside project root
+Raised when a file operation is attempted on a directory.
 
+Example: Calling `Skpath.unlink()` on a directory.
+
+## Types
+
+### `AnyPath`
+
+Type alias for path parameters that accept multiple types.
+
+```python
+from typing import Union
+
+# using Union for forward reference compatibility at runtime
+AnyPath = Union[str, Path, "Skpath"]
+```
+
+Note: Does NOT include `None` - use `AnyPath | None` when `None` is acceptable.
+
+Use in function annotations to indicate a parameter accepts any path type:
+
+```python
+def process(path: AnyPath) -> None:
+    ...
+```
+
+When used with `@autopath()`, parameters annotated with `AnyPath` are converted to `Skpath` (the richest type in the union).
+
+## Thread Safety
+
+Module-level state is protected by `threading.RLock` instances.
+
+- `_root_lock`: Protects custom root state (`_custom_root`)
+- `_cache_lock`: Protects cached root state (`_cached_root`, `_cached_root_source`)
+- `_skpath_lock`: Defined for potential Skpath operations (currently unused)
+- `_autopath_lock`: Defined for potential autopath operations (currently unused)
+- `_id_lock`: Defined in id_utils for potential ID operations (currently unused)
+
+RLock (reentrant lock) is used because operations may call each other (e.g., `detect_project_root()` is called from both `Skpath()` and custom root validation).
+
+The root detection functions (`set_custom_root`, `get_custom_root`, `clear_custom_root`, `detect_project_root`) actively use locks to protect shared state.
 "

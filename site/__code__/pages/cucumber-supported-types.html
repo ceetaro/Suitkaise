@@ -2,371 +2,143 @@
     <button class="module-bar-title">suitkaise.cucumber</button>
     <nav class="module-bar-nav">
         <a href="#cucumber-why" class="module-bar-link" data-page="cucumber-why">why</a>
+        <a href="#cucumber-quick-start" class="module-bar-link" data-page="cucumber-quick-start">quick start</a>
         <a href="#cucumber" class="module-bar-link" data-page="cucumber">how to use</a>
         <a href="#cucumber-how-it-works" class="module-bar-link" data-page="cucumber-how-it-works">how it works</a>
         <a href="#cucumber-supported-types" class="module-bar-link active" data-page="cucumber-supported-types">supported types</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
-        <a href="#cucumber-examples" class="module-bar-link" data-page="cucumber-examples">examples</a>
+        <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
+        <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
+        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Supported Types</h1>
-
-    <p>Complete list of all Python types that <code>cucumber</code> can serialize and deserialize, and the time it takes to handle each type.</p>
-
-    <h2>All <code>suitkaise</code> object types</h2>
-
+    <h1>cucumber supported types</h1>
+    <p>Note: Iterator-style objects (including <code>enumerate</code> and <code>zip</code>) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.</p>
+    <p>Note: Objects that turn into <code>Reconnector</code> objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit <code>reconnect(...)</code> call (or <code>reconnect_all(...)</code> with credentials).</p>
+    <p>Note: Due to Python limitations, some types are not supported by <code>Share</code>.</p>
     <ul>
-        <li><code>Sktimer</code> — 18.6µs</li>
-        <li><code>TimeThis</code> — 36.9µs</li>
-        <li><code>Circuit</code> — 16.8µs</li>
-        <li><code>BreakingCircuit</code> — 17.4µs</li>
-        <li><code>Skpath</code> — 13.2µs</li>
-        <li><code>CustomRoot</code> — 3.4µs</li>
-        <li><code>Skprocess</code> — 151.0µs</li>
-        <li><code>Pool</code> — 10.6µs</li>
-        <li><code>Share</code> — 47.5µs</li>
-        <li><code>ProcessTimers</code> — 29.7µs</li>
-        <li>all <code>suitkaise</code> error classes — 4.0µs</li>
+        <li><code>multiprocessing.*</code> objects (queues, managers, events, shared_memory, connections)</li>
+        <li><code>os.pipe()</code> file handles / pipe-backed <code>io.FileIO</code></li>
+        <li><code>weakref.ref</code> objects (recreated as weak references; dead refs become placeholders)</li>
+        <li>tokens with authentication (cannot serialize authentication strings)</li>
+        <li>user-defined class instances --&gt; new instance of same type with same state</li>
+        <li><code>None</code> --&gt; <code>None</code></li>
+        <li><code>bool</code> --&gt; <code>bool</code></li>
+        <li><code>int</code> --&gt; <code>int</code></li>
+        <li><code>float</code> --&gt; <code>float</code></li>
+        <li><code>str</code> --&gt; <code>str</code></li>
+        <li><code>bytes</code> --&gt; <code>bytes</code></li>
+        <li><code>list</code> --&gt; <code>list</code></li>
+        <li><code>tuple</code> --&gt; <code>tuple</code></li>
+        <li><code>set</code> --&gt; <code>set</code></li>
+        <li><code>frozenset</code> --&gt; <code>frozenset</code></li>
+        <li><code>dict</code> --&gt; <code>dict</code></li>
+        <li><code>datetime.datetime</code> --&gt; <code>datetime.datetime</code></li>
+        <li><code>datetime.date</code> --&gt; <code>datetime.date</code></li>
+        <li><code>datetime.time</code> --&gt; <code>datetime.time</code></li>
+        <li><code>datetime.timedelta</code> --&gt; <code>datetime.timedelta</code></li>
+        <li><code>datetime.timezone</code> --&gt; <code>datetime.timezone</code></li>
+        <li><code>decimal.Decimal</code> --&gt; <code>decimal.Decimal</code></li>
+        <li><code>fractions.Fraction</code> --&gt; <code>fractions.Fraction</code></li>
+        <li><code>uuid.UUID</code> --&gt; <code>uuid.UUID</code></li>
+        <li><code>pathlib.Path</code> --&gt; <code>pathlib.Path</code></li>
+        <li><code>pathlib.PurePath</code> --&gt; <code>pathlib.PurePath</code></li>
+        <li><code>pathlib.PosixPath</code> --&gt; <code>pathlib.PosixPath</code></li>
+        <li><code>pathlib.WindowsPath</code> --&gt; <code>pathlib.WindowsPath</code></li>
+        <li><code>types.FunctionType</code> --&gt; <code>types.FunctionType</code></li>
+        <li><code>functools.partial</code> --&gt; <code>functools.partial</code></li>
+        <li><code>types.MethodType</code> --&gt; <code>types.MethodType</code></li>
+        <li><code>staticmethod</code> --&gt; <code>staticmethod</code></li>
+        <li><code>classmethod</code> --&gt; <code>classmethod</code></li>
+        <li><code>type</code> --&gt; <code>type</code></li>
+        <li><code>logging.Logger</code> --&gt; <code>logging.Logger</code></li>
+        <li><code>logging.StreamHandler</code> --&gt; <code>logging.StreamHandler</code></li>
+        <li><code>logging.FileHandler</code> --&gt; <code>logging.FileHandler</code></li>
+        <li><code>logging.Formatter</code> --&gt; <code>logging.Formatter</code></li>
+        <li><code>_thread.lock</code> --&gt; <code>_thread.lock</code></li>
+        <li><code>threading.RLock</code> --&gt; <code>threading.RLock</code></li>
+        <li><code>threading.Semaphore</code> --&gt; <code>threading.Semaphore</code></li>
+        <li><code>threading.BoundedSemaphore</code> --&gt; <code>threading.BoundedSemaphore</code></li>
+        <li><code>threading.Barrier</code> --&gt; <code>threading.Barrier</code></li>
+        <li><code>threading.Condition</code> --&gt; <code>threading.Condition</code></li>
+        <li><code>io.TextIOBase</code> --&gt; <code>io.TextIOBase</code></li>
+        <li><code>tempfile._TemporaryFileWrapper</code> --&gt; <code>tempfile._TemporaryFileWrapper</code></li>
+        <li><code>io.StringIO</code> --&gt; <code>io.StringIO</code></li>
+        <li><code>io.BytesIO</code> --&gt; <code>io.BytesIO</code></li>
+        <li><code>queue.Queue</code> --&gt; <code>queue.Queue</code></li>
+        <li><code>multiprocessing.Queue</code> --&gt; <code>multiprocessing.Queue</code> (<code>Share</code> not supported)</li>
+        <li><code>threading.Event</code> --&gt; <code>threading.Event</code></li>
+        <li><code>multiprocessing.Event</code> --&gt; <code>multiprocessing.Event</code> (<code>Share</code> not supported)</li>
+        <li><code>re.Pattern</code> --&gt; <code>re.Pattern</code></li>
+        <li><code>re.Match</code> --&gt; <code>MatchReconnector</code></li>
+        <li><code>sqlite3.Connection</code> --&gt; <code>SQLiteConnectionReconnector</code></li>
+        <li><code>sqlite3.Cursor</code> --&gt; <code>SQLiteCursorReconnector</code></li>
+        <li><code>contextvars.ContextVar</code> --&gt; <code>contextvars.ContextVar</code></li>
+        <li><code>contextvars.Token</code> --&gt; <code>contextvars.Token</code> (<code>Share</code> not supported)</li>
+        <li><code>requests.Session</code> --&gt; <code>requests.Session</code></li>
+        <li><code>socket.socket</code> --&gt; <code>SocketReconnector</code></li>
+        <li><code>psycopg2.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymysql.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymongo.MongoClient</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>redis.Redis</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>sqlalchemy.Engine</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>cassandra.Cluster</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>elasticsearch.Elasticsearch</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>neo4j.Driver</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>influxdb_client.InfluxDBClient</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pyodbc.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>clickhouse_driver.Client</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymssql.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>oracledb.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>snowflake.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>duckdb.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>collections.abc.Iterator</code> --&gt; <code>iterator</code></li>
+        <li><code>range</code> --&gt; <code>range</code></li>
+        <li><code>enumerate</code> --&gt; <code>iterator</code></li>
+        <li><code>zip</code> --&gt; <code>iterator</code></li>
+        <li><code>mmap.mmap</code> --&gt; <code>mmap.mmap</code></li>
+        <li><code>multiprocessing.shared_memory.SharedMemory</code> --&gt; <code>multiprocessing.shared_memory.SharedMemory</code> (<code>Share</code> not supported)</li>
+        <li><code>int</code> (file descriptors) --&gt; <code>int</code> (file descriptors)</li>
+        <li><code>memoryview</code> --&gt; <code>memoryview</code></li>
+        <li><code>threading.Thread</code> --&gt; <code>ThreadReconnector</code></li>
+        <li><code>concurrent.futures.ThreadPoolExecutor</code> --&gt; <code>concurrent.futures.ThreadPoolExecutor</code></li>
+        <li><code>concurrent.futures.ProcessPoolExecutor</code> --&gt; <code>concurrent.futures.ProcessPoolExecutor</code></li>
+        <li><code>threading.local</code> --&gt; <code>threading.local</code></li>
+        <li><code>io.FileIO</code> (from <code>os.pipe</code>) --&gt; <code>io.FileIO</code> (<code>Share</code> not supported)</li>
+        <li><code>multiprocessing.connection.Connection</code> --&gt; <code>multiprocessing.connection.Connection</code> (<code>Share</code> not supported)</li>
+        <li><code>multiprocessing.managers.BaseProxy</code> --&gt; <code>multiprocessing.managers.BaseProxy</code> (<code>Share</code> not supported)</li>
+        <li><code>types.CodeType</code> --&gt; <code>types.CodeType</code></li>
+        <li><code>types.FrameType</code> --&gt; <code>types.FrameType</code> (<code>Share</code> not supported)</li>
+        <li><code>property</code> --&gt; <code>property</code></li>
+        <li><code>types.MemberDescriptorType</code> --&gt; <code>types.MemberDescriptorType</code> (<code>Share</code> not supported)</li>
+        <li><code>types.GetSetDescriptorType</code> --&gt; <code>types.GetSetDescriptorType</code> (<code>Share</code> not supported)</li>
+        <li><code>types.WrapperDescriptorType</code> --&gt; <code>types.WrapperDescriptorType</code> (<code>Share</code> not supported)</li>
+        <li><code>types.MethodDescriptorType</code> --&gt; <code>types.MethodDescriptorType</code> (<code>Share</code> not supported)</li>
+        <li><code>types.MethodWrapperType</code> --&gt; <code>types.MethodWrapperType</code></li>
+        <li><code>types.GeneratorType</code> --&gt; <code>iterator</code></li>
+        <li><code>weakref.ref</code> --&gt; <code>weakref.ref</code> (<code>Share</code> not supported)</li>
+        <li><code>weakref.WeakValueDictionary</code> --&gt; <code>weakref.WeakValueDictionary</code></li>
+        <li><code>weakref.WeakKeyDictionary</code> --&gt; <code>weakref.WeakKeyDictionary</code></li>
+        <li><code>enum.Enum</code> --&gt; <code>enum.Enum</code></li>
+        <li><code>enum.EnumMeta</code> --&gt; <code>enum.EnumMeta</code></li>
+        <li><code>contextlib._GeneratorContextManager</code> --&gt; <code>contextlib._GeneratorContextManager</code></li>
+        <li><code>subprocess.Popen</code> --&gt; <code>SubprocessReconnector</code></li>
+        <li><code>subprocess.CompletedProcess</code> --&gt; <code>subprocess.CompletedProcess</code></li>
+        <li><code>types.CoroutineType</code> --&gt; <code>types.CoroutineType</code></li>
+        <li><code>types.AsyncGeneratorType</code> --&gt; <code>types.AsyncGeneratorType</code></li>
+        <li><code>asyncio.Task</code> --&gt; <code>asyncio.Task</code></li>
+        <li><code>asyncio.Future</code> --&gt; <code>asyncio.Future</code></li>
+        <li><code>types.ModuleType</code> --&gt; <code>types.ModuleType</code></li>
+        <li><code>collections.namedtuple</code> --&gt; <code>collections.namedtuple</code></li>
+        <li><code>typing.NamedTuple</code> --&gt; <code>typing.NamedTuple</code></li>
+        <li><code>typing.TypedDict</code> --&gt; <code>typing.TypedDict</code></li>
+        <li><code>DbReconnector</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>SocketReconnector</code> --&gt; <code>SocketReconnector</code></li>
+        <li><code>ThreadReconnector</code> --&gt; <code>ThreadReconnector</code></li>
+        <li><code>PipeReconnector</code> --&gt; <code>PipeReconnector</code></li>
+        <li><code>SubprocessReconnector</code> --&gt; <code>SubprocessReconnector</code></li>
+        <li><code>MatchReconnector</code> --&gt; <code>MatchReconnector</code></li>
     </ul>
-
-    <hr>
-
-    <h2>Primitives</h2>
-
-    <p>These types are handled directly by <code>pickle</code> — <code>cucumber</code> passes them through.</p>
-
-    <ul>
-        <li><code>None</code> — 0.4µs</li>
-        <li><code>bool</code> — 0.5µs</li>
-        <li><code>int</code> — 0.5µs</li>
-        <li><code>float</code> — 0.4µs</li>
-        <li><code>complex</code> — 1.6µs</li>
-        <li><code>str</code> — 0.4µs</li>
-        <li><code>bytes</code> — 0.4µs</li>
-        <li><code>bytearray</code> — 1.1µs</li>
-        <li><code>Ellipsis</code> — 2.1µs</li>
-        <li><code>NotImplemented</code> — 2.0µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Collections</h2>
-
-    <p>Cucumber handles the container; contents are recursively serialized.</p>
-
-    <ul>
-        <li><code>list</code> — 2.1µs</li>
-        <li><code>tuple</code> — 2.1µs</li>
-        <li><code>dict</code> — 1.9µs</li>
-        <li><code>set</code> — 2.0µs</li>
-        <li><code>frozenset</code> — 2.0µs</li>
-        <li><code>range</code> — 2.1µs</li>
-        <li><code>slice</code> — 2.1µs</li>
-        <li><code>collections.deque</code> — 3.2µs</li>
-        <li><code>collections.Counter</code> — 2.0µs</li>
-        <li><code>collections.OrderedDict</code> — 2.7µs</li>
-        <li><code>collections.defaultdict</code> — 2.5µs</li>
-        <li><code>collections.ChainMap</code> — 3.4µs</li>
-        <li><code>collections.namedtuple</code> — 1.9µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Datetime</h2>
-
-    <ul>
-        <li><code>datetime.datetime</code> — 2.8µs</li>
-        <li><code>datetime.date</code> — 2.6µs</li>
-        <li><code>datetime.time</code> — 2.6µs</li>
-        <li><code>datetime.timedelta</code> — 2.7µs</li>
-        <li><code>datetime.timezone</code> — 6.2µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Numeric</h2>
-
-    <ul>
-        <li><code>decimal.Decimal</code> — 2.7µs</li>
-        <li><code>fractions.Fraction</code> — 2.7µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Paths and UUIDs</h2>
-
-    <ul>
-        <li><code>uuid.UUID</code> — 2.9µs</li>
-        <li><code>pathlib.Path</code> — 2.9µs</li>
-        <li><code>pathlib.PurePath</code> — 12.9µs</li>
-        <li><code>pathlib.PosixPath</code> — 2.8µs</li>
-        <li><code>pathlib.WindowsPath</code> — n/a (windows only)</li>
-    </ul>
-
-    <hr>
-
-    <h2>Logging</h2>
-
-    <ul>
-        <li><code>logging.Logger</code> — 9.1µs</li>
-        <li><code>logging.StreamHandler</code> — 4.8µs</li>
-        <li><code>logging.FileHandler</code> — 5.5µs</li>
-        <li><code>logging.Formatter</code> — 5.0µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Threading</h2>
-
-    <ul>
-        <li><code>threading.Lock</code> — 0.5µs</li>
-        <li><code>threading.RLock</code> — 0.4µs</li>
-        <li><code>threading.Semaphore</code> — 0.4µs</li>
-        <li><code>threading.BoundedSemaphore</code> — 0.4µs</li>
-        <li><code>threading.Barrier</code> — 4.9µs</li>
-        <li><code>threading.Condition</code> — 0.4µs</li>
-        <li><code>threading.Event</code> — 4.4µs</li>
-        <li><code>threading.Thread</code> — 36.1µs</li>
-        <li><code>threading.local</code> — 6.8µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Multiprocessing</h2>
-
-    <ul>
-        <li><code>multiprocessing.Queue</code> — 6.9µs</li>
-        <li><code>multiprocessing.Event</code> — 5.8µs</li>
-        <li><code>multiprocessing.Pipe</code> — 11.3µs</li>
-        <li><code>multiprocessing.Manager</code> — 4.8µs</li>
-        <li><code>multiprocessing.shared_memory.SharedMemory</code> — 6.1µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Queues</h2>
-
-    <ul>
-        <li><code>queue.Queue</code> — 7.4µs</li>
-        <li><code>queue.LifoQueue</code> — 7.2µs</li>
-        <li><code>queue.PriorityQueue</code> — 7.0µs</li>
-        <li><code>queue.SimpleQueue</code> — 7.2µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>File I/O</h2>
-
-    <ul>
-        <li><code>io.TextIOWrapper</code> — 10.3µs</li>
-        <li><code>io.BufferedReader</code> — 1660µs</li>
-        <li><code>io.BufferedWriter</code> — 1594µs</li>
-        <li><code>io.FileIO</code> — 1594µs</li>
-        <li><code>io.StringIO</code> — 4.9µs</li>
-        <li><code>io.BytesIO</code> — 5.1µs</li>
-        <li><code>tempfile.NamedTemporaryFile</code> — 10.1µs</li>
-        <li><code>tempfile.SpooledTemporaryFile</code> — 16.6µs</li>
-        <li><code>mmap.mmap</code> — 6.6µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Regular Expressions</h2>
-
-    <ul>
-        <li><code>re.Pattern</code> — 4.8µs</li>
-        <li><code>re.Match</code> — 12.6µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Database</h2>
-
-    <ul>
-        <li><code>sqlite3.Connection</code> — 11.3µs</li>
-        <li><code>sqlite3.Cursor</code> — 16.3µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Network</h2>
-
-    <ul>
-        <li><code>requests.Session</code> — 13.8µs</li>
-        <li><code>socket.socket</code> — 6.7µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Functions and Methods</h2>
-
-    <ul>
-        <li><code>types.FunctionType</code> — 28.3µs</li>
-        <li>Lambda functions — 28.5µs</li>
-        <li><code>functools.partial</code> — 34.7µs</li>
-        <li><code>types.MethodType</code> — 10.3µs</li>
-        <li><code>staticmethod</code> — 10.3µs</li>
-        <li><code>classmethod</code> — 10.2µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Generators and Iterators</h2>
-
-    <ul>
-        <li><code>types.GeneratorType</code> — 6.9µs</li>
-        <li><code>range_iterator</code> — 8.4µs</li>
-        <li><code>enumerate</code> — 8.1µs</li>
-        <li><code>zip</code> — 8.1µs</li>
-        <li><code>map</code> — 8.0µs</li>
-        <li><code>filter</code> — 7.9µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Async</h2>
-
-    <ul>
-        <li><code>types.CoroutineType</code> — 24.3µs</li>
-        <li><code>types.AsyncGeneratorType</code> — 4.6µs</li>
-        <li><code>asyncio.Task</code> — 5.5µs</li>
-        <li><code>asyncio.Future</code> — 5.5µs</li>
-        <li><code>concurrent.futures.Future</code> — 21.2µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Executors</h2>
-
-    <ul>
-        <li><code>concurrent.futures.ThreadPoolExecutor</code> — 4.9µs</li>
-        <li><code>concurrent.futures.ProcessPoolExecutor</code> — 4.6µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Weak References</h2>
-
-    <ul>
-        <li><code>weakref.ref</code> — 5.0µs</li>
-        <li><code>weakref.WeakValueDictionary</code> — 7.0µs</li>
-        <li><code>weakref.WeakKeyDictionary</code> — 7.0µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Enums</h2>
-
-    <ul>
-        <li><code>enum.Enum</code> — 7.2µs</li>
-        <li><code>enum.IntEnum</code> — 0.9µs</li>
-        <li><code>enum.Flag</code> — 7.1µs</li>
-        <li><code>enum.IntFlag</code> — 0.9µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Context Variables</h2>
-
-    <ul>
-        <li><code>contextvars.ContextVar</code> — 5.3µs</li>
-        <li><code>contextvars.Token</code> — 5.3µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Context Managers</h2>
-
-    <ul>
-        <li><code>contextlib.contextmanager</code> decorated functions — 62.9µs</li>
-        <li>Objects with <code>__enter__</code> / <code>__exit__</code> — 8.6µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Subprocess</h2>
-
-    <ul>
-        <li><code>subprocess.Popen</code> — 32.4µs</li>
-        <li><code>subprocess.CompletedProcess</code> — 7.5µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Advanced Python Internals</h2>
-
-    <ul>
-        <li><code>types.CodeType</code> — 17.0µs</li>
-        <li><code>types.FrameType</code> — 2216µs</li>
-        <li><code>property</code> — 33.4µs</li>
-        <li>Custom descriptors — 7.5µs</li>
-        <li>File descriptors — 0.4µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Modules</h2>
-
-    <ul>
-        <li><code>types.ModuleType</code> — 36.7µs</li>
-        <li>OS pipes — 2.0µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Typing</h2>
-
-    <ul>
-        <li><code>typing.NamedTuple</code> — 1.9µs</li>
-        <li><code>typing.TypedDict</code> — 1.9µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Classes</h2>
-
-    <ul>
-        <li>Class objects (<code>type</code>) — 3.1µs</li>
-        <li>Class instances — 3.3µs</li>
-        <li><code>@dataclass</code> classes — 23.8µs</li>
-        <li><code>__slots__</code> classes — 8.4µs</li>
-        <li><code>__dict__</code> classes — 3.7µs</li> 
-        <li>classes with both <code>__dict__</code> and <code>__slots__</code> — 10.1µs</li>
-    </ul>
-
-    <hr>
-
-    <h2>Circular References</h2>
-
-    <p>Cucumber handles circular references in:</p>
-
-    <ul>
-        <li>Lists, dicts, sets, tuples</li>
-        <li>Class instances</li>
-        <li>Any nested combination</li>
-    </ul>
-
-<pre><code class="language-python">a = []
-a.append(a)  # self-referential list
-
-obj = Node(1)
-obj.next = obj  # self-referential object
-
-# both serialize correctly</code></pre>
-
-    <hr>
-
-    <h2>Not Supported</h2>
-
-    <ul>
-        <li><strong>C extension objects without <code>__reduce__</code></strong> — no Python state to extract</li>
-        <li><strong>Live network connections (mid-request)</strong> — state is external</li>
-        <li><strong>Running threads/processes</strong> — cannot capture execution state</li>
-        <li><strong>Memory views of external buffers</strong> — buffer not owned</li>
-        <li><strong><code>ctypes</code> pointers</strong> — raw memory addresses</li>
-    </ul>
-
 </section>

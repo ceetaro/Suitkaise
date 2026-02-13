@@ -2,14 +2,2195 @@
     <button class="module-bar-title">suitkaise.processing</button>
     <nav class="module-bar-nav">
         <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+        <a href="#processing-quick-start" class="module-bar-link" data-page="processing-quick-start">quick start</a>
         <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
         <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+        <a href="#processing-examples" class="module-bar-link active" data-page="processing-examples">examples</a>
         <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
-        <a href="#processing-examples" class="module-bar-link active" data-page="processing-examples">examples</a>
+        <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>examples</h1>
-    <p>Coming soon...</p>
+    <h1><code>processing</code> Examples</h1>
+    <details>
+        <summary>Basic <code>Skprocess</code></summary>
+        <div class="dropdown-content">
+    <h3>Simple Counter Process</h3>
+    <p>A minimal process that counts iterations.</p>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class CounterProcess(Skprocess):
+    &quot;&quot;&quot;
+    A simple process that counts up to a specified number.
+    
+    - Basic __init__ with process_config.runs
+    - __run__ for main work
+    - __result__ to return data
+    &quot;&quot;&quot;
+    
+    def __init__(self, target: int = 10):
+        # store target count
+        # (process_config is already initialized by Skprocess._setup)
+        self.target = target
+        self.counter = 0
+        
+        # configure: run exactly &#x27;target&#x27; iterations
+        self.process_config.runs = target
+    
+    def __run__(self):
+        # increment counter each iteration
+        self.counter += 1
+    
+    def __result__(self):
+        # return final count when process completes
+        return self.counter
+
+
+# create process with target of 100
+process = CounterProcess(target=100)
+
+# start the subprocess
+process.start()
+
+# wait for completion (blocks until done)
+process.wait()
+
+# get the result
+result = process.result()
+print(f&quot;Final count: {result}&quot;)  # Final count: 100</code></pre>
+    <h3>Using <code>run()</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class QuickProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that does quick work.
+    
+    Using run() to start, wait, and get result in one call
+    &quot;&quot;&quot;
+    
+    def __init__(self, data: list):
+        self.data = data
+        self.results = []
+        self.process_config.runs = len(data)
+    
+    def __run__(self):
+        # process one item per run
+        item = self.data[self._current_run]
+        self.results.append(item * 2)
+    
+    def __result__(self):
+        return self.results
+
+
+# run() combines start(), wait(), and result()
+process = QuickProcess([1, 2, 3, 4, 5])
+results = process.run()
+print(results)  # [2, 4, 6, 8, 10]</code></pre>
+    <h3>Full Lifecycle Process</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class DataProcessor(Skprocess):
+    &quot;&quot;&quot;
+    A process demonstrating all lifecycle methods.
+    
+    - __prerun__: Setup before each run
+    - __run__: Main work
+    - __postrun__: Cleanup after each run
+    - __onfinish__: Final cleanup
+    - __result__: Return data
+    &quot;&quot;&quot;
+    
+    def __init__(self, batch_size: int = 5):
+        # configure process
+        self.batch_size = batch_size
+        self.process_config.runs = 3  # process 3 batches
+        
+        # state tracking
+        self.current_batch = None
+        self.processed_batches = []
+        self.total_items = 0
+    
+    def __prerun__(self):
+        # called before each __run__
+        # fetch the next batch of data
+        batch_number = self._current_run
+        self.current_batch = [
+            f&quot;item_{batch_number}_{i}&quot; 
+            for i in range(self.batch_size)
+        ]
+        print(f&quot;[prerun] Fetched batch {batch_number}: {len(self.current_batch)} items&quot;)
+    
+    def __run__(self):
+        # called each iteration - do the main work
+        # process each item in the current batch
+        processed = []
+        for item in self.current_batch:
+            result = item.upper()
+            processed.append(result)
+            self.total_items += 1
+        
+        # store for postrun
+        self._processed = processed
+        print(f&quot;[run] Processed {len(processed)} items&quot;)
+    
+    def __postrun__(self):
+        # called after each __run__
+        # save results and cleanup
+        self.processed_batches.append(self._processed)
+        self.current_batch = None  # clear for next iteration
+        self._processed = None
+        print(f&quot;[postrun] Saved batch, total batches: {len(self.processed_batches)}&quot;)
+    
+    def __onfinish__(self):
+        # called once when process ends (stop signal or run limit)
+        # final cleanup and summary
+        print(f&quot;[onfinish] Finished processing {self.total_items} total items&quot;)
+    
+    def __result__(self):
+        # return the final data
+        return {
+            &#x27;batches&#x27;: self.processed_batches,
+            &#x27;total_items&#x27;: self.total_items,
+            &#x27;num_batches&#x27;: len(self.processed_batches)
+        }
+
+    # NOTE: not implementing __error__ to let Skprocess decide what error to raise
+
+
+process = DataProcessor(batch_size=3)
+result = process.run()
+
+print(f&quot;\nResult: {result[&#x27;num_batches&#x27;]} batches, {result[&#x27;total_items&#x27;]} items&quot;)
+# Output:
+# [prerun] Fetched batch 0: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 1
+# [prerun] Fetched batch 1: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 2
+# [prerun] Fetched batch 2: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 3
+# [onfinish] Finished processing 9 total items
+
+# Result: 3 batches, 9 items</code></pre>
+    <h3>Indefinite Process with <code>stop()</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+from suitkaise import timing
+
+class MonitorProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that runs indefinitely until stopped.
+    
+    - `process_config.runs=None` for indefinite execution
+    - Using stop() from the parent process
+    - Graceful shutdown with __onfinish__
+    &quot;&quot;&quot;
+    
+    def __init__(self):
+        # no run limit - runs until stop() is called
+        self.process_config.runs = None
+        self.events = []
+    
+    def __run__(self):
+        # record timestamp and system info each iteration
+        import os
+        import hashlib
+        payload = f&quot;{self._current_run}:{os.getpid()}&quot;.encode()
+        digest = hashlib.sha256(payload).hexdigest()
+        self.events.append({
+            &#x27;run&#x27;: self._current_run,
+            &#x27;time&#x27;: timing.time(),
+            &#x27;pid&#x27;: os.getpid(),
+            &#x27;memory&#x27;: self._get_memory_usage(),
+            &#x27;hash&#x27;: digest[:12],
+        })
+    
+    def _get_memory_usage(self):
+        &quot;&quot;&quot;Get current process memory usage in MB.&quot;&quot;&quot;
+        import resource
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024
+    
+    def __onfinish__(self):
+        # called when stop() signal is received
+        print(f&quot;Monitor shutting down after {len(self.events)} events&quot;)
+    
+    def __result__(self):
+        return self.events
+
+
+# start the monitor
+process = MonitorProcess()
+process.start()
+
+# do some work while it collects data
+import hashlib
+data = b&quot;monitor_work&quot;
+for _ in range(2000):
+    data = hashlib.sha256(data).digest()
+
+# signal graceful stop
+timing.sleep(0.05)
+process.stop()
+
+# wait for it to finish
+process.wait()
+
+# get results
+events = process.result()
+print(f&quot;Captured {len(events)} events&quot;)</code></pre>
+    <h3>Time-Limited Process with <code>process_config.join_in</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+
+class TimeBoundProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that runs for a maximum amount of time.
+    
+    - `process_config.join_in` to set maximum runtime
+    - `process_config.runs=None` combined with `process_config.join_in` for time-based limits
+    &quot;&quot;&quot;
+    
+    def __init__(self, max_seconds: float = 10.0):
+        self.process_config.runs = None # this is the default
+        self.process_config.join_in = max_seconds
+        
+        self.iterations = 0
+    
+    def __run__(self):
+        import hashlib
+        payload = f&quot;iter_{self._current_run}&quot;.encode()
+        digest = hashlib.sha256(payload).digest()
+        self.iterations += digest[0]
+
+    
+    def __result__(self):
+        return self.iterations
+
+
+process = TimeBoundProcess(max_seconds=1.0)
+result = process.run()
+print(f&quot;Completed {result} iterations in ~1 second&quot;)
+# Completed ~10 iterations in ~1 second</code></pre>
+    <h3>Process with Retries (Lives)</h3>
+    <pre><code class="language-python">import hashlib
+from suitkaise.processing import Skprocess, RunError, ProcessError
+
+class UnreliableProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that may fail but retries automatically.
+    
+    - `process_config.lives` for automatic retry on failure
+    - State preservation across retries
+    - __error__ for handling final failure
+    &quot;&quot;&quot;
+    
+    def __init__(self):
+        self.process_config.runs = 10
+        # allow 3 total attempts (2 retries)
+        self.process_config.lives = 3
+        
+        self.successful_runs = 0
+        self.attempt_count = 0
+    
+    def __prerun__(self):
+        # track attempts
+        self.attempt_count += 1
+    
+    def __run__(self):
+        # deterministic failure based on real work
+        payload = f&quot;run:{self._current_run}&quot;.encode()
+        digest = hashlib.sha256(payload).digest()
+        if digest[0] % 5 == 0:
+            raise RuntimeError(f&quot;Content failure on run {self._current_run}&quot;)
+        
+        # success!
+        self.successful_runs += 1
+    
+    def __error__(self):
+        # called when all lives exhausted
+        # self.error contains the exception
+        print(f&quot;Process failed after {self.attempt_count} attempts&quot;)
+        print(f&quot;Error: {self.error}&quot;)
+        
+        # return partial results
+        return {
+            &#x27;status&#x27;: &#x27;failed&#x27;,
+            &#x27;successful_runs&#x27;: self.successful_runs,
+            &#x27;error&#x27;: str(self.error)
+        }
+    
+    def __result__(self):
+        return {
+            &#x27;status&#x27;: &#x27;success&#x27;,
+            &#x27;successful_runs&#x27;: self.successful_runs,
+            &#x27;total_attempts&#x27;: self.attempt_count
+        }
+
+
+# set seed for reproducibility
+process = UnreliableProcess()
+try:
+    result = process.run()
+    print(f&quot;Result: {result}&quot;)
+except ProcessError as e:
+    print(f&quot;Process ultimately failed: {e}&quot;)</code></pre>
+    <h3>Timeouts on Lifecycle Methods</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess, ProcessTimeoutError
+
+class SlowProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process with timeout protection on lifecycle methods.
+    
+    - Setting timeouts for individual lifecycle sections
+    - ProcessTimeoutError when timeouts are exceeded
+    &quot;&quot;&quot;
+    
+    def __init__(self):
+        self.process_config.runs = 5
+        
+        # set timeouts for each section
+        self.process_config.timeouts.prerun = 1.0   # 1 second max
+        self.process_config.timeouts.run = 2.0      # 2 seconds max
+        self.process_config.timeouts.postrun = 1.0  # 1 second max
+        
+        self.completed_runs = 0
+    
+    def __prerun__(self):
+        # quick prerun - well within timeout
+        pass
+    
+    def __run__(self):
+        # CPU-intensive work that varies in duration
+        if self._current_run == 3:
+            # this run will exceed timeout - compute intensive fibonacci
+            self._fibonacci(40)  # takes several seconds
+        else:
+            # normal quick computation
+            self._fibonacci(25)
+        
+        self.completed_runs += 1
+    
+    def _fibonacci(self, n):
+        &quot;&quot;&quot;Recursive fibonacci - intentionally slow for large n.&quot;&quot;&quot;
+        if n &lt;= 1:
+            return n
+        return self._fibonacci(n - 1) + self._fibonacci(n - 2)
+    
+    def __error__(self):
+        # handle timeout error
+        if isinstance(self.error, ProcessTimeoutError):
+            print(f&quot;Timeout in {self.error.section} after {self.error.timeout}s&quot;)
+        return {
+            &#x27;status&#x27;: &#x27;timeout&#x27;,
+            &#x27;completed_runs&#x27;: self.completed_runs
+        }
+    
+    def __result__(self):
+        return {
+            &#x27;status&#x27;: &#x27;success&#x27;,
+            &#x27;completed_runs&#x27;: self.completed_runs
+        }
+
+
+process = SlowProcess()
+result = process.run()
+print(f&quot;Result: {result}&quot;)
+# Timeout in __run__ after 2.0s
+# Result: {&#x27;status&#x27;: &#x27;timeout&#x27;, &#x27;completed_runs&#x27;: 3}</code></pre>
+    <h3>Accessing Timing Data</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+import hashlib
+
+class TimedProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process demonstrating timing access.
+    
+    - Accessing per-method timers
+    - Using process_timer for aggregate stats
+    - Timer statistics (mean, min, max, percentile)
+    &quot;&quot;&quot;
+    
+    def __init__(self, runs: int = 20):
+        self.process_config.runs = runs
+        self.data = [f&quot;data_block_{i}&quot; for i in range(1000)]
+    
+    def __prerun__(self):
+        # variable prerun work - rotate data
+        self.data = self.data[-1:] + self.data[:-1]
+    
+    def __run__(self):
+        # variable run work - hash computations
+        iterations = 50 + (self._current_run * 7 % 100)
+        for _ in range(iterations):
+            for item in self.data[:100]:
+                hashlib.sha256(item.encode()).hexdigest()
+    
+    def __postrun__(self):
+        # quick postrun - sort a slice
+        sorted(self.data[:50])
+    
+    def __result__(self):
+        return &quot;done&quot;
+
+
+process = TimedProcess(runs=20)
+process.run()
+
+# access individual timers
+print(f&quot;__prerun__ timing:&quot;)
+print(f&quot;  mean:   {process.__prerun__.timer.mean:.4f}s&quot;)
+print(f&quot;  min:    {process.__prerun__.timer.min:.4f}s&quot;)
+print(f&quot;  max:    {process.__prerun__.timer.max:.4f}s&quot;)
+
+print(f&quot;\n__run__ timing:&quot;)
+print(f&quot;  mean:   {process.__run__.timer.mean:.4f}s&quot;)
+print(f&quot;  p50:    {process.__run__.timer.percentile(50):.4f}s&quot;)
+print(f&quot;  p95:    {process.__run__.timer.percentile(95):.4f}s&quot;)
+
+print(f&quot;\n__postrun__ timing:&quot;)
+print(f&quot;  total:  {process.__postrun__.timer.total_time:.4f}s&quot;)
+
+# aggregate timer for full iterations
+print(f&quot;\nFull iteration timing (prerun + run + postrun):&quot;)
+print(f&quot;  mean:   {process.process_timer.mean:.4f}s&quot;)
+print(f&quot;  total:  {process.process_timer.total_time:.4f}s&quot;)
+print(f&quot;  count:  {process.process_timer.num_times}&quot;)</code></pre>
+    <h3>Async Process Execution</h3>
+    <pre><code class="language-python">import asyncio
+import hashlib
+from suitkaise.processing import Skprocess
+
+class AsyncFriendlyProcess(Skprocess):
+    &quot;&quot;&quot;
+    Running processes in async code.
+    
+    - Using .asynced() modifier on wait() and result()
+    - Running multiple processes concurrently
+    &quot;&quot;&quot;
+    
+    def __init__(self, process_id: int, data_chunks: list):
+        self.process_id = process_id
+        self.data_chunks = data_chunks
+        self.process_config.runs = len(data_chunks)
+        self.results = []
+    
+    def __run__(self):
+        # process a data chunk - compute hash
+        chunk = self.data_chunks[self._current_run]
+        hash_result = hashlib.sha256(chunk.encode()).hexdigest()
+        self.results.append({
+            &#x27;process&#x27;: self.process_id,
+            &#x27;run&#x27;: self._current_run,
+            &#x27;hash&#x27;: hash_result[:16]
+        })
+    
+    def __result__(self):
+        return self.results
+
+
+async def run_processes_concurrently():
+    &quot;&quot;&quot;Run multiple processes and wait for all concurrently.&quot;&quot;&quot;
+    
+    # create data for each process
+    all_data = [
+        [f&quot;process_0_chunk_{i}&quot; for i in range(5)],
+        [f&quot;process_1_chunk_{i}&quot; for i in range(5)],
+        [f&quot;process_2_chunk_{i}&quot; for i in range(5)],
+    ]
+    
+    # create and start multiple processes
+    processes = []
+    for i, data in enumerate(all_data):
+        p = AsyncFriendlyProcess(process_id=i, data_chunks=data)
+        p.start()
+        processes.append(p)
+    
+    # wait for all concurrently using asynced()
+    wait_tasks = [p.wait.asynced()() for p in processes]
+    await asyncio.gather(*wait_tasks)
+    
+    # get all results
+    results = [p.result() for p in processes]
+    
+    return results
+
+
+# run the async code
+results = asyncio.run(run_processes_concurrently())
+for i, r in enumerate(results):
+    print(f&quot;Process {i}: {len(r)} results&quot;)</code></pre>
+    <h3>Background Execution with Future</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+from suitkaise import timing
+import math
+
+class BackgroundProcess(Skprocess):
+    &quot;&quot;&quot;
+    Running a process in the background.
+    
+    - Using .background() modifier
+    - Doing other work while process runs
+    - Getting result from Future
+    &quot;&quot;&quot;
+    
+    def __init__(self, numbers: list):
+        self.numbers = numbers
+        self.process_config.runs = len(numbers)
+        self.results = []
+    
+    def __run__(self):
+        # compute prime factorization for each number
+        n = self.numbers[self._current_run]
+        factors = self._prime_factors(n)
+        self.results.append({&#x27;number&#x27;: n, &#x27;factors&#x27;: factors})
+    
+    def _prime_factors(self, n):
+        &quot;&quot;&quot;Find prime factors of n.&quot;&quot;&quot;
+        factors = []
+        d = 2
+        while d * d &lt;= n:
+            while n % d == 0:
+                factors.append(d)
+                n //= d
+            d += 1
+        if n &gt; 1:
+            factors.append(n)
+        return factors
+    
+    def __result__(self):
+        return self.results
+
+
+# start process and get Future immediately
+numbers = [123456789, 987654321, 1000000007, 999999937, 2147483647]
+process = BackgroundProcess(numbers)
+future = process.run.background()()
+
+# do other work while process runs
+print(&quot;Process running in background...&quot;)
+main_thread_work = []
+for i in range(5):
+    # compute something in main thread
+    main_thread_work.append(math.factorial(100 + i))
+    print(f&quot;  Main thread computed factorial({100 + i})&quot;)
+
+# now get the result (may block if not done)
+result = future.result()
+print(f&quot;\nProcess computed {len(result)} factorizations&quot;)
+for r in result[:3]:
+    print(f&quot;  {r[&#x27;number&#x27;]} = {r[&#x27;factors&#x27;]}&quot;)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>Pool</code></summary>
+        <div class="dropdown-content">
+    <h3>Basic <code>map</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+def square(x):
+    &quot;&quot;&quot;Simple function to square a number.&quot;&quot;&quot;
+    return x * x
+
+
+# create a pool with 4 workers
+pool = Pool(workers=4)
+
+# map applies the function to each item
+# results are returned in the same order as inputs
+items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+results = pool.map(square, items)
+
+print(results)  # [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
+
+# always close the pool when done
+pool.close()</code></pre>
+    <h3><code>Pool</code> as Context Manager</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import hashlib
+import json
+
+def process_data(data):
+    &quot;&quot;&quot;Process a single data item - normalize and hash.&quot;&quot;&quot;
+    # normalize the data
+    normalized = data.strip().lower()
+    
+    # compute a hash
+    data_hash = hashlib.md5(normalized.encode()).hexdigest()
+    
+    # return processed result
+    return {
+        &#x27;original&#x27;: data,
+        &#x27;normalized&#x27;: normalized,
+        &#x27;hash&#x27;: data_hash[:8]
+    }
+
+
+# use context manager for automatic cleanup
+with Pool(workers=4) as pool:
+    items = [&quot;  Apple  &quot;, &quot;BANANA&quot;, &quot;Cherry&quot;, &quot;  DATE&quot;, &quot;elderberry&quot;]
+
+    results = pool.map(process_data, items)
+
+    for r in results:
+        print(f&quot;{r[&#x27;original&#x27;]:&gt;12} -&gt; {r[&#x27;normalized&#x27;]:&lt;12} ({r[&#x27;hash&#x27;]})&quot;)
+
+        
+# pool is automatically closed when exiting the &#x27;with&#x27; block</code></pre>
+    <h3>Using <code>star()</code> for Tuple Unpacking</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+def add(a, b):
+    &quot;&quot;&quot;Add two numbers.&quot;&quot;&quot;
+    return a + b
+
+def multiply(x, y, z):
+    &quot;&quot;&quot;Multiply three numbers.&quot;&quot;&quot;
+    return x * y * z
+
+
+with Pool(workers=4) as pool:
+    # without star(): each item is passed as a single argument
+    # the function receives a tuple
+    # pool.map(add, [(1, 2), (3, 4)])  # ERROR: add() expects 2 args, got 1 tuple
+    
+    # with star(): tuples are unpacked into positional arguments
+    pairs = [(1, 2), (3, 4), (5, 6), (7, 8)]
+    sums = pool.star().map(add, pairs)
+    print(f&quot;Sums: {sums}&quot;)  # Sums: [3, 7, 11, 15]
+    
+    # works with any number of arguments
+    triples = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
+    products = pool.star().map(multiply, triples)
+    print(f&quot;Products: {products}&quot;)  # Products: [6, 120, 504]</code></pre>
+    <h3><code>unordered_map</code> for Fastest List</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import hashlib
+
+def variable_work(item):
+    &quot;&quot;&quot;Work that takes variable time based on input.&quot;&quot;&quot;
+    # compute variable number of hashes based on item value
+    iterations = (item % 10 + 1) * 500  # 500 to 5000 iterations
+    
+    data = str(item).encode()
+    for _ in range(iterations):
+        data = hashlib.sha256(data).digest()
+    
+    return {
+        &#x27;item&#x27;: item,
+        &#x27;iterations&#x27;: iterations,
+        &#x27;hash&#x27;: hashlib.sha256(data).hexdigest()[:12]
+    }
+
+
+with Pool(workers=4) as pool:
+    items = list(range(20))
+    
+    # unordered_map returns a list (like map)
+    # but results are in completion order (like unordered_imap)
+    results = pool.unordered_map(variable_work, items)
+    
+    print(f&quot;Got {len(results)} results&quot;)
+    print(f&quot;Order received: {[r[&#x27;item&#x27;] for r in results]}&quot;)
+    # Order is NOT sequential - items with fewer iterations complete first
+    
+    # useful when you need all results but don&#x27;t care about order
+    # faster than map() because you don&#x27;t wait for slow items to unblock fast ones</code></pre>
+    <h3><code>imap</code> for Memory Efficiency</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import hashlib
+
+def heavy_computation(item):
+    &quot;&quot;&quot;Compute SHA-256 hash multiple times, return large result.&quot;&quot;&quot;
+    # do real computation - iterative hashing
+    data = str(item).encode()
+    for _ in range(1000):
+        data = hashlib.sha256(data).digest()
+    
+    # return result with computed hash and derived data
+    final_hash = hashlib.sha256(data).hexdigest()
+    return {
+        &#x27;input&#x27;: item,
+        &#x27;hash&#x27;: final_hash,
+        &#x27;derived&#x27;: [final_hash[i:i+4] for i in range(0, 64, 4)]  # 16 chunks
+    }
+
+
+with Pool(workers=4) as pool:
+    # imap returns an iterator - results are yielded one at a time
+    # this is memory efficient for large datasets
+    items = range(100)
+    
+    processed = 0
+    for result in pool.imap(heavy_computation, items):
+        # process each result as it arrives (in order)
+        processed += 1
+        if processed % 20 == 0:
+            print(f&quot;Processed {processed} items, latest hash: {result[&#x27;hash&#x27;][:16]}...&quot;)
+    
+    print(f&quot;Done! Processed {processed} total items&quot;)</code></pre>
+    <h3><code>unordered_imap</code> for Fastest Results</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import hashlib
+
+def variable_work(item):
+    &quot;&quot;&quot;Work that takes variable time based on input.&quot;&quot;&quot;
+    # compute variable number of hashes based on item value
+    # larger items = more work = longer time
+    iterations = (item % 10 + 1) * 500  # 500 to 5000 iterations
+    
+    data = str(item).encode()
+    for _ in range(iterations):
+        data = hashlib.sha256(data).digest()
+    
+    return {
+        &#x27;item&#x27;: item,
+        &#x27;iterations&#x27;: iterations,
+        &#x27;hash&#x27;: hashlib.sha256(data).hexdigest()[:12]
+    }
+
+
+with Pool(workers=4) as pool:
+    items = list(range(20))
+    
+    print(&quot;Using unordered_imap - fastest results first:&quot;)
+    results = []
+    for result in pool.unordered_imap(variable_work, items):
+        # results arrive as they complete (NOT in order)
+        results.append(result)
+        print(f&quot;  Got item {result[&#x27;item&#x27;]:2d} ({result[&#x27;iterations&#x27;]:4d} iters)&quot;)
+    
+    print(f&quot;\nOrder received: {[r[&#x27;item&#x27;] for r in results]}&quot;)
+    # Order is NOT sequential - items with fewer iterations complete first</code></pre>
+    <h3><code>Pool</code> with Timeout</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+def slow_function(x):
+    &quot;&quot;&quot;Function that might be slow - recursive fibonacci.&quot;&quot;&quot;
+    def fib(n):
+        if n &lt;= 1:
+            return n
+        return fib(n - 1) + fib(n - 2)
+    
+    if x == 5:
+        # this one computes a large fibonacci - takes several seconds
+        return fib(40)
+    else:
+        # quick computation
+        return fib(20 + x)
+
+
+with Pool(workers=4) as pool:
+    items = [1, 2, 3, 4, 5, 6, 7, 8]
+    
+    try:
+        # timeout applies to the entire operation
+        results = pool.map.timeout(2.0)(slow_function, items)
+        print(results)
+    except TimeoutError as e:
+        print(f&quot;Operation timed out: {e}&quot;)
+    
+    # timeout also works with imap - use items that complete quickly
+    try:
+        for result in pool.imap.timeout(5.0)(slow_function, [1, 2, 3]):
+            print(f&quot;Got: {result}&quot;)
+    except TimeoutError:
+        print(&quot;imap timed out&quot;)</code></pre>
+    <h3>Background Execution with <code>Pool</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import math
+
+def compute(x):
+    &quot;&quot;&quot;CPU-intensive computation - prime factorization.&quot;&quot;&quot;
+    def prime_factors(n):
+        factors = []
+        d = 2
+        while d * d &lt;= n:
+            while n % d == 0:
+                factors.append(d)
+                n //= d
+            d += 1
+        if n &gt; 1:
+            factors.append(n)
+        return factors
+    
+    # compute prime factors of a large number
+    large_num = 10**9 + x * 1000 + 7
+    return {&#x27;input&#x27;: x, &#x27;number&#x27;: large_num, &#x27;factors&#x27;: prime_factors(large_num)}
+
+
+with Pool(workers=4) as pool:
+    items = list(range(20))
+    
+    # start map in background - returns Future immediately
+    future = pool.map.background()(compute, items)
+    
+    # do other work while pool processes
+    print(&quot;Pool working in background...&quot;)
+    main_work = []
+    for i in range(3):
+        # compute something in main thread
+        result = math.factorial(500 + i * 100)
+        main_work.append(len(str(result)))
+        print(f&quot;  Main thread computed factorial, {main_work[-1]} digits&quot;)
+    
+    # get results (blocks if not done)
+    results = future.result()
+    print(f&quot;Got {len(results)} factorizations&quot;)
+    print(f&quot;First result: {results[0]}&quot;)</code></pre>
+    <h3>Async <code>Pool</code> Operations</h3>
+    <pre><code class="language-python">import asyncio
+import hashlib
+from suitkaise.processing import Pool
+
+def cpu_work(x):
+    &quot;&quot;&quot;CPU-bound work - compute hash chain.&quot;&quot;&quot;
+    data = str(x).encode()
+    for _ in range(1000):
+        data = hashlib.sha256(data).digest()
+    return {&#x27;input&#x27;: x, &#x27;hash&#x27;: hashlib.sha256(data).hexdigest()[:16]}
+
+
+async def process_batches():
+    &quot;&quot;&quot;Process multiple batches concurrently.&quot;&quot;&quot;
+    
+    with Pool(workers=4) as pool:
+        # create multiple async map operations
+        batch1 = list(range(10))
+        batch2 = list(range(10, 20))
+        batch3 = list(range(20, 30))
+        
+        # run all batches concurrently using asynced()
+        results = await asyncio.gather(
+            pool.map.asynced()(cpu_work, batch1),
+            pool.map.asynced()(cpu_work, batch2),
+            pool.map.asynced()(cpu_work, batch3),
+        )
+        
+        return results
+
+
+results = asyncio.run(process_batches())
+print(f&quot;Batch 1: {len(results[0])} items, first: {results[0][0]}&quot;)
+print(f&quot;Batch 2: {len(results[1])} items, first: {results[1][0]}&quot;)
+print(f&quot;Batch 3: {len(results[2])} items, first: {results[2][0]}&quot;)</code></pre>
+    <h3>Using <code>Skprocess</code> with <code>Pool</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool, Skprocess
+import hashlib
+import json
+
+class DataTransformer(Skprocess):
+    &quot;&quot;&quot;
+    A Skprocess that can be used with Pool.
+    
+    Pool creates an instance for each item and runs it.
+    &quot;&quot;&quot;
+    
+    def __init__(self, input_data: dict):
+        # receive input through __init__
+        self.input_data = input_data
+        self.process_config.runs = 1  # single run per item
+        
+        self.transformed = None
+    
+    def __run__(self):
+        # transform the data - real computation
+        data = self.input_data
+        
+        # compute a hash of the input
+        data_json = json.dumps(data, sort_keys=True)
+        data_hash = hashlib.sha256(data_json.encode()).hexdigest()
+        
+        # transform the value
+        self.transformed = {
+            &#x27;original_id&#x27;: data[&#x27;id&#x27;],
+            &#x27;original_value&#x27;: data[&#x27;value&#x27;],
+            &#x27;doubled&#x27;: data[&#x27;value&#x27;] * 2,
+            &#x27;squared&#x27;: data[&#x27;value&#x27;] ** 2,
+            &#x27;hash&#x27;: data_hash[:12],
+            &#x27;processed&#x27;: True
+        }
+    
+    def __result__(self):
+        return self.transformed
+
+
+# create input data
+items = [
+    {&#x27;id&#x27;: 1, &#x27;value&#x27;: 10},
+    {&#x27;id&#x27;: 2, &#x27;value&#x27;: 20},
+    {&#x27;id&#x27;: 3, &#x27;value&#x27;: 30},
+    {&#x27;id&#x27;: 4, &#x27;value&#x27;: 40},
+]
+
+with Pool(workers=2) as pool:
+    # Pool creates DataTransformer(item) for each item
+    # and runs it, collecting results
+    results = pool.map(DataTransformer, items)
+    
+    for r in results:
+        print(f&quot;ID {r[&#x27;original_id&#x27;]}: {r[&#x27;original_value&#x27;]} -&gt; doubled={r[&#x27;doubled&#x27;]}, squared={r[&#x27;squared&#x27;]}&quot;)
+# ID 1: 10 -&gt; doubled=20, squared=100
+# ID 2: 20 -&gt; doubled=40, squared=400
+# ID 3: 30 -&gt; doubled=60, squared=900
+# ID 4: 40 -&gt; doubled=80, squared=1600</code></pre>
+    <h3>Combining <code>star()</code> with Modifiers</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+import asyncio
+import math
+
+def process_pair(x, y):
+    &quot;&quot;&quot;Process a pair of values - compute combination and factorial ratio.&quot;&quot;&quot;
+    # compute nCr (n choose r) where x &gt;= y
+    n, r = max(x, y), min(x, y)
+    result = math.comb(n * 10, r * 2)
+    return {&#x27;inputs&#x27;: (x, y), &#x27;comb&#x27;: result, &#x27;digits&#x27;: len(str(result))}
+
+
+async def main():
+    with Pool(workers=4) as pool:
+        pairs = [(1, 2), (3, 4), (5, 6), (7, 8)]
+        
+        # star() composes with all modifiers
+        
+        # star + timeout
+        results = pool.star().map.timeout(5.0)(process_pair, pairs)
+        print(f&quot;star + timeout: {[r[&#x27;digits&#x27;] for r in results]} digits&quot;)
+        
+        # star + background
+        future = pool.star().map.background()(process_pair, pairs)
+        results = future.result()
+        print(f&quot;star + background: {[r[&#x27;digits&#x27;] for r in results]} digits&quot;)
+        
+        # star + async
+        results = await pool.star().map.asynced()(process_pair, pairs)
+        print(f&quot;star + async: {[r[&#x27;digits&#x27;] for r in results]} digits&quot;)
+        
+        # star + imap
+        print(&quot;star + imap:&quot;, end=&quot; &quot;)
+        for result in pool.star().imap(process_pair, pairs):
+            print(f&quot;{result[&#x27;inputs&#x27;]}&quot;, end=&quot; &quot;)
+        print()
+        
+        # star + unordered_imap
+        print(&quot;star + unordered_imap:&quot;, end=&quot; &quot;)
+        for result in pool.star().unordered_imap(process_pair, pairs):
+            print(f&quot;{result[&#x27;inputs&#x27;]}&quot;, end=&quot; &quot;)
+        print()
+
+
+asyncio.run(main())</code></pre>
+    <h3>Error Handling in <code>Pool</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Pool
+
+def risky_function(x):
+    &quot;&quot;&quot;Function that might raise an error.&quot;&quot;&quot;
+    if x == 3:
+        raise ValueError(f&quot;Cannot process {x}&quot;)
+    return x * 2
+
+
+with Pool(workers=4) as pool:
+    items = [1, 2, 3, 4, 5]
+    
+    try:
+        # error in any worker propagates to main process
+        results = pool.map(risky_function, items)
+    except RuntimeError as e:
+        print(f&quot;Caught error: {e}&quot;)
+    
+    # process the items that don&#x27;t cause errors
+    safe_items = [1, 2, 4, 5]
+    results = pool.map(risky_function, safe_items)
+    print(f&quot;Safe results: {results}&quot;)  # [2, 4, 8, 10]</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>Share</code></summary>
+        <div class="dropdown-content">
+    <h3>Basic Shared Counter using <code>Share</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+
+# create a Share and assign a counter object
+share = Share()
+
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self, amount: int = 1):
+        self.value += amount
+
+share.counter = Counter()
+
+
+class CounterProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that increments a shared counter.
+    
+    Demonstrates basic Share usage across processes.
+    &quot;&quot;&quot;
+    # pass the Share instance to the process
+    def __init__(self, shared: Share, amount: int = 1):
+        self.shared = shared
+        self.amount = amount
+        self.process_config.runs = 10  # increment 10 times
+    
+    def __postrun__(self):
+        # increment the shared counter
+        # use a method to avoid read/modify/write races
+        self.shared.counter.increment(self.amount)
+    
+    def __result__(self):
+        return &quot;done&quot;
+
+
+# run 5 processes, each incrementing 10 times
+with Pool(workers=4) as pool:
+    # pass the same share instance to all processes
+    pool.map(CounterProcess, [share] * 5)
+
+# counter was incremented 50 times (5 processes × 10 runs each)
+print(f&quot;Final counter: {share.counter.value}&quot;) # will be 50
+
+# always stop share when done to save resources
+share.stop()</code></pre>
+    <h3>Sharing Complex Objects (like <code>Sktimer</code>)</h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+from suitkaise.timing import Sktimer
+from suitkaise import timing
+import hashlib
+
+# create Share and assign a timer
+share = Share()
+share.timer = Sktimer()
+
+
+class TimedWorker(Skprocess):
+    &quot;&quot;&quot;
+    A process that records timing to a shared timer.
+    
+    Demonstrates sharing suitkaise objects with _shared_meta.
+    &quot;&quot;&quot;
+    
+    def __init__(self, shared: Share, work_count: int = 5):
+        self.shared = shared
+        self.process_config.runs = work_count
+    
+    def __run__(self):
+        # variable hash iterations (deterministic)
+        with timing.TimeThis() as run_timer:
+            data = b&quot;benchmark_data&quot;
+            iterations = 500 + (self._current_run * 97 % 1500)
+            for _ in range(iterations):
+                data = hashlib.sha256(data).digest()
+        
+        # add timing to shared timer
+        self.shared.timer.add_time(run_timer.most_recent)
+    
+    def __result__(self):
+        return &quot;done&quot;
+
+
+# run multiple workers
+workers = 4
+with Pool(workers=workers) as pool:
+    pool.map(TimedWorker, [share] * workers)
+
+stats = share.timer.get_stats()
+
+# will be 20 (4 workers × 5 runs each)
+num_times = stats.num_times
+
+mean = stats.mean
+min = stats.min
+max = stats.max
+stdev = stats.stdev
+variance = stats.variance
+
+share.stop()</code></pre>
+    <h3><code>Share</code> as Context Manager</h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+
+class Counter:
+    &quot;&quot;&quot;A simple counter class (will be auto-wrapped by Share).&quot;&quot;&quot;
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self, amount=1):
+        self.value += amount
+
+
+class WorkerProcess(Skprocess):
+    def __init__(self, shared: Share):
+        self.shared = shared
+        self.process_config.runs = 10
+    
+    def __postrun__(self):
+        self.shared.my_counter.increment(1)
+    
+    def __result__(self):
+        return &quot;done&quot;
+
+
+# use Share as context manager for automatic cleanup
+with Share() as share:
+
+    # assign custom object - auto-wrapped with Skclass
+    share.counter = Counter()
+    
+    with Pool(workers=2) as pool:
+        pool.map(WorkerProcess, [share] * 3)
+    
+    print(f&quot;Final value: {share.counter.value}&quot;) # 30
+
+# Share automatically stopped after &#x27;with&#x27; block</code></pre>
+    <h3>Multiple Shared Objects</h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+from suitkaise import timing
+import hashlib
+
+class Stats:
+    &quot;&quot;&quot;Track statistics across processes.&quot;&quot;&quot;
+    def __init__(self):
+        self.processed = 0
+        self.errors = 0
+        self.successes = 0
+    
+    def record_success(self):
+        self.processed += 1
+        self.successes += 1
+    
+    def record_error(self):
+        self.processed += 1
+        self.errors += 1
+
+
+class DataProcessor(Skprocess):
+    &quot;&quot;&quot;
+    Process that uses multiple shared objects.
+    &quot;&quot;&quot;
+    
+    def __init__(self, shared: Share, item: dict):
+        self.shared = shared
+        self.item = item
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        # time the processing
+        with timing.TimeThis() as run_timer:
+            try:
+                # process the data - hash computation
+                data = self.item[&#x27;data&#x27;].encode()
+                
+                # deterministically fail based on content hash
+                checksum = hashlib.sha256(data).digest()
+                if checksum[0] % 5 == 0:
+                    raise RuntimeError(f&quot;Failed processing {self.item[&#x27;id&#x27;]}&quot;)
+                
+                # compute hash chain
+                for _ in range(1000):
+                    data = hashlib.sha256(data).digest()
+                
+                self.shared.stats.record_success()
+                
+            except Exception:
+                self.shared.stats.record_error()
+        
+        self.shared.timer.add_time(run_timer.most_recent)
+    
+    def __result__(self):
+        return self.item[&#x27;id&#x27;]
+
+
+with Share() as share:
+    # multiple shared objects
+    share.stats = Stats()
+    share.timer = timing.Sktimer()
+    
+    # create work items
+    items = [{&#x27;id&#x27;: i, &#x27;data&#x27;: f&#x27;item_{i}&#x27;} for i in range(20)]
+    
+    with Pool(workers=4) as pool:
+        # use star() to pass both share and item
+        args = [(share, item) for item in items]
+        pool.star().map(DataProcessor, args)
+    
+    # access aggregated results
+    print(f&quot;Processed: {share.stats.processed}&quot;)
+    print(f&quot;Successes: {share.stats.successes}&quot;)
+    print(f&quot;Errors: {share.stats.errors}&quot;)
+    print(f&quot;Avg time: {share.timer.mean:.4f}s&quot;)</code></pre>
+    <h3>Sharing with single <code>Skprocess</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Skprocess
+from suitkaise.timing import Sktimer, TimeThis
+import hashlib
+
+class IterativeWorker(Skprocess):
+    &quot;&quot;&quot;
+    A long-running process that updates shared state.
+    &quot;&quot;&quot;
+    
+    def __init__(self, shared: Share):
+        self.shared = shared
+        self.process_config.runs = 100
+    
+    def __run__(self):
+        # variable work - hash computation with deterministic iterations
+        with TimeThis() as run_timer:
+            data = f&quot;iteration_{self._current_run}&quot;.encode()
+            iterations = 200 + (hashlib.sha256(data).digest()[0] % 600)
+            for _ in range(iterations):
+                data = hashlib.sha256(data).digest()
+        
+        # update shared state
+        self.shared.progress += 1
+        self.shared.timer.add_time(run_timer.most_recent)
+    
+    def __result__(self):
+        return &quot;complete&quot;
+
+
+with Share() as share:
+    share.progress = 0
+    share.timer = Sktimer()
+    
+    # run single process
+    process = IterativeWorker(share)
+    process.start()
+    
+    # monitor progress from parent
+    while process.is_alive:
+        print(f&quot;Progress: {share.progress}/100&quot;)
+        # do real work while waiting
+        payload = b&quot;progress&quot;
+        for _ in range(500):
+            payload = hashlib.sha256(payload).digest()
+    
+    process.wait()
+    
+    print(f&quot;\nFinal progress: {share.progress}&quot;)
+    print(f&quot;Total time: {share.timer.total_time:.2f}s&quot;)
+    print(f&quot;Avg iteration: {share.timer.mean:.4f}s&quot;)</code></pre>
+    <h3><code>Share.start()</code> and <code>Share.stop()</code> control</h3>
+    <pre><code class="language-python">from suitkaise.processing import Share
+
+# create Share without auto-start
+share = Share(auto_start=False)
+
+# Share is not running - operations will warn
+share.counter = 0  # warning: Share is stopped
+
+# explicitly start
+share.start()
+print(f&quot;Running: {share.is_running}&quot;)  # Running: True
+
+# normal operations
+share.counter = 100
+
+# stop to free resources
+share.stop()
+print(f&quot;Running: {share.is_running}&quot;)  # Running: False
+
+# can restart
+share.start()
+print(f&quot;Counter: {share.counter}&quot;)  # Counter: 100
+share.stop()</code></pre>
+    <h3>Clearing <code>Share</code> State</h3>
+    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
+
+class Incrementer(Skprocess):
+    def __init__(self, shared: Share):
+        self.shared = shared
+        self.process_config.runs = 10
+    
+    def __postrun__(self):
+        self.shared.count += 1
+    
+    def __result__(self):
+        return &quot;done&quot;
+
+
+with Share() as share:
+    share.count = 0
+    
+    # first batch
+    with Pool(workers=2) as pool:
+        pool.map(Incrementer, [share] * 2)
+    
+    print(f&quot;After batch 1: {share.count}&quot;)  # 20
+    
+    # clear all shared state
+    share.clear()
+    
+    # re-initialize
+    share.count = 0
+    
+    # second batch
+    with Pool(workers=2) as pool:
+        pool.map(Incrementer, [share] * 3)
+    
+    print(f&quot;After batch 2: {share.count}&quot;)  # 30</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>Pipe</code></summary>
+        <div class="dropdown-content">
+    <h3>Basic <code>Pipe</code> Communication</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pipe, Skprocess
+
+class PipeWorker(Skprocess):
+    &quot;&quot;&quot;
+    A process that communicates via Pipe.
+    
+    - Receiving the point end of a pipe
+    - Bidirectional communication with parent
+    &quot;&quot;&quot;
+    
+    def __init__(self, pipe_point: Pipe.Point):
+        self.pipe = pipe_point
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        # receive command from parent
+        command = self.pipe.recv()
+        print(f&quot;[Child] Received: {command}&quot;)
+        
+        # process the command
+        result = command[&#x27;value&#x27;] * 2
+        
+        # send result back
+        self.pipe.send({&#x27;result&#x27;: result, &#x27;status&#x27;: &#x27;ok&#x27;})
+        print(f&quot;[Child] Sent result: {result}&quot;)
+    
+    def __result__(self):
+        return &quot;pipe_complete&quot;
+
+
+# create a pipe pair
+# anchor stays in parent, point goes to child
+anchor, point = Pipe.pair()
+
+# start process with pipe point
+process = PipeWorker(point)
+process.start()
+point.close()
+
+# send command through anchor
+print(&quot;[Parent] Sending command...&quot;)
+anchor.send({&#x27;action&#x27;: &#x27;compute&#x27;, &#x27;value&#x27;: 21})
+
+# receive response
+response = anchor.recv()
+print(f&quot;[Parent] Received response: {response}&quot;)
+
+# wait for process to finish
+process.wait()
+
+# close the pipe
+anchor.close()</code></pre>
+    <h3>One-Way <code>Pipe</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Pipe, Skprocess
+
+class DataReceiver(Skprocess):
+    &quot;&quot;&quot;
+    A process that only receives data (one-way pipe).
+    &quot;&quot;&quot;
+    
+    def __init__(self, pipe_point: Pipe.Point):
+        self.pipe = pipe_point
+        self.process_config.runs = 1
+        self.received_data = []
+    
+    def __run__(self):
+        # receive all data until None sentinel
+        while True:
+            data = self.pipe.recv()
+            if data is None:
+                break
+            self.received_data.append(data)
+            print(f&quot;[Child] Received: {data}&quot;)
+    
+    def __result__(self):
+        return self.received_data
+
+
+# create one-way pipe (parent sends, child receives)
+anchor, point = Pipe.pair(one_way=True)
+
+process = DataReceiver(point)
+process.start()
+point.close()
+
+# send multiple items
+for i in range(5):
+    anchor.send({&#x27;id&#x27;: i, &#x27;value&#x27;: i * 10})
+
+# send sentinel to signal end
+anchor.send(None)
+
+# get results
+process.wait()
+result = process.result()
+print(f&quot;Received {len(result)} items&quot;)
+
+anchor.close()</code></pre>
+    <h3>Multiple <code>Pipe</code>s</h3>
+    <pre><code class="language-python">from suitkaise.processing import Pipe, Skprocess
+
+class DualPipeWorker(Skprocess):
+    &quot;&quot;&quot;
+    A process with separate command and data pipes.
+    &quot;&quot;&quot;
+    
+    def __init__(self, cmd_pipe: Pipe.Point, data_pipe: Pipe.Point):
+        self.cmd_pipe = cmd_pipe
+        self.data_pipe = data_pipe
+        self.process_config.runs = None  # run until stop
+    
+    def __run__(self):
+        # check for commands (non-blocking would need timeout)
+        try:
+            cmd = self.cmd_pipe.recv()
+            
+            if cmd[&#x27;action&#x27;] == &#x27;process&#x27;:
+                # get data from data pipe
+                data = self.data_pipe.recv()
+                result = sum(data)
+                self.cmd_pipe.send({&#x27;status&#x27;: &#x27;done&#x27;, &#x27;result&#x27;: result})
+            
+            elif cmd[&#x27;action&#x27;] == &#x27;stop&#x27;:
+                self.stop()
+                
+        except Exception as e:
+            self.cmd_pipe.send({&#x27;status&#x27;: &#x27;error&#x27;, &#x27;error&#x27;: str(e)})
+    
+    def __result__(self):
+        return &quot;worker_stopped&quot;
+
+
+# create two pipe pairs
+cmd_anchor, cmd_point = Pipe.pair()
+data_anchor, data_point = Pipe.pair()
+
+process = DualPipeWorker(cmd_point, data_point)
+process.start()
+cmd_point.close()
+data_point.close()
+
+# send process command
+cmd_anchor.send({&#x27;action&#x27;: &#x27;process&#x27;})
+
+# send data on data pipe
+data_anchor.send([1, 2, 3, 4, 5])
+
+# get result on command pipe
+result = cmd_anchor.recv()
+print(f&quot;Result: {result}&quot;)  # Result: {&#x27;status&#x27;: &#x27;done&#x27;, &#x27;result&#x27;: 15}
+
+# stop the worker
+cmd_anchor.send({&#x27;action&#x27;: &#x27;stop&#x27;})
+process.wait()
+
+cmd_anchor.close()
+data_anchor.close()</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>Skprocess.tell()</code> and <code>Skprocess.listen()</code></summary>
+        <div class="dropdown-content">
+    <h3>Basic usage</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess
+from suitkaise import timing
+import hashlib
+
+class CommandableProcess(Skprocess):
+    &quot;&quot;&quot;
+    A process that receives commands via listen().
+    
+    - listen() from subprocess
+    - tell() from parent
+    - Bidirectional communication without Pipe
+    &quot;&quot;&quot;
+    
+    def __init__(self):
+        self.process_config.runs = None  # run indefinitely
+        self.multiplier = 1
+        self.results = []
+    
+    def __prerun__(self):
+        # check for commands (non-blocking with timeout)
+        command = self.listen(timeout=0.1)
+        
+        if command is not None:
+            if command.get(&#x27;action&#x27;) == &#x27;set_multiplier&#x27;:
+                self.multiplier = command[&#x27;value&#x27;]
+                print(f&quot;[Child] Multiplier set to {self.multiplier}&quot;)
+            
+            elif command.get(&#x27;action&#x27;) == &#x27;stop&#x27;:
+                self.stop()
+    
+    def __run__(self):
+        # do some real work - compute hash
+        data = f&quot;run_{self._current_run}_mult_{self.multiplier}&quot;.encode()
+        for _ in range(100 * self.multiplier):
+            data = hashlib.sha256(data).digest()
+        
+        value = int.from_bytes(data[:4], &#x27;big&#x27;) % 1000
+        self.results.append({&#x27;run&#x27;: self._current_run, &#x27;value&#x27;: value})
+        
+        # notify parent of progress
+        if self._current_run % 5 == 0:
+            self.tell({&#x27;progress&#x27;: self._current_run, &#x27;latest&#x27;: value})
+    
+    def __result__(self):
+        return self.results
+
+
+process = CommandableProcess()
+process.start()
+
+# let it run while doing work in parent
+import hashlib
+data = b&quot;parent_work&quot;
+for _ in range(1500):
+    data = hashlib.sha256(data).digest()
+
+# send command to change multiplier
+process.tell({&#x27;action&#x27;: &#x27;set_multiplier&#x27;, &#x27;value&#x27;: 10})
+
+# listen for progress updates for a short window
+data = b&quot;parent_work_2&quot;
+for _ in range(1500):
+    data = hashlib.sha256(data).digest()
+for _ in range(20):
+    msg = process.listen(timeout=0.1)
+    if msg is not None:
+        print(f&quot;[Parent] Progress: {msg}&quot;)
+
+# stop the process, then drain any remaining messages
+process.tell({&#x27;action&#x27;: &#x27;stop&#x27;})
+process.wait()
+while True:
+    msg = process.listen(timeout=0.1)
+    if msg is None:
+        break
+    print(f&quot;[Parent] Progress (late): {msg}&quot;)
+
+results = process.result()
+print(f&quot;Got {len(results)} results&quot;)</code></pre>
+    <h3>Async usage</h3>
+    <pre><code class="language-python">import asyncio
+import hashlib
+from suitkaise.processing import Skprocess
+
+class AsyncWorker(Skprocess):
+    &quot;&quot;&quot;
+    A worker that uses tell/listen in async code.
+    &quot;&quot;&quot;
+    
+    def __init__(self, data_items: list):
+        self.data_items = data_items
+        self.process_config.runs = len(data_items)
+        self.results = []
+    
+    def __run__(self):
+        # process data item - compute hash
+        item = self.data_items[self._current_run]
+        hash_result = hashlib.sha256(item.encode()).hexdigest()
+        self.results.append(hash_result[:16])
+        
+        # send status every 5 runs
+        if self._current_run % 5 == 0:
+            self.tell({
+                &#x27;run&#x27;: self._current_run,
+                &#x27;status&#x27;: &#x27;working&#x27;,
+                &#x27;last_hash&#x27;: hash_result[:8]
+            })
+    
+    def __result__(self):
+        return self.results
+
+
+async def monitor_process():
+    &quot;&quot;&quot;Monitor a process using async listen.&quot;&quot;&quot;
+    
+    data = [f&quot;async_data_item_{i}&quot; for i in range(20)]
+    process = AsyncWorker(data)
+    process.start()
+    
+    # monitor with async listen
+    while process.is_alive:
+        # use asynced() for non-blocking listen in async code
+        msg = await process.listen.asynced()(timeout=0.2)
+        if msg:
+            print(f&quot;Status: {msg}&quot;)
+    
+    await process.wait.asynced()()
+    result = process.result()
+    print(f&quot;Final: {len(result)} hashes computed&quot;)
+
+
+asyncio.run(monitor_process())</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code>autoreconnect</code></summary>
+        <div class="dropdown-content">
+    <h3>Basic <code>autoreconnect</code></h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess, autoreconnect, Pool
+
+# NOTE: This example shows the pattern - actual database would need real connection
+
+@autoreconnect(
+    start_threads=False,
+    **{
+        &quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;secret&quot;},  # auth value is the password string
+    }
+)
+class DatabaseWorker(Skprocess):
+    &quot;&quot;&quot;
+    A process that uses a database connection.
+    
+    @autoreconnect ensures the connection is re-established
+    in the subprocess after serialization.
+    &quot;&quot;&quot;
+    
+    def __init__(self, db_connection, query: str):
+        self.db = db_connection
+        self.query = query
+        self.process_config.runs = 1
+        self.results = None
+    
+    def __run__(self):
+        # db connection was auto-reconnected in subprocess
+        # self.db is now a live connection, not a Reconnector
+        cursor = self.db.cursor()
+        cursor.execute(self.query)
+        self.results = cursor.fetchall()
+        cursor.close()
+    
+    def __result__(self):
+        return self.results
+
+
+# Usage (conceptual):
+# db = psycopg2.connect(host=&quot;localhost&quot;, database=&quot;mydb&quot;, password=&quot;secret&quot;)
+# 
+# with Pool(workers=2) as pool:
+#     queries = [
+#         (db, &quot;SELECT * FROM users LIMIT 10&quot;),
+#         (db, &quot;SELECT * FROM orders LIMIT 10&quot;),
+#     ]
+#     results = pool.star().map(DatabaseWorker, queries)</code></pre>
+    <h3><code>autoreconnect</code> with Multiple Connection Types</h3>
+    <pre><code class="language-python">from suitkaise.processing import Skprocess, autoreconnect
+
+@autoreconnect(
+    start_threads=False,
+    **{
+        # PostgreSQL connections - auth value is the password string
+        &quot;psycopg2.Connection&quot;: {
+            &quot;*&quot;: &quot;default_pass&quot;,           # default for all psycopg2 connections
+            &quot;analytics_db&quot;: &quot;analytics_pass&quot;  # specific override for analytics_db attr
+        },
+        # Redis connections
+        &quot;redis.Redis&quot;: {
+            &quot;*&quot;: &quot;redis_secret&quot;
+        },
+        # MongoDB connections
+        &quot;pymongo.MongoClient&quot;: {
+            &quot;*&quot;: &quot;mongo_pass&quot;
+        }
+    }
+)
+class MultiDbWorker(Skprocess):
+    &quot;&quot;&quot;
+    A process that uses multiple database connections.
+    
+    Each connection type can have its own auth configuration.
+    Use &quot;*&quot; for defaults, attr name for specific overrides.
+    &quot;&quot;&quot;
+    
+    def __init__(self, main_db, analytics_db, cache, mongo):
+        self.main_db = main_db            # uses &quot;*&quot; auth
+        self.analytics_db = analytics_db  # uses &quot;analytics_db&quot; auth
+        self.cache = cache                # Redis with its auth
+        self.mongo = mongo                # MongoDB with its auth
+        self.process_config.runs = 1
+    
+    def __run__(self):
+        # all connections are auto-reconnected in subprocess
+        # ... use connections ...
+        pass
+    
+    def __result__(self):
+        return &quot;done&quot;</code></pre>
+        </div>
+    </details>
+    <h2>Full-on distributed task queue</h2>
+    <p>Goal: Build a production-ready task processing system that can handle thousands of jobs with automatic retries, failure tracking, and performance monitoring.</p>
+    <p>Say you have a batch of data transformation tasks (processing uploaded files, running ML inference on images, generating reports) that need to run in parallel with:</p>
+    <ul>
+        <li>Automatic retry when individual tasks fail (network issues, transient errors)</li>
+        <li>Centralized statistics tracking (how many succeeded, failed, retried)</li>
+        <li>Performance metrics (average processing time, P95 latency)</li>
+        <li>Timeout protection (kill tasks that hang)</li>
+    </ul>
+    <p>What this script does</p>
+    <ol>
+        <li>Takes a list of 50 tasks, each with an ID and data payload</li>
+        <li>Distributes them across 4 parallel workers</li>
+        <li>Each task computes a cryptographic hash chain (this represents real CPU work)</li>
+        <li>Some tasks fail deterministically based on content</li>
+        <li>Failed tasks are automatically retried up to 3 times</li>
+        <li>All timing and success/failure stats are aggregated across workers</li>
+        <li>Prints a summary report with task statistics and performance metrics</li>
+    </ol>
+    <pre><code class="language-python">&quot;&quot;&quot;
+A complete example of a distributed task queue using processing.
+
+Features used:
+- Pool for parallel worker management
+- Share for tracking global state across processes
+- Skprocess for structured task execution with lifecycle hooks
+- Timing for performance metrics collection
+- lives for automatic retry on failure
+&quot;&quot;&quot;
+
+from suitkaise.processing import Pool, Share, Skprocess
+from suitkaise.timing import Sktimer
+from suitkaise import timing
+import hashlib
+
+
+class TaskStats:
+    &quot;&quot;&quot;
+    Tracks statistics across all workers.
+    
+    This class will be auto-wrapped by Share with Skclass.
+    &quot;&quot;&quot;
+    
+    def __init__(self):
+        self.total_tasks = 0
+        self.completed = 0
+        self.failed = 0
+        self.retried = 0
+    
+    def record_complete(self):
+        self.completed += 1
+        self.total_tasks += 1
+    
+    def record_fail(self):
+        self.failed += 1
+        self.total_tasks += 1
+    
+    def record_retry(self):
+        self.retried += 1
+
+
+class TaskWorker(Skprocess):
+    &quot;&quot;&quot;
+    A worker that processes a single task.
+    
+    Features:
+    - Deterministic failure based on task content
+    - Retry support via lives
+    - Timing recorded to shared timer
+    - Stats recorded to shared stats object
+    &quot;&quot;&quot;
+    
+    def __init__(self, shared: Share, task: dict):
+        # store references
+        self.shared = shared
+        self.task = task
+        
+        # configure process
+        self.process_config.runs = 1      # one run per task
+        self.process_config.lives = 3     # retry up to 2 times
+        self.process_config.timeouts.run = 5.0  # 5 second timeout
+        
+        # result storage
+        self.result_data = None
+        self.attempts = 0
+    
+    def __prerun__(self):
+        # track retry attempts
+        self.attempts += 1
+        if self.attempts &gt; 1:
+            # this is a retry
+            self.shared.stats.record_retry()
+    
+    def __run__(self):
+        # record timing
+        start = timing.time()
+        
+        try:
+            # real work - compute hash chain with deterministic iterations
+            iterations = 500 + (self.task[&#x27;id&#x27;] * 37 % 1500)
+            data = self.task[&#x27;data&#x27;].encode()
+            for _ in range(iterations):
+                data = hashlib.sha256(data).digest()
+            
+            # deterministic failure based on task content
+            checksum = hashlib.sha256(self.task[&#x27;data&#x27;].encode()).digest()
+            if checksum[0] % 10 == 0:
+                raise RuntimeError(f&quot;Task {self.task[&#x27;id&#x27;]} failed (content check)&quot;)
+            
+            # process the task
+            self.result_data = {
+                &#x27;task_id&#x27;: self.task[&#x27;id&#x27;],
+                &#x27;input&#x27;: self.task[&#x27;data&#x27;],
+                &#x27;output&#x27;: hashlib.sha256(data).hexdigest()[:32],
+                &#x27;iterations&#x27;: iterations,
+                &#x27;attempts&#x27;: self.attempts,
+                &#x27;status&#x27;: &#x27;success&#x27;
+            }
+            
+            # record success
+            self.shared.stats.record_complete()
+            
+        finally:
+            # always record timing
+            elapsed = timing.elapsed(start)
+            self.shared.timer.add_time(elapsed)
+    
+    def __error__(self):
+        # all retries exhausted
+        self.shared.stats.record_fail()
+        
+        return {
+            &#x27;task_id&#x27;: self.task[&#x27;id&#x27;],
+            &#x27;input&#x27;: self.task[&#x27;data&#x27;],
+            &#x27;output&#x27;: None,
+            &#x27;attempts&#x27;: self.attempts,
+            &#x27;status&#x27;: &#x27;failed&#x27;,
+            &#x27;error&#x27;: str(self.error)
+        }
+    
+    def __result__(self):
+        return self.result_data
+
+
+def run_task_queue(tasks: list[dict], workers: int = 4):
+    &quot;&quot;&quot;
+    Process a list of tasks using a distributed worker pool.
+    
+    Args:
+        tasks: List of task dicts with &#x27;id&#x27; and &#x27;data&#x27; keys
+        workers: Number of parallel workers
+    Returns:
+        Dict with results and statistics
+    &quot;&quot;&quot;
+    
+    # set up shared state
+    with Share() as share:
+        share.stats = TaskStats()
+        share.timer = Sktimer()
+        
+        # create argument tuples for star()
+        args = [(share, task) for task in tasks]
+        
+        # process all tasks in parallel
+        with Pool(workers=workers) as pool:
+            results = pool.star().map(TaskWorker, args)
+        
+        # collect statistics
+        stats = {
+            &#x27;total_tasks&#x27;: share.stats.total_tasks,
+            &#x27;completed&#x27;: share.stats.completed,
+            &#x27;failed&#x27;: share.stats.failed,
+            &#x27;retried&#x27;: share.stats.retried,
+            &#x27;timing&#x27;: {
+                &#x27;total&#x27;: share.timer.total_time,
+                &#x27;mean&#x27;: share.timer.mean,
+                &#x27;min&#x27;: share.timer.min,
+                &#x27;max&#x27;: share.timer.max,
+                &#x27;p95&#x27;: share.timer.percentile(95),
+            }
+        }
+    
+    return {
+        &#x27;results&#x27;: results,
+        &#x27;stats&#x27;: stats
+    }
+
+
+# example usage
+if __name__ == &quot;__main__&quot;:
+    # create tasks
+    tasks = [
+        {&#x27;id&#x27;: i, &#x27;data&#x27;: f&#x27;task_data_{i}&#x27;}
+        for i in range(50)
+    ]
+    print(f&quot;Processing {len(tasks)} tasks...&quot;)
+
+    start = timing.time()
+    
+    # run the queue
+    output = run_task_queue(tasks, workers=4)
+    
+    elapsed = timing.elapsed(start)
+    
+    # print results
+    print(f&quot;\n{&#x27;=&#x27;*50}&quot;)
+    print(f&quot;TASK QUEUE RESULTS&quot;)
+    print(f&quot;{&#x27;=&#x27;*50}&quot;)
+    print(f&quot;Total time: {elapsed:.2f}s&quot;)
+    print(f&quot;\nTask Statistics:&quot;)
+    print(f&quot;  Total processed: {output[&#x27;stats&#x27;][&#x27;total_tasks&#x27;]}&quot;)
+    print(f&quot;  Completed:       {output[&#x27;stats&#x27;][&#x27;completed&#x27;]}&quot;)
+    print(f&quot;  Failed:          {output[&#x27;stats&#x27;][&#x27;failed&#x27;]}&quot;)
+    print(f&quot;  Retried:         {output[&#x27;stats&#x27;][&#x27;retried&#x27;]}&quot;)
+    print(f&quot;\nTiming Statistics:&quot;)
+    print(f&quot;  Total work time: {output[&#x27;stats&#x27;][&#x27;timing&#x27;][&#x27;total&#x27;]:.2f}s&quot;)
+    print(f&quot;  Mean per task:   {output[&#x27;stats&#x27;][&#x27;timing&#x27;][&#x27;mean&#x27;]:.4f}s&quot;)
+    print(f&quot;  Min:             {output[&#x27;stats&#x27;][&#x27;timing&#x27;][&#x27;min&#x27;]:.4f}s&quot;)
+    print(f&quot;  Max:             {output[&#x27;stats&#x27;][&#x27;timing&#x27;][&#x27;max&#x27;]:.4f}s&quot;)
+    print(f&quot;  P95:             {output[&#x27;stats&#x27;][&#x27;timing&#x27;][&#x27;p95&#x27;]:.4f}s&quot;)
+    
+    # show sample results
+    print(f&quot;\nSample Results:&quot;)
+    for r in output[&#x27;results&#x27;][:5]:
+        status = r[&#x27;status&#x27;]
+        attempts = r[&#x27;attempts&#x27;]
+        print(f&quot;  Task {r[&#x27;task_id&#x27;]}: {status} (attempts: {attempts})&quot;)</code></pre>
+    <hr>
+    <h2>Full-on data streaming pipeline</h2>
+    <p>Goal: Build a streaming data processor that can handle a continuous flow of incoming data items, distribute them across multiple workers, and collect results in real-time.</p>
+    <p>Say you&#x27;re building a system that processes a stream of events (log entries, sensor readings, user actions, webhook payloads) where:</p>
+    <ul>
+        <li>Data arrives continuously and needs to be processed as it comes</li>
+        <li>Multiple workers process data in parallel for throughput</li>
+        <li>Workers run indefinitely until explicitly stopped (not batch processing)</li>
+        <li>Parent process can monitor progress and worker status in real-time</li>
+        <li>System shuts down gracefully, finishing in-flight work before exiting</li>
+    </ul>
+    <p>What this script does</p>
+    <ol>
+        <li>Starts 3 worker processes that run indefinitely</li>
+        <li>Generates a stream of 100 data items (&quot;item_0&quot;, &quot;item_1&quot;, etc.)</li>
+        <li>Distributes items to workers in round-robin fashion via <code>tell()</code></li>
+        <li>Each worker computes a hash transformation on received items</li>
+        <li>Workers report their status periodically via <code>tell()</code> back to parent</li>
+        <li>Results accumulate in shared state accessible from all processes</li>
+        <li>After stream ends, sends stop signal to all workers</li>
+        <li>Collects final statistics and prints summary</li>
+    </ol>
+    <pre><code class="language-python">&quot;&quot;&quot;
+A real-time data pipeline using processing.
+
+Features used:
+- Indefinite process with stop signal (runs=None)
+- tell/listen for real-time bidirectional communication
+- Share for accumulating results across processes
+- Graceful shutdown with __onfinish__
+&quot;&quot;&quot;
+
+from suitkaise.processing import Skprocess, Share
+from suitkaise.timing import Sktimer
+from suitkaise import timing
+import hashlib
+
+
+class Results:
+    &quot;&quot;&quot;Accumulates processed data.&quot;&quot;&quot;
+    def __init__(self):
+        self.items = []
+        self.count = 0
+    
+    def add(self, item):
+        self.items.append(item)
+        self.count += 1
+
+
+class DataPipelineWorker(Skprocess):
+    &quot;&quot;&quot;
+    A worker that processes streaming data.
+    
+    - Runs indefinitely until parent sends stop
+    - Receives data items via listen()
+    - Processes and stores results in Share
+    - Sends status updates via tell()
+    &quot;&quot;&quot;
+    
+    def __init__(self, shared: Share, worker_id: int):
+        self.shared = shared
+        self.worker_id = worker_id
+        
+        # run indefinitely
+        self.process_config.runs = None
+        
+        self.processed = 0
+    
+    def __prerun__(self):
+        # check for stop signal or data
+        msg = self.listen(timeout=0.1)
+        
+        if msg is not None:
+            if msg.get(&#x27;action&#x27;) == &#x27;stop&#x27;:
+                # graceful shutdown
+                self.stop()
+            elif msg.get(&#x27;action&#x27;) == &#x27;data&#x27;:
+                # store data for processing
+                self._pending_data = msg[&#x27;payload&#x27;]
+            else:
+                self._pending_data = None
+        else:
+            self._pending_data = None
+    
+    def __run__(self):
+        if self._pending_data is None:
+            # no data to process
+            return
+        
+        # process the data - real work
+        with TimeThis() as run_timer:
+            data = self._pending_data
+            
+            # transform the data - compute hash and transform
+            if isinstance(data, str):
+                data_bytes = data.encode()
+                # compute hash chain
+                for _ in range(500):
+                    data_bytes = hashlib.sha256(data_bytes).digest()
+                output = hashlib.sha256(data_bytes).hexdigest()[:16]
+            else:
+                output = data * 2
+            
+            result = {
+                &#x27;worker&#x27;: self.worker_id,
+                &#x27;input&#x27;: data,
+                &#x27;output&#x27;: output,
+                &#x27;timestamp&#x27;: timing.time()
+            }
+        
+        
+        # store result in shared state
+        self.shared.results.add(result)
+        self.shared.timer.add_time(run_timer.most_recent)
+        
+        self.processed += 1
+        self._pending_data = None
+    
+    def __postrun__(self):
+        # send periodic status updates
+        if self.processed &gt; 0 and self.processed % 10 == 0:
+            self.tell({
+                &#x27;worker&#x27;: self.worker_id,
+                &#x27;processed&#x27;: self.processed,
+                &#x27;status&#x27;: &#x27;running&#x27;
+            })
+    
+    def __onfinish__(self):
+        # send final status
+        self.tell({
+            &#x27;worker&#x27;: self.worker_id,
+            &#x27;processed&#x27;: self.processed,
+            &#x27;status&#x27;: &#x27;finished&#x27;
+        })
+    
+    def __result__(self):
+        return {
+            &#x27;worker_id&#x27;: self.worker_id,
+            &#x27;total_processed&#x27;: self.processed
+        }
+
+def run_pipeline(data_stream, num_workers: int = 2, timeout: float = 5.0):
+    &quot;&quot;&quot;
+    Run a data pipeline with multiple workers.
+    
+    Args:
+        data_stream: Iterator of data items to process
+        num_workers: Number of parallel workers
+        timeout: Maximum time to run
+    
+    Returns:
+        Dict with results and worker stats
+    &quot;&quot;&quot;
+    
+    with Share() as share:
+        share.results = Results()
+        share.timer = Sktimer()
+        
+        # start workers
+        workers = []
+        for i in range(num_workers):
+            worker = DataPipelineWorker(share, worker_id=i)
+            worker.start()
+            workers.append(worker)
+        
+        # distribute data to workers
+        start_time = timing.time()
+        worker_idx = 0
+        
+        for item in data_stream:
+            # check timeout
+            if timing.elapsed(start_time) &gt; timeout:
+                break
+            
+            # round-robin to workers (compute checksum in parent)
+            import hashlib
+            checksum = hashlib.sha256(str(item).encode()).hexdigest()[:8]
+            workers[worker_idx].tell({
+                &#x27;action&#x27;: &#x27;data&#x27;,
+                &#x27;payload&#x27;: item,
+                &#x27;checksum&#x27;: checksum,
+            })
+            worker_idx = (worker_idx + 1) % num_workers
+        
+        # signal workers to stop
+        for worker in workers:
+            worker.tell({&#x27;action&#x27;: &#x27;stop&#x27;})
+        
+        # collect status messages
+        statuses = []
+        for worker in workers:
+            while True:
+                msg = worker.listen(timeout=0.5)
+                if msg is None:
+                    break
+                statuses.append(msg)
+        
+        # wait for all workers
+        for worker in workers:
+            worker.wait()
+        
+        # collect results
+        worker_results = [worker.result() for worker in workers]
+        
+        return {
+            &#x27;results&#x27;: share.results.items,
+            &#x27;count&#x27;: share.results.count,
+            &#x27;worker_stats&#x27;: worker_results,
+            &#x27;timing&#x27;: {
+                &#x27;total&#x27;: share.timer.total_time,
+                &#x27;mean&#x27;: share.timer.mean if share.timer.num_times &gt; 0 else 0,
+            },
+            &#x27;statuses&#x27;: statuses
+        }
+
+
+# example usage
+if __name__ == &quot;__main__&quot;:
+    # create a data stream
+    def generate_data(n):
+        for i in range(n):
+            yield f&quot;item_{i}&quot;
+    
+    print(&quot;Starting pipeline...&quot;)
+    output = run_pipeline(generate_data(100), num_workers=3, timeout=10.0)
+    
+    print(f&quot;\nPipeline Results:&quot;)
+    print(f&quot;  Total processed: {output[&#x27;count&#x27;]}&quot;)
+    print(f&quot;  Total time: {output[&#x27;timing&#x27;][&#x27;total&#x27;]:.2f}s&quot;)
+    print(f&quot;  Mean per item: {output[&#x27;timing&#x27;][&#x27;mean&#x27;]:.4f}s&quot;)
+    
+    print(f&quot;\nWorker Stats:&quot;)
+    for ws in output[&#x27;worker_stats&#x27;]:
+        print(f&quot;  Worker {ws[&#x27;worker_id&#x27;]}: {ws[&#x27;total_processed&#x27;]} items&quot;)
+    
+    print(f&quot;\nSample Results:&quot;)
+    for r in output[&#x27;results&#x27;][:5]:
+        print(f&quot;  {r[&#x27;input&#x27;]} -&gt; {r[&#x27;output&#x27;]} (worker {r[&#x27;worker&#x27;]})&quot;)</code></pre>
 </section>
