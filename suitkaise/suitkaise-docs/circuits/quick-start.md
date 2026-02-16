@@ -1,50 +1,50 @@
-# Quick Start: `circuits`
+# Quick Start: `<suitkaise-api>circuits</suitkaise-api>`
 
 ```bash
-pip install suitkaise
+pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```
 
-## Auto-resetting circuit (`Circuit`)
+## Auto-resetting circuit (`<suitkaise-api>Circuit</suitkaise-api>`)
 
 Sleeps after N failures, then resets and continues.
 
 ```python
-from suitkaise import Circuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 for request in incoming_requests:
     try:
         process(request)
     except ServiceError:
-        circuit.short()  # after 5 failures, sleeps 1s, then resets
+        circuit.<suitkaise-api>short</suitkaise-api>()  # after 5 failures, sleeps 1s, then resets
 ```
 
-## Breaking circuit (`BreakingCircuit`)
+## Breaking circuit (`<suitkaise-api>BreakingCircuit</suitkaise-api>`)
 
 Stays broken after N failures until you manually reset.
 
 ```python
-from suitkaise import BreakingCircuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 
-breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-while not breaker.broken:
+while not breaker.<suitkaise-api>broken</suitkaise-api>:
     try:
-        result = risky_operation()
+        <suitkaise-api>result</suitkaise-api> = risky_operation()
         break
     except OperationError:
-        breaker.short()
+        breaker.<suitkaise-api>short</suitkaise-api>()
 
-if breaker.broken:
+if breaker.<suitkaise-api>broken</suitkaise-api>:
     handle_failure()
-    breaker.reset()  # manually reset when ready
+    breaker.<suitkaise-api>reset</suitkaise-api>()  # manually reset when ready
 ```
 
 ## Exponential backoff (with jitter and max sleep time)
 
 ```python
-circuit = Circuit(
+circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,    # double sleep time after each trip
@@ -56,7 +56,7 @@ circuit = Circuit(
 ## Jitter (randomness to prevent thundering herd)
 
 ```python
-circuit = Circuit(
+circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=5.0,
     jitter=0.2  # ±20% randomness to prevent thundering herd
@@ -67,36 +67,36 @@ circuit = Circuit(
 
 ```python
 try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except CriticalError:
-    circuit.trip()  # skip the counter, trip immediately
+    circuit.<suitkaise-api>trip</suitkaise-api>()  # skip the counter, trip immediately
 except MinorError:
-    circuit.short()  # count normally
+    circuit.<suitkaise-api>short</suitkaise-api>()  # count normally
 ```
 
 ## Async support (native async support)
 
 ```python
 # sync
-circuit.short()
+circuit.<suitkaise-api>short</suitkaise-api>()
 
 # async
-await circuit.short.asynced()()
+await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 ## Check state (get the current state of the circuit)
 
 ```python
-circuit.times_shorted       # failures since last trip
-circuit.total_trips         # lifetime trip count
-circuit.current_sleep_time  # current backoff delay
+circuit.<suitkaise-api>times_shorted</suitkaise-api>       # failures since last trip
+circuit.<suitkaise-api>total_trips</suitkaise-api>         # lifetime trip count
+circuit.<suitkaise-api>current_sleep_time</suitkaise-api>  # current backoff delay
 
-breaker.broken              # is it broken?
+breaker.<suitkaise-api>broken</suitkaise-api>              # is it broken?
 ```
 
 ## Want to learn more?
 
-- **Why page** — why `circuits` exists, coordinated shutdown, and cross-process circuit breaking
-- **How to use** — full API reference for `Circuit` and `BreakingCircuit`
+- **Why page** — why `<suitkaise-api>circuits</suitkaise-api>` exists, coordinated shutdown, and cross-process circuit breaking
+- **How to use** — full API reference for `<suitkaise-api>Circuit</suitkaise-api>` and `<suitkaise-api>BreakingCircuit</suitkaise-api>`
 - **Examples** — progressively complex examples into a full script
-- **How it works** — internal architecture (locks, backoff, `Share` integration) (level: beginner-intermediate)
+- **How it works** — internal architecture (locks, backoff, `<suitkaise-api>Share</suitkaise-api>` integration) (level: beginner-intermediate)

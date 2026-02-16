@@ -9,86 +9,86 @@ columns = 1
 
 # 1.1
 
-title = "Quick Start: `processing`"
+title = "Quick Start: `<suitkaise-api>processing</suitkaise-api>`"
 
 # 1.2
 
 text = "
 ```bash
-pip install suitkaise
+pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```
 
 ## Run a process
 
 ```python
-from suitkaise.processing import Skprocess
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
 
-class Doubler(Skprocess):
+class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, value):
         self.value = value
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         self.value *= 2
 
-    def __result__(self):
+    def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.value
 
 process = Doubler(5)
-result = process.run() # start, wait, return result
-print(result) # 10
+<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>() # start, wait, return <suitkaise-api>result</suitkaise-api>
+print(<suitkaise-api>result</suitkaise-api>) # 10
 ```
 
 ## Run it multiple times
 
 ```python
-class Doubler(Skprocess):
+class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, value):
         self.value = value
-        self.process_config.runs = 3 # loop 3 times
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 3 # loop 3 times
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         self.value *= 2
 
-    def __result__(self):
+    def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.value
 
-result = Doubler(5).run()
-print(result) # 40 (5 → 10 → 20 → 40)
+<suitkaise-api>result</suitkaise-api> = Doubler(5).<suitkaise-api>run</suitkaise-api>()
+print(<suitkaise-api>result</suitkaise-api>) # 40 (5 → 10 → 20 → 40)
 ```
 
 ## Batch processing with Pool
 
 ```python
-from suitkaise.processing import Pool
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
 
 def double(x):
     return x * 2
 
-pool = Pool(workers=4)
-results = pool.map(double, [1, 2, 3, 4, 5])
+pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+results = pool.<suitkaise-api>map</suitkaise-api>(double, [1, 2, 3, 4, 5])
 print(results) # [2, 4, 6, 8, 10]
 ```
 
 ## Share state across processes
 
 ```python
-from suitkaise.processing import Share, Pool, Skprocess
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
-share = Share()
+share = <suitkaise-api>Share</suitkaise-api>()
 share.counter = 0
 share.results = []
 
-class Worker(Skprocess):
+class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share, item):
         self.share = share
         self.item = item
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         self.share.results.append(self.item * 2)
         self.share.counter += 1
 
-pool = Pool(workers=4)
-pool.star().map(Worker, [(share, x) for x in range(10)])
+pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(10)])
 
 print(share.counter) # 10
 print(share.results) # [0, 2, 4, ..., 18]
@@ -97,43 +97,43 @@ print(share.results) # [0, 2, 4, ..., 18]
 ## Communicate between parent and process
 
 ```python
-from suitkaise.processing import Skprocess
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
 
-class Echo(Skprocess):
-    def __prerun__(self):
-        self.msg = self.listen(timeout=1.0)
+class Echo(<suitkaise-api>Skprocess</suitkaise-api>):
+    def <suitkaise-api>__prerun__</suitkaise-api>(self):
+        self.msg = self.<suitkaise-api>listen</suitkaise-api>(timeout=1.0)
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         if self.msg:
-            self.tell(f"echo: {self.msg}")
+            self.<suitkaise-api>tell</suitkaise-api>(f"echo: {self.msg}")
 
 process = Echo()
-process.start()
+process.<suitkaise-api>start</suitkaise-api>()
 
-process.tell("hello")
-response = process.listen(timeout=2.0)
+process.<suitkaise-api>tell</suitkaise-api>("hello")
+response = process.<suitkaise-api>listen</suitkaise-api>(timeout=2.0)
 print(response) # "echo: hello"
 
-process.stop()
-process.wait()
+process.<suitkaise-api>stop</suitkaise-api>()
+process.<suitkaise-api>wait</suitkaise-api>()
 ```
 
 ## Add retries and timeouts
 
 ```python
-class ReliableWorker(Skprocess):
+class ReliableWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
-        self.process_config.lives = 3 # retry up to 2 times on crash
-        self.process_config.timeouts.run = 10.0 # 10 second timeout per run
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3 # retry up to 2 times on crash
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 10.0 # 10 second timeout per <suitkaise-api>run</suitkaise-api>
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         do_work()
 ```
 
 ## Want to learn more?
 
-- **Why page** — why `processing` exists and what problems it solves
-- **How to use** — full API reference for `Skprocess`, `Pool`, `Share`, `Pipe`
+- **Why page** — why `<suitkaise-api>processing</suitkaise-api>` exists and what problems it solves
+- **How to use** — full API reference for `<suitkaise-api>Skprocess</suitkaise-api>`, `<suitkaise-api>Pool</suitkaise-api>`, `<suitkaise-api>Share</suitkaise-api>`, `<suitkaise-api>Pipe</suitkaise-api>`
 - **Examples** — progressively complex examples into a full script
 - **How it works** — internal architecture (level: advanced)
 "

@@ -6,48 +6,48 @@
         <a href="#paths" class="module-bar-link" data-page="paths">how to use</a>
         <a href="#paths-how-it-works" class="module-bar-link" data-page="paths-how-it-works">how it works</a>
         <a href="#paths-examples" class="module-bar-link" data-page="paths-examples">examples</a>
-        <a href="#paths-videos" class="module-bar-link" data-page="paths-videos">videos</a>
         <a href="#paths-tests" class="module-bar-link" data-page="paths-tests">tests</a>
+        <a href="#paths-videos" class="module-bar-link" data-page="paths-videos">videos</a>
         <a href="#paths-learn" class="module-bar-link" data-page="paths-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Quick Start: <code>paths</code></h1>
-    <pre><code class="language-bash">pip install suitkaise</code></pre>
+    <h1>Quick Start: <code><suitkaise-api>paths</suitkaise-api></code></h1>
+    <pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
     <h2>Create a project-relative path</h2>
-    <pre><code class="language-python">from suitkaise.paths import Skpath
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-path = Skpath(&quot;data/file.txt&quot;)
+path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
 
 path.ap   # &quot;/Users/me/project/data/file.txt&quot; — absolute, normalized
 path.rp   # &quot;data/file.txt&quot; — relative to project root, same on every machine
-path.id   # &quot;ZGF0YS9maWxlLnR4dA&quot; — reversible ID for database storage</code></pre>
+path.<suitkaise-api>id</suitkaise-api>   # &quot;ZGF0YS9maWxlLnR4dA&quot; — reversible ID for database storage</code></pre>
     <h2>Get the current file&#x27;s path</h2>
-    <pre><code class="language-python">here = Skpath()  # no arguments = caller&#x27;s file path
+    <pre><code class="language-python">here = <suitkaise-api>Skpath</suitkaise-api>()  # no arguments = caller&#x27;s file path
 print(here.rp)   # &quot;src/my_module.py&quot;</code></pre>
     <h2>Get the project root</h2>
-    <pre><code class="language-python">root = Skpath().root
-print(root.ap)  # &quot;/Users/me/project&quot;
+    <pre><code class="language-python">root = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>
+print(<suitkaise-api>root</suitkaise-api>.ap)  # &quot;/Users/me/project&quot;
 
 # or directly
-from suitkaise import paths
-root = paths.get_project_root()</code></pre>
-    <h2>Auto-convert path types with <code>@autopath</code></h2>
-    <pre><code class="language-python">from suitkaise.paths import autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()</code></pre>
+    <h2>Auto-convert path types with <code>@<suitkaise-api>autopath</suitkaise-api></code></h2>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
-@autopath()
-def process(path: AnyPath):
-    # path is always an Skpath, no matter what was passed in
+@<suitkaise-api>autopath</suitkaise-api>()
+def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
+    # path is always an <suitkaise-api>Skpath</suitkaise-api>, no matter what was passed in
     print(path.rp)
 
-process(&quot;data/file.txt&quot;)                  # str → Skpath
-process(Path(&quot;data/file.txt&quot;))            # Path → Skpath
-process(Skpath(&quot;data/file.txt&quot;))          # Skpath → Skpath</code></pre>
-    <h2>Use <code>Skpath</code> like <code>pathlib.Path</code></h2>
-    <p>Everything <code>pathlib</code> does, <code>Skpath</code> does too:</p>
-    <pre><code class="language-python">path = Skpath(&quot;src&quot;)
+process(&quot;data/file.txt&quot;)                  # str → <suitkaise-api>Skpath</suitkaise-api>
+process(Path(&quot;data/file.txt&quot;))            # Path → <suitkaise-api>Skpath</suitkaise-api>
+process(<suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;))          # <suitkaise-api>Skpath</suitkaise-api> → <suitkaise-api>Skpath</suitkaise-api></code></pre>
+    <h2>Use <code><suitkaise-api>Skpath</suitkaise-api></code> like <code>pathlib.Path</code></h2>
+    <p>Everything <code>pathlib</code> does, <code><suitkaise-api>Skpath</suitkaise-api></code> does too:</p>
+    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;src&quot;)
 
-# join paths
+# join <suitkaise-api>paths</suitkaise-api>
 config = path / &quot;config&quot; / &quot;settings.yaml&quot;
 
 # read/write
@@ -62,32 +62,32 @@ for py_file in path.rglob(&quot;*.py&quot;):
 if config.exists:
     print(config.name)</code></pre>
     <h2>Path IDs for database storage (reversible IDs)</h2>
-    <pre><code class="language-python">path = Skpath(&quot;data/reports/q1.csv&quot;)
+    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/reports/q1.csv&quot;)
 
 # store a compact, reversible ID
-db.execute(&quot;INSERT INTO files (path_id) VALUES (?)&quot;, (path.id,))
+db.execute(&quot;INSERT INTO files (path_id) VALUES (?)&quot;, (path.<suitkaise-api>id</suitkaise-api>,))
 
 # reconstruct later
-same_path = Skpath(&quot;ZGF0YS9yZXBvcnRzL3ExLmNzdg&quot;)
+same_path = <suitkaise-api>Skpath</suitkaise-api>(&quot;ZGF0YS9yZXBvcnRzL3ExLmNzdg&quot;)
 print(same_path.rp)  # &quot;data/reports/q1.csv&quot;</code></pre>
     <h2>Validate and sanitize filenames</h2>
-    <pre><code class="language-python">from suitkaise.paths import is_valid_filename, streamline_path_quick
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
 
-is_valid_filename(&quot;report.pdf&quot;)        # True
-is_valid_filename(&quot;file&lt;name&gt;.txt&quot;)    # False
-is_valid_filename(&quot;CON&quot;)               # False (Windows reserved)
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;report.pdf&quot;)        # True
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file&lt;name&gt;.txt&quot;)    # False
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;CON&quot;)               # False (Windows reserved)
 
-streamline_path_quick(&quot;My File (1).txt&quot;)  # &quot;My_File__1_.txt&quot;</code></pre>
+<suitkaise-api>streamline_path_quick</suitkaise-api>(&quot;My File (1).txt&quot;)  # &quot;My_File__1_.txt&quot;</code></pre>
     <h2>Temporary root override for testing</h2>
-    <pre><code class="language-python">from suitkaise.paths import CustomRoot, Skpath
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>CustomRoot</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
-with CustomRoot(&quot;/tmp/test_project&quot;):
-    path = Skpath(&quot;config/settings.yaml&quot;)
+with <suitkaise-api>CustomRoot</suitkaise-api>(&quot;/tmp/test_project&quot;):
+    path = <suitkaise-api>Skpath</suitkaise-api>(&quot;config/settings.yaml&quot;)
     assert path.root_str == &quot;/tmp/test_project&quot;</code></pre>
     <h2>Want to learn more?</h2>
     <ul>
-        <li><strong>Why page</strong> — why <code>paths</code> exists, cross-platform pitfalls, <code>@autopath</code>, and more</li>
-        <li><strong>How to use</strong> — full API reference for <code>Skpath</code>, <code>@autopath</code>, and all utility functions</li>
+        <li><strong>Why page</strong> — why <code><suitkaise-api>paths</suitkaise-api></code> exists, cross-platform pitfalls, <code>@<suitkaise-api>autopath</suitkaise-api></code>, and more</li>
+        <li><strong>How to use</strong> — full API reference for <code><suitkaise-api>Skpath</suitkaise-api></code>, <code>@<suitkaise-api>autopath</suitkaise-api></code>, and all utility functions</li>
         <li><strong>Examples</strong> — progressively complex examples into a full script</li>
         <li><strong>How it works</strong> — project root detection, caller detection, path normalization (level: intermediate)</li>
     </ul>

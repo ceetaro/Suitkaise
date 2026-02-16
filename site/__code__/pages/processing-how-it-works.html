@@ -6,26 +6,26 @@
         <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
         <a href="#processing-how-it-works" class="module-bar-link active" data-page="processing-how-it-works">how it works</a>
         <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
-        <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
+        <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>How <code>processing</code> works</h1>
-    <p><code>processing</code> is built around subprocess execution with several key components.</p>
+    <h1>How <code><suitkaise-api>processing</suitkaise-api></code> works</h1>
+    <p><code><suitkaise-api>processing</suitkaise-api></code> is built around subprocess execution with several key components.</p>
     <h2>Architecture Overview</h2>
-    <p>The <code>processing</code> module is built around subprocess execution with several key components:</p>
+    <p>The <code><suitkaise-api>processing</suitkaise-api></code> module is built around subprocess execution with several key components:</p>
     <pre><code class="language-python">┌────────────────────────────────────────────────────────────────────────────┐
 │                              Parent Process                                │
 │                                                                            │
 │  ┌──────────────┐   ┌─────────────┐   ┌─────────────┐   ┌───────────────┐  │
-│  │  Skprocess   │   │    Pool     │   │    Share    │   │     Pipe      │  │
+│  │  <suitkaise-api>Skprocess</suitkaise-api>   │   │    <suitkaise-api>Pool</suitkaise-api>     │   │    <suitkaise-api>Share</suitkaise-api>    │   │     <suitkaise-api>Pipe</suitkaise-api>      │  │
 │  │  (instance)  │   │  (workers)  │   │(coordinator)│   │(anchor/point) │  │
 │  └──────┬───────┘   └──────┬──────┘   └──────┬──────┘   └───────┬───────┘  │
 │         │                  │                 │                  │          │
-│         │  cucumber        │  cucumber       │  manager         │  pickle  │
-│         │  serialize       │  serialize      │  proxies         │  handles │
+│         │  <suitkaise-api>cucumber</suitkaise-api>        │  <suitkaise-api>cucumber</suitkaise-api>       │  manager         │  pickle  │
+│         │  <suitkaise-api>serialize</suitkaise-api>       │  <suitkaise-api>serialize</suitkaise-api>      │  proxies         │  handles │
 │         ▼                  ▼                 ▼                  ▼          │
 └─────────┼──────────────────┼─────────────────┼──────────────────┼──────────┘
           │                  │                 │                  │
@@ -40,18 +40,18 @@
 │                           Subprocess(es)                                   │
 └────────────────────────────────────────────────────────────────────────────┘</code></pre>
     <hr>
-    <h2><code>Skprocess</code></h2>
+    <h2><code><suitkaise-api>Skprocess</suitkaise-api></code></h2>
     <h3>Class Hierarchy and Initialization</h3>
-    <p>When you define a subclass of <code>Skprocess</code>:</p>
-    <pre><code class="language-python">class MyProcess(Skprocess):
+    <p>When you define a subclass of <code><suitkaise-api>Skprocess</suitkaise-api></code>:</p>
+    <pre><code class="language-python">class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
         self.counter = 0</code></pre>
     <p>The <code>__init_subclass__</code> hook runs automatically when your class is defined. What happens when you define a Skprocess subclass</p>
     <ol>
-        <li>Python calls <code>__init_subclass__</code> on the parent class (<code>Skprocess</code>)</li>
+        <li>Python calls <code>__init_subclass__</code> on the parent class (<code><suitkaise-api>Skprocess</suitkaise-api></code>)</li>
         <li>Skprocess wraps your <code>__init__</code> method to call <code>_setup()</code> first</li>
-        <li>Skprocess creates <code>__serialize__</code> and <code>__deserialize__</code> methods for <code>cucumber</code> to use</li>
-        <li>These serialization methods capture your class&#x27;s lifecycle methods (<code>__run__</code>, etc.)</li>
+        <li>Skprocess creates <code>__serialize__</code> and <code>__deserialize__</code> methods for <code><suitkaise-api>cucumber</suitkaise-api></code> to use</li>
+        <li>These serialization methods capture your class&#x27;s lifecycle methods (<code><suitkaise-api>__run__</suitkaise-api></code>, etc.)</li>
     </ol>
     <pre><code class="language-python"># what happens under the hood
 def __init_subclass__(cls, **kwargs):
@@ -62,7 +62,7 @@ def __init_subclass__(cls, **kwargs):
         original_init = cls.__dict__[&#x27;__init__&#x27;]
         
         def wrapped_init(self, *args, **kwargs):
-            Skprocess._setup(self)       # parent setup first
+            <suitkaise-api>Skprocess</suitkaise-api>._setup(self)       # parent setup first
             original_init(self, *args, **kwargs)  # then user&#x27;s __init__
         
         cls.__init__ = wrapped_init
@@ -71,27 +71,27 @@ def __init_subclass__(cls, **kwargs):
     cls.__serialize__ = make_serialize(user_serialize)
     cls.__deserialize__ = make_deserialize(user_deserialize)</code></pre>
     <ol>
-        <li>When <code>class MyProcess(Skprocess)</code> is parsed, Python triggers <code>Skprocess.__init_subclass__</code></li>
+        <li>When <code>class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>)</code> is parsed, Python triggers <code><suitkaise-api>Skprocess</suitkaise-api>.__init_subclass__</code></li>
         <li>Your original <code>__init__</code> is saved and replaced with a wrapper</li>
         <li>The wrapper ensures <code>_setup()</code> runs before your code, initializing all internal state</li>
         <li>Custom <code>__serialize__</code>/<code>__deserialize__</code> methods are generated that know how to capture your specific lifecycle methods</li>
     </ol>
     <h3>Internal State (<code>_setup</code>)</h3>
-    <p><code>Skprocess._setup()</code> initializes all internal state before your <code>__init__</code> runs.</p>
+    <p><code><suitkaise-api>Skprocess</suitkaise-api>._setup()</code> initializes all internal state before your <code>__init__</code> runs.</p>
     <p>What <code>_setup()</code> creates</p>
     <ol>
-        <li><strong>Configuration</strong> - <code>process_config</code> holds <code>runs</code>, <code>join_in</code>, <code>lives</code>, and <code>timeouts</code></li>
+        <li><strong>Configuration</strong> - <code><suitkaise-api>process_config</suitkaise-api></code> holds <code><suitkaise-api>runs</suitkaise-api></code>, <code><suitkaise-api>join_in</suitkaise-api></code>, <code><suitkaise-api>lives</suitkaise-api></code>, and <code><suitkaise-api>timeouts</suitkaise-api></code></li>
         <li><strong>Timing</strong> - <code>timers</code> container (created lazily when first needed)</li>
         <li><strong>Runtime tracking</strong> - <code>_current_run</code> counter and <code>_start_time</code> timestamp</li>
-        <li><strong>Error state</strong> - <code>error</code> attribute for <code>__error__</code> to access</li>
+        <li><strong>Error state</strong> - <code><suitkaise-api>error</suitkaise-api></code> attribute for <code><suitkaise-api>__error__</suitkaise-api></code> to access</li>
         <li><strong>Communication queues</strong> - <code>_tell_queue</code> (parent→child) and <code>_listen_queue</code> (child→parent)</li>
         <li><strong>Process handle</strong> - <code>_subprocess</code> holds the <code>multiprocessing.Process</code> object</li>
         <li><strong>Result storage</strong> - <code>_result</code> and <code>_has_result</code> for retrieving the final value</li>
-        <li><strong>TimedMethod wrappers</strong> - Wraps lifecycle methods so <code>process.__run__.timer</code> works</li>
+        <li><strong>TimedMethod wrappers</strong> - Wraps lifecycle methods so <code>process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api></code> works</li>
     </ol>
     <pre><code class="language-python">def _setup(instance):
     # configuration with defaults
-    instance.process_config = ProcessConfig()
+    instance.<suitkaise-api>process_config</suitkaise-api> = ProcessConfig()
     
     # timers container (created when needed)
     instance.timers = None
@@ -100,8 +100,8 @@ def __init_subclass__(cls, **kwargs):
     instance._current_run = 0
     instance._start_time = None
     
-    # error state (set when error occurs)
-    instance.error = None
+    # <suitkaise-api>error</suitkaise-api> state (set when <suitkaise-api>error</suitkaise-api> occurs)
+    instance.<suitkaise-api>error</suitkaise-api> = None
     
     # communication primitives (created on start)
     instance._stop_event = None
@@ -112,27 +112,27 @@ def __init_subclass__(cls, **kwargs):
     # subprocess handle
     instance._subprocess = None
     
-    # result storage
+    # <suitkaise-api>result</suitkaise-api> storage
     instance._result = None
     instance._has_result = False
     
     # set up TimedMethod wrappers
-    Skprocess._setup_timed_methods(instance)</code></pre>
+    <suitkaise-api>Skprocess</suitkaise-api>._setup_timed_methods(instance)</code></pre>
     <h3>TimedMethod Wrappers</h3>
     <p>Each lifecycle method is wrapped in a <code>TimedMethod</code> to enable timer access.</p>
     <p>Why wrap lifecycle methods?</p>
     <ol>
-        <li>Allow <code>process.__run__.timer</code> syntax to get the timer for <code>__run__</code></li>
-        <li>Keep the method callable as normal (<code>process.__run__()</code>)</li>
+        <li>Allow <code>process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api></code> syntax to get the timer for <code><suitkaise-api>__run__</suitkaise-api></code></li>
+        <li>Keep the method callable as normal (<code>process.<suitkaise-api>__run__</suitkaise-api>()</code>)</li>
         <li>Provide a uniform interface for the engine to access the underlying method</li>
     </ol>
     <p>What <code>TimedMethod</code> does</p>
     <ol>
         <li>Stores reference to the original method</li>
         <li>Stores reference to the process (for timer access)</li>
-        <li>Stores the timer name (e.g., <code>&quot;run&quot;</code> for <code>__run__</code>)</li>
+        <li>Stores the timer name (e.g., <code>&quot;<suitkaise-api>run</suitkaise-api>&quot;</code> for <code><suitkaise-api>__run__</suitkaise-api></code>)</li>
         <li>On call, delegates to the original method</li>
-        <li>On <code>.timer</code> access, looks up the <code>Sktimer</code> from <code>process.timers</code></li>
+        <li>On <code>.<suitkaise-api>timer</suitkaise-api></code> access, looks up the <code><suitkaise-api>Sktimer</suitkaise-api></code> from <code>process.timers</code></li>
     </ol>
     <pre><code class="language-python">class TimedMethod:
     def __init__(self, method, process, timer_name):
@@ -144,23 +144,23 @@ def __init_subclass__(cls, **kwargs):
         return self._method(*args, **kwargs)
     
     @property
-    def timer(self):
-        # returns the Sktimer for this method
+    def <suitkaise-api>timer</suitkaise-api>(self):
+        # returns the <suitkaise-api>Sktimer</suitkaise-api> for this method
         if self._process.timers is None:
             return None
         return getattr(self._process.timers, self._timer_name, None)</code></pre>
-    <p>This enables the <code>process.__run__.timer</code> access pattern:</p>
-    <pre><code class="language-python">process.run()
-print(process.__run__.timer.elapsed)  # Get timing for __run__ method
-print(process.__prerun__.timer.elapsed)  # Get timing for __prerun__ method</code></pre>
+    <p>This enables the <code>process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api></code> access pattern:</p>
+    <pre><code class="language-python">process.<suitkaise-api>run</suitkaise-api>()
+print(process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>)  # Get <suitkaise-api>timing</suitkaise-api> for <suitkaise-api>__run__</suitkaise-api> method
+print(process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>)  # Get <suitkaise-api>timing</suitkaise-api> for <suitkaise-api>__prerun__</suitkaise-api> method</code></pre>
     <h3>Serialization for Subprocess Transfer</h3>
-    <p>When <code>start()</code> is called, the entire <code>Skprocess</code> object must be transferred to the subprocess. This uses <code>cucumber</code> serialization.</p>
+    <p>When <code><suitkaise-api>start</suitkaise-api>()</code> is called, the entire <code><suitkaise-api>Skprocess</suitkaise-api></code> object must be transferred to the subprocess. This uses <code><suitkaise-api>cucumber</suitkaise-api></code> serialization.</p>
     <p>Serialization</p>
     <ol>
         <li>Extract all instance attributes (except <code>TimedMethod</code> wrappers which aren&#x27;t serializable)</li>
         <li>Capture the class name for reconstruction</li>
-        <li>Extract all lifecycle method definitions (<code>__run__</code>, <code>__prerun__</code>, etc.) as actual function objects</li>
-        <li>Package into a dict that <code>cucumber</code> can serialize</li>
+        <li>Extract all lifecycle method definitions (<code><suitkaise-api>__run__</suitkaise-api></code>, <code><suitkaise-api>__prerun__</suitkaise-api></code>, etc.) as actual function objects</li>
+        <li>Package into a dict that <code><suitkaise-api>cucumber</suitkaise-api></code> can serialize</li>
     </ol>
     <pre><code class="language-python">def __serialize__(self):
     return {
@@ -169,8 +169,8 @@ print(process.__prerun__.timer.elapsed)  # Get timing for __prerun__ method</cod
         &#x27;class_name&#x27;: cls.__name__,
         &#x27;lifecycle_methods&#x27;: {
             name: cls.__dict__[name] 
-            for name in [&#x27;__prerun__&#x27;, &#x27;__run__&#x27;, &#x27;__postrun__&#x27;, 
-                        &#x27;__onfinish__&#x27;, &#x27;__result__&#x27;, &#x27;__error__&#x27;]
+            for name in [&#x27;<suitkaise-api>__prerun__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>__run__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>__postrun__</suitkaise-api>&#x27;, 
+                        &#x27;<suitkaise-api>__onfinish__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>__result__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>__error__</suitkaise-api>&#x27;]
             if name in cls.__dict__
         },
         &#x27;class_attrs&#x27;: {...},
@@ -181,14 +181,14 @@ print(process.__prerun__.timer.elapsed)  # Get timing for __prerun__ method</cod
         <li>Create an instance using <code>object.__new__()</code> to skip <code>__init__</code> (state already captured)</li>
         <li>Restore all instance attributes from the serialized dict</li>
         <li>Re-wrap lifecycle methods with <code>TimedMethod</code> for timer access</li>
-        <li>If <code>@autoreconnect</code> was used, call <code>reconnect_all()</code> to restore live connections</li>
+        <li>If <code>@<suitkaise-api>autoreconnect</suitkaise-api></code> was used, call <code><suitkaise-api>reconnect_all</suitkaise-api>()</code> to restore live connections</li>
     </ol>
     <pre><code class="language-python">@staticmethod
 def __deserialize__(state):
     # rebuild class with lifecycle methods
     new_class = type(
         state[&#x27;class_name&#x27;],
-        (Skprocess,),
+        (<suitkaise-api>Skprocess</suitkaise-api>,),
         state[&#x27;lifecycle_methods&#x27;] | state[&#x27;class_attrs&#x27;]
     )
     
@@ -197,18 +197,18 @@ def __deserialize__(state):
     obj.__dict__.update(state[&#x27;instance_dict&#x27;])
     
     # set up timed methods
-    Skprocess._setup_timed_methods(obj)
+    <suitkaise-api>Skprocess</suitkaise-api>._setup_timed_methods(obj)
     
-    # handle @autoreconnect
+    # handle @<suitkaise-api>autoreconnect</suitkaise-api>
     if getattr(new_class, &#x27;_auto_reconnect_enabled&#x27;, False):
-        obj = reconnect_all(obj, **reconnect_kwargs)
+        obj = <suitkaise-api>reconnect_all</suitkaise-api>(obj, **reconnect_kwargs)
     
     return obj</code></pre>
-    <h3><code>start()</code> flow</h3>
-    <p>What happens when you call <code>process.start()</code></p>
+    <h3><code><suitkaise-api>start</suitkaise-api>()</code> flow</h3>
+    <p>What happens when you call <code>process.<suitkaise-api>start</suitkaise-api>()</code></p>
     <ol>
-        <li><strong>Initialize timers</strong> - Create <code>ProcessTimers</code> if not already present</li>
-        <li><strong>Serialize the process</strong> - Convert entire object to bytes using <code>cucumber</code></li>
+        <li><strong>Initialize timers</strong> - Create <code><suitkaise-api>ProcessTimers</suitkaise-api></code> if not already present</li>
+        <li><strong>Serialize the process</strong> - Convert entire object to bytes using <code><suitkaise-api>cucumber</suitkaise-api></code></li>
         <li><strong>Create communication primitives</strong> (manager-backed, shared across processes):</li>
     </ol>
     <ul>
@@ -218,32 +218,32 @@ def __deserialize__(state):
         <li><code>_listen_queue</code> - Child sends messages to parent</li>
     </ul>
     <ol start="4">
-        <li><strong>Record start time</strong> - For <code>join_in</code> time limit checking</li>
+        <li><strong>Record start time</strong> - For <code><suitkaise-api>join_in</suitkaise-api></code> time limit checking</li>
         <li><strong>Spawn subprocess</strong> - Create <code>multiprocessing.Process</code> targeting the engine</li>
         <li><strong>Start the subprocess</strong> - Control returns immediately to parent</li>
-        <li><strong>IPC cleanup</strong> - Manager/queues are cleaned up when <code>result()</code> completes</li>
+        <li><strong>IPC cleanup</strong> - Manager/queues are cleaned up when <code><suitkaise-api>result</suitkaise-api>()</code> completes</li>
     </ol>
-    <pre><code class="language-python">def start(self):
+    <pre><code class="language-python">def <suitkaise-api>start</suitkaise-api>(self):
     from .engine import _engine_main
-    from suitkaise import cucumber
+    from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
     
     # ensure timers exist
     if self.timers is None:
-        self.timers = ProcessTimers()
+        self.timers = <suitkaise-api>ProcessTimers</suitkaise-api>()
     
-    # serialize current state
-    serialized = cucumber.serialize(self)
+    # <suitkaise-api>serialize</suitkaise-api> current state
+    serialized = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(self)
     
     # create communication primitives (manager-backed to avoid SemLock issues)
-    manager = _get_ipc_manager()  # shared manager for all Skprocess instances
+    manager = _get_ipc_manager()  # shared manager for all <suitkaise-api>Skprocess</suitkaise-api> instances
     self._stop_event = manager.Event()
     self._result_queue = manager.Queue()
     self._tell_queue = manager.Queue()   # Parent → Child
     self._listen_queue = manager.Queue() # Child → Parent
     
     # record start time
-    from suitkaise import timing
-    self._start_time = timing.time()
+    from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+    self._start_time = <suitkaise-api>timing</suitkaise-api>.time()
     
     # spawn subprocess
     self._subprocess = multiprocessing.Process(
@@ -251,8 +251,8 @@ def __deserialize__(state):
         args=(serialized, self._stop_event, self._result_queue,
               serialized, self._tell_queue, self._listen_queue)
     )
-    self._subprocess.start()</code></pre>
-    <p>After <code>start()</code> returns:</p>
+    self._subprocess.<suitkaise-api>start</suitkaise-api>()</code></pre>
+    <p>After <code><suitkaise-api>start</suitkaise-api>()</code> returns:</p>
     <ul>
         <li>Parent process continues executing (non-blocking)</li>
         <li>Subprocess begins deserializing and running the engine</li>
@@ -264,82 +264,82 @@ def __deserialize__(state):
     <h3>Main Loop</h3>
     <p>Engine startup sequence</p>
     <ol>
-        <li><strong>Deserialize the process</strong> - Reconstruct the <code>Skprocess</code> object from bytes</li>
-        <li><strong>Initialize timers</strong> - Ensure <code>ProcessTimers</code> exists</li>
-        <li><strong>Track lives</strong> - Copy <code>lives</code> from config for retry tracking</li>
+        <li><strong>Deserialize the process</strong> - Reconstruct the <code><suitkaise-api>Skprocess</suitkaise-api></code> object from bytes</li>
+        <li><strong>Initialize timers</strong> - Ensure <code><suitkaise-api>ProcessTimers</suitkaise-api></code> exists</li>
+        <li><strong>Track lives</strong> - Copy <code><suitkaise-api>lives</suitkaise-api></code> from config for retry tracking</li>
         <li><strong>Swap communication queues</strong> - See &quot;Queue Swapping&quot; below</li>
-        <li><strong>Record subprocess start time</strong> - For <code>join_in</code> tracking</li>
+        <li><strong>Record subprocess start time</strong> - For <code><suitkaise-api>join_in</suitkaise-api></code> tracking</li>
     </ol>
     <p>Main execution loop</p>
     <ol>
         <li><strong>Check continuation</strong> - Should we keep running? (runs limit, join_in, stop signal)</li>
-        <li><strong>Run <code>__prerun__</code></strong> - Timed, with configured timeout</li>
+        <li><strong>Run <code><suitkaise-api>__prerun__</suitkaise-api></code></strong> - Timed, with configured timeout</li>
         <li><strong>Check stop</strong> - Exit early if stop signal received</li>
-        <li><strong>Run <code>__run__</code></strong> - Your main work, timed with configured timeout</li>
+        <li><strong>Run <code><suitkaise-api>__run__</suitkaise-api></code></strong> - Your main work, timed with configured timeout</li>
         <li><strong>Check stop</strong> - Exit early if stop signal received</li>
-        <li><strong>Run <code>__postrun__</code></strong> - Cleanup after each run, timed</li>
+        <li><strong>Run <code><suitkaise-api>__postrun__</suitkaise-api></code></strong> - Cleanup after each run, timed</li>
         <li><strong>Increment run counter</strong> - Track how many iterations completed</li>
         <li><strong>Update full_run timer</strong> - Aggregate timing for this iteration</li>
         <li><strong>Loop back to step 1</strong> - Until continuation check fails</li>
     </ol>
     <p>On success (loop exits normally)</p>
     <ul>
-        <li>Run finish sequence (<code>__onfinish__</code> → <code>__result__</code>)</li>
+        <li>Run finish sequence (<code><suitkaise-api>__onfinish__</suitkaise-api></code> → <code><suitkaise-api>__result__</suitkaise-api></code>)</li>
         <li>Send result to parent via queue</li>
     </ul>
     <p>On failure (exception in lifecycle method)</p>
     <ul>
         <li>Decrement <code>lives_remaining</code></li>
         <li>If lives left: retry from step 1</li>
-        <li>If no lives: run <code>__error__</code>, send error to parent</li>
+        <li>If no lives: run <code><suitkaise-api>__error__</suitkaise-api></code>, send error to parent</li>
     </ul>
     <pre><code class="language-python">def _engine_main_inner(serialized_process, stop_event, result_queue, 
                        original_state, tell_queue, listen_queue):
-    # deserialize the process
-    process = cucumber.deserialize(serialized_process)
+    # <suitkaise-api>deserialize</suitkaise-api> the process
+    process = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(serialized_process)
     
     # ensure timers exist
     if process.timers is None:
-        process.timers = ProcessTimers()
+        process.timers = <suitkaise-api>ProcessTimers</suitkaise-api>()
     
-    # track lives
-    lives_remaining = process.process_config.lives
+    # track <suitkaise-api>lives</suitkaise-api>
+    lives_remaining = process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api>
     
     # set up communication (SWAPPED for symmetric API)
     process._stop_event = stop_event
-    process._tell_queue = listen_queue   # subprocess tell() → parent listen()
-    process._listen_queue = tell_queue   # parent tell() → subprocess listen()
+    process._tell_queue = listen_queue   # subprocess <suitkaise-api>tell</suitkaise-api>() → parent <suitkaise-api>listen</suitkaise-api>()
+    process._listen_queue = tell_queue   # parent <suitkaise-api>tell</suitkaise-api>() → subprocess <suitkaise-api>listen</suitkaise-api>()
     
-    process._start_time = timing.time()
+    process._start_time = <suitkaise-api>timing</suitkaise-api>.time()
     
     while lives_remaining &gt; 0:
         try:
             # main execution loop
             while _should_continue(process, stop_event):
-                _run_section_timed(process, &#x27;__prerun__&#x27;, &#x27;prerun&#x27;, PreRunError, stop_event)
+                _run_section_timed(process, &#x27;<suitkaise-api>__prerun__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>prerun</suitkaise-api>&#x27;, <suitkaise-api>PreRunError</suitkaise-api>, stop_event)
                 if stop_event.is_set(): break
                 
-                _run_section_timed(process, &#x27;__run__&#x27;, &#x27;run&#x27;, RunError, stop_event)
+                _run_section_timed(process, &#x27;<suitkaise-api>__run__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>run</suitkaise-api>&#x27;, <suitkaise-api>RunError</suitkaise-api>, stop_event)
                 if stop_event.is_set(): break
                 
-                _run_section_timed(process, &#x27;__postrun__&#x27;, &#x27;postrun&#x27;, PostRunError, stop_event)
+                _run_section_timed(process, &#x27;<suitkaise-api>__postrun__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>postrun</suitkaise-api>&#x27;, <suitkaise-api>PostRunError</suitkaise-api>, stop_event)
                 
                 process._current_run += 1
                 process.timers._update_full_run()
             
-            # success - run finish sequence
+            # success - <suitkaise-api>run</suitkaise-api> finish sequence
             _run_finish_sequence(process, stop_event, result_queue)
             return
             
-        except (PreRunError, RunError, PostRunError, ProcessTimeoutError) as e:
+        except (<suitkaise-api>PreRunError</suitkaise-api>, <suitkaise-api>RunError</suitkaise-api>, <suitkaise-api>PostRunError</suitkaise-api>, <suitkaise-api>ProcessTimeoutError</suitkaise-api>) as e:
             lives_remaining -= 1
             
             if lives_remaining &gt; 0:
                 # retry with current state
-                process.process_config.lives = lives_remaining
+                process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = lives_remaining
                 continue
             else:
-                # no lives - send error
+                # no <suitkaise-api>lives</suitkaise-api> - send <suitkaise-api>error</suitkaise-api>
                 _send_error(process, e, result_queue)
                 return</code></pre>
     <h3>Queue Swapping Explanation</h3>
@@ -347,9 +347,9 @@ def __deserialize__(state):
     <p>Without swapping:</p>
     <ul>
         <li>Parent creates two queues: <code>tell_queue</code> and <code>listen_queue</code></li>
-        <li>Parent&#x27;s <code>tell()</code> writes to <code>tell_queue</code></li>
-        <li>Parent&#x27;s <code>listen()</code> reads from <code>listen_queue</code></li>
-        <li>If subprocess uses same assignment, <code>tell()</code> would write to... <code>tell_queue</code> (same as parent!)</li>
+        <li>Parent&#x27;s <code><suitkaise-api>tell</suitkaise-api>()</code> writes to <code>tell_queue</code></li>
+        <li>Parent&#x27;s <code><suitkaise-api>listen</suitkaise-api>()</code> reads from <code>listen_queue</code></li>
+        <li>If subprocess uses same assignment, <code><suitkaise-api>tell</suitkaise-api>()</code> would write to... <code>tell_queue</code> (same as parent!)</li>
         <li>Both would write to same queue, both would read from same queue = broken</li>
     </ul>
     <p>Swap in subprocess to maintain symmetry.</p>
@@ -363,15 +363,15 @@ Subprocess (after deserialization):
     <p>Result - symmetric API.</p>
     <p>This means both sides use the same mental model:</p>
     <ul>
-        <li><code>tell()</code> always sends TO the other side</li>
-        <li><code>listen()</code> always receives FROM the other side</li>
+        <li><code><suitkaise-api>tell</suitkaise-api>()</code> always sends TO the other side</li>
+        <li><code><suitkaise-api>listen</suitkaise-api>()</code> always receives FROM the other side</li>
     </ul>
     <h3>Continuation Checks</h3>
     <p>Checked before each iteration of the main loop</p>
     <ol>
-        <li><strong>Stop signal</strong> - Has the parent called <code>stop()</code>? Check the multiprocessing event.</li>
-        <li><strong>Run count</strong> - Have we completed <code>process_config.runs</code> iterations? (If <code>runs=None</code>, skip this check - run indefinitely)</li>
-        <li><strong>Time limit</strong> - Have we exceeded <code>process_config.join_in</code> seconds? (If <code>join_in=None</code>, skip this check)</li>
+        <li><strong>Stop signal</strong> - Has the parent called <code><suitkaise-api>stop</suitkaise-api>()</code>? Check the multiprocessing event.</li>
+        <li><strong>Run count</strong> - Have we completed <code><suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api></code> iterations? (If <code><suitkaise-api>runs</suitkaise-api>=None</code>, skip this check - run indefinitely)</li>
+        <li><strong>Time limit</strong> - Have we exceeded <code><suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api></code> seconds? (If <code><suitkaise-api>join_in</suitkaise-api>=None</code>, skip this check)</li>
     </ol>
     <p><strong>Evaluation order matters:</strong></p>
     <ul>
@@ -384,15 +384,15 @@ Subprocess (after deserialization):
     if stop_event.is_set():
         return False
     
-    # check run count limit
-    if process.process_config.runs is not None:
-        if process._current_run &gt;= process.process_config.runs:
+    # check <suitkaise-api>run</suitkaise-api> count limit
+    if process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> is not None:
+        if process._current_run &gt;= process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api>:
             return False
     
-    # check time limit (join_in)
-    if process.process_config.join_in is not None:
-        elapsed = timing.elapsed(process._start_time)
-        if elapsed &gt;= process.process_config.join_in:
+    # check time limit (<suitkaise-api>join_in</suitkaise-api>)
+    if process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api> is not None:
+        <suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(process._start_time)
+        if <suitkaise-api>elapsed</suitkaise-api> &gt;= process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api>:
             return False
     
     return True</code></pre>
@@ -401,16 +401,16 @@ Subprocess (after deserialization):
     <p>How section timing works</p>
     <ol>
         <li><strong>Get the method</strong> - Unwrap from <code>TimedMethod</code> if necessary to get the raw function</li>
-        <li><strong>Get the timeout</strong> - Look up configured timeout for this section (e.g., <code>timeouts.run</code>)</li>
-        <li><strong>Get or create timer</strong> - Ensure an <code>Sktimer</code> exists for this section</li>
+        <li><strong>Get the timeout</strong> - Look up configured timeout for this section (e.g., <code><suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api></code>)</li>
+        <li><strong>Get or create timer</strong> - Ensure an <code><suitkaise-api>Sktimer</suitkaise-api></code> exists for this section</li>
         <li><strong>Start the timer</strong> - Begin measuring</li>
         <li><strong>Execute with timeout</strong> - Run the method with platform-appropriate timeout handling</li>
         <li><strong>Stop the timer</strong> - Record elapsed time on success</li>
         <li><strong>Handle failures</strong>:</li>
     </ol>
     <ul>
-        <li>Timeout: Discard timing (don&#x27;t pollute stats), re-raise <code>ProcessTimeoutError</code></li>
-        <li>Exception: Discard timing, wrap in section-specific error (e.g., <code>RunError</code>)</li>
+        <li>Timeout: Discard timing (don&#x27;t pollute stats), re-raise <code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code></li>
+        <li>Exception: Discard timing, wrap in section-specific error (e.g., <code><suitkaise-api>RunError</suitkaise-api></code>)</li>
     </ul>
     <pre><code class="language-python">def _run_section_timed(process, method_name, timer_name, error_class, stop_event):
     # get method (unwrap TimedMethod if needed)
@@ -418,20 +418,20 @@ Subprocess (after deserialization):
     method = method_attr._method if hasattr(method_attr, &#x27;_method&#x27;) else method_attr
     
     # get timeout
-    timeout = getattr(process.process_config.timeouts, timer_name, None)
+    timeout = getattr(process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>, timer_name, None)
     
     # get or create timer
     timer = process.timers._ensure_timer(timer_name)
     
-    timer.start()
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
     try:
         run_with_timeout(method, timeout, method_name, process._current_run)
-        timer.stop()
-    except ProcessTimeoutError:
-        timer.discard()  # don&#x27;t record failed timing
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+    except <suitkaise-api>ProcessTimeoutError</suitkaise-api>:
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don&#x27;t record failed <suitkaise-api>timing</suitkaise-api>
         raise
     except Exception as e:
-        timer.discard()
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
         raise error_class(process._current_run, e) from e</code></pre>
     <h3>Timeout Implementation</h3>
     <p>Platform-specific timeout handling.</p>
@@ -439,7 +439,7 @@ Subprocess (after deserialization):
     <p>How signal-based timeout works:</p>
     <ol>
         <li>If no timeout configured, just run the function directly</li>
-        <li>Install a custom <code>SIGALRM</code> handler that raises <code>ProcessTimeoutError</code></li>
+        <li>Install a custom <code>SIGALRM</code> handler that raises <code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code></li>
         <li>Set an alarm to fire after <code>timeout</code> seconds</li>
         <li>Run the function</li>
         <li>Cancel the alarm when done (success or exception)</li>
@@ -451,7 +451,7 @@ Subprocess (after deserialization):
         return func()
     
     def handler(signum, frame):
-        raise ProcessTimeoutError(section, timeout, current_run)
+        raise <suitkaise-api>ProcessTimeoutError</suitkaise-api>(section, timeout, current_run)
     
     old_handler = signal.signal(signal.SIGALRM, handler)
     signal.alarm(int(timeout) + 1)
@@ -470,128 +470,128 @@ Subprocess (after deserialization):
         <li>Spawn a daemon thread to run the function</li>
         <li>Wait on the completion event with timeout</li>
         <li>If event fires before timeout: return result or re-raise exception</li>
-        <li>If timeout elapses first: raise <code>ProcessTimeoutError</code></li>
+        <li>If timeout elapses first: raise <code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code></li>
     </ol>
     <p>Limitation: The thread-based approach cannot interrupt blocking code. The thread continues running as a &quot;zombie&quot; but the timeout is detected and raised.</p>
     <pre><code class="language-python">def _thread_based_timeout(func, timeout, section, current_run):
     if timeout is None:
         return func()
     
-    result = [None]
+    <suitkaise-api>result</suitkaise-api> = [None]
     exception = [None]
     completed = threading.Event()
     
     def wrapper():
         try:
-            result[0] = func()
+            <suitkaise-api>result</suitkaise-api>[0] = func()
         except BaseException as e:
             exception[0] = e
         finally:
             completed.set()
     
     thread = threading.Thread(target=wrapper, daemon=True)
-    thread.start()
+    thread.<suitkaise-api>start</suitkaise-api>()
     
-    finished = completed.wait(timeout=timeout)
+    finished = completed.<suitkaise-api>wait</suitkaise-api>(timeout=timeout)
     
     if not finished:
-        raise ProcessTimeoutError(section, timeout, current_run)
+        raise <suitkaise-api>ProcessTimeoutError</suitkaise-api>(section, timeout, current_run)
     
     if exception[0] is not None:
         raise exception[0]
     
-    return result[0]</code></pre>
+    return <suitkaise-api>result</suitkaise-api>[0]</code></pre>
     <h3>Finish Sequence</h3>
     <p>What happens when the process completes successfully</p>
     <ol>
-        <li><strong>Run <code>__onfinish__</code></strong> - Final cleanup, timed with configured timeout</li>
+        <li><strong>Run <code><suitkaise-api>__onfinish__</suitkaise-api></code></strong> - Final cleanup, timed with configured timeout</li>
     </ol>
     <ul>
-        <li>If it fails: Send <code>OnFinishError</code> to parent, abort</li>
+        <li>If it fails: Send <code><suitkaise-api>OnFinishError</suitkaise-api></code> to parent, abort</li>
     </ul>
     <ol start="2">
-        <li><strong>Run <code>__result__</code></strong> - Extract the return value, timed</li>
+        <li><strong>Run <code><suitkaise-api>__result__</suitkaise-api></code></strong> - Extract the return value, timed</li>
     </ol>
     <ul>
-        <li>If it fails: Send <code>ResultError</code> to parent, abort</li>
+        <li>If it fails: Send <code><suitkaise-api>ResultError</suitkaise-api></code> to parent, abort</li>
     </ul>
     <ol start="3">
         <li><strong>Serialize the result</strong> - Convert return value to bytes</li>
         <li><strong>Serialize the timers</strong> - Include all timing data for parent access</li>
-        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;result&quot;, ...}</code></li>
+        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;<suitkaise-api>result</suitkaise-api>&quot;, ...}</code></li>
     </ol>
     <pre><code class="language-python">def _run_finish_sequence(process, stop_event, result_queue):
-    # run __onfinish__
-    method = unwrap(process.__onfinish__)
-    timeout = process.process_config.timeouts.onfinish
-    timer = process.timers._ensure_timer(&#x27;onfinish&#x27;)
+    # <suitkaise-api>run</suitkaise-api> <suitkaise-api>__onfinish__</suitkaise-api>
+    method = unwrap(process.<suitkaise-api>__onfinish__</suitkaise-api>)
+    timeout = process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>onfinish</suitkaise-api>
+    timer = process.timers._ensure_timer(&#x27;<suitkaise-api>onfinish</suitkaise-api>&#x27;)
     
-    timer.start()
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
     try:
-        run_with_timeout(method, timeout, &#x27;__onfinish__&#x27;, process._current_run)
+        run_with_timeout(method, timeout, &#x27;<suitkaise-api>__onfinish__</suitkaise-api>&#x27;, process._current_run)
     except Exception as e:
-        _send_error(process, OnFinishError(process._current_run, e), result_queue)
+        _send_error(process, <suitkaise-api>OnFinishError</suitkaise-api>(process._current_run, e), result_queue)
         return
     finally:
-        timer.stop()
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
     
-    # run __result__
-    result_method = unwrap(process.__result__)
-    result_timeout = process.process_config.timeouts.result
-    result_timer = process.timers._ensure_timer(&#x27;result&#x27;)
+    # <suitkaise-api>run</suitkaise-api> <suitkaise-api>__result__</suitkaise-api>
+    result_method = unwrap(process.<suitkaise-api>__result__</suitkaise-api>)
+    result_timeout = process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>result</suitkaise-api>
+    result_timer = process.timers._ensure_timer(&#x27;<suitkaise-api>result</suitkaise-api>&#x27;)
     
-    result_timer.start()
+    result_timer.<suitkaise-api>start</suitkaise-api>()
     try:
-        result = run_with_timeout(result_method, result_timeout, &#x27;__result__&#x27;, process._current_run)
+        <suitkaise-api>result</suitkaise-api> = run_with_timeout(result_method, result_timeout, &#x27;<suitkaise-api>__result__</suitkaise-api>&#x27;, process._current_run)
     except Exception as e:
-        _send_error(process, ResultError(process._current_run, e), result_queue)
+        _send_error(process, <suitkaise-api>ResultError</suitkaise-api>(process._current_run, e), result_queue)
         return
     finally:
-        result_timer.stop()
+        result_timer.<suitkaise-api>stop</suitkaise-api>()
     
-    # send success result with timers
+    # send success <suitkaise-api>result</suitkaise-api> with timers
     result_queue.put({
-        &quot;type&quot;: &quot;result&quot;,
-        &quot;data&quot;: cucumber.serialize(result),
-        &quot;timers&quot;: cucumber.serialize(process.timers)
+        &quot;type&quot;: &quot;<suitkaise-api>result</suitkaise-api>&quot;,
+        &quot;data&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(<suitkaise-api>result</suitkaise-api>),
+        &quot;timers&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(process.timers)
     })</code></pre>
     <h3>Error Handling</h3>
     <p>What happens when the process fails (no lives remaining)</p>
     <ol>
-        <li><strong>Set <code>process.error</code></strong> - Make the error accessible to <code>__error__</code> method</li>
-        <li><strong>Run <code>__error__</code></strong> - Give user a chance to handle/transform the error</li>
+        <li><strong>Set <code>process.<suitkaise-api>error</suitkaise-api></code></strong> - Make the error accessible to <code><suitkaise-api>__error__</suitkaise-api></code> method</li>
+        <li><strong>Run <code><suitkaise-api>__error__</suitkaise-api></code></strong> - Give user a chance to handle/transform the error</li>
     </ol>
     <ul>
         <li>Timed with configured timeout</li>
-        <li>If <code>__error__</code> itself fails: use the original error</li>
+        <li>If <code><suitkaise-api>__error__</suitkaise-api></code> itself fails: use the original error</li>
     </ul>
     <ol start="3">
-        <li><strong>Serialize the error result</strong> - Whatever <code>__error__</code> returned (or original error)</li>
+        <li><strong>Serialize the error result</strong> - Whatever <code><suitkaise-api>__error__</suitkaise-api></code> returned (or original error)</li>
         <li><strong>Serialize the timers</strong> - Include all timing data collected so far</li>
-        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;error&quot;, ...}</code></li>
+        <li><strong>Send to result queue</strong> - Parent will receive <code>{&quot;type&quot;: &quot;<suitkaise-api>error</suitkaise-api>&quot;, ...}</code></li>
     </ol>
-    <pre><code class="language-python">def _send_error(process, error, result_queue):
-    # set error for __error__ to access
-    process.error = error
+    <pre><code class="language-python">def _send_error(process, <suitkaise-api>error</suitkaise-api>, result_queue):
+    # set <suitkaise-api>error</suitkaise-api> for <suitkaise-api>__error__</suitkaise-api> to access
+    process.<suitkaise-api>error</suitkaise-api> = <suitkaise-api>error</suitkaise-api>
     
-    error_method = unwrap(process.__error__)
-    error_timeout = process.process_config.timeouts.error
-    error_timer = process.timers._ensure_timer(&#x27;error&#x27;)
+    error_method = unwrap(process.<suitkaise-api>__error__</suitkaise-api>)
+    error_timeout = process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>error</suitkaise-api>
+    error_timer = process.timers._ensure_timer(&#x27;<suitkaise-api>error</suitkaise-api>&#x27;)
     
-    error_timer.start()
+    error_timer.<suitkaise-api>start</suitkaise-api>()
     try:
-        error_result = run_with_timeout(error_method, error_timeout, &#x27;__error__&#x27;, process._current_run)
+        error_result = run_with_timeout(error_method, error_timeout, &#x27;<suitkaise-api>__error__</suitkaise-api>&#x27;, process._current_run)
     except Exception:
-        # if __error__ fails, send original error
-        error_result = error
+        # if <suitkaise-api>__error__</suitkaise-api> fails, send original <suitkaise-api>error</suitkaise-api>
+        error_result = <suitkaise-api>error</suitkaise-api>
     finally:
-        error_timer.stop()
+        error_timer.<suitkaise-api>stop</suitkaise-api>()
     
-    # send error result
+    # send <suitkaise-api>error</suitkaise-api> <suitkaise-api>result</suitkaise-api>
     result_queue.put({
-        &quot;type&quot;: &quot;error&quot;,
-        &quot;data&quot;: cucumber.serialize(error_result),
-        &quot;timers&quot;: cucumber.serialize(process.timers)
+        &quot;type&quot;: &quot;<suitkaise-api>error</suitkaise-api>&quot;,
+        &quot;data&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(error_result),
+        &quot;timers&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(process.timers)
     })</code></pre>
     <h3>Result Queue Draining</h3>
     <p>The parent must drain the result queue BEFORE joining the subprocess to avoid deadlock.</p>
@@ -624,7 +624,7 @@ Subprocess (after deserialization):
     if self._subprocess is None:
         return True
     
-    # MUST drain result queue BEFORE waiting
+    # MUST drain <suitkaise-api>result</suitkaise-api> queue BEFORE waiting
     # otherwise: subprocess can&#x27;t exit until queue is drained,
     # but we can&#x27;t drain until subprocess exits = deadlock
     self._drain_result_queue()
@@ -646,17 +646,17 @@ def _drain_result_queue(self):
     
     # update timers from subprocess
     if message.get(&#x27;timers&#x27;):
-        self.timers = cucumber.deserialize(message[&#x27;timers&#x27;])
-        Skprocess._setup_timed_methods(self)
+        self.timers = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&#x27;timers&#x27;])
+        <suitkaise-api>Skprocess</suitkaise-api>._setup_timed_methods(self)
     
-    if message[&quot;type&quot;] == &quot;error&quot;:
-        self._result = cucumber.deserialize(message[&quot;data&quot;])
+    if message[&quot;type&quot;] == &quot;<suitkaise-api>error</suitkaise-api>&quot;:
+        self._result = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;])
     else:
-        self._result = cucumber.deserialize(message[&quot;data&quot;])
+        self._result = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;])
     
     self._has_result = True</code></pre>
     <hr>
-    <h2><code>Pool</code></h2>
+    <h2><code><suitkaise-api>Pool</suitkaise-api></code></h2>
     <h3>Internal Structure</h3>
     <p>What Pool creates on initialization</p>
     <ol>
@@ -664,15 +664,15 @@ def _drain_result_queue(self):
         <li><strong>Active process tracking</strong> - List to track spawned workers</li>
         <li><strong>Multiprocessing pool</strong> - Built-in pool for efficient batch execution</li>
     </ol>
-    <pre><code class="language-python">class Pool:
+    <pre><code class="language-python">class <suitkaise-api>Pool</suitkaise-api>:
     def __init__(self, workers=None):
         self._workers = workers or multiprocessing.cpu_count()
         self._active_processes = []
-        self._mp_pool = multiprocessing.Pool(processes=self._workers)</code></pre>
+        self._mp_pool = multiprocessing.<suitkaise-api>Pool</suitkaise-api>(processes=self._workers)</code></pre>
     <h3>Map Implementation</h3>
     <p>Two execution paths</p>
     <ol>
-        <li><strong>Fast path (no timeout)</strong> - Use built-in <code>multiprocessing.Pool.map()</code> for efficiency</li>
+        <li><strong>Fast path (no timeout)</strong> - Use built-in <code>multiprocessing.<suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>()</code> for efficiency</li>
         <li><strong>Timeout path</strong> - Manual worker management with individual timeouts</li>
     </ol>
     <p>Fast path</p>
@@ -681,7 +681,7 @@ def _drain_result_queue(self):
         <li>Return early if empty</li>
         <li>Serialize the function/Skprocess once (reused for all items)</li>
         <li>Build argument tuples: <code>(serialized_fn, serialized_item, is_star)</code></li>
-        <li>Use <code>multiprocessing.Pool.map()</code> to distribute work</li>
+        <li>Use <code>multiprocessing.<suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>()</code> to distribute work</li>
         <li>Deserialize results, raise if any worker returned an error</li>
         <li>Return results in input order</li>
     </ol>
@@ -707,21 +707,21 @@ def _drain_result_queue(self):
     if not items:
         return []
     
-    # serialize function once
-    serialized_fn = cucumber.serialize(fn_or_process)
+    # <suitkaise-api>serialize</suitkaise-api> function once
+    serialized_fn = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(fn_or_process)
     
-    # use built-in multiprocessing.Pool for efficiency when no timeout
+    # use built-in multiprocessing.<suitkaise-api>Pool</suitkaise-api> for efficiency when no timeout
     if timeout is None and self._mp_pool is not None:
         args = [
-            (serialized_fn, cucumber.serialize(item), is_star)
+            (serialized_fn, <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(item), is_star)
             for item in items
         ]
-        messages = self._mp_pool.map(_pool_worker_bytes_args, args)
+        messages = self._mp_pool.<suitkaise-api>map</suitkaise-api>(_pool_worker_bytes_args, args)
         results = []
         for message in messages:
-            if message[&quot;type&quot;] == &quot;error&quot;:
-                raise cucumber.deserialize(message[&quot;data&quot;])
-            results.append(cucumber.deserialize(message[&quot;data&quot;]))
+            if message[&quot;type&quot;] == &quot;<suitkaise-api>error</suitkaise-api>&quot;:
+                raise <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;])
+            results.append(<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;]))
         return results
     
     # manual worker management with timeout
@@ -732,7 +732,7 @@ def _drain_result_queue(self):
     while active or next_index &lt; len(items):
         # start workers up to limit
         while next_index &lt; len(items) and len(active) &lt; self._workers:
-            serialized_item = cucumber.serialize(items[next_index])
+            serialized_item = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(items[next_index])
             queue, worker = self._spawn_worker(serialized_fn, serialized_item, is_star)
             active.append((next_index, queue, worker))
             next_index += 1
@@ -746,9 +746,9 @@ def _drain_result_queue(self):
                 raise TimeoutError(f&quot;Worker {idx} timed out&quot;)
             
             message = queue.get()
-            if message[&quot;type&quot;] == &quot;error&quot;:
-                raise cucumber.deserialize(message[&quot;data&quot;])
-            results[idx] = cucumber.deserialize(message[&quot;data&quot;])
+            if message[&quot;type&quot;] == &quot;<suitkaise-api>error</suitkaise-api>&quot;:
+                raise <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;])
+            results[idx] = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(message[&quot;data&quot;])
             active.remove((idx, queue, worker))
             break
     
@@ -772,8 +772,8 @@ def _drain_result_queue(self):
     </ol>
     <pre><code class="language-python">def _pool_worker(serialized_fn, serialized_item, is_star, result_queue):
     try:
-        fn_or_process = cucumber.deserialize(serialized_fn)
-        item = cucumber.deserialize(serialized_item)
+        fn_or_process = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(serialized_fn)
+        item = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(serialized_item)
         
         # unpack if star mode
         if is_star:
@@ -781,25 +781,25 @@ def _drain_result_queue(self):
         else:
             args = (item,)
         
-        # check if Skprocess class
-        if isinstance(fn_or_process, type) and issubclass(fn_or_process, Skprocess):
+        # check if <suitkaise-api>Skprocess</suitkaise-api> class
+        if isinstance(fn_or_process, type) and issubclass(fn_or_process, <suitkaise-api>Skprocess</suitkaise-api>):
             process_instance = fn_or_process(*args)
-            result = _run_process_inline(process_instance)
+            <suitkaise-api>result</suitkaise-api> = _run_process_inline(process_instance)
         else:
-            result = fn_or_process(*args) if is_star else fn_or_process(item)
+            <suitkaise-api>result</suitkaise-api> = fn_or_process(*args) if is_star else fn_or_process(item)
         
         result_queue.put({
-            &quot;type&quot;: &quot;result&quot;,
-            &quot;data&quot;: cucumber.serialize(result)
+            &quot;type&quot;: &quot;<suitkaise-api>result</suitkaise-api>&quot;,
+            &quot;data&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)
         })
     except Exception as e:
         result_queue.put({
-            &quot;type&quot;: &quot;error&quot;,
-            &quot;data&quot;: cucumber.serialize(e)
+            &quot;type&quot;: &quot;<suitkaise-api>error</suitkaise-api>&quot;,
+            &quot;data&quot;: <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(e)
         })</code></pre>
     <h3>Inline Process Execution</h3>
-    <p>When <code>Pool</code> runs a <code>Skprocess</code>, it runs inline since it&#x27;s already in a subprocess. No need to spawn another subprocess.</p>
-    <p>Key differences from normal <code>Skprocess</code> execution</p>
+    <p>When <code><suitkaise-api>Pool</suitkaise-api></code> runs a <code><suitkaise-api>Skprocess</suitkaise-api></code>, it runs inline since it&#x27;s already in a subprocess. No need to spawn another subprocess.</p>
+    <p>Key differences from normal <code><suitkaise-api>Skprocess</suitkaise-api></code> execution</p>
     <ol>
         <li><strong>No subprocess</strong> - Already in a worker process</li>
         <li><strong><code>threading.Event</code></strong> - Uses thread event instead of multiprocessing event</li>
@@ -807,7 +807,7 @@ def _drain_result_queue(self):
     </ol>
     <p>Inline execution</p>
     <ol>
-        <li><strong>Initialize timers</strong> - Create <code>ProcessTimers</code> if needed</li>
+        <li><strong>Initialize timers</strong> - Create <code><suitkaise-api>ProcessTimers</suitkaise-api></code> if needed</li>
         <li><strong>Initialize state</strong> - Set run counter to 0, record start time</li>
         <li><strong>Create stop event</strong> - <code>threading.Event</code> for potential early termination</li>
         <li><strong>Copy lives</strong> - For retry tracking</li>
@@ -815,43 +815,43 @@ def _drain_result_queue(self):
     <p>Main loop (same as engine)</p>
     <ol>
         <li>Check continuation conditions</li>
-        <li>Run <code>__prerun__</code> → <code>__run__</code> → <code>__postrun__</code> cycle</li>
+        <li>Run <code><suitkaise-api>__prerun__</suitkaise-api></code> → <code><suitkaise-api>__run__</suitkaise-api></code> → <code><suitkaise-api>__postrun__</suitkaise-api></code> cycle</li>
         <li>Increment run counter, update timers</li>
-        <li>On success: run <code>__onfinish__</code> → <code>__result__</code>, return result</li>
-        <li>On failure: decrement lives, retry or run <code>__error__</code></li>
+        <li>On success: run <code><suitkaise-api>__onfinish__</suitkaise-api></code> → <code><suitkaise-api>__result__</suitkaise-api></code>, return result</li>
+        <li>On failure: decrement lives, retry or run <code><suitkaise-api>__error__</suitkaise-api></code></li>
     </ol>
     <pre><code class="language-python">def _run_process_inline(process):
     # ensure timers exist
     if process.timers is None:
-        process.timers = ProcessTimers()
+        process.timers = <suitkaise-api>ProcessTimers</suitkaise-api>()
     
     # initialize state
     process._current_run = 0
-    process._start_time = timing.time()
+    process._start_time = <suitkaise-api>timing</suitkaise-api>.time()
     
     # create threading.Event (not multiprocessing.Event - already in subprocess)
     stop_event = threading.Event()
     process._stop_event = stop_event
     
-    lives_remaining = process.process_config.lives
+    lives_remaining = process.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api>
     
     while lives_remaining &gt; 0:
         try:
             while _should_continue_inline():
-                _run_section_timed(&#x27;__prerun__&#x27;, &#x27;prerun&#x27;, PreRunError)
+                _run_section_timed(&#x27;<suitkaise-api>__prerun__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>prerun</suitkaise-api>&#x27;, <suitkaise-api>PreRunError</suitkaise-api>)
                 if stop_event.is_set(): break
                 
-                _run_section_timed(&#x27;__run__&#x27;, &#x27;run&#x27;, RunError)
+                _run_section_timed(&#x27;<suitkaise-api>__run__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>run</suitkaise-api>&#x27;, <suitkaise-api>RunError</suitkaise-api>)
                 if stop_event.is_set(): break
                 
-                _run_section_timed(&#x27;__postrun__&#x27;, &#x27;postrun&#x27;, PostRunError)
+                _run_section_timed(&#x27;<suitkaise-api>__postrun__</suitkaise-api>&#x27;, &#x27;<suitkaise-api>postrun</suitkaise-api>&#x27;, <suitkaise-api>PostRunError</suitkaise-api>)
                 
                 process._current_run += 1
                 process.timers._update_full_run()
             
             return _run_finish_sequence_inline(process)
             
-        except (PreRunError, RunError, PostRunError, ProcessTimeoutError) as e:
+        except (<suitkaise-api>PreRunError</suitkaise-api>, <suitkaise-api>RunError</suitkaise-api>, <suitkaise-api>PostRunError</suitkaise-api>, <suitkaise-api>ProcessTimeoutError</suitkaise-api>) as e:
             lives_remaining -= 1
             if lives_remaining &gt; 0:
                 continue
@@ -861,17 +861,17 @@ def _drain_result_queue(self):
     <p>Pool methods return modifier objects that allow chaining.</p>
     <p>Modifier chaining</p>
     <ol>
-        <li><code>pool.map</code> returns <code>_PoolMapModifier</code> instance</li>
-        <li>Calling it directly (<code>pool.map(fn, items)</code>) runs synchronously</li>
-        <li>Calling <code>.timeout(30)</code> returns <code>_PoolMapTimeoutModifier</code> with timeout stored</li>
-        <li>Calling <code>.background()</code> returns <code>_PoolMapBackgroundModifier</code> that returns a Future</li>
-        <li>Calling <code>.asynced()</code> returns <code>_PoolMapAsyncModifier</code> that returns a coroutine</li>
+        <li><code>pool.<suitkaise-api>map</suitkaise-api></code> returns <code>_PoolMapModifier</code> instance</li>
+        <li>Calling it directly (<code>pool.<suitkaise-api>map</suitkaise-api>(fn, items)</code>) runs synchronously</li>
+        <li>Calling <code>.<suitkaise-api>timeout</suitkaise-api>(30)</code> returns <code>_PoolMapTimeoutModifier</code> with timeout stored</li>
+        <li>Calling <code>.<suitkaise-api>background</suitkaise-api>()</code> returns <code>_PoolMapBackgroundModifier</code> that returns a Future</li>
+        <li>Calling <code>.<suitkaise-api>asynced</suitkaise-api>()</code> returns <code>_PoolMapAsyncModifier</code> that returns a coroutine</li>
     </ol>
     <p>Modifier pattern</p>
-    <pre><code class="language-python">pool.map                     → _PoolMapModifier          → sync execution
-pool.map.timeout(30)         → _PoolMapTimeoutModifier   → sync with timeout
-pool.map.background()        → _PoolMapBackgroundModifier→ returns Future
-pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine</code></pre>
+    <pre><code class="language-python">pool.<suitkaise-api>map</suitkaise-api>                     → _PoolMapModifier          → sync execution
+pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30)         → _PoolMapTimeoutModifier   → sync with timeout
+pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()        → _PoolMapBackgroundModifier→ returns Future
+pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()           → _PoolMapAsyncModifier     → returns coroutine</code></pre>
     <pre><code class="language-python">class _PoolMapModifier:
     def __init__(self, pool, is_star=False):
         self._pool = pool
@@ -880,41 +880,41 @@ pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine
     def __call__(self, fn_or_process, iterable):
         return self._pool._map_impl(fn_or_process, iterable, self._is_star)
     
-    def timeout(self, seconds):
+    def <suitkaise-api>timeout</suitkaise-api>(self, seconds):
         return _PoolMapTimeoutModifier(self._pool, self._is_star, seconds)
     
-    def background(self):
+    def <suitkaise-api>background</suitkaise-api>(self):
         return _PoolMapBackgroundModifier(self._pool, self._is_star)
     
-    def asynced(self):
+    def <suitkaise-api>asynced</suitkaise-api>(self):
         return _PoolMapAsyncModifier(self._pool, self._is_star)</code></pre>
-    <p><code>star()</code> modifier Returns a <code>StarModifier</code> that configures <code>is_star=True</code> for all methods. This makes each method unpack tuples as positional arguments.</p>
+    <p><code><suitkaise-api>star</suitkaise-api>()</code> modifier Returns a <code>StarModifier</code> that configures <code>is_star=True</code> for all methods. This makes each method unpack tuples as positional arguments.</p>
     <pre><code class="language-python">class StarModifier:
     def __init__(self, pool):
         self._pool = pool
     
     @property
-    def map(self):
+    def <suitkaise-api>map</suitkaise-api>(self):
         return _PoolMapModifier(self._pool, is_star=True)
     
     @property
-    def imap(self):
+    def <suitkaise-api>imap</suitkaise-api>(self):
         return _PoolImapModifier(self._pool, is_star=True)
     
     @property
-    def unordered_imap(self):
+    def <suitkaise-api>unordered_imap</suitkaise-api>(self):
         return _PoolUnorderedImapModifier(self._pool, is_star=True)
     
     @property
-    def unordered_map(self):
+    def <suitkaise-api>unordered_map</suitkaise-api>(self):
         return _PoolUnorderedMapModifier(self._pool, is_star=True)</code></pre>
     <hr>
-    <h2><code>Share</code></h2>
+    <h2><code><suitkaise-api>Share</suitkaise-api></code></h2>
     <h3>Architecture</h3>
-    <p><code>Share</code> uses a coordinator-proxy system to enable safe concurrent access to shared objects.</p>
+    <p><code><suitkaise-api>Share</suitkaise-api></code> uses a coordinator-proxy system to enable safe concurrent access to shared objects.</p>
     <p>All writes go through a single queue to a coordinator process, ensuring serialized (one-at-a-time) execution. Reads wait for pending writes to complete before fetching.</p>
     <pre><code class="language-python">┌─────────────────────────────────────────────────────────────────────────┐
-│                           Share Container                               │
+│                           <suitkaise-api>Share</suitkaise-api> Container                               │
 │                                                                         │
 │  ┌────────────┐   ┌────────────┐   ┌────────────┐                       │
 │  │   timer    │   │  counter   │   │   config   │   (user objects)      │
@@ -939,7 +939,7 @@ pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine
 │  └──────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘</code></pre>
     <h3>Object Registration</h3>
-    <p>What happens when you assign to a Share attribute (<code>share.timer = Sktimer()</code>)</p>
+    <p>What happens when you assign to a Share attribute (<code>share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()</code>)</p>
     <ol>
         <li><strong>Check if internal</strong> - Skip internal attributes (<code>_SHARE_ATTRS</code>)</li>
         <li><strong>Check for <code>_shared_meta</code></strong> - Does the object&#x27;s class have sharing metadata?</li>
@@ -949,13 +949,13 @@ pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine
         <li><strong>Create proxy</strong> - If has metadata, create <code>_ObjectProxy</code> to intercept access</li>
         <li><strong>Store proxy</strong> - Future attribute access returns the proxy, not the real object</li>
     </ol>
-    <p>Note: When <code>Share</code> is deserialized inside a subprocess, it is reconstructed in client mode from a snapshot. In that mode it does not re-register objects or allocate new counters; it simply restores the serialized snapshots and proxies so reads/writes go through the existing coordinator.</p>
+    <p>Note: When <code><suitkaise-api>Share</suitkaise-api></code> is deserialized inside a subprocess, it is reconstructed in client mode from a snapshot. In that mode it does not re-register objects or allocate new counters; it simply restores the serialized snapshots and proxies so reads/writes go through the existing coordinator.</p>
     <pre><code class="language-python">def __setattr__(self, name, value):
     if name in self._SHARE_ATTRS:
         object.__setattr__(self, name, value)
         return
     
-    # check for _shared_meta (suitkaise objects)
+    # check for _shared_meta (<suitkaise-api>suitkaise</suitkaise-api> objects)
     has_meta = hasattr(type(value), &#x27;_shared_meta&#x27;)
     
     # auto-wrap user classes
@@ -996,8 +996,8 @@ pool.map.asynced()           → _PoolMapAsyncModifier     → returns coroutine
     <h4>Command Queue</h4>
     <p>All writes go through the command queue.</p>
     <pre><code class="language-python">def queue_command(self, object_name, method_name, args=(), kwargs=None, written_attrs=None):
-    serialized_args = cucumber.serialize(args)
-    serialized_kwargs = cucumber.serialize(kwargs or {})
+    serialized_args = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(args)
+    serialized_kwargs = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(kwargs or {})
     
     command = (object_name, method_name, serialized_args, serialized_kwargs, written_attrs or [])
     self._command_queue.put(command)</code></pre>
@@ -1052,9 +1052,9 @@ def wait_for_read(self, keys, timeout=1.0):
             mirrors.pop(method_name, None)
             continue
         
-        # deserialize args
-        args = cucumber.deserialize(ser_args)
-        kwargs = cucumber.deserialize(ser_kwargs)
+        # <suitkaise-api>deserialize</suitkaise-api> args
+        args = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(ser_args)
+        kwargs = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(ser_kwargs)
         
         # get mirror (from cache or source)
         mirror = mirrors.get(object_name)
@@ -1062,7 +1062,7 @@ def wait_for_read(self, keys, timeout=1.0):
             with source_lock:
                 serialized = source_store.get(object_name)
                 if serialized:
-                    mirror = cucumber.deserialize(serialized)
+                    mirror = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(serialized)
                     mirrors[object_name] = mirror
         
         if mirror is None:
@@ -1078,21 +1078,21 @@ def wait_for_read(self, keys, timeout=1.0):
         
         # commit to source of truth
         with source_lock:
-            serialized = cucumber.serialize(mirror)
+            serialized = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(mirror)
             source_store[object_name] = serialized
         
         # update counters
         _update_counters_after_write(counter_registry, object_name, written_attrs)</code></pre>
     <h3>Proxy</h3>
     <p>The proxy intercepts all attribute access and routes it through the coordinator.</p>
-    <p>What the proxy does on attribute access (<code>share.timer.start()</code>)</p>
+    <p>What the proxy does on attribute access (<code>share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()</code>)</p>
     <ol>
         <li><strong>Check if internal</strong> - Proxy&#x27;s own attributes bypass interception</li>
         <li><strong>Check if method</strong> - If in <code>_shared_meta[&#x27;methods&#x27;]</code>, return <code>_MethodProxy</code></li>
         <li><strong>Check if property</strong> - If in <code>_shared_meta[&#x27;properties&#x27;]</code>, wait for writes then fetch</li>
         <li><strong>Fallback</strong> - Fetch object from source and get attribute directly</li>
     </ol>
-    <p>What the proxy does on attribute assignment (<code>share.timer.count = 5</code>)</p>
+    <p>What the proxy does on attribute assignment (<code>share.<suitkaise-api>timer</suitkaise-api>.count = 5</code>)</p>
     <ol>
         <li><strong>Check if internal</strong> - Proxy&#x27;s own attributes bypass interception</li>
         <li><strong>Increment pending counter</strong> - Signal that a write is queued</li>
@@ -1134,7 +1134,7 @@ def wait_for_read(self, keys, timeout=1.0):
             [name]
         )</code></pre>
     <h4>Method Proxy</h4>
-    <p>What happens when you call a method (<code>share.timer.start()</code>)</p>
+    <p>What happens when you call a method (<code>share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()</code>)</p>
     <ol>
         <li><strong>Get write dependencies</strong> - From <code>_shared_meta</code>, which attributes will this method modify?</li>
         <li><strong>Increment pending counters</strong> - For each written attribute, signal a pending write</li>
@@ -1169,7 +1169,7 @@ def wait_for_read(self, keys, timeout=1.0):
             write_attrs
         )</code></pre>
     <h4>Property Reading</h4>
-    <p>What happens when you read a property (<code>share.timer.elapsed</code>)</p>
+    <p>What happens when you read a property (<code>share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api></code>)</p>
     <ol>
         <li><strong>Get read dependencies</strong> - From <code>_shared_meta</code>, which attributes does this property depend on?</li>
         <li><strong>Build counter keys</strong> - For each dependency, create <code>&quot;object_name.attr_name&quot;</code> key</li>
@@ -1193,25 +1193,25 @@ def wait_for_read(self, keys, timeout=1.0):
     obj = self._coordinator.get_object(self._object_name)
     return getattr(obj, name)</code></pre>
     <hr>
-    <h2><code>Pipe</code></h2>
+    <h2><code><suitkaise-api>Pipe</suitkaise-api></code></h2>
     <h3>Endpoint Structure</h3>
     <p>What a pipe endpoint does</p>
     <ol>
-        <li><strong>Holds connection</strong> - <code>_conn</code> is a <code>multiprocessing.Pipe</code> connection object</li>
+        <li><strong>Holds connection</strong> - <code>_conn</code> is a <code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code> connection object</li>
         <li><strong>Tracks lock state</strong> - <code>_locked</code> prevents serialization (transfer to subprocess)</li>
         <li><strong>Tracks role</strong> - <code>&quot;anchor&quot;</code> (parent side) or <code>&quot;point&quot;</code> (transferable side)</li>
     </ol>
     <p>*How <code>send()</code> works</p>
     <ol>
         <li>Ensure connection is valid</li>
-        <li>Serialize the object using <code>cucumber</code></li>
+        <li>Serialize the object using <code><suitkaise-api>cucumber</suitkaise-api></code></li>
         <li>Send raw bytes over the connection</li>
     </ol>
     <p>How <code>recv()</code> works</p>
     <ol>
         <li>Ensure connection is valid</li>
         <li>Read raw bytes from the connection</li>
-        <li>Deserialize using <code>cucumber</code> and return</li>
+        <li>Deserialize using <code><suitkaise-api>cucumber</suitkaise-api></code> and return</li>
     </ol>
     <p>How serialization works</p>
     <ol>
@@ -1227,12 +1227,12 @@ class _PipeEndpoint:
     
     def send(self, obj):
         conn = self._ensure_conn()
-        conn.send_bytes(cucumber.serialize(obj))
+        conn.send_bytes(<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj))
     
     def recv(self):
         conn = self._ensure_conn()
         data = conn.recv_bytes()
-        return cucumber.deserialize(data)
+        return <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
     
     def __serialize__(self):
         if self._locked:
@@ -1259,13 +1259,13 @@ class _PipeEndpoint:
     </ol>
     <p>How <code>pair()</code> works</p>
     <ol>
-        <li>Create a <code>multiprocessing.Pipe</code> with two connection objects</li>
+        <li>Create a <code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code> with two connection objects</li>
         <li>If <code>one_way=True</code>, ensure anchor is the send-only end and point is the recv-only end</li>
         <li>Wrap one in <code>Anchor</code> (automatically locked)</li>
         <li>Wrap other in <code>Point</code> (unlocked, ready to transfer)</li>
         <li>Return both for parent to use anchor and pass point to subprocess</li>
     </ol>
-    <pre><code class="language-python">class Pipe:
+    <pre><code class="language-python">class <suitkaise-api>Pipe</suitkaise-api>:
     class Anchor(_PipeEndpoint):
         def __init__(self, conn, locked=True, role=&quot;anchor&quot;):
             super().__init__(conn, True, role)  # always locked
@@ -1278,78 +1278,78 @@ class _PipeEndpoint:
     
     @staticmethod
     def pair(one_way=False):
-        conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
+        conn1, conn2 = multiprocessing.<suitkaise-api>Pipe</suitkaise-api>(duplex=not one_way)
         if one_way:
             # conn1 is recv-only, conn2 is send-only
-            anchor = Pipe.Anchor(conn2)
-            point = Pipe.Point(conn1, False, &quot;point&quot;)
+            anchor = <suitkaise-api>Pipe</suitkaise-api>.Anchor(conn2)
+            point = <suitkaise-api>Pipe</suitkaise-api>.Point(conn1, False, &quot;point&quot;)
         else:
-            anchor = Pipe.Anchor(conn1)
-            point = Pipe.Point(conn2, False, &quot;point&quot;)
+            anchor = <suitkaise-api>Pipe</suitkaise-api>.Anchor(conn1)
+            point = <suitkaise-api>Pipe</suitkaise-api>.Point(conn2, False, &quot;point&quot;)
         return anchor, point</code></pre>
     <hr>
     <h2><code>ProcessConfig</code></h2>
     <h3>Structure</h3>
     <pre><code class="language-python">@dataclass
 class TimeoutConfig:
-    prerun: float | None = None
-    run: float | None = None
-    postrun: float | None = None
-    onfinish: float | None = None
-    result: float | None = None
-    error: float | None = None
+    <suitkaise-api>prerun</suitkaise-api>: float | None = None
+    <suitkaise-api>run</suitkaise-api>: float | None = None
+    <suitkaise-api>postrun</suitkaise-api>: float | None = None
+    <suitkaise-api>onfinish</suitkaise-api>: float | None = None
+    <suitkaise-api>result</suitkaise-api>: float | None = None
+    <suitkaise-api>error</suitkaise-api>: float | None = None
 
 @dataclass
 class ProcessConfig:
-    runs: int | None = None      # None = indefinite
-    join_in: float | None = None # None = no time limit
-    lives: int = 1               # 1 = no retries
-    timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)</code></pre>
+    <suitkaise-api>runs</suitkaise-api>: int | None = None      # None = indefinite
+    <suitkaise-api>join_in</suitkaise-api>: float | None = None # None = no time limit
+    <suitkaise-api>lives</suitkaise-api>: int = 1               # 1 = no retries
+    <suitkaise-api>timeouts</suitkaise-api>: TimeoutConfig = field(default_factory=TimeoutConfig)</code></pre>
     <hr>
-    <h2><code>ProcessTimers</code></h2>
+    <h2><code><suitkaise-api>ProcessTimers</suitkaise-api></code></h2>
     <h3>Structure</h3>
-    <pre><code class="language-python">class ProcessTimers:
+    <pre><code class="language-python">class <suitkaise-api>ProcessTimers</suitkaise-api>:
     def __init__(self):
         # individual section timers (created lazily)
-        self.prerun: Sktimer | None = None
-        self.run: Sktimer | None = None
-        self.postrun: Sktimer | None = None
-        self.onfinish: Sktimer | None = None
-        self.result: Sktimer | None = None
-        self.error: Sktimer | None = None
+        self.<suitkaise-api>prerun</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
+        self.<suitkaise-api>run</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
+        self.<suitkaise-api>postrun</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
+        self.<suitkaise-api>onfinish</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
+        self.<suitkaise-api>result</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
+        self.<suitkaise-api>error</suitkaise-api>: <suitkaise-api>Sktimer</suitkaise-api> | None = None
         
         # aggregate for full iterations
-        self.full_run: Sktimer = Sktimer()
+        self.full_run: <suitkaise-api>Sktimer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
     
     def _ensure_timer(self, section):
         current = getattr(self, section, None)
         if current is None:
-            new_timer = Sktimer()
+            new_timer = <suitkaise-api>Sktimer</suitkaise-api>()
             setattr(self, section, new_timer)
             return new_timer
         return current
     
     def _update_full_run(self):
         total = 0.0
-        for timer in [self.prerun, self.run, self.postrun]:
-            if timer and timer.num_times &gt; 0 and timer.most_recent:
-                total += timer.most_recent
+        for timer in [self.<suitkaise-api>prerun</suitkaise-api>, self.<suitkaise-api>run</suitkaise-api>, self.<suitkaise-api>postrun</suitkaise-api>]:
+            if timer and <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api> &gt; 0 and <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:
+                total += <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>
         
         if total &gt; 0:
-            self.full_run.add_time(total)</code></pre>
+            self.full_run.<suitkaise-api>add_time</suitkaise-api>(total)</code></pre>
     <hr>
-    <h2><code>autoreconnect()</code> Decorator</h2>
+    <h2><code><suitkaise-api>autoreconnect</suitkaise-api>()</code> Decorator</h2>
     <h3>Implementation</h3>
-    <p>What <code>@autoreconnect</code> does at class definition time</p>
+    <p>What <code>@<suitkaise-api>autoreconnect</suitkaise-api></code> does at class definition time</p>
     <ol>
         <li>Mark the class as requiring reconnection (<code>_auto_reconnect_enabled = True</code>)</li>
         <li>Store authentication credentials for each connection type</li>
         <li>Store thread start preference</li>
     </ol>
     <p>The decorator does NOT reconnect anything - it just marks the class so deserialization knows to reconnect.</p>
-    <pre><code class="language-python">def autoreconnect(*, start_threads=False, **auth):
+    <pre><code class="language-python">def <suitkaise-api>autoreconnect</suitkaise-api>(*, start_threads=False, **auth):
     def decorator(cls):
-        # mark class for reconnect on deserialize
+        # mark class for reconnect on <suitkaise-api>deserialize</suitkaise-api>
         cls._auto_reconnect_enabled = True
         cls._auto_reconnect_kwargs = dict(auth) if auth else {}
         cls._auto_reconnect_start_threads = bool(start_threads)
@@ -1360,70 +1360,70 @@ class ProcessConfig:
     <ol>
         <li>Check if <code>_auto_reconnect_enabled</code> is True</li>
         <li>Get stored auth credentials</li>
-        <li>Call <code>reconnect_all()</code> which recursively finds <code>Reconnector</code> objects</li>
+        <li>Call <code><suitkaise-api>reconnect_all</suitkaise-api>()</code> which recursively finds <code>Reconnector</code> objects</li>
         <li>Each <code>Reconnector</code> calls its <code>reconnect(auth)</code> method to restore the live connection</li>
         <li>If <code>start_threads=True</code>, find all <code>Thread</code> objects and start them</li>
     </ol>
     <p>Reconnect Flow</p>
     <ol>
-        <li><code>Skprocess</code> serialized with a database connection</li>
-        <li><code>cucumber</code> converts connection to <code>PostgresReconnector</code> (stores connection params)</li>
+        <li><code><suitkaise-api>Skprocess</suitkaise-api></code> serialized with a database connection</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> converts connection to <code>PostgresReconnector</code> (stores connection params)</li>
         <li>Subprocess deserializes the process</li>
         <li><code>__deserialize__</code> sees <code>_auto_reconnect_enabled</code></li>
-        <li><code>reconnect_all()</code> finds the <code>PostgresReconnector</code></li>
+        <li><code><suitkaise-api>reconnect_all</suitkaise-api>()</code> finds the <code>PostgresReconnector</code></li>
         <li>Calls <code>reconnector.reconnect(&quot;password&quot;)</code> → returns new live connection</li>
         <li>Replaces reconnector with live connection in the object</li>
     </ol>
-    <pre><code class="language-python"># in Skprocess.__deserialize__
+    <pre><code class="language-python"># in <suitkaise-api>Skprocess</suitkaise-api>.__deserialize__
 if getattr(new_class, &#x27;_auto_reconnect_enabled&#x27;, False):
     reconnect_kwargs = getattr(new_class, &#x27;_auto_reconnect_kwargs&#x27;, {})
     start_threads = getattr(new_class, &#x27;_auto_reconnect_start_threads&#x27;, False)
     
-    obj = reconnect_all(obj, **reconnect_kwargs)
+    obj = <suitkaise-api>reconnect_all</suitkaise-api>(obj, **reconnect_kwargs)
     
     if start_threads:
         # recursively find and start Thread objects
         _start_threads(obj)</code></pre>
     <hr>
     <h2>Error Hierarchy</h2>
-    <pre><code class="language-python">ProcessError (base)
-├── PreRunError
-├── RunError
-├── PostRunError
-├── OnFinishError
-├── ResultError
-├── ErrorHandlerError
-├── ProcessTimeoutError
-├── ResultTimeoutError
+    <pre><code class="language-python"><suitkaise-api>ProcessError</suitkaise-api> (base)
+├── <suitkaise-api>PreRunError</suitkaise-api>
+├── <suitkaise-api>RunError</suitkaise-api>
+├── <suitkaise-api>PostRunError</suitkaise-api>
+├── <suitkaise-api>OnFinishError</suitkaise-api>
+├── <suitkaise-api>ResultError</suitkaise-api>
+├── <suitkaise-api>ErrorHandlerError</suitkaise-api>
+├── <suitkaise-api>ProcessTimeoutError</suitkaise-api>
+├── <suitkaise-api>ResultTimeoutError</suitkaise-api>
 └── DuplicateTimeoutError</code></pre>
     <h3>Error Structure</h3>
-    <pre><code class="language-python">class ProcessError(Exception):
+    <pre><code class="language-python">class <suitkaise-api>ProcessError</suitkaise-api>(Exception):
     def __init__(self, message, current_run=0, original_error=None):
         self.current_run = current_run
         self.original_error = original_error
         super().__init__(message)
 
-class PreRunError(ProcessError):
+class <suitkaise-api>PreRunError</suitkaise-api>(<suitkaise-api>ProcessError</suitkaise-api>):
     def __init__(self, current_run, original_error=None):
         super().__init__(
-            f&quot;Error in __prerun__ on run {current_run}&quot;,
+            f&quot;Error in <suitkaise-api>__prerun__</suitkaise-api> on <suitkaise-api>run</suitkaise-api> {current_run}&quot;,
             current_run,
             original_error
         )
 
-class ProcessTimeoutError(ProcessError):
+class <suitkaise-api>ProcessTimeoutError</suitkaise-api>(<suitkaise-api>ProcessError</suitkaise-api>):
     def __init__(self, section, timeout, current_run):
         self.section = section
-        self.timeout = timeout
+        self.<suitkaise-api>timeout</suitkaise-api> = timeout
         super().__init__(
-            f&quot;Timeout in {section} after {timeout}s on run {current_run}&quot;,
+            f&quot;Timeout in {section} after {timeout}s on <suitkaise-api>run</suitkaise-api> {current_run}&quot;,
             current_run,
             None
         )</code></pre>
     <hr>
     <h2>Thread Safety</h2>
-    <h3><code>Skprocess</code></h3>
-    <p>Each <code>Skprocess</code> runs in its own subprocess, providing process isolation.</p>
+    <h3><code><suitkaise-api>Skprocess</suitkaise-api></code></h3>
+    <p>Each <code><suitkaise-api>Skprocess</suitkaise-api></code> runs in its own subprocess, providing process isolation.</p>
     <ul>
         <li><strong>No shared memory</strong> - Each subprocess has its own memory space</li>
         <li><strong>Communication via queues</strong> - All cross-process data goes through serialization</li>
@@ -1434,15 +1434,15 @@ class ProcessTimeoutError(ProcessError):
         <li><code>threading.Event</code> used for stop signaling (in Pool inline execution)</li>
         <li><code>multiprocessing.Event</code> used for cross-process signaling</li>
     </ul>
-    <h3><code>Pool</code></h3>
-    <p><code>Pool</code> thread safety</p>
+    <h3><code><suitkaise-api>Pool</suitkaise-api></code></h3>
+    <p><code><suitkaise-api>Pool</suitkaise-api></code> thread safety</p>
     <ul>
-        <li><strong>Built-in pool</strong> - Uses <code>multiprocessing.Pool</code> which handles worker management internally</li>
+        <li><strong>Built-in pool</strong> - Uses <code>multiprocessing.<suitkaise-api>Pool</suitkaise-api></code> which handles worker management internally</li>
         <li><strong>Manual mode</strong> - For timeout scenarios, tracks workers in <code>_active_processes</code> list</li>
         <li><strong>Result isolation</strong> - Each worker writes to its own result queue</li>
     </ul>
-    <h3><code>Share</code></h3>
-    <p><code>Share</code> thread safety</p>
+    <h3><code><suitkaise-api>Share</suitkaise-api></code></h3>
+    <p><code><suitkaise-api>Share</suitkaise-api></code> thread safety</p>
     <ol>
         <li><strong>Single writer</strong> - All writes go through one coordinator process (no write conflicts)</li>
         <li><strong>Command queue</strong> - All writes serialized through a single queue</li>
@@ -1453,17 +1453,17 @@ class ProcessTimeoutError(ProcessError):
     <p>Reads wait for pending writes to complete before fetching, ensuring you see effects of prior writes from the same logical sequence.</p>
     <hr>
     <h2>Serialization</h2>
-    <p>All cross-process communication uses <code>cucumber</code> for serialization.</p>
+    <p>All cross-process communication uses <code><suitkaise-api>cucumber</suitkaise-api></code> for serialization.</p>
     <p>What gets serialized and where</p>
     <ul>
-        <li><code>Skprocess</code> - Full state + lifecycle methods</li>
-        <li><code>Pool</code> - Function/class + each item</li>
-        <li><code>Share</code> - Registered objects</li>
-        <li><code>Pipe</code> - Any object via <code>send()</code></li>
+        <li><code><suitkaise-api>Skprocess</suitkaise-api></code> - Full state + lifecycle methods</li>
+        <li><code><suitkaise-api>Pool</suitkaise-api></code> - Function/class + each item</li>
+        <li><code><suitkaise-api>Share</suitkaise-api></code> - Registered objects</li>
+        <li><code><suitkaise-api>Pipe</suitkaise-api></code> - Any object via <code>send()</code></li>
     </ul>
-    <p>Why <code>cucumber</code> instead of <code>pickle</code></p>
+    <p>Why <code><suitkaise-api>cucumber</suitkaise-api></code> instead of <code>pickle</code></p>
     <ol>
-        <li><strong>Locally-defined classes</strong> - <code>pickle</code> fails on <code>&lt;locals&gt;</code> classes, <code>cucumber</code> reconstructs them</li>
+        <li><strong>Locally-defined classes</strong> - <code>pickle</code> fails on <code>&lt;locals&gt;</code> classes, <code><suitkaise-api>cucumber</suitkaise-api></code> reconstructs them</li>
         <li><strong>Live resources</strong> - Database connections become <code>Reconnector</code> objects that can restore themselves</li>
         <li><strong>Circular references</strong> - Handled correctly during serialization</li>
         <li><strong>Complex nested structures</strong> - Recursively handles arbitrary object graphs</li>
@@ -1471,11 +1471,11 @@ class ProcessTimeoutError(ProcessError):
     </ol>
     <p>Serialization flow</p>
     <ol>
-        <li>Object passed to <code>cucumber.serialize()</code></li>
+        <li>Object passed to <code><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>()</code></li>
         <li>Handlers match by type and extract state</li>
         <li>State converted to bytes</li>
         <li>Bytes sent over queue/pipe/store</li>
-        <li>Receiving side calls <code>cucumber.deserialize()</code></li>
+        <li>Receiving side calls <code><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>()</code></li>
         <li>Handlers reconstruct objects from state</li>
     </ol>
 </section>

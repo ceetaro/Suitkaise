@@ -7,7 +7,7 @@ module bar for suitkaise.cucumber
 rows = 1
 columns = 11
 
-order = [why, quick start, how to use, how it works, supported types, performance, worst possible object, videos, tests, learn]
+order = [why, quick start, how to use, how it works, supported types, performance, worst possible object, tests, videos, learn]
 
 # 1.1
 
@@ -50,13 +50,13 @@ link = "cucumber-worst-possible-object.md"
 
 # 1.9
 
-button = "videos"
-link = "cucumber-videos.md"
+button = "tests"
+link = "cucumber-tests.md"
 
 # 1.10
 
-button = "tests"
-link = "cucumber-tests.md"
+button = "videos"
+link = "cucumber-videos.md"
 
 # 1.11
 

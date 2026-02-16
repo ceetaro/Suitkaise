@@ -1,4 +1,4 @@
-# Why you would use `cucumber`
+# Why you would use `<suitkaise-api>cucumber</suitkaise-api>`
 
 ## TLDR
 
@@ -12,7 +12,7 @@
 
 ---
 
-`cucumber` is a serialization engine.
+`<suitkaise-api>cucumber</suitkaise-api>` is a serialization engine.
 
 It allows you to serialize and deserialize objects across `Python` processes.
 
@@ -22,9 +22,9 @@ However, it can do something that no other Python serializer can do: get rid of 
 
 If you need super fast speed for simple types, use base `pickle`. It is literally what Python originally gave us! Of course it's the fastest.
 
-But, if you need to serialize anything else, use `cucumber`.
+But, if you need to serialize anything else, use `<suitkaise-api>cucumber</suitkaise-api>`.
 
-### `pickle` vs `cucumber` — same object, different outcomes
+### `pickle` vs `<suitkaise-api>cucumber</suitkaise-api>` — same object, different outcomes
 
 ```python
 import threading
@@ -32,10 +32,10 @@ import threading
 class Worker:
     def __init__(self):
         self.lock = threading.Lock()
-        self.thread = threading.Thread(target=self.run)
+        self.thread = threading.Thread(target=self.<suitkaise-api>run</suitkaise-api>)
         self.results = []
     
-    def run(self):
+    def <suitkaise-api>run</suitkaise-api>(self):
         self.results.append("done")
 
 worker = Worker()
@@ -55,21 +55,21 @@ cloudpickle.dumps(worker)
 # TypeError: cannot pickle '_thread.lock' objects
 ```
 
-With `cucumber`:
+With `<suitkaise-api>cucumber</suitkaise-api>`:
 ```python
-from suitkaise import cucumber
-data = cucumber.serialize(worker)
-restored = cucumber.deserialize(data)
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(worker)
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 # works. lock and thread become Reconnectors, ready to be recreated.
-cucumber.reconnect_all(restored)
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored)
 # lock and thread are live again.
 ```
 
 No errors. No workarounds. No tiptoeing around types that cause `PicklingError`s.
 
-### Serialize anything using `cucumber`
+### Serialize anything using `<suitkaise-api>cucumber</suitkaise-api>`
 
-`cucumber` handles every type that `dill` and `cloudpickle` can handle.
+`<suitkaise-api>cucumber</suitkaise-api>` handles every type that `dill` and `cloudpickle` can handle.
 
 It also handles many more types that are frequently used in higher level programming and parallel processing.
 
@@ -80,7 +80,7 @@ And, it can handle user created classes, with all of these objects!
 - handles asyncio
 - handles multiprocessing and threading
 
-#### Types only `cucumber` can handle
+#### Types only `<suitkaise-api>cucumber</suitkaise-api>` can handle
 
 - `threading.local`
 - `multiprocessing.Queue`
@@ -106,22 +106,22 @@ And, it can handle user created classes, with all of these objects!
 
 #### User created classes
 
-`cucumber` has a way to dissect your class instances, allowing you to serialize essentially anything.
+`<suitkaise-api>cucumber</suitkaise-api>` has a way to dissect your class instances, allowing you to serialize essentially anything.
 
 #### Classes defined in `__main__`
 
-`cucumber` can handle classes defined in `__main__`.
+`<suitkaise-api>cucumber</suitkaise-api>` can handle classes defined in `__main__`.
 
 - enables multiprocessing when quickly prototyping in one file
 - allows for easy testing using CodeRunners
 
 #### Circular references
 
-`cucumber` handles all circular references in your objects.
+`<suitkaise-api>cucumber</suitkaise-api>` handles all circular references in your objects.
 
 ### Superior speed
 
-`cucumber` is faster than `cloudpickle` and `dill` for most simple types.
+`<suitkaise-api>cucumber</suitkaise-api>` is faster than `cloudpickle` and `dill` for most simple types.
 
 Additionally, it is multiple times faster that both of them for many types.
 
@@ -136,32 +136,32 @@ For a full performance breakdown, head to the performance page.
 
 ### Actually reconstructs objects
 
-`cucumber` intelligently reconstructs complex objects using custom handlers.
+`<suitkaise-api>cucumber</suitkaise-api>` intelligently reconstructs complex objects using custom handlers.
 
 - easy reconnection to live resources like database connections, sockets, threads, and more while maintaining security
 
-All you have to do after deserializing is call `reconnect_all()` and provide any authentication needed, and all of your live resources will be recreated automatically.
+All you have to do after deserializing is call `<suitkaise-api>reconnect_all</suitkaise-api>()` and provide any authentication needed, and all of your live resources will be recreated automatically.
 
-You can even start threads automatically if you use `cucumber`.
+You can even start threads automatically if you use `<suitkaise-api>cucumber</suitkaise-api>`.
 
 #### The `Reconnector` pattern — nothing else does this
 
-When `cucumber` encounters a live resource (a database connection, an open socket, a running thread), it doesn't try to freeze and resume it -- that would be unsafe and often impossible. Instead, it creates a `Reconnector` object that stores the information needed to recreate the resource.
+When `<suitkaise-api>cucumber</suitkaise-api>` encounters a live resource (a database connection, an open socket, a running thread), it doesn't try to freeze and resume it -- that would be unsafe and often impossible. Instead, it creates a `Reconnector` object that stores the information needed to recreate the resource.
 
 ```python
 import psycopg2
-from suitkaise import cucumber
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
-# serialize a live database connection
+# <suitkaise-api>serialize</suitkaise-api> a live database connection
 conn = psycopg2.connect(host='localhost', database='mydb', password='secret')
-data = cucumber.serialize(conn)
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(conn)
 
-# deserialize it in another process
-restored = cucumber.deserialize(data)
+# <suitkaise-api>deserialize</suitkaise-api> it in another process
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 # restored.connection is a Reconnector, not a live connection yet
 
 # reconnect with credentials (password is never stored in serialized data)
-cucumber.reconnect_all(restored, password='secret')
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, password='secret')
 # now restored.connection is a live psycopg2 connection again
 ```
 
@@ -173,7 +173,7 @@ Additionally, objects that don't need auth will be lazily reconstructed on first
 
 ### Easy inspection and error analysis
 
-`cucumber` creates an intermediate representation (IR) of the object using `pickle` native types before using base `pickle` to serialize it to bytes.
+`<suitkaise-api>cucumber</suitkaise-api>` creates an intermediate representation (IR) of the object using `pickle` native types before using base `pickle` to serialize it to bytes.
 
 ```python
 {
@@ -188,39 +188,39 @@ Additionally, objects that don't need auth will be lazily reconstructed on first
 
 This allows everything to be cleanly organized and inspected.
 
-Additionally, `cucumber` functions provide traceable, simple explanations of what went wrong if something fails.
+Additionally, `<suitkaise-api>cucumber</suitkaise-api>` functions provide traceable, simple explanations of what went wrong if something fails.
 
 ```python
 # all you have to do is add debug=True
-cucumber.serialize(obj, debug=True)
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, debug=True)
 ```
 
 It also has an option to see how the object is getting serialized or reconstructed in real time with color-coded output.
 
 ```python
 # all you have to do is add verbose=True
-cucumber.serialize(obj, verbose=True)
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, verbose=True)
 ```
 
-## How do I know that `cucumber` can handle any user class?
+## How do I know that `<suitkaise-api>cucumber</suitkaise-api>` can handle any user class?
 
-`cucumber` can serialize any object as long as it contains supported types.
+`<suitkaise-api>cucumber</suitkaise-api>` can serialize any object as long as it contains supported types.
 
 99% of Python objects only have supported types within them.
 
-To prove to you that `cucumber` can handle any user class, I created a monster.
+To prove to you that `<suitkaise-api>cucumber</suitkaise-api>` can handle any user class, I created a monster.
 
 ### The `WorstPossibleObject`
 
 `WorstPossibleObject` is an object I created that would never exist in real life.
 
-Its only goal: try and break `cucumber`.
+Its only goal: try and break `<suitkaise-api>cucumber</suitkaise-api>`.
 
-It contains every type that `cucumber` can handle, in a super nested, circular-referenced, randomly-generated structure.
+It contains every type that `<suitkaise-api>cucumber</suitkaise-api>` can handle, in a super nested, circular-referenced, randomly-generated structure.
 
 Each `WorstPossibleObject` is different from the last, and they all have ways to verify that they remain intact after being converted to and from bytes.
 
-Not only does `cucumber` handle this object, but it can handle more than 100 different `WorstPossibleObjects` per second.
+Not only does `<suitkaise-api>cucumber</suitkaise-api>` handle this object, but it can handle more than 100 different `WorstPossibleObjects` per second.
 
 By handle, I mean:
 
@@ -234,33 +234,33 @@ It can then verify that it is the same object as it was when it got created, and
 Run the WorstPossibleObject round‑trip test:
 
 ```bash
-python tests/cucumber/test_worst_possible_object.py
+python tests/<suitkaise-api>cucumber</suitkaise-api>/test_worst_possible_object.py
 ```
 This test includes a full round trip.
 
-```
-`serialize()` → another process → `deserialize()` → `reconnect_all()` → verify → `serialize()` → back to original process → `deserialize()` → `reconnect_all()` → verify
+```text
+`<suitkaise-api>serialize</suitkaise-api>()` → another process → `<suitkaise-api>deserialize</suitkaise-api>()` → `<suitkaise-api>reconnect_all</suitkaise-api>()` → verify → `<suitkaise-api>serialize</suitkaise-api>()` → back to original process → `<suitkaise-api>deserialize</suitkaise-api>()` → `<suitkaise-api>reconnect_all</suitkaise-api>()` → verify
 ```
 
 To see the full `WorstPossibleObject` code, head to the worst possible object page. Have fun!
 
-## Where `cucumber` sits in the landscape
+## Where `<suitkaise-api>cucumber</suitkaise-api>` sits in the landscape
 
-`cucumber`'s real competitor is `dill`, not `cloudpickle`. Both `cucumber` and `dill` prioritize type coverage over raw speed. The difference: `cucumber` far outclasses `dill` on speed while exceeding its type coverage.
+`<suitkaise-api>cucumber</suitkaise-api>`'s real competitor is `dill`, not `cloudpickle`. Both `<suitkaise-api>cucumber</suitkaise-api>` and `dill` prioritize type coverage over raw speed. The difference: `<suitkaise-api>cucumber</suitkaise-api>` far outclasses `dill` on speed while exceeding its type coverage.
 
-The fact that `cucumber` also competes with `cloudpickle` on speed -- despite covering vastly more types -- is the surprising part. `cloudpickle` is designed for speed with limited types. `cucumber` is designed for coverage and still keeps up.
+The fact that `<suitkaise-api>cucumber</suitkaise-api>` also competes with `cloudpickle` on speed -- despite covering vastly more types -- is the surprising part. `cloudpickle` is designed for speed with limited types. `<suitkaise-api>cucumber</suitkaise-api>` is designed for coverage and still keeps up.
 
 - Need raw speed on simple types? Use base `pickle`.
 - Need slightly more type coverage with great speed? `cloudpickle` is solid.
-- Need everything to just work, with no `PicklingError` ever, and still competitive speed? That's `cucumber`.
+- Need everything to just work, with no `PicklingError` ever, and still competitive speed? That's `<suitkaise-api>cucumber</suitkaise-api>`.
 
 For a full performance breakdown, head to the performance page.
 
-## Works with the rest of `suitkaise`
+## Works with the rest of `<suitkaise-api>suitkaise</suitkaise-api>`
 
-`cucumber` is the serialization backbone of the `suitkaise` ecosystem.
+`<suitkaise-api>cucumber</suitkaise-api>` is the serialization backbone of the `<suitkaise-api>suitkaise</suitkaise-api>` ecosystem.
 
-- `processing` uses `cucumber` by default for all cross-process communication. Every `Skprocess`, every `Pool.map`, every `Share` operation goes through `cucumber`. You never think about serialization.
-- `@autoreconnect` from `processing` builds on the `Reconnector` pattern to automatically reconnect live resources (like database connections) when they cross process boundaries.
-- `Share` relies on `cucumber` to serialize any object you assign to it. This is what makes `share.anything = any_object` possible.
-- All `suitkaise` objects (`Sktimer`, `Circuit`, `Skpath`, etc.) are designed to serialize cleanly through `cucumber`.
+- `<suitkaise-api>processing</suitkaise-api>` uses `<suitkaise-api>cucumber</suitkaise-api>` by default for all cross-process communication. Every `<suitkaise-api>Skprocess</suitkaise-api>`, every `<suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>`, every `<suitkaise-api>Share</suitkaise-api>` operation goes through `<suitkaise-api>cucumber</suitkaise-api>`. You never think about serialization.
+- `@<suitkaise-api>autoreconnect</suitkaise-api>` from `<suitkaise-api>processing</suitkaise-api>` builds on the `Reconnector` pattern to automatically reconnect live resources (like database connections) when they cross process boundaries.
+- `<suitkaise-api>Share</suitkaise-api>` relies on `<suitkaise-api>cucumber</suitkaise-api>` to serialize any object you assign to it. This is what makes `share.anything = any_object` possible.
+- All `<suitkaise-api>suitkaise</suitkaise-api>` objects (`<suitkaise-api>Sktimer</suitkaise-api>`, `<suitkaise-api>Circuit</suitkaise-api>`, `<suitkaise-api>Skpath</suitkaise-api>`, etc.) are designed to serialize cleanly through `<suitkaise-api>cucumber</suitkaise-api>`.

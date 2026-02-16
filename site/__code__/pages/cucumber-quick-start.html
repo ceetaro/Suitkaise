@@ -8,77 +8,77 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
+        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Quick Start: <code>cucumber</code></h1>
-    <pre><code class="language-bash">pip install suitkaise</code></pre>
+    <h1>Quick Start: <code><suitkaise-api>cucumber</suitkaise-api></code></h1>
+    <pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
     <h2>Serialize and deserialize</h2>
-    <pre><code class="language-python">from suitkaise import cucumber
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
-# serialize any object to bytes
-data = cucumber.serialize(my_object)
+# <suitkaise-api>serialize</suitkaise-api> any object to bytes
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(my_object)
 
-# deserialize back
-restored = cucumber.deserialize(data)</code></pre>
+# <suitkaise-api>deserialize</suitkaise-api> back
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)</code></pre>
     <h2>It works with things <code>pickle</code> can&#x27;t handle</h2>
-    <pre><code class="language-python">from suitkaise import cucumber
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
 # lambdas
-data = cucumber.serialize(lambda x: x * 2)
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(lambda x: x * 2)
 
 # closures
 def make_multiplier(n):
     return lambda x: x * n
 
-data = cucumber.serialize(make_multiplier(3))
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(make_multiplier(3))
 
 # classes defined in __main__
 class MyClass:
     def __init__(self):
         self.value = 42
 
-data = cucumber.serialize(MyClass())
-restored = cucumber.deserialize(data)
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(MyClass())
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 print(restored.value)  # 42</code></pre>
     <h2>Live resources become <code>Reconnector</code> objects</h2>
-    <p>Objects like database connections, sockets, and threads can&#x27;t be directly transferred between processes. <code>cucumber</code> serializes them as <code>Reconnector</code> placeholders, then you reconnect them:</p>
+    <p>Objects like database connections, sockets, and threads can&#x27;t be directly transferred between processes. <code><suitkaise-api>cucumber</suitkaise-api></code> serializes them as <code>Reconnector</code> placeholders, then you reconnect them:</p>
     <pre><code class="language-python">import sqlite3
-from suitkaise import cucumber
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
 conn = sqlite3.connect(&quot;:memory:&quot;)
-data = cucumber.serialize(conn)
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(conn)
 
-restored = cucumber.deserialize(data)
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 # restored is a Reconnector, not a live connection yet
 
-cucumber.reconnect_all(restored)
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored)
 # now it&#x27;s a live sqlite3 connection again</code></pre>
     <p>For connections that require passwords:</p>
-    <pre><code class="language-python">cucumber.reconnect_all(restored, **{
+    <pre><code class="language-python"><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, **{
     &quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;my_password&quot;}
 })</code></pre>
-    <p><code>Reconnector</code>s that don&#x27;t require authentication will lazily reconnect on first access.</p>
+    <p><code>Reconnectors</code> that don&#x27;t require authentication will lazily reconnect on first access.</p>
     <h2>Debug mode</h2>
     <p>When something goes wrong:</p>
     <pre><code class="language-python"># see where serialization failed
-cucumber.serialize(obj, debug=True)
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, debug=True)
 
 # see the full serialization path in real-time
-cucumber.serialize(obj, verbose=True)</code></pre>
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, verbose=True)</code></pre>
     <h2>Inspect the intermediate representation</h2>
-    <pre><code class="language-python">ir = cucumber.serialize_ir(my_object)
-print(ir)  # dict/list structure showing how cucumber sees your object</code></pre>
+    <pre><code class="language-python">ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(my_object)
+print(ir)  # dict/list structure showing how <suitkaise-api>cucumber</suitkaise-api> sees your object</code></pre>
     <h2>Convert to JSON</h2>
-    <pre><code class="language-python">json_str = cucumber.to_json(my_object)</code></pre>
+    <pre><code class="language-python">json_str = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_json</suitkaise-api>(my_object)</code></pre>
     <h2>Want to learn more?</h2>
     <ul>
-        <li><strong>Why page</strong> — why <code>cucumber</code> exists and how it compares to <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code></li>
+        <li><strong>Why page</strong> — why <code><suitkaise-api>cucumber</suitkaise-api></code> exists and how it compares to <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code></li>
         <li><strong>How to use</strong> — full API reference</li>
-        <li><strong>Supported types</strong> — every type <code>cucumber</code> can handle</li>
+        <li><strong>Supported types</strong> — every type <code><suitkaise-api>cucumber</suitkaise-api></code> can handle</li>
         <li><strong>Performance</strong> — benchmarks against other serializers</li>
         <li><strong>How it works</strong> — internal architecture (IR, handlers, two-pass deserialization) (level: very advanced)</li>
     </ul>

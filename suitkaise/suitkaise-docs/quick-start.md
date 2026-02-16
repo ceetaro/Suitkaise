@@ -3,7 +3,7 @@
 Install suitkaise:
 
 ```bash
-pip install suitkaise
+pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```
 
 Requires Python 3.11+.
@@ -13,37 +13,37 @@ Requires Python 3.11+.
 ## 1. Share state across processes
 
 ```python
-from suitkaise.processing import Share, Pool, Skprocess
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
-share = Share()
+share = <suitkaise-api>Share</suitkaise-api>()
 share.counter = 0
 
-class Counter(Skprocess):
+class Counter(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
-        self.process_config.runs = 5
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 5
 
-    def __run__(self):
+    def <suitkaise-api>__run__</suitkaise-api>(self):
         self.share.counter += 1
 
-Pool(workers=4).map(Counter, [share] * 4)
-print(share.counter)  # 20 (4 processes × 5 runs)
+<suitkaise-api>Pool</suitkaise-api>(workers=4).<suitkaise-api>map</suitkaise-api>(Counter, [share] * 4)
+print(share.counter)  # 20 (4 processes × 5 <suitkaise-api>runs</suitkaise-api>)
 ```
 
-`Share` works with any object. `Skprocess` gives you lifecycle hooks. `Pool` runs them in parallel. That's it.
+`<suitkaise-api>Share</suitkaise-api>` works with any object. `<suitkaise-api>Skprocess</suitkaise-api>` gives you lifecycle hooks. `<suitkaise-api>Pool</suitkaise-api>` runs them in parallel. That's it.
 
 ---
 
 ## 2. Serialize anything
 
 ```python
-from suitkaise import cucumber
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
-# serialize
-data = cucumber.serialize(any_object)
+# <suitkaise-api>serialize</suitkaise-api>
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(any_object)
 
-# deserialize
-restored = cucumber.deserialize(data)
+# <suitkaise-api>deserialize</suitkaise-api>
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 ```
 
 No `PicklingError`. Works with lambdas, closures, threads, database connections, generators, and more.
@@ -51,7 +51,7 @@ No `PicklingError`. Works with lambdas, closures, threads, database connections,
 If the object has live resources (connections, threads), they become `Reconnector` objects:
 
 ```python
-cucumber.reconnect_all(restored, password='secret')
+<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, password='secret')
 ```
 
 ---
@@ -61,28 +61,28 @@ cucumber.reconnect_all(restored, password='secret')
 Decorator:
 
 ```python
-from suitkaise.timing import timethis
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api>
 
-@timethis()
+@<suitkaise-api>timethis</suitkaise-api>()
 def process_data():
     do_work()
 
 for _ in range(100):
     process_data()
 
-print(process_data.timer.mean)
-print(process_data.timer.percentile(95))
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
 ```
 
 Context manager:
 
 ```python
-from suitkaise.timing import TimeThis
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>TimeThis</suitkaise-api>
 
-with TimeThis() as timer:
+with <suitkaise-api>TimeThis</suitkaise-api>() as timer:
     do_work()
 
-print(timer.most_recent)
+print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>)
 ```
 
 ---
@@ -90,9 +90,9 @@ print(timer.most_recent)
 ## 4. Add modifiers to any function
 
 ```python
-from suitkaise import sk
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 
-@sk
+@<suitkaise-api>sk</suitkaise-api>
 def fetch(url):
     return requests.get(url).json()
 
@@ -100,19 +100,19 @@ def fetch(url):
 data = fetch("https://api.example.com")
 
 # retry 3 times
-data = fetch.retry(times=3)("https://api.example.com")
+data = fetch.<suitkaise-api>retry</suitkaise-api>(times=3)("https://api.example.com")
 
 # timeout after 5 seconds
-data = fetch.timeout(5.0)("https://api.example.com")
+data = fetch.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com")
 
 # chain them
-data = fetch.retry(3).timeout(5.0)("https://api.example.com")
+data = fetch.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com")
 
-# run in background
-future = fetch.background()("https://api.example.com")
+# <suitkaise-api>run</suitkaise-api> in background
+future = fetch.<suitkaise-api>background</suitkaise-api>()("https://api.example.com")
 
 # async
-data = await fetch.asynced()("https://api.example.com")
+data = await fetch.<suitkaise-api>asynced</suitkaise-api>()("https://api.example.com")
 ```
 
 ---
@@ -122,34 +122,34 @@ data = await fetch.asynced()("https://api.example.com")
 Auto-resetting:
 
 ```python
-from suitkaise import Circuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 for request in incoming_requests:
     try:
         process(request)
     except ServiceError:
-        circuit.short()  # after 5 failures, sleeps 1s, then resets
+        circuit.<suitkaise-api>short</suitkaise-api>()  # after 5 failures, sleeps 1s, then resets
 ```
 
 Manual reset:
 
 ```python
-from suitkaise import BreakingCircuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 
-breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-while not breaker.broken:
+while not breaker.<suitkaise-api>broken</suitkaise-api>:
     try:
-        result = risky_operation()
+        <suitkaise-api>result</suitkaise-api> = risky_operation()
         break
     except OperationError:
-        breaker.short()
+        breaker.<suitkaise-api>short</suitkaise-api>()
 
-if breaker.broken:
+if breaker.<suitkaise-api>broken</suitkaise-api>:
     handle_failure()
-    breaker.reset()
+    breaker.<suitkaise-api>reset</suitkaise-api>()
 ```
 
 ---
@@ -157,21 +157,21 @@ if breaker.broken:
 ## 6. Cross-platform paths
 
 ```python
-from suitkaise.paths import Skpath, autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
 # project-relative path — same on every machine
-path = Skpath("data/file.txt")
+path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
 print(path.rp)   # "data/file.txt"
 print(path.ap)   # "/Users/me/project/data/file.txt"
-print(path.id)   # reversible base64 ID for database storage
+print(path.<suitkaise-api>id</suitkaise-api>)   # reversible base64 ID for database storage
 
 # auto-convert path types
-@autopath()
-def process(path: AnyPath):
-    print(path.rp)  # always an Skpath, no matter what was passed in
+@<suitkaise-api>autopath</suitkaise-api>()
+def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
+    print(path.rp)  # always an <suitkaise-api>Skpath</suitkaise-api>, no matter what was passed in
 
-process("data/file.txt")        # str → Skpath
-process(Path("data/file.txt"))  # Path → Skpath
+process("data/file.txt")        # str → <suitkaise-api>Skpath</suitkaise-api>
+process(Path("data/file.txt"))  # Path → <suitkaise-api>Skpath</suitkaise-api>
 ```
 
 ---
@@ -181,32 +181,32 @@ process(Path("data/file.txt"))  # Path → Skpath
 The modules are designed to work together:
 
 ```python
-from suitkaise.processing import Share, Pool, Skprocess
-from suitkaise.timing import Sktimer
-from suitkaise import Circuit
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-share = Share()
-share.timer = Sktimer()
-share.circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=2.0)
+share = <suitkaise-api>Share</suitkaise-api>()
+share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+share.circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=2.0)
 
-class ResilientWorker(Skprocess):
+class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share, url):
         self.share = share
         self.url = url
 
-    def __run__(self):
-        self.share.timer.start()
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        self.share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
         try:
-            result = fetch(self.url)
+            <suitkaise-api>result</suitkaise-api> = fetch(self.url)
         except ServiceError:
-            self.share.circuit.short()
-        self.share.timer.stop()
+            self.share.circuit.<suitkaise-api>short</suitkaise-api>()
+        self.share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-pool = Pool(workers=4)
-pool.star().map(ResilientWorker, [(share, url) for url in urls])
+pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(ResilientWorker, [(share, url) for url in urls])
 
-print(f"Mean response time: {share.timer.mean:.3f}s")
-print(f"Circuit tripped {share.circuit.total_trips} times")
+print(f"Mean response time: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"<suitkaise-api>Circuit</suitkaise-api> tripped {share.circuit.<suitkaise-api>total_trips</suitkaise-api>} times")
 ```
 
 Shared timers, shared circuit breakers, parallel workers — all synced automatically.
@@ -214,9 +214,9 @@ Shared timers, shared circuit breakers, parallel workers — all synced automati
 ---
 
 For full documentation on each module, see:
-- `processing/` — Skprocess, Pool, Share, Pipe
-- `cucumber/` — serialize, deserialize, reconnect_all
-- `timing/` — Sktimer, timethis, TimeThis
-- `sk/` — @sk, modifiers, @blocking
-- `circuits/` — Circuit, BreakingCircuit
-- `paths/` — Skpath, @autopath, AnyPath
+- `<suitkaise-api>processing</suitkaise-api>/` — Skprocess, Pool, Share, Pipe
+- `<suitkaise-api>cucumber</suitkaise-api>/` — serialize, deserialize, reconnect_all
+- `<suitkaise-api>timing</suitkaise-api>/` — Sktimer, timethis, TimeThis
+- `<suitkaise-api>sk</suitkaise-api>/` — @sk, modifiers, @blocking
+- `<suitkaise-api>circuits</suitkaise-api>/` — Circuit, BreakingCircuit
+- `<suitkaise-api>paths</suitkaise-api>/` — Skpath, @autopath, AnyPath

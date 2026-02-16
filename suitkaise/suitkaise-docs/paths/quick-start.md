@@ -1,62 +1,62 @@
-# Quick Start: `paths`
+# Quick Start: `<suitkaise-api>paths</suitkaise-api>`
 
 ```bash
-pip install suitkaise
+pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```
 
 ## Create a project-relative path
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-path = Skpath("data/file.txt")
+path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
 
 path.ap   # "/Users/me/project/data/file.txt" — absolute, normalized
 path.rp   # "data/file.txt" — relative to project root, same on every machine
-path.id   # "ZGF0YS9maWxlLnR4dA" — reversible ID for database storage
+path.<suitkaise-api>id</suitkaise-api>   # "ZGF0YS9maWxlLnR4dA" — reversible ID for database storage
 ```
 
 ## Get the current file's path
 
 ```python
-here = Skpath()  # no arguments = caller's file path
+here = <suitkaise-api>Skpath</suitkaise-api>()  # no arguments = caller's file path
 print(here.rp)   # "src/my_module.py"
 ```
 
 ## Get the project root
 
 ```python
-root = Skpath().root
-print(root.ap)  # "/Users/me/project"
+root = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>
+print(<suitkaise-api>root</suitkaise-api>.ap)  # "/Users/me/project"
 
 # or directly
-from suitkaise import paths
-root = paths.get_project_root()
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
 ```
 
-## Auto-convert path types with `@autopath`
+## Auto-convert path types with `@<suitkaise-api>autopath</suitkaise-api>`
 
 ```python
-from suitkaise.paths import autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
-@autopath()
-def process(path: AnyPath):
-    # path is always an Skpath, no matter what was passed in
+@<suitkaise-api>autopath</suitkaise-api>()
+def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
+    # path is always an <suitkaise-api>Skpath</suitkaise-api>, no matter what was passed in
     print(path.rp)
 
-process("data/file.txt")                  # str → Skpath
-process(Path("data/file.txt"))            # Path → Skpath
-process(Skpath("data/file.txt"))          # Skpath → Skpath
+process("data/file.txt")                  # str → <suitkaise-api>Skpath</suitkaise-api>
+process(Path("data/file.txt"))            # Path → <suitkaise-api>Skpath</suitkaise-api>
+process(<suitkaise-api>Skpath</suitkaise-api>("data/file.txt"))          # <suitkaise-api>Skpath</suitkaise-api> → <suitkaise-api>Skpath</suitkaise-api>
 ```
 
-## Use `Skpath` like `pathlib.Path`
+## Use `<suitkaise-api>Skpath</suitkaise-api>` like `pathlib.Path`
 
-Everything `pathlib` does, `Skpath` does too:
+Everything `pathlib` does, `<suitkaise-api>Skpath</suitkaise-api>` does too:
 
 ```python
-path = Skpath("src")
+path = <suitkaise-api>Skpath</suitkaise-api>("src")
 
-# join paths
+# join <suitkaise-api>paths</suitkaise-api>
 config = path / "config" / "settings.yaml"
 
 # read/write
@@ -75,41 +75,41 @@ if config.exists:
 ## Path IDs for database storage (reversible IDs)
 
 ```python
-path = Skpath("data/reports/q1.csv")
+path = <suitkaise-api>Skpath</suitkaise-api>("data/reports/q1.csv")
 
 # store a compact, reversible ID
-db.execute("INSERT INTO files (path_id) VALUES (?)", (path.id,))
+db.execute("INSERT INTO files (path_id) VALUES (?)", (path.<suitkaise-api>id</suitkaise-api>,))
 
 # reconstruct later
-same_path = Skpath("ZGF0YS9yZXBvcnRzL3ExLmNzdg")
+same_path = <suitkaise-api>Skpath</suitkaise-api>("ZGF0YS9yZXBvcnRzL3ExLmNzdg")
 print(same_path.rp)  # "data/reports/q1.csv"
 ```
 
 ## Validate and sanitize filenames
 
 ```python
-from suitkaise.paths import is_valid_filename, streamline_path_quick
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
 
-is_valid_filename("report.pdf")        # True
-is_valid_filename("file<name>.txt")    # False
-is_valid_filename("CON")               # False (Windows reserved)
+<suitkaise-api>is_valid_filename</suitkaise-api>("report.pdf")        # True
+<suitkaise-api>is_valid_filename</suitkaise-api>("file<name>.txt")    # False
+<suitkaise-api>is_valid_filename</suitkaise-api>("CON")               # False (Windows reserved)
 
-streamline_path_quick("My File (1).txt")  # "My_File__1_.txt"
+<suitkaise-api>streamline_path_quick</suitkaise-api>("My File (1).txt")  # "My_File__1_.txt"
 ```
 
 ## Temporary root override for testing
 
 ```python
-from suitkaise.paths import CustomRoot, Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>CustomRoot</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
-with CustomRoot("/tmp/test_project"):
-    path = Skpath("config/settings.yaml")
+with <suitkaise-api>CustomRoot</suitkaise-api>("/tmp/test_project"):
+    path = <suitkaise-api>Skpath</suitkaise-api>("config/settings.yaml")
     assert path.root_str == "/tmp/test_project"
 ```
 
 ## Want to learn more?
 
-- **Why page** — why `paths` exists, cross-platform pitfalls, `@autopath`, and more
-- **How to use** — full API reference for `Skpath`, `@autopath`, and all utility functions
+- **Why page** — why `<suitkaise-api>paths</suitkaise-api>` exists, cross-platform pitfalls, `@<suitkaise-api>autopath</suitkaise-api>`, and more
+- **How to use** — full API reference for `<suitkaise-api>Skpath</suitkaise-api>`, `@<suitkaise-api>autopath</suitkaise-api>`, and all utility functions
 - **Examples** — progressively complex examples into a full script
 - **How it works** — project root detection, caller detection, path normalization (level: intermediate)

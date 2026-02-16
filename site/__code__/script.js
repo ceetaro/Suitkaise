@@ -4,6 +4,22 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    const assetBasePath = window.location.pathname.includes('/__code__/')
+        ? '../__assets__'
+        : '__assets__';
+    const assetPath = (filename) => `${assetBasePath}/${filename}`;
+
+    // Normalize asset image paths for both serve modes:
+    // - site root: /__code__/index.html (needs ../__assets__/...)
+    // - __code__ root: / (needs __assets__/...)
+    document.querySelectorAll('img[src*="__assets__/"]').forEach((img) => {
+        const rawSrc = img.getAttribute('src') || '';
+        const fileName = rawSrc.split('/').pop();
+        if (fileName) {
+            img.src = assetPath(fileName);
+        }
+    });
+
     // ============================================
     // Loading Screen Animation
     // Cycles through briefcase images
@@ -13,9 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingImg = document.getElementById('loadingImg');
     
     const loadingImages = [
-        { src: '../__assets__/briefcase-laptop-closed.png', class: '' },
-        { src: '../__assets__/briefcase-laptop-half-open.png', class: 'half-open' },
-        { src: '../__assets__/briefcase-laptop-fully-open.png', class: 'fully-open' }
+        { src: assetPath('briefcase-laptop-closed.png'), class: '' },
+        { src: assetPath('briefcase-laptop-half-open.png'), class: 'half-open' },
+        { src: assetPath('briefcase-laptop-fully-open.png'), class: 'fully-open' }
     ];
     
     let loadingFrame = 0;
@@ -102,9 +118,394 @@ document.addEventListener('DOMContentLoaded', () => {
     function styleLineCountComments() {
         // Disabled: numeric line comments should not receive special highlight.
     }
+    
+    function styleCalloutLabels() {
+        const textContainers = document.querySelectorAll(
+            '.module-page p, .module-page li, .about-page p, .about-page li, .why-page p, .why-page li'
+        );
+        
+        textContainers.forEach(el => {
+            // Prevent double-wrapping on repeated navigation/highlight passes.
+            if (el.querySelector('.callout-label')) return;
+            
+            // Find first non-empty text node at the start of the element.
+            let firstTextNode = null;
+            for (const child of el.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                    firstTextNode = child;
+                    break;
+                }
+                // If element starts with non-text content, don't force a rewrite.
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    return;
+                }
+            }
+            if (!firstTextNode) return;
+            
+            const text = firstTextNode.textContent;
+            const colonIndex = text.indexOf(':');
+            if (colonIndex <= 0) return;
+            const labelText = text.slice(0, colonIndex).trim();
+            if (!labelText) return;
+            const lowerLabel = labelText.toLowerCase();
+            if (lowerLabel === 'pros' || lowerLabel === 'cons') return;
+            
+            // Smart callouts: if a line starts with a short phrase (<= 8 words)
+            // followed by ":", emphasize the label.
+            const wordCount = labelText.split(/\s+/).filter(Boolean).length;
+            if (wordCount === 0 || wordCount > 8) return;
+            const after = text.slice(colonIndex + 1);
+            // If ":" is the last non-whitespace character, do not style.
+            if (!after.trim()) return;
+            
+            const label = document.createElement('strong');
+            label.className = 'callout-label';
+            label.textContent = `${labelText}:`;
+            
+            const afterText = after.replace(/^\s*/, '');
+            const fragment = document.createDocumentFragment();
+            fragment.appendChild(label);
+            fragment.appendChild(document.createTextNode(` ${afterText}`));
+            
+            el.replaceChild(fragment, firstTextNode);
+        });
+    }
+
+    function normalizeSignatureLabelParagraphs() {
+        const labels = new Set(['Arguments', 'Returns', 'Raises', 'Parameters', 'Attributes']);
+        const paragraphs = document.querySelectorAll('.module-page p, .about-page p, .why-page p');
+
+        paragraphs.forEach(p => {
+            // Skip if this paragraph is already a standalone label.
+            if (p.children.length === 1 && p.firstElementChild?.tagName === 'STRONG' && p.textContent.trim()) {
+                return;
+            }
+
+            // Find first text node at paragraph start.
+            let firstText = null;
+            for (const child of p.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    if (child.textContent.trim()) {
+                        firstText = child;
+                        break;
+                    }
+                    continue;
+                }
+                // Starts with non-text content; not our pattern.
+                return;
+            }
+            if (!firstText) return;
+
+            const text = firstText.textContent.replace(/^\s+/, '');
+            const labelMatch = text.match(/^([A-Za-z]+)\s+/);
+            if (!labelMatch) return;
+            const label = labelMatch[1];
+            if (!labels.has(label)) return;
+
+            // Require a ":" somewhere in the paragraph for "X <code>...: ..."
+            if (!p.textContent.includes(':')) return;
+
+            // Split at first whitespace after label in the leading text node.
+            firstText.textContent = text.slice(label.length).replace(/^\s+/, '');
+
+            const labelP = document.createElement('p');
+            const strong = document.createElement('strong');
+            strong.textContent = label;
+            labelP.appendChild(strong);
+
+            p.parentNode?.insertBefore(labelP, p);
+        });
+    }
+
+    function styleWithWithoutLineCounts() {
+        const containers = document.querySelectorAll(
+            '.module-page p, .module-page details summary, .about-page p, .about-page details summary, .why-page p, .why-page details summary'
+        );
+
+        containers.forEach(el => {
+            if (el.querySelector('.line-count-number')) return;
+
+            const normalizedText = el.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
+            if (!normalizedText.includes('lines')) return;
+            if (!/\b(with|without)\b/.test(normalizedText)) return;
+
+            // Primary pattern in docs: "With/Without <code>x</code> - <em>92 lines</em>"
+            const emBlocks = el.querySelectorAll('em');
+            let styledFromEm = false;
+            emBlocks.forEach(em => {
+                if (em.closest('pre, code')) return;
+                const match = em.textContent.match(/^\s*(\d+\+?)\s+lines\b/i);
+                if (!match) return;
+
+                const numberSpan = document.createElement('span');
+                numberSpan.className = 'line-count-number';
+                numberSpan.textContent = `${match[1]} lines`;
+
+                em.textContent = '';
+                em.appendChild(numberSpan);
+                styledFromEm = true;
+            });
+            if (styledFromEm) {
+                el.classList.add('line-count-row');
+                return;
+            }
+
+            // Fallback for plain text: "... - 92 lines"
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    if (!node.textContent || !node.textContent.trim()) return NodeFilter.FILTER_REJECT;
+                    const parent = node.parentElement;
+                    if (!parent) return NodeFilter.FILTER_REJECT;
+                    if (parent.closest('pre, code, .line-count-number')) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
+            const nodesToPatch = [];
+            let currentNode = walker.nextNode();
+            while (currentNode) {
+                if (/-\s*\d+\+?\s+lines\b/i.test(currentNode.textContent)) {
+                    nodesToPatch.push(currentNode);
+                }
+                currentNode = walker.nextNode();
+            }
+
+            nodesToPatch.forEach(node => {
+                const text = node.textContent;
+                const match = text.match(/-\s*(\d+\+?)\s+lines\b/i);
+                if (!match || match.index === undefined) return;
+
+                const prefix = text.slice(0, match.index);
+                const suffix = text.slice(match.index + match[0].length);
+                const fragment = document.createDocumentFragment();
+
+                if (prefix) fragment.appendChild(document.createTextNode(prefix));
+                fragment.appendChild(document.createTextNode('- '));
+
+                const numberSpan = document.createElement('span');
+                numberSpan.className = 'line-count-number';
+                numberSpan.textContent = `${match[1]} lines`;
+                fragment.appendChild(numberSpan);
+                if (suffix) fragment.appendChild(document.createTextNode(suffix));
+
+                node.parentNode?.replaceChild(fragment, node);
+            });
+
+            if (nodesToPatch.length > 0) {
+                el.classList.add('line-count-row');
+            }
+        });
+    }
+
+    function compactProsConsSpacing() {
+        const paragraphs = document.querySelectorAll('.module-page p, .about-page p, .why-page p');
+
+        paragraphs.forEach((p) => {
+            const text = p.textContent.trim();
+            const isProsCons = /^(Pros|Cons):\s+/i.test(text);
+            if (!isProsCons) return;
+
+            p.classList.add('pros-cons-line');
+
+            // Label-only styling: color just "Pros:" / "Cons:" (not whole line).
+            if (!p.querySelector('.pros-cons-label')) {
+                let firstTextNode = null;
+                for (const child of p.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+                        firstTextNode = child;
+                        break;
+                    }
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        break;
+                    }
+                }
+
+                if (firstTextNode) {
+                    const labelMatch = firstTextNode.textContent.match(/^\s*(Pros|Cons):\s*/i);
+                    if (labelMatch && labelMatch.index !== undefined) {
+                        const fullMatch = labelMatch[0];
+                        const labelOnly = labelMatch[1];
+                        const rest = firstTextNode.textContent.slice(fullMatch.length);
+
+                        const fragment = document.createDocumentFragment();
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'pros-cons-label';
+                        labelSpan.textContent = `${labelOnly}:`;
+                        fragment.appendChild(labelSpan);
+                        if (rest.length > 0) {
+                            fragment.appendChild(document.createTextNode(` ${rest.replace(/^\s+/, '')}`));
+                        }
+                        firstTextNode.parentNode?.replaceChild(fragment, firstTextNode);
+                    }
+                }
+            }
+
+            const prev = p.previousElementSibling;
+            if (prev && prev.tagName === 'P') {
+                prev.classList.add('before-pros-cons');
+            }
+        });
+    }
 
     // Global state for API highlight toggle
     let apiHighlightEnabled = true;
+    const API_FLICKER_BASE_CHANCE = 0.03;
+    const SKAPI_PLACEHOLDER_PATTERN = /__SKAPI_TOKEN_(\d+)__/g;
+    const skapiManualTokenMap = new Map();
+    const KNOWN_SKAPI_TOKENS = Array.from(new Set([
+        // modules
+        'suitkaise', 'timing', 'paths', 'circuits', 'cucumber', 'processing', 'sk', 'docs',
+        // classes / errors
+        'Skpath', 'AnyPath', 'CustomRoot', 'PathDetectionError', 'NotAFileError',
+        'Sktimer', 'TimeThis', 'Circuit', 'BreakingCircuit',
+        'SerializationError', 'DeserializationError',
+        'Skprocess', 'Pool', 'Share', 'Pipe', 'ProcessTimers',
+        'ProcessError', 'PreRunError', 'RunError', 'PostRunError', 'OnFinishError',
+        'ResultError', 'ErrorHandlerError', 'ProcessTimeoutError', 'ResultTimeoutError',
+        'AsyncSkfunction', 'SkModifierError', 'FunctionTimeoutError',
+        // functions / helpers
+        'elapsed', 'timethis', 'clear_global_timers', 'autopath',
+        'get_project_root', 'set_custom_root', 'get_custom_root', 'clear_custom_root',
+        'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
+        'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
+        'is_valid_filename', 'streamline_path', 'streamline_path_quick',
+        'serialize', 'serialize_ir', 'deserialize_ir', 'deserialize', 'reconnect_all',
+        'ir_to_jsonable', 'ir_to_json', 'to_jsonable', 'to_json',
+        'autoreconnect', 'sk', 'blocking',
+        // common API members / chains
+        'start', 'stop', 'lap', 'pause', 'resume', 'discard', 'add_time', 'reset',
+        'set_max_times', 'most_recent', 'total_time', 'mean', 'stdev', 'variance',
+        'times', 'num_times', 'percentile', 'map', 'imap', 'unordered_map', 'unordered_imap',
+        'star', 'wait', 'result', 'tell', 'listen', 'kill', 'process_config',
+        'runs', 'join_in', 'lives', 'timeouts', 'prerun', 'run', 'postrun', 'onfinish', 'error',
+        'short', 'trip', 'reset_backoff', 'broken', 'times_shorted', 'total_trips',
+        'current_sleep_time', 'num_shorts_to_trip', 'asynced', 'retry', 'timeout',
+        'background', 'rate_limit', 'has_blocking_calls', 'blocking_calls', 'timer',
+        'id', 'root', 'parent',
+        // Skprocess lifecycle dunders
+        '__prerun__', '__run__', '__postrun__', '__onfinish__', '__result__', '__error__',
+    ]));
+
+    function autoTagKnownAPIInCode() {
+        const scope = document.querySelector('.module-page, .about-page, .why-page');
+        if (!scope) return;
+
+        const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const tokenPattern = KNOWN_SKAPI_TOKENS
+            .slice()
+            .sort((a, b) => b.length - a.length)
+            .map(escapeRegex)
+            .join('|');
+        if (!tokenPattern) return;
+        const tokenRegex = new RegExp(`\\b(${tokenPattern})\\b`, 'g');
+
+        const codeEls = scope.querySelectorAll('code');
+        codeEls.forEach((codeEl) => {
+            if (codeEl.classList.contains('language-text')) return;
+            if (codeEl.closest('suitkaise-api')) return;
+
+            const walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null, false);
+            const textNodes = [];
+            let node;
+            while ((node = walker.nextNode())) {
+                const parent = node.parentElement;
+                if (!parent) continue;
+                if (parent.closest('suitkaise-api')) continue;
+                if (!node.textContent || !node.textContent.trim()) continue;
+                textNodes.push(node);
+            }
+
+            textNodes.forEach((textNode) => {
+                const text = textNode.textContent;
+                tokenRegex.lastIndex = 0;
+                if (!tokenRegex.test(text)) return;
+                tokenRegex.lastIndex = 0;
+
+                const frag = document.createDocumentFragment();
+                let lastIndex = 0;
+                let match;
+                while ((match = tokenRegex.exec(text)) !== null) {
+                    if (match.index > lastIndex) {
+                        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+                    }
+                    const tag = document.createElement('suitkaise-api');
+                    tag.textContent = match[1];
+                    frag.appendChild(tag);
+                    lastIndex = tokenRegex.lastIndex;
+                }
+                if (lastIndex < text.length) {
+                    frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+                }
+
+                textNode.parentNode?.replaceChild(frag, textNode);
+            });
+        });
+    }
+
+    function preprocessManualAPITags() {
+        skapiManualTokenMap.clear();
+        let tokenIndex = 0;
+
+        const manualTags = document.querySelectorAll('suitkaise-api');
+        manualTags.forEach((tag) => {
+            const tokenText = (tag.textContent || '').trim();
+            if (!tokenText) {
+                tag.remove();
+                return;
+            }
+
+            // In fenced code blocks, Prism would strip unknown tags. Replace with
+            // a stable placeholder, then restore to .api-highlight after highlighting.
+            if (tag.closest('pre code')) {
+                const placeholder = `__SKAPI_TOKEN_${tokenIndex++}__`;
+                skapiManualTokenMap.set(placeholder, tokenText);
+                tag.replaceWith(document.createTextNode(placeholder));
+                return;
+            }
+
+            // Outside fenced blocks, convert directly to highlighted span.
+            const span = document.createElement('span');
+            span.className = 'api-highlight api-highlight-manual';
+            span.textContent = tokenText;
+            tag.replaceWith(span);
+        });
+    }
+
+    function getAPIFlickerChance() {
+        // Temporary debug override:
+        // - URL: ?apiFlickerDebug=1
+        // - localStorage: apiFlickerDebug = "1" (or "true")
+        const params = new URLSearchParams(window.location.search);
+        const urlDebug = params.get('apiFlickerDebug');
+        const storageDebug = localStorage.getItem('apiFlickerDebug');
+        const debugEnabled =
+            urlDebug === '1' || urlDebug === 'true' ||
+            storageDebug === '1' || storageDebug === 'true';
+        return debugEnabled ? 1 : API_FLICKER_BASE_CHANCE;
+    }
+
+    function triggerAPIFlickerOnActivate() {
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        if (!modulePage || !modulePage.classList.contains('highlight-active')) return;
+
+        const apiTokens = Array.from(modulePage.querySelectorAll('.api-highlight'));
+        if (apiTokens.length === 0) return;
+        // Exact behavior: each API token independently gets a 3% flicker chance on toggle-on.
+        // Debug mode can temporarily force this to 100% via getAPIFlickerChance().
+        modulePage.querySelectorAll('.api-highlight.api-flicker').forEach((el) => {
+            el.classList.remove('api-flicker');
+        });
+        void modulePage.offsetWidth;
+        const flickerChance = getAPIFlickerChance();
+        apiTokens.forEach((el) => {
+            if (Math.random() < flickerChance) {
+                el.classList.add('api-flicker');
+                el.addEventListener('animationend', () => {
+                    el.classList.remove('api-flicker');
+                }, { once: true });
+            }
+        });
+    }
     
     function toggleAPIHighlight() {
         apiHighlightEnabled = !apiHighlightEnabled;
@@ -124,8 +525,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modulePage) {
             if (apiHighlightEnabled) {
                 modulePage.classList.add('highlight-active');
+                triggerAPIFlickerOnActivate();
             } else {
                 modulePage.classList.remove('highlight-active');
+                // Ensure no flicker animation can continue while highlight is off.
+                modulePage.querySelectorAll('.api-highlight.api-flicker').forEach((el) => {
+                    el.classList.remove('api-flicker');
+                });
             }
         }
     }
@@ -190,10 +596,12 @@ document.addEventListener('DOMContentLoaded', () => {
             'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
             'is_valid_filename', 'streamline_path', 'streamline_path_quick',
             // cucumber
-            'serialize', 'serialize_ir', 'deserialize', 'reconnect_all',
+            'serialize', 'serialize_ir', 'deserialize_ir', 'deserialize', 'reconnect_all',
             'ir_to_jsonable', 'ir_to_json', 'to_jsonable', 'to_json',
             // processing
             'autoreconnect',
+            // Skprocess lifecycle methods
+            '__prerun__', '__run__', '__postrun__', '__onfinish__', '__result__', '__error__',
             // sk
             'sk', 'blocking',
         ]);
@@ -208,7 +616,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'times', 'num_times', 'percentile',
             // processing / Pool / Skprocess
             'map', 'imap', 'unordered_map', 'unordered_imap', 'star',
-            'wait', 'result', 'tell', 'listen',
+            'wait', 'result', 'tell', 'listen', 'kill', 'process_config',
+            'runs', 'join_in', 'lives', 'timeouts', 'prerun', 'run', 'postrun', 'onfinish', 'error',
             // circuits
             'short', 'trip', 'reset_backoff', 'broken', 'times_shorted', 'total_trips',
             'current_sleep_time', 'num_shorts_to_trip',
@@ -225,10 +634,45 @@ document.addEventListener('DOMContentLoaded', () => {
             'timer': '@timing.timethis'  // timer property only highlights if @timing.timethis decorator exists
         };
         
-        // Find all code blocks
-        const codeBlocks = document.querySelectorAll('.module-page pre code, .about-page pre code, .why-page pre code');
+        // Find all code elements (inline + block). Inline code needs API highlighting too.
+        const codeBlocks = document.querySelectorAll('.module-page code, .about-page code, .why-page code');
         
         codeBlocks.forEach(codeBlock => {
+            // Plain text blocks (tracebacks, logs, ASCII diagrams) should not get API highlight.
+            if (codeBlock.classList.contains('language-text')) {
+                return;
+            }
+
+            // Manual API overrides:
+            // - data-skapi-extra="token1,token2"  -> force-add highlightable API tokens
+            // - data-skapi-ignore="token1,token2" -> suppress tokens for this scope
+            // - data-skapi-roots="token1,token2"  -> allow anyRoot.token.chain highlighting
+            // Attributes can be set on <code>, enclosing <pre>, or page <section>.
+            const preEl = codeBlock.closest('pre');
+            const pageSection = codeBlock.closest('.module-page, .about-page, .why-page');
+            const readSkapiSet = (attrName) => {
+                const raw =
+                    codeBlock.getAttribute(attrName) ||
+                    preEl?.getAttribute(attrName) ||
+                    pageSection?.getAttribute(attrName) ||
+                    '';
+                return new Set(
+                    raw
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(Boolean)
+                );
+            };
+            const manualApiExtra = readSkapiSet('data-skapi-extra');
+            const manualApiIgnore = readSkapiSet('data-skapi-ignore');
+            const manualChainRoots = readSkapiSet('data-skapi-roots');
+            const manualOnlyAttr =
+                codeBlock.getAttribute('data-skapi-manual-only') ||
+                preEl?.getAttribute('data-skapi-manual-only') ||
+                pageSection?.getAttribute('data-skapi-manual-only') ||
+                '';
+            const manualOnly = /^(1|true|yes|on)$/i.test(manualOnlyAttr.trim());
+
             // Track variables assigned to API objects in this block
             const apiVariables = new Set();
             // Roots inferred from member-chain usage (no import/assignment context)
@@ -393,13 +837,49 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     parent = parent.parentElement;
                 }
-                if (!isComment && node.textContent.trim()) {
+                const hasManualPlaceholder = node.textContent && node.textContent.includes('__SKAPI_TOKEN_');
+                if (((!isComment && node.textContent.trim()) || hasManualPlaceholder)) {
                     nodesToProcess.push(node);
                 }
             }
             
             nodesToProcess.forEach(textNode => {
                 const text = textNode.textContent;
+
+                // Manual placeholders (from <suitkaise-api> in code blocks):
+                // convert "__SKAPI_TOKEN_n__" back into forced api-highlight spans.
+                if (text && text.includes('__SKAPI_TOKEN_')) {
+                    SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
+                    if (SKAPI_PLACEHOLDER_PATTERN.test(text)) {
+                        SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
+                        const parts = [];
+                        let lastIdx = 0;
+                        let m;
+                        while ((m = SKAPI_PLACEHOLDER_PATTERN.exec(text)) !== null) {
+                            const matchStart = m.index;
+                            const fullMatch = m[0];
+                            if (matchStart > lastIdx) {
+                                parts.push(document.createTextNode(text.slice(lastIdx, matchStart)));
+                            }
+                            const replacementText = skapiManualTokenMap.get(fullMatch) || fullMatch;
+                            const span = document.createElement('span');
+                            span.className = 'api-highlight api-highlight-manual';
+                            span.textContent = replacementText;
+                            parts.push(span);
+                            lastIdx = matchStart + fullMatch.length;
+                        }
+                        if (lastIdx < text.length) {
+                            parts.push(document.createTextNode(text.slice(lastIdx)));
+                        }
+                        const parent = textNode.parentNode;
+                        if (parent && parts.length > 0) {
+                            parts.forEach(part => parent.insertBefore(part, textNode));
+                            parent.removeChild(textNode);
+                            return;
+                        }
+                    }
+                }
+                if (manualOnly) return;
                 
                 // Build regex pattern for all API identifiers
                 const allIdentifiers = [
@@ -408,8 +888,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     ...apiDerivedClasses,
                     ...apiMethods,
                     ...apiVariables,
-                    ...activeOverrides  // Add active override properties (like 'timer') as identifiers
-                ];
+                    ...activeOverrides, // Add active override properties (like 'timer') as identifiers
+                    ...manualApiExtra,  // Manual forced API tokens for this scope
+                ].filter(id => !manualApiIgnore.has(id));
+                // Always-on chain roots that should match after any identifier.
+                // Example: self.process_config.runs
+                const alwaysChainRoots = [
+                    'process_config',
+                    ...manualChainRoots
+                ].filter(id => !manualApiIgnore.has(id));
                 
                 // Check if this text contains any API identifiers
                 let hasMatch = false;
@@ -437,6 +924,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     }
                 }
+                // Ensure always-on chain roots can trigger matching.
+                if (!hasMatch) {
+                    for (const root of alwaysChainRoots) {
+                        if (text.includes(`.${root}`) || text.startsWith(`${root}.`) || text.includes(` ${root}.`)) {
+                            hasMatch = true;
+                            break;
+                        }
+                    }
+                }
                 
                 if (!hasMatch) return;
                 
@@ -455,7 +951,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ...apiModules,
                     ...apiDerivedClasses,
                     ...activeOverrides,
+                    ...manualApiExtra,
                 ]
+                    .filter(id => !manualApiIgnore.has(id))
                     .sort((a, b) => b.length - a.length)
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
@@ -470,14 +968,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
                 
+                const alwaysChainRootsPattern = alwaysChainRoots
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .join('|');
+                
                 // Match patterns:
                 // 1. Decorators: @identifier.method()
                 // 2. Module.something chains: timing.Sktimer(), paths.get_project_root()
                 // 3. Standalone classes/functions: Skpath(), timethis()
                 // 4. Variables with chains: t.mean, timer.stdev, circ.flowing
-                // 5. Override patterns: word.timer.chain... (1 word before, all words after connected by dots)
+                // 5. Override patterns: word.timer.chain... / word.process_config.chain...
                 let regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
                     `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                if (alwaysChainRootsPattern) {
+                    regexPattern += `|(\\b\\w+)\\.(${alwaysChainRootsPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                }
                 
                 // Inferred variables (like pool, timer, breaker) only highlight when
                 // connected to known API chain segments.
@@ -490,6 +995,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
                         `(\\b\\w+)\\.(${overridesPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?|` +
                         `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                    if (alwaysChainRootsPattern) {
+                        regexPattern += `|(\\b\\w+)\\.(${alwaysChainRootsPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                    }
                     if (variablePattern) {
                         regexPattern += `|\\b(${variablePattern})(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
                     }
@@ -504,6 +1012,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 let match;
                 
                 while ((match = regex.exec(text)) !== null) {
+                    const matchedText = match[0];
+                    const matchStart = match.index;
+                    const matchEnd = matchStart + matchedText.length;
+                    
+                    // Skip keyword-argument names inside calls:
+                    // e.g. connect(host=..., database=...) -> do not highlight host/database.
+                    // Heuristic: token is immediately followed by "=" and appears after
+                    // "(" or "," (ignoring whitespace) in the same expression.
+                    let nextIdx = matchEnd;
+                    while (nextIdx < text.length && /\s/.test(text[nextIdx])) nextIdx++;
+                    const hasEqualsAfter = nextIdx < text.length && text[nextIdx] === '=';
+                    if (hasEqualsAfter) {
+                        let prevIdx = matchStart - 1;
+                        while (prevIdx >= 0 && /\s/.test(text[prevIdx])) prevIdx--;
+                        const prevChar = prevIdx >= 0 ? text[prevIdx] : '';
+                        if (prevChar === '(' || prevChar === ',') {
+                            lastIndex = regex.lastIndex;
+                            continue;
+                        }
+                    }
+                    
                     // Add text before match
                     if (match.index > lastIndex) {
                         parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
@@ -531,81 +1060,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // Second pass: extend api-highlight to include adjacent "()" 
-            // This handles cases where Prism split the parens into separate tokens
-            const highlights = codeBlock.querySelectorAll('.api-highlight');
-            highlights.forEach(highlight => {
+            // Second pass: extend api-highlight to include adjacent "()"
+            // This handles cases where Prism split parens into separate tokens.
+            const absorbAdjacentCallParens = (highlight) => {
                 let nextSibling = highlight.nextSibling;
-                
-                // Skip whitespace text nodes
                 while (nextSibling && nextSibling.nodeType === Node.TEXT_NODE && !nextSibling.textContent.trim()) {
                     nextSibling = nextSibling.nextSibling;
                 }
-                
-                // Check if next element is "(" or "()"
-                if (nextSibling) {
-                    let textToAdd = '';
-                    let nodesToRemove = [];
-                    
-                    // Handle text node with "(" or "()"
-                    if (nextSibling.nodeType === Node.TEXT_NODE) {
-                        const text = nextSibling.textContent;
-                        if (text.startsWith('()')) {
-                            textToAdd = '()';
-                            if (text === '()') {
-                                nodesToRemove.push(nextSibling);
-                            } else {
-                                nextSibling.textContent = text.slice(2);
-                            }
-                        } else if (text.startsWith('(')) {
-                            // Look for closing )
-                            if (text === '(') {
-                                const afterOpen = nextSibling.nextSibling;
-                                if (afterOpen && afterOpen.nodeType === Node.TEXT_NODE && afterOpen.textContent.startsWith(')')) {
-                                    textToAdd = '()';
-                                    nodesToRemove.push(nextSibling);
-                                    if (afterOpen.textContent === ')') {
-                                        nodesToRemove.push(afterOpen);
-                                    } else {
-                                        afterOpen.textContent = afterOpen.textContent.slice(1);
-                                    }
-                                }
-                            }
+                if (!nextSibling) return false;
+
+                let textToAdd = '';
+                const nodesToRemove = [];
+
+                if (nextSibling.nodeType === Node.TEXT_NODE) {
+                    const text = nextSibling.textContent;
+                    if (text.startsWith('()')) {
+                        textToAdd = '()';
+                        if (text === '()') {
+                            nodesToRemove.push(nextSibling);
+                        } else {
+                            nextSibling.textContent = text.slice(2);
                         }
-                    }
-                    // Handle span element containing "(" or "()" (Prism punctuation token)
-                    else if (nextSibling.nodeType === Node.ELEMENT_NODE) {
-                        const text = nextSibling.textContent;
-                        if (text === '()' || text === '(') {
-                            if (text === '()') {
+                    } else if (text === '(') {
+                        let afterOpen = nextSibling.nextSibling;
+                        while (afterOpen && afterOpen.nodeType === Node.TEXT_NODE && !afterOpen.textContent.trim()) {
+                            afterOpen = afterOpen.nextSibling;
+                        }
+                        if (afterOpen) {
+                            const afterText = afterOpen.textContent || '';
+                            if (afterText === ')' || afterText.startsWith(')')) {
                                 textToAdd = '()';
                                 nodesToRemove.push(nextSibling);
-                            } else if (text === '(') {
-                                // Look for closing ) in next sibling
-                                const afterOpen = nextSibling.nextSibling;
-                                if (afterOpen) {
-                                    const afterText = afterOpen.textContent;
-                                    if (afterText === ')' || afterText.startsWith(')')) {
-                                        textToAdd = '()';
-                                        nodesToRemove.push(nextSibling);
-                                        if (afterText === ')') {
-                                            nodesToRemove.push(afterOpen);
-                                        } else if (afterOpen.nodeType === Node.TEXT_NODE) {
-                                            afterOpen.textContent = afterText.slice(1);
-                                        }
-                                    }
+                                if (afterText === ')') {
+                                    nodesToRemove.push(afterOpen);
+                                } else if (afterOpen.nodeType === Node.TEXT_NODE) {
+                                    afterOpen.textContent = afterText.slice(1);
                                 }
                             }
                         }
                     }
-                    
-                    // Extend the highlight
-                    if (textToAdd) {
-                        highlight.textContent += textToAdd;
-                        nodesToRemove.forEach(n => n.parentNode.removeChild(n));
+                } else if (nextSibling.nodeType === Node.ELEMENT_NODE) {
+                    const text = nextSibling.textContent;
+                    if (text === '()') {
+                        textToAdd = '()';
+                        nodesToRemove.push(nextSibling);
+                    } else if (text === '(') {
+                        let afterOpen = nextSibling.nextSibling;
+                        while (afterOpen && afterOpen.nodeType === Node.TEXT_NODE && !afterOpen.textContent.trim()) {
+                            afterOpen = afterOpen.nextSibling;
+                        }
+                        if (afterOpen) {
+                            const afterText = afterOpen.textContent || '';
+                            if (afterText === ')' || afterText.startsWith(')')) {
+                                textToAdd = '()';
+                                nodesToRemove.push(nextSibling);
+                                if (afterText === ')') {
+                                    nodesToRemove.push(afterOpen);
+                                } else if (afterOpen.nodeType === Node.TEXT_NODE) {
+                                    afterOpen.textContent = afterText.slice(1);
+                                }
+                            }
+                        }
                     }
                 }
-            });
+
+                if (!textToAdd) return false;
+                highlight.textContent += textToAdd;
+                nodesToRemove.forEach(n => n.parentNode && n.parentNode.removeChild(n));
+                return true;
+            };
+
+            codeBlock.querySelectorAll('.api-highlight').forEach(absorbAdjacentCallParens);
             
             // Third pass: merge api-highlight chains connected by dots
             // This handles cases like my_function.timer.mean where Prism splits them
@@ -897,6 +1422,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
+
+            // Re-run paren absorption after chain merges, since merges can create
+            // new trailing-call opportunities (e.g. root.method + () tokens).
+            codeBlock.querySelectorAll('.api-highlight').forEach(absorbAdjacentCallParens);
             
             // Sixth pass: for inferred roots (like `pool`), keep highlight only
             // when connected to a chain (root.member...). If not chained, unwrap.
@@ -940,6 +1469,120 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function tagInlineCodeVariants() {
+        const codeEls = document.querySelectorAll('.module-page code, .about-page code, .why-page code');
+        codeEls.forEach((codeEl) => {
+            // Skip fenced/code-block content; inline rules only.
+            if (codeEl.closest('pre')) return;
+
+            codeEl.classList.add('inline-code');
+            codeEl.classList.remove('inline-code-suitkaise');
+
+            if (/\bsuitkaise\b/i.test(codeEl.textContent || '')) {
+                codeEl.classList.add('inline-code-suitkaise');
+            }
+        });
+    }
+
+    function transformBenchmarkTables() {
+        const parseBenchmarkUs = (value) => {
+            if (!value) return null;
+            const trimmed = value.trim();
+            if (!trimmed || trimmed.toLowerCase() === 'fail') return null;
+            const match = trimmed.match(/-?\d+(?:\.\d+)?/);
+            if (!match) return null;
+            const parsed = Number.parseFloat(match[0]);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const benchmarkPres = document.querySelectorAll('pre[data-benchmark-table]');
+        benchmarkPres.forEach(pre => {
+            // Skip if already transformed.
+            if (pre.dataset.benchmarkTransformed === 'true') return;
+            const code = pre.querySelector('code');
+            if (!code) return;
+
+            const raw = code.textContent || '';
+            const lines = raw
+                .split('\n')
+                .map(line => line.trimEnd());
+
+            const cleaned = lines.filter(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return false;
+                if (/^─+$/.test(trimmed)) return false;
+                if (trimmed.includes('Supported Types Compatibility Benchmarks')) return false;
+                return true;
+            });
+
+            const headerIndex = cleaned.findIndex(line => /^Type\s{2,}/.test(line.trim()));
+            if (headerIndex === -1) return;
+
+            const headers = cleaned[headerIndex].trim().split(/\s{2,}/);
+            const dataLines = cleaned.slice(headerIndex + 1);
+            if (headers.length < 2 || dataLines.length === 0) return;
+
+            const wrap = document.createElement('div');
+            wrap.className = 'benchmark-table-wrap';
+
+            const table = document.createElement('table');
+            table.className = 'benchmark-table';
+
+            const thead = document.createElement('thead');
+            const headRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            dataLines.forEach(line => {
+                const cols = line.trim().split(/\s{2,}/);
+                if (cols.length < 2) return;
+                while (cols.length < headers.length) cols.push('');
+                
+                // Find fastest numeric benchmark in this row (excluding type col).
+                const numericValues = cols.slice(1, headers.length).map(parseBenchmarkUs);
+                let fastestCol = -1;
+                let fastestValue = Number.POSITIVE_INFINITY;
+                numericValues.forEach((num, idx) => {
+                    if (num !== null && num < fastestValue) {
+                        fastestValue = num;
+                        fastestCol = idx + 1; // offset because first column is type
+                    }
+                });
+
+                const tr = document.createElement('tr');
+                cols.slice(0, headers.length).forEach((value, idx) => {
+                    const td = document.createElement('td');
+                    if (idx === 0) {
+                        const typeCode = document.createElement('code');
+                        typeCode.textContent = value;
+                        td.appendChild(typeCode);
+                    } else {
+                        td.textContent = value;
+                        if (value.trim().toLowerCase() === 'fail') {
+                            td.classList.add('benchmark-fail');
+                        } else if (idx === fastestCol) {
+                            td.classList.add('benchmark-fastest');
+                        }
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            wrap.appendChild(table);
+
+            pre.dataset.benchmarkTransformed = 'true';
+            pre.replaceWith(wrap);
+        });
+    }
+
     // ============================================
     // Page Content Storage
     // Core pages are inline (instant)
@@ -963,7 +1606,7 @@ document.addEventListener('DOMContentLoaded', () => {
         error: `
             <section class="error-page">
                 <a href="#home" class="error-briefcase" id="errorBriefcase" data-page="home">
-                    <img src="../__assets__/briefcase-laptop-closed.png" alt="Back to Home" class="error-briefcase-img" id="errorBriefcaseImg">
+                    <img src="${assetPath('briefcase-laptop-closed.png')}" alt="Back to Home" class="error-briefcase-img" id="errorBriefcaseImg">
                     <span class="error-back-text">Back to Home</span>
                 </a>
                 <h1 class="error-title">ERROR</h1>
@@ -973,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         password: `
             <section class="password-page">
                 <div class="password-briefcase">
-                    <img src="../__assets__/briefcase-laptop-closed.png" alt="Suitkaise" class="password-briefcase-img" id="passwordBriefcaseImg">
+                    <img src="${assetPath('briefcase-laptop-closed.png')}" alt="Suitkaise" class="password-briefcase-img" id="passwordBriefcaseImg">
                 </div>
                 <p class="password-message">This site is not yet publicly accessible. Enter the password to access the site.</p>
                 <div class="password-input-container">
@@ -1007,7 +1650,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch a single page from the pages folder
     async function fetchPage(pageName) {
         try {
-            const response = await fetch(`pages/${pageName}.html`);
+            const cacheBust = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const response = await fetch(`pages/${pageName}.html?cb=${cacheBust}`, { cache: 'no-store' });
             if (!response.ok) {
                 throw new Error(`Failed to load ${pageName}: ${response.status}`);
             }
@@ -1109,6 +1753,113 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Page doesn't exist
         return null;
+    }
+
+    function renderInlineMarkdown(text) {
+        const escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        return escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+    }
+
+    function renderSimpleMarkdownToHtml(markdownText) {
+        const lines = markdownText.split('\n');
+        const html = [];
+
+        let inCodeBlock = false;
+        let codeLang = '';
+        let codeLines = [];
+        let paragraphLines = [];
+        let listItems = [];
+
+        const flushParagraph = () => {
+            if (paragraphLines.length === 0) return;
+            const joined = paragraphLines.join(' ').trim();
+            if (joined) {
+                html.push(`<p>${renderInlineMarkdown(joined)}</p>`);
+            }
+            paragraphLines = [];
+        };
+
+        const flushList = () => {
+            if (listItems.length === 0) return;
+            html.push('<ul>');
+            listItems.forEach(item => {
+                html.push(`    <li>${renderInlineMarkdown(item)}</li>`);
+            });
+            html.push('</ul>');
+            listItems = [];
+        };
+
+        const flushCode = () => {
+            const codeText = codeLines.join('\n')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const langClass = codeLang ? ` class="language-${codeLang}"` : '';
+            html.push(`<pre><code${langClass}>${codeText}</code></pre>`);
+            codeLines = [];
+            codeLang = '';
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.replace(/\r$/, '');
+
+            if (line.trim().startsWith('```')) {
+                if (inCodeBlock) {
+                    flushCode();
+                    inCodeBlock = false;
+                } else {
+                    flushParagraph();
+                    flushList();
+                    inCodeBlock = true;
+                    codeLang = line.trim().slice(3).trim();
+                }
+                continue;
+            }
+
+            if (inCodeBlock) {
+                codeLines.push(line);
+                continue;
+            }
+
+            const headingMatch = line.match(/^(#{2,6})\s+(.*)$/);
+            if (headingMatch) {
+                flushParagraph();
+                flushList();
+                const level = headingMatch[1].length;
+                html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
+                continue;
+            }
+
+            const listMatch = line.match(/^\s*-\s+(.*)$/);
+            if (listMatch) {
+                flushParagraph();
+                listItems.push(listMatch[1].trim());
+                continue;
+            }
+
+            if (!line.trim()) {
+                flushParagraph();
+                flushList();
+                continue;
+            }
+
+            paragraphLines.push(line.trim());
+        }
+
+        if (inCodeBlock) {
+            flushCode();
+        }
+        flushParagraph();
+        flushList();
+
+        return html.join('\n');
+    }
+
+    async function hydrateCucumberHowItWorksIfEmpty(pageName) {
+        // No-op: cucumber-how-it-works.html is now fully static; no fallback hydration needed.
     }
     
     // ============================================
@@ -1275,8 +2026,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorBackText = errorBriefcase?.querySelector('.error-back-text');
         
         if (errorBriefcase && errorBriefcaseImg) {
-            const closedImg = '../__assets__/briefcase-laptop-closed.png';
-            const halfOpenImg = '../__assets__/briefcase-laptop-half-open.png';
+            const closedImg = assetPath('briefcase-laptop-closed.png');
+            const halfOpenImg = assetPath('briefcase-laptop-half-open.png');
             
             errorBriefcase.addEventListener('mouseenter', () => {
                 errorBriefcaseImg.src = halfOpenImg;
@@ -1377,6 +2128,9 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 window.scrollTo(0, 0);
             }
+
+            // Fallback: hydrate known empty generated pages from pseudo-markdown source.
+            await hydrateCucumberHowItWorksIfEmpty(pageName);
         }
         
         // Hide loading screen (if it was shown)
@@ -1390,7 +2144,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (pageName === 'home') {
             setupFadeInAnimations();
         }
+
+        // If summary title already labels the dropdown, remove duplicated first heading.
+        normalizeDropdownHeadingDupes();
         
+        // Deterministically tag known API tokens across the current page.
+        autoTagKnownAPIInCode();
+        // Convert manual <suitkaise-api> tags before Prism tokenization.
+        preprocessManualAPITags();
+
         // Run syntax highlighting on code blocks
         if (typeof Prism !== 'undefined') {
             Prism.highlightAll();
@@ -1398,6 +2160,23 @@ document.addEventListener('DOMContentLoaded', () => {
             styleLineCountComments();
             styleAPIHighlights();
         }
+        tagInlineCodeVariants();
+
+        // Normalize collapsed signature labels:
+        // "Arguments <code>x</code>: ..." -> "<strong>Arguments</strong>" + next line.
+        normalizeSignatureLabelParagraphs();
+        
+        // Emphasize callout prefixes like "Note:" and "Important:".
+        styleCalloutLabels();
+
+        // Bold just the numeric part in "With/Without X - N lines".
+        styleWithWithoutLineCounts();
+
+        // Tighten spacing around "Pros:" / "Cons:" blocks.
+        compactProsConsSpacing();
+        
+        // Convert large benchmark pre blocks to custom HTML tables
+        transformBenchmarkTables();
         
         // Setup module bar links if present
         setupModuleBarLinks();
@@ -1421,6 +2200,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pageName = link.dataset.page;
                 navigateTo(pageName);
             });
+        });
+    }
+
+    function normalizeDropdownHeadingDupes() {
+        const normalize = (value) =>
+            (value || '')
+                .replace(/[`"'“”‘’]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+
+        const detailsEls = document.querySelectorAll('.module-page details, .about-page details, .why-page details');
+        detailsEls.forEach((details) => {
+            const summary = details.querySelector(':scope > summary');
+            if (!summary) return;
+
+            const summaryText = normalize(summary.textContent);
+            if (!summaryText) return;
+
+            const contentRoot = details.querySelector(':scope > .dropdown-content') || details;
+            const firstContentChild = Array.from(contentRoot.children).find((el) => el.tagName !== 'SUMMARY');
+            if (!firstContentChild) return;
+
+            if (!/^H[1-4]$/.test(firstContentChild.tagName)) return;
+
+            const headingText = normalize(firstContentChild.textContent);
+            if (headingText === summaryText) {
+                // Preserve full heading element so summary-specific heading CSS hooks
+                // (including arrow styling for h2 summaries) keep working.
+                summary.innerHTML = firstContentChild.outerHTML;
+                if (firstContentChild.tagName === 'H2') {
+                    summary.classList.add('dropdown-title-h2');
+                } else {
+                    summary.classList.remove('dropdown-title-h2');
+                }
+                firstContentChild.remove();
+            }
         });
     }
 
@@ -1850,20 +2666,44 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Listen for details toggle events (dropdowns expanding/collapsing)
         const detailsElements = modulePage.querySelectorAll('details');
-        function onDetailsToggle() {
-            // Small delay to let the DOM update after toggle
-            requestAnimationFrame(() => {
-                updateSections();
-            });
-        }
+        const detailsToggleHandlers = [];
         detailsElements.forEach(details => {
+            const summary = details.querySelector(':scope > summary');
+            if (!summary) return;
+
+            const capturePreToggleTop = (e) => {
+                // Only capture keyboard toggles that can change details state.
+                if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+                details._preToggleSummaryTop = summary.getBoundingClientRect().top;
+            };
+
+            const onDetailsToggle = () => {
+                const beforeTop = details._preToggleSummaryTop;
+                requestAnimationFrame(() => {
+                    updateSections();
+                    if (typeof beforeTop === 'number') {
+                        const afterTop = summary.getBoundingClientRect().top;
+                        const delta = afterTop - beforeTop;
+                        if (Math.abs(delta) > 1) {
+                            window.scrollBy(0, delta);
+                        }
+                        details._preToggleSummaryTop = undefined;
+                    }
+                });
+            };
+
+            summary.addEventListener('mousedown', capturePreToggleTop);
+            summary.addEventListener('keydown', capturePreToggleTop);
             details.addEventListener('toggle', onDetailsToggle);
+            detailsToggleHandlers.push({ details, summary, capturePreToggleTop, onDetailsToggle });
         });
         
         // Store cleanup function for when navigating away
         modulePage._scrollOpacityCleanup = () => {
             window.removeEventListener('scroll', onScroll);
-            detailsElements.forEach(details => {
+            detailsToggleHandlers.forEach(({ details, summary, capturePreToggleTop, onDetailsToggle }) => {
+                summary.removeEventListener('mousedown', capturePreToggleTop);
+                summary.removeEventListener('keydown', capturePreToggleTop);
                 details.removeEventListener('toggle', onDetailsToggle);
             });
         };
@@ -1958,8 +2798,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const homeBtn = document.getElementById('homeBtn');
     const homeIcon = document.getElementById('homeIcon');
     
-    const closedImage = '../__assets__/briefcase-laptop-closed.png';
-    const openImage = '../__assets__/briefcase-laptop-fully-open.png';
+    const closedImage = assetPath('briefcase-laptop-closed.png');
+    const openImage = assetPath('briefcase-laptop-fully-open.png');
 
     const preloadImage = new Image();
     preloadImage.src = openImage;

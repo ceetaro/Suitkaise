@@ -2,9 +2,9 @@
 
 Note: Iterator-style objects (including `enumerate` and `zip`) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.
 
-Note: Objects that turn into `Reconnector` objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `reconnect_all(...)` with credentials).
+Note: Objects that turn into `Reconnector` objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `<suitkaise-api>reconnect_all</suitkaise-api>(...)` with credentials).
 
-Note: Due to Python limitations, some types are not supported by `Share`.
+Note: Due to Python limitations, some types are not supported by `<suitkaise-api>Share</suitkaise-api>`.
 - `multiprocessing.*` objects (queues, managers, events, shared_memory, connections)
 - `os.pipe()` file handles / pipe-backed `io.FileIO`
 - `weakref.ref` objects (recreated as weak references; dead refs become placeholders)
@@ -56,15 +56,15 @@ Note: Due to Python limitations, some types are not supported by `Share`.
 - `io.StringIO` --> `io.StringIO`
 - `io.BytesIO` --> `io.BytesIO`
 - `queue.Queue` --> `queue.Queue`
-- `multiprocessing.Queue` --> `multiprocessing.Queue` (`Share` not supported)
+- `multiprocessing.Queue` --> `multiprocessing.Queue` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `threading.Event` --> `threading.Event`
-- `multiprocessing.Event` --> `multiprocessing.Event` (`Share` not supported)
+- `multiprocessing.Event` --> `multiprocessing.Event` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `re.Pattern` --> `re.Pattern`
 - `re.Match` --> `MatchReconnector`
 - `sqlite3.Connection` --> `SQLiteConnectionReconnector`
 - `sqlite3.Cursor` --> `SQLiteCursorReconnector`
 - `contextvars.ContextVar` --> `contextvars.ContextVar`
-- `contextvars.Token` --> `contextvars.Token` (`Share` not supported)
+- `contextvars.Token` --> `contextvars.Token` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `requests.Session` --> `requests.Session`
 - `socket.socket` --> `SocketReconnector`
 - `psycopg2.Connection` --> `DbReconnector`
@@ -87,26 +87,26 @@ Note: Due to Python limitations, some types are not supported by `Share`.
 - `enumerate` --> `iterator`
 - `zip` --> `iterator`
 - `mmap.mmap` --> `mmap.mmap`
-- `multiprocessing.shared_memory.SharedMemory` --> `multiprocessing.shared_memory.SharedMemory` (`Share` not supported)
+- `multiprocessing.shared_memory.SharedMemory` --> `multiprocessing.shared_memory.SharedMemory` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `int` (file descriptors) --> `int` (file descriptors)
 - `memoryview` --> `memoryview`
 - `threading.Thread` --> `ThreadReconnector`
 - `concurrent.futures.ThreadPoolExecutor` --> `concurrent.futures.ThreadPoolExecutor`
 - `concurrent.futures.ProcessPoolExecutor` --> `concurrent.futures.ProcessPoolExecutor`
 - `threading.local` --> `threading.local`
-- `io.FileIO` (from `os.pipe`) --> `io.FileIO` (`Share` not supported)
-- `multiprocessing.connection.Connection` --> `multiprocessing.connection.Connection` (`Share` not supported)
-- `multiprocessing.managers.BaseProxy` --> `multiprocessing.managers.BaseProxy` (`Share` not supported)
+- `io.FileIO` (from `os.pipe`) --> `io.FileIO` (`<suitkaise-api>Share</suitkaise-api>` not supported)
+- `multiprocessing.connection.Connection` --> `multiprocessing.connection.Connection` (`<suitkaise-api>Share</suitkaise-api>` not supported)
+- `multiprocessing.managers.BaseProxy` --> `multiprocessing.managers.BaseProxy` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `types.CodeType` --> `types.CodeType`
-- `types.FrameType` --> `types.FrameType` (`Share` not supported)
+- `types.FrameType` --> `types.FrameType` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `property` --> `property`
-- `types.MemberDescriptorType` --> `types.MemberDescriptorType` (`Share` not supported)
-- `types.GetSetDescriptorType` --> `types.GetSetDescriptorType` (`Share` not supported)
-- `types.WrapperDescriptorType` --> `types.WrapperDescriptorType` (`Share` not supported)
-- `types.MethodDescriptorType` --> `types.MethodDescriptorType` (`Share` not supported)
+- `types.MemberDescriptorType` --> `types.MemberDescriptorType` (`<suitkaise-api>Share</suitkaise-api>` not supported)
+- `types.GetSetDescriptorType` --> `types.GetSetDescriptorType` (`<suitkaise-api>Share</suitkaise-api>` not supported)
+- `types.WrapperDescriptorType` --> `types.WrapperDescriptorType` (`<suitkaise-api>Share</suitkaise-api>` not supported)
+- `types.MethodDescriptorType` --> `types.MethodDescriptorType` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `types.MethodWrapperType` --> `types.MethodWrapperType`
 - `types.GeneratorType` --> `iterator`
-- `weakref.ref` --> `weakref.ref` (`Share` not supported)
+- `weakref.ref` --> `weakref.ref` (`<suitkaise-api>Share</suitkaise-api>` not supported)
 - `weakref.WeakValueDictionary` --> `weakref.WeakValueDictionary`
 - `weakref.WeakKeyDictionary` --> `weakref.WeakKeyDictionary`
 - `enum.Enum` --> `enum.Enum`

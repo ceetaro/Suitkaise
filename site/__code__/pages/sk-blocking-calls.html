@@ -7,16 +7,16 @@
         <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
         <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
         <a href="#sk-blocking-calls" class="module-bar-link active" data-page="sk-blocking-calls">blocking calls</a>
-        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
         <a href="#sk-tests" class="module-bar-link" data-page="sk-tests">tests</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
         <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1>Blocking Calls Reference</h1>
-    <p>This page lists all function and method calls that the <code>sk</code> module auto-detects as blocking. If your code uses any of these, <code>.asynced()</code> and <code>.background()</code> become available.</p>
+    <p>This page lists all function and method calls that the <code><suitkaise-api>sk</suitkaise-api></code> module auto-detects as blocking. If your code uses any of these, <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> become available.</p>
     <p>Note: Detection is case-insensitive.</p>
-    <p>Note: You can always use the <code>@blocking</code> decorator to explicitly mark code as blocking when AST detection doesn&#x27;t catch it (for things like heavy, time consuming CPU bound work)</p>
+    <p>Note: You can always use the <code>@<suitkaise-api>blocking</suitkaise-api></code> decorator to explicitly mark code as blocking when AST detection doesn&#x27;t catch it (for things like heavy, time consuming CPU bound work)</p>
     <hr>
     <h2>Exact Blocking Calls</h2>
     <p>These are matched exactly (full call path).</p>
@@ -24,8 +24,8 @@
     <ul>
         <li><code>time.sleep</code></li>
         <li><code>sleep</code></li>
-        <li><code>timing.sleep</code></li>
-        <li><code>suitkaise.timing.sleep</code></li>
+        <li><code><suitkaise-api>timing</suitkaise-api>.sleep</code></li>
+        <li><code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api>.sleep</code></li>
     </ul>
     <h3>File I/O</h3>
     <ul>
@@ -45,7 +45,7 @@
     </ul>
     <h3>Subprocess</h3>
     <ul>
-        <li><code>subprocess.run</code></li>
+        <li><code>subprocess.<suitkaise-api>run</suitkaise-api></code></li>
         <li><code>subprocess.call</code></li>
         <li><code>subprocess.check_call</code></li>
         <li><code>subprocess.check_output</code></li>
@@ -292,7 +292,7 @@
     <h3>Other Databases</h3>
     <ul>
         <li><code>execute</code></li>
-        <li><code>run</code></li>
+        <li><code><suitkaise-api>run</suitkaise-api></code></li>
         <li><code>query</code></li>
         <li><code>write_points</code></li>
         <li><code>write_api</code></li>
@@ -405,10 +405,10 @@ s3_client.get_object(...)        # pattern match: get_object</code></pre>
 data.update({&quot;a&quot;: 1})            # broad method, no I/O context
 calculate()                      # unknown function</code></pre>
     <h3>Use @blocking for undetected cases</h3>
-    <pre><code class="language-python">from suitkaise import sk, blocking
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@sk
-@blocking
+@<suitkaise-api>sk</suitkaise-api>
+@<suitkaise-api>blocking</suitkaise-api>
 def cpu_intensive():
     # pure computation, no I/O calls
     return sum(x**2 for x in range(10_000_000))</code></pre>

@@ -1,21 +1,21 @@
-# `cucumber` performance
+# `<suitkaise-api>cucumber</suitkaise-api>` performance
 
 Note from future me: I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).
 
-Here are the performance benchmarks for `cucumber` compared to other serialization libraries.
+Here are the performance benchmarks for `<suitkaise-api>cucumber</suitkaise-api>` compared to other serialization libraries.
 
 These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.
 
 Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.
 
-Note: `cucumber` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
+Note: `<suitkaise-api>cucumber</suitkaise-api>` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
 
 To run the benchmarks yourself, run the following command:
 ```bash
-python -m tests.cucumber.run_all_benchmarks
+python -m tests.<suitkaise-api>cucumber</suitkaise-api>.run_all_benchmarks
 ```
 
-## Types only `cucumber` can handle
+## Types only `<suitkaise-api>cucumber</suitkaise-api>` can handle
 
 - `threading.local`
 - `multiprocessing.Queue`
@@ -39,64 +39,64 @@ python -m tests.cucumber.run_all_benchmarks
 - `subprocess.Popen`
 - `FrameType`
 
-### `suitkaise` specific types that only `cucumber` can handle
+### `<suitkaise-api>suitkaise</suitkaise-api>` specific types that only `<suitkaise-api>cucumber</suitkaise-api>` can handle
 
-- `Pool`
-- `Share`
+- `<suitkaise-api>Pool</suitkaise-api>`
+- `<suitkaise-api>Share</suitkaise-api>`
 
-## `cucumber` vs `pickle`
+## `<suitkaise-api>cucumber</suitkaise-api>` vs `pickle`
 
-`cucumber` actually handles `requests.Session` 1.45x faster than base `pickle`.
+`<suitkaise-api>cucumber</suitkaise-api>` actually handles `requests.Session` 1.45x faster than base `pickle`.
 
 ## Primitive type comparison (excluding base `pickle`)
 
-`bool`: `cucumber` is fastest
-- `cucumber` 6.4µs 
+`bool`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 6.4µs 
 - `cloudpickle` 10.4µs 
 - `dill` 55.1µs
 
-`int`: `cucumber` is fastest
-- `cucumber` 1.2µs
+`int`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 1.2µs
 - `cloudpickle` 2.6µs
 - `dill` 10.7µs
 
-`float`: `cucumber` is fastest
-- `cucumber` 1.6µs
+`float`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 1.6µs
 - `cloudpickle` 1.7µs
 - `dill` 8.5µs
 
-`complex`: `cucumber` is fastest
-- `cucumber` 5.8µs
+`complex`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 5.8µs
 - `cloudpickle` 14.2µs
 - `dill` 41.8µs
 
-`str`: `cucumber` is fastest
-- `cucumber` 1.0µs
+`str`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 1.0µs
 - `cloudpickle` 1.5µs
 - `dill` 7.3µs
 
-`bytes`: `cucumber` is fastest
-- `cucumber` 0.9µs
+`bytes`: `<suitkaise-api>cucumber</suitkaise-api>` is fastest
+- `<suitkaise-api>cucumber</suitkaise-api>` 0.9µs
 - `cloudpickle` 1.4µs
 - `dill` 7.2µs
 
 `bytearray`: `cloudpickle` is fastest
 - `cloudpickle` 2.0µs
-- `cucumber` 2.5µs
+- `<suitkaise-api>cucumber</suitkaise-api>` 2.5µs
 - `dill` 24.0µs
 
-This is mainly because `cucumber` fast paths basic types directly to the IR instead of handling them normally.
+This is mainly because `<suitkaise-api>cucumber</suitkaise-api>` fast paths basic types directly to the IR instead of handling them normally.
 
-## `cucumber` vs `cloudpickle` vs `dill`
+## `<suitkaise-api>cucumber</suitkaise-api>` vs `cloudpickle` vs `dill`
 
-### Types `cucumber` handles the fastest (>1.33x faster)
+### Types `<suitkaise-api>cucumber</suitkaise-api>` handles the fastest (>1.33x faster)
 
-Here is a table of types that `cucumber` handles the fastest (>1.33x faster) compared to `cloudpickle` and `dill`, and how much faster `cucumber` is than the second fastest serializer.
+Here is a table of types that `<suitkaise-api>cucumber</suitkaise-api>` handles the fastest (>1.33x faster) compared to `cloudpickle` and `dill`, and how much faster `<suitkaise-api>cucumber</suitkaise-api>` is than the second fastest serializer.
 
-If a 2nd place speed is less than 1.33x faster than `cucumber`, we consider this not significant enough to list, as times in microseconds (µs) are very small and can easily be affected by external factors.
+If a 2nd place speed is less than 1.33x faster than `<suitkaise-api>cucumber</suitkaise-api>`, we consider this not significant enough to list, as times in microseconds (µs) are very small and can easily be affected by external factors.
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  Type                                  speed with `cucumber`              How much faster than 2nd place?
+  Type                                  speed with `<suitkaise-api>cucumber</suitkaise-api>`              How much faster than 2nd place?
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   `NamedTemporaryFile`                  26.6µs                           33.62x (`dill`)
   `TextIOWrapper`                       46.0µs                           21.83x (`dill`)
@@ -141,81 +141,81 @@ If a 2nd place speed is less than 1.33x faster than `cucumber`, we consider this
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
   Type                                  speed with `cloudpickle`         How much faster than 2nd place?
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  `Skclass`                             9.8µs                            5.24x (`cucumber`)
-  `multiprocessing.Pipe`                6.6µs                            4.77x (`dill`)
-  `SQLiteReconnector`                   5.1µs                            4.06x (`cucumber`)
-  `CodeType`                            9.4µs                            3.82x (`cucumber`)
+  `Skclass`                             9.8µs                            5.24x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>`                6.6µs                            4.77x (`dill`)
+  `SQLiteReconnector`                   5.1µs                            4.06x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `CodeType`                            9.4µs                            3.82x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `PurePath`                            3.8µs                            3.82x (`dill`)
-  `SpooledTemporaryFile`                9.9µs                            3.69x (`cucumber`)
+  `SpooledTemporaryFile`                9.9µs                            3.69x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `Logger`                              4.0µs                            3.65x (`dill`)
   `SharedMemory`                        12.0µs                           3.61x (`dill`)
-  `list`                                1.7µs                            3.29x (`cucumber`)
-  `CompletedProcess`                    5.8µs                            3.19x (`cucumber`)
+  `list`                                1.7µs                            3.29x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `CompletedProcess`                    5.8µs                            3.19x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `Enum`                                6.4µs                            2.95x (`dill`)
-  `re.Pattern`                          6.4µs                            2.80x (`cucumber`)
-  `tuple`                               1.5µs                            2.73x (`cucumber`)
-  `Flag`                                5.1µs                            2.65x (`cucumber`)
-  `Skpath`                              8.5µs                            2.65x (`cucumber`)
+  `re.Pattern`                          6.4µs                            2.80x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `tuple`                               1.5µs                            2.73x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Flag`                                5.1µs                            2.65x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>Skpath</suitkaise-api>`                              8.5µs                            2.65x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `ModuleType`                          7.2µs                            2.58x (`dill`)
-  `Class object`                        3.3µs                            2.58x (`cucumber`)
-  `set`                                 1.4µs                            2.50x (`cucumber`)
-  `OS pipes`                            1.7µs                            2.47x (`cucumber`)
-  `functools.partial`                   22.4µs                           2.46x (`cucumber`)
-  `date`                                4.0µs                            2.42x (`cucumber`)
-  `Skfunction`                          34.4µs                           2.40x (`cucumber`)
-  `frozenset`                           1.3µs                            2.31x (`cucumber`)
-  `typing.TypedDict`                    2.0µs                            2.25x (`cucumber`)
-  `enumerate`                           7.5µs                            2.23x (`cucumber`)
-  `dict`                                1.8µs                            2.06x (`cucumber`)
-  `timezone`                            6.6µs                            1.98x (`cucumber`)
-  `StringIO`                            5.8µs                            1.90x (`cucumber`)
-  `deque`                               5.7µs                            1.84x (`cucumber`)
-  `ErrorHandlerError`                   4.1µs                            1.78x (`cucumber`)
-  `PipeReconnector`                     6.2µs                            1.77x (`cucumber`)
-  `Path`                                4.0µs                            1.75x (`cucumber`)
-  `Formatter`                           7.3µs                            1.74x (`cucumber`)
-  `ProcessTimeoutError`                 4.1µs                            1.73x (`cucumber`)
-  `BytesIO`                             6.3µs                            1.73x (`cucumber`)
-  `FunctionTimeoutError`                3.7µs                            1.70x (`cucumber`)
-  `UUID`                                4.8µs                            1.69x (`cucumber`)
-  `CustomRoot`                          4.7µs                            1.68x (`cucumber`)
-  `Fraction`                            4.2µs                            1.67x (`cucumber`)
-  `DeserializationError`                4.2µs                            1.67x (`cucumber`)
-  `ProcessError`                        6.2µs                            1.66x (`cucumber`)
-  `range_iterator`                      8.5µs                            1.65x (`cucumber`)
-  `Class instance`                      4.2µs                            1.62x (`cucumber`)
-  `zip`                                 9.2µs                            1.60x (`cucumber`)
-  `PreRunError`                         5.0µs                            1.58x (`cucumber`)
-  `PathDetectionError`                  4.1µs                            1.54x (`cucumber`)
-  `ResultTimeoutError`                  4.0µs                            1.48x (`cucumber`)
-  `PostRunError`                        4.2µs                            1.45x (`cucumber`)
-  `ResultError`                         4.1µs                            1.44x (`cucumber`)
-  `SkModifierError`                     3.9µs                            1.44x (`cucumber`)
-  `timedelta`                           3.7µs                            1.43x (`cucumber`)
-  `PosixPath`                           3.5µs                            1.43x (`cucumber`)
-  `Decimal`                             4.6µs                            1.41x (`cucumber`)
-  `OnFinishError`                       4.1µs                            1.37x (`cucumber`)
-  `time`                                3.7µs                            1.35x (`cucumber`)
+  `Class object`                        3.3µs                            2.58x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `set`                                 1.4µs                            2.50x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `OS pipes`                            1.7µs                            2.47x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `functools.partial`                   22.4µs                           2.46x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `date`                                4.0µs                            2.42x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Skfunction`                          34.4µs                           2.40x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `frozenset`                           1.3µs                            2.31x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `typing.TypedDict`                    2.0µs                            2.25x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `enumerate`                           7.5µs                            2.23x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `dict`                                1.8µs                            2.06x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `timezone`                            6.6µs                            1.98x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `StringIO`                            5.8µs                            1.90x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `deque`                               5.7µs                            1.84x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>ErrorHandlerError</suitkaise-api>`                   4.1µs                            1.78x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `PipeReconnector`                     6.2µs                            1.77x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Path`                                4.0µs                            1.75x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Formatter`                           7.3µs                            1.74x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>ProcessTimeoutError</suitkaise-api>`                 4.1µs                            1.73x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `BytesIO`                             6.3µs                            1.73x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>FunctionTimeoutError</suitkaise-api>`                3.7µs                            1.70x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `UUID`                                4.8µs                            1.69x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>CustomRoot</suitkaise-api>`                          4.7µs                            1.68x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Fraction`                            4.2µs                            1.67x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>DeserializationError</suitkaise-api>`                4.2µs                            1.67x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>ProcessError</suitkaise-api>`                        6.2µs                            1.66x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `range_iterator`                      8.5µs                            1.65x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Class instance`                      4.2µs                            1.62x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `zip`                                 9.2µs                            1.60x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>PreRunError</suitkaise-api>`                         5.0µs                            1.58x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>PathDetectionError</suitkaise-api>`                  4.1µs                            1.54x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>ResultTimeoutError</suitkaise-api>`                  4.0µs                            1.48x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>PostRunError</suitkaise-api>`                        4.2µs                            1.45x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>ResultError</suitkaise-api>`                         4.1µs                            1.44x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>SkModifierError</suitkaise-api>`                     3.9µs                            1.44x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `timedelta`                           3.7µs                            1.43x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `PosixPath`                           3.5µs                            1.43x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `Decimal`                             4.6µs                            1.41x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `<suitkaise-api>OnFinishError</suitkaise-api>`                       4.1µs                            1.37x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `time`                                3.7µs                            1.35x (`<suitkaise-api>cucumber</suitkaise-api>`)
 
 
 ### Types `dill` handles the fastest (>1.33x faster)
 
 `dill` handles more types than `cloudpickle`, but it pretty slow.
 
-`cucumber` handles more types than `dill` and is almost always faster.
+`<suitkaise-api>cucumber</suitkaise-api>` handles more types than `dill` and is almost always faster.
 
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
   Type                                  speed with `dill`                How much faster than 2nd place?
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  `BufferedReader`                      28.7µs                           3.19x (`cucumber`)
-  `BufferedWriter`                      25.5µs                           1.84x (`cucumber`)
-  `FileIO`                              24.7µs                           1.81x (`cucumber`)
+  `BufferedReader`                      28.7µs                           3.19x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `BufferedWriter`                      25.5µs                           1.84x (`<suitkaise-api>cucumber</suitkaise-api>`)
+  `FileIO`                              24.7µs                           1.81x (`<suitkaise-api>cucumber</suitkaise-api>`)
 
 ```
 
 ## All Benchmarks
 
-```
+```text
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                    Supported Types Compatibility Benchmarks                                   
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────

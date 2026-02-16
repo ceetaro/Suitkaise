@@ -1,10 +1,10 @@
-# How `cucumber` actually works
+# How `<suitkaise-api>cucumber</suitkaise-api>` actually works
 
-`cucumber` is built entirely on the standard library.
+`<suitkaise-api>cucumber</suitkaise-api>` is built entirely on the standard library.
 
 It is a serialization engine that converts Python objects into an intermediate representation (IR) that can be serialized by `pickle` into bytes.
 
-Then, after the data is deserialized from bytes back to the IR, `cucumber` can take the IR and reconstruct the original Python objects.
+Then, after the data is deserialized from bytes back to the IR, `<suitkaise-api>cucumber</suitkaise-api>` can take the IR and reconstruct the original Python objects.
 
 ```
 Object -> Serializer._serialize_recursive() -> IR -> pickle.dumps() -> bytes
@@ -18,15 +18,15 @@ bytes -> pickle.loads() -> IR -> Deserializer._reconstruct_recursive() -> Object
 
 These same handlers are used to reconstruct the original Python objects from the IR.
 
-There are handlers for a wide variety of objects, which is what allows `cucumber` to work with more objects than base `pickle`, `cloudpickle`, and `dill`. 
+There are handlers for a wide variety of objects, which is what allows `<suitkaise-api>cucumber</suitkaise-api>` to work with more objects than base `pickle`, `cloudpickle`, and `dill`. 
 
 The aforementioned classes, `Serializer` and `Deserializer`, handle recursion (walking through nested objects and collections), circular references, and metadata, using the handlers when they come across complex objects (or their IR state).
 
-This allows `cucumber` to handle basically any object, including user defined classes.
+This allows `<suitkaise-api>cucumber</suitkaise-api>` to handle basically any object, including user defined classes.
 
 ## Intermediate Representation (IR)
 
-The IR is a nested structure of `pickle` native values. It attaches metadata to the objects so that `cucumber` knows how to reconstruct them on the other end.
+The IR is a nested structure of `pickle` native values. It attaches metadata to the objects so that `<suitkaise-api>cucumber</suitkaise-api>` knows how to reconstruct them on the other end.
 
 There are a couple of different things you might see in an IR.
 
@@ -87,7 +87,7 @@ These are used to wrap collections that are capable of handling circular referen
 
 ### Simple instance fast-path IR
 
-For simple instances that don't need to pass through the standard flow in order to be serialized, `cucumber` will use a fast path to serialize them.
+For simple instances that don't need to pass through the standard flow in order to be serialized, `<suitkaise-api>cucumber</suitkaise-api>` will use a fast path to serialize them.
 
 ```python
 {
@@ -119,7 +119,7 @@ Serialization is done by a central, internal `Serializer` class, that uses the h
 Tracks object IDs that were already serialized to detect circular references.
 
 `_serialization_depth: int`
-Recursive depth counter; used to prevent runaway recursion. If recursion depth exceeds 1000, a `SerializationError` is raised.
+Recursive depth counter; used to prevent runaway recursion. If recursion depth exceeds 1000, a `<suitkaise-api>SerializationError</suitkaise-api>` is raised.
 
 `_object_path: List[str]`
 Breadcrumb path to the current object, for error reporting.
@@ -129,16 +129,16 @@ This is a cache for types that have been processed using a certain handler, so t
 
 ### Methods
 
-#### `serialize(obj) -> bytes`
+#### `<suitkaise-api>serialize</suitkaise-api>(obj) -> bytes`
 
 1. Resets internal state.
 2. Calls `_serialize_recursive(obj)` to build IR.
 3. Pickles IR to bytes using `pickle.dumps()`.
 4. Returns the bytes.
 
-#### `serialize_ir(obj) -> Any`
+#### `<suitkaise-api>serialize_ir</suitkaise-api>(obj) -> Any`
 
-This does the same thing as `serialize`, but returns the IR directly instead of converting it to bytes.
+This does the same thing as `<suitkaise-api>serialize</suitkaise-api>`, but returns the IR directly instead of converting it to bytes.
 
 1. Resets internal state.
 2. Calls `_serialize_recursive(obj)` to build IR.
@@ -149,7 +149,7 @@ This does the same thing as `serialize`, but returns the IR directly instead of 
 This is the core method that builds the IR for a given object. The steps are ordered in a way that maximizes speed and avoids unnecessary handler calls.
 
 1. Depth check
-If `_serialization_depth` exceeds 1000, a `SerializationError` is raised.
+If `_serialization_depth` exceeds 1000, a `<suitkaise-api>SerializationError</suitkaise-api>` is raised.
 
 2. Primitive fast path
 Returns directly for `None`, `bool`, `int`, `float`, `str`, `bytes`.
@@ -201,13 +201,13 @@ For module level functions without closures:
 1. The serializer records `module` and `qualname`.
 2. The deserializer can then import the module and resolve the function by name.
 
-If the function is a lambda, local function, or has closures, `cucumber` falls back to the `FunctionHandler` and serializes code objects, globals, and closure state.
+If the function is a lambda, local function, or has closures, `<suitkaise-api>cucumber</suitkaise-api>` falls back to the `FunctionHandler` and serializes code objects, globals, and closure state.
 
 (A closure is a function that uses variables from outside itself, like a nested function using a variable from the outer function. The outside values need to be saved too.)
 
 ### Handlers
 
-All handlers are defined in `suitkaise/cucumber/_int/handlers/`.
+All handlers are defined in `<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/handlers/`.
 
 They are placed into an `ALL_HANDLERS` list.
 
@@ -324,7 +324,7 @@ class Handler(ABC):
     def reconstruct(self, state: Dict[str, Any]) -> Any: ...
 ```
 
-All handlers are defined in `suitkaise/cucumber/_int/handlers/` and are registered in `handlers/__init__.py`.
+All handlers are defined in `<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/handlers/` and are registered in `handlers/__init__.py`.
 
 ### `FunctionHandler`
 
@@ -456,9 +456,9 @@ Serializes open file handle objects (`TextIOWrapper`, `BufferedReader`, etc.).
 
 State captured:
 - `path`: Absolute file path
-- `relative_path`: Relative path using `Skpath` (if available)
+- `relative_path`: Relative path using `<suitkaise-api>Skpath</suitkaise-api>` (if available)
 - `mode`: File open mode
-- `position`: Current position from `tell()`
+- `position`: Current position from `<suitkaise-api>tell</suitkaise-api>()`
 - `encoding`, `errors`, `newline`: Text mode settings
 - `closed`, `is_pipe`: State flags
 
@@ -568,7 +568,7 @@ State captured:
 
 Reconstruction: Create new queue (different underlying pipes), put items back.
 
-Limitation: For reliable cross-process sharing, use `Share` over raw `multiprocessing.Queue`, or `Skprocess.tell()` / `Skprocess.listen()` for direct queue-based communication.
+Limitation: For reliable cross-process sharing, use `<suitkaise-api>Share</suitkaise-api>` over raw `multiprocessing.Queue`, or `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` / `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()` for direct queue-based communication.
 
 ### `EventHandler`
 
@@ -702,7 +702,7 @@ Serializes `socket.socket` objects.
 
 State captured:
 - `family`, `type`, `proto`: Socket parameters
-- `timeout`, `blocking`
+- `timeout`, `<suitkaise-api>blocking</suitkaise-api>`
 - `local_addr`, `remote_addr`: From getsockname/getpeername
 
 Reconstruction: Returns `SocketReconnector`. Call `reconnect()` to create new socket with same parameters, apply timeout/blocking settings, and best-effort bind/connect using saved addresses.
@@ -847,9 +847,9 @@ Serializes `asyncio.Task` objects.
 
 State captured:
 - `task_name`, `is_done`, `is_cancelled`
-- `result`, `exception` (if done)
+- `<suitkaise-api>result</suitkaise-api>`, `exception` (if done)
 
-Reconstruction: Returns `DeserializedTask` placeholder with `done()`, `cancelled()`, `result()`, `exception()` methods.
+Reconstruction: Returns `DeserializedTask` placeholder with `done()`, `cancelled()`, `<suitkaise-api>result</suitkaise-api>()`, `exception()` methods.
 
 ### `FutureHandler`
 
@@ -857,7 +857,7 @@ Serializes `asyncio.Future` objects.
 
 State captured:
 - `is_done`, `is_cancelled`
-- `result`, `exception`
+- `<suitkaise-api>result</suitkaise-api>`, `exception`
 
 Reconstruction: Returns `DeserializedFuture` placeholder with Future-like interface.
 
@@ -908,7 +908,7 @@ Network sockets, database connections, threads, subprocesses, and more cannot be
 
 Additionally, auto reconnecting live resources like these can lead to unexpected behavior.
 
-For these cases, we return `Reconnector` instances that store as much metadata as possible to recreate the live resource, acting as a placeholder until we actually reconnect the live resource. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `reconnect_all(...)` with credentials).
+For these cases, we return `Reconnector` instances that store as much metadata as possible to recreate the live resource, acting as a placeholder until we actually reconnect the live resource. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `<suitkaise-api>reconnect_all</suitkaise-api>(...)` with credentials).
 
 1. Original object is serialized
 2. Object is then deserialized (likely in a different process)
@@ -916,12 +916,12 @@ For these cases, we return `Reconnector` instances that store as much metadata a
 4. `Reconnector.reconnect()` is called to create a new live resource (may require authentication)
 
 How it works:
-- `cucumber` creates a placeholder `Reconnector` object
+- `<suitkaise-api>cucumber</suitkaise-api>` creates a placeholder `Reconnector` object
 - You call `reconnect()` to create the new live resource, providing any authentication needed
 
-### `reconnect_all(obj, **auth)`
+### `<suitkaise-api>reconnect_all</suitkaise-api>(obj, **auth)`
 
-`cucumber` also includes a function called `reconnect_all()`.
+`<suitkaise-api>cucumber</suitkaise-api>` also includes a function called `<suitkaise-api>reconnect_all</suitkaise-api>()`.
 
 Args:
 - `start_threads`: if True, any `threading.Thread` objects returned by reconnectors are automatically started after reconnect. This is a keyword only argument.
@@ -1009,7 +1009,7 @@ data collected:
 result: `sqlite3.Connection`
 limitations: in-memory databases do not persist across processes; file locks may force fallback to `:memory:`
 
-You still need to call `reconnect()` or `reconnect_all()` to create the actual `sqlite3.Connection` object again, but we capture all data needed to recreate the object.
+You still need to call `reconnect()` or `<suitkaise-api>reconnect_all</suitkaise-api>()` to create the actual `sqlite3.Connection` object again, but we capture all data needed to recreate the object.
 
 - `MongoReconnector`
 types: `pymongo.MongoClient`
@@ -1155,7 +1155,7 @@ data collected:
 result: `duckdb.Connection`
 limitations: in-memory databases do not persist across processes
 
-You still need to call `reconnect()` or `reconnect_all()` to create the actual `duckdb.Connection` object again, but we capture all data needed to recreate the object.
+You still need to call `reconnect()` or `<suitkaise-api>reconnect_all</suitkaise-api>()` to create the actual `duckdb.Connection` object again, but we capture all data needed to recreate the object.
 
 
 ### `SocketReconnector` --> `socket.socket`
@@ -1167,7 +1167,7 @@ Data collected:
 - `type`
 - `proto`
 - `timeout`
-- `blocking`
+- `<suitkaise-api>blocking</suitkaise-api>`
 - `local_addr`
 - `remote_addr`
 
@@ -1183,11 +1183,11 @@ Limitations:
 
 Threads run in their own process's memory space. You cannot directly serialize and reconnect to the exact same thread in the same memory space if the thread object has moved to a different process.
 
-However, it is still useful to quickly recreate the exact same thread in a different process. This is why `cucumber` includes a `ThreadReconnector`.
+However, it is still useful to quickly recreate the exact same thread in a different process. This is why `<suitkaise-api>cucumber</suitkaise-api>` includes a `ThreadReconnector`.
 
 If an object is bouncing around different places in memory (running in different processes with different GILs), it is useful and convenient to be able to quickly start something like a background runner thread or a monitoring thread without having to manually create the thread object and start it.
 
-It is also useful when doing something like adding a `ThreadReconnector` to shared memory using `Share` or `Skprocess.tell()` to quickly start a thread in multiple different places.
+It is also useful when doing something like adding a `ThreadReconnector` to shared memory using `<suitkaise-api>Share</suitkaise-api>` or `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` to quickly start a thread in multiple different places.
 
 Data collected:
 - `name`
@@ -1201,20 +1201,20 @@ When you call `reconnect()`, a new `threading.Thread` object is constructed with
 
 Result: `threading.Thread` (not started)
 
-`cucumber` does not start the thread by default because that could cause silent issues or unexpected behavior. 
+`<suitkaise-api>cucumber</suitkaise-api>` does not start the thread by default because that could cause silent issues or unexpected behavior. 
 
 If you want to start the thread automatically when you reconnect, use:
 
 ```python
 thread = reconnector.reconnect(start=True)
 
-# reconnect_all()
-reconnect_all(obj, start_threads=True, **auth)
+# <suitkaise-api>reconnect_all</suitkaise-api>()
+<suitkaise-api>reconnect_all</suitkaise-api>(obj, start_threads=True, **auth)
 
-# autoreconnect decorator on Skprocess class
-from suitkaise.processing import Skprocess, autoreconnect
-@autoreconnect(start_threads=True, **auth)
-class MyProcess(Skprocess):
+# <suitkaise-api>autoreconnect</suitkaise-api> decorator on <suitkaise-api>Skprocess</suitkaise-api> class
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
+@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)
+class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
     # ...
 ```
@@ -1222,15 +1222,15 @@ class MyProcess(Skprocess):
 Limitations:
 - original execution state is not preserved
 
-### `PipeReconnector` --> `multiprocessing.Pipe` / OS pipes
+### `PipeReconnector` --> `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>` / OS pipes
 
-Created from OS pipe file objects and `multiprocessing.Pipe` endpoints.
+Created from OS pipe file objects and `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>` endpoints.
 
 Pipes are OS level handles tied to a specific process. The file descriptors or connection handles are not valid outside the original process boundary unless one side of the pipe is explicitly passed to a new process as it is being created.
 
-Since pipes are actually OS handles, they cannot be converted down to bytes and then passed. When going through `cucumber` without using the `Skprocess` class, OS handles get lost because of this, meaning pipes won't actually work correctly.
+Since pipes are actually OS handles, they cannot be converted down to bytes and then passed. When going through `<suitkaise-api>cucumber</suitkaise-api>` without using the `<suitkaise-api>Skprocess</suitkaise-api>` class, OS handles get lost because of this, meaning pipes won't actually work correctly.
 
-If you want to use pipes with `cucumber`, use the `Pipe` class from `suitkaise.processing` instead of relying on the `PipeReconnector`.
+If you want to use pipes with `<suitkaise-api>cucumber</suitkaise-api>`, use the `<suitkaise-api>Pipe</suitkaise-api>` class from `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>` instead of relying on the `PipeReconnector`.
 
 Data collected:
 - `readable`
@@ -1251,7 +1251,7 @@ Reconnector specific attributes:
 
 These are new `multiprocessing.connection.Connection` objects, that do not point to the original parent, but are still valid and ready to use.
 
-NOTE: `PipeReconnector` does not apply to `suitkaise.processing.Pipe` objects. These are handled directly using `__serialize__` and `__deserialize__` and preserve pipe handles.
+NOTE: `PipeReconnector` does not apply to `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>` objects. These are handled directly using `__serialize__` and `__deserialize__` and preserve pipe handles.
 
 Limitations:
 - buffered data in the old pipe is lost
@@ -1303,7 +1303,7 @@ Limitations:
 
 As seen above, some limitations are present.
 
-This is due to how Python handles these resources when they cross process boundaries, and something that `cucumber` has to find workarounds for.
+This is due to how Python handles these resources when they cross process boundaries, and something that `<suitkaise-api>cucumber</suitkaise-api>` has to find workarounds for.
 
 Using `Reconnectors` is the best way we can work with Python's architecture to allow you to use this in a cross-process/distributed environment.
 
@@ -1317,7 +1317,7 @@ Why not automatically reconnect these resources?
 
 In order to automatically reconnect objects like database connections that require authentication, we would need to pass that authentication somewhere in the IR. This data is easily readable and can easily be compromised.
 
-In general, it is not good practice to include sensitive data when moving objects between processes. `cucumber` does everything else for you so all you have to to is reaccess and add the authentication once your object reaches the target process.
+In general, it is not good practice to include sensitive data when moving objects between processes. `<suitkaise-api>cucumber</suitkaise-api>` does everything else for you so all you have to to is reaccess and add the authentication once your object reaches the target process.
 
 #### User expectations
 
@@ -1327,11 +1327,11 @@ Automatically reconnecting things like this is awkward for users.
 - silently reconnecting things can cause silent failures or user confusion
 - users expect modules/tools like these to adhere to good practices when it comes to security and authentication
 
-`suitkaise` offers 3 levels of user control regarding reconnection.
+`<suitkaise-api>suitkaise</suitkaise-api>` offers 3 levels of user control regarding reconnection.
 
 1. (most manual control) calling `reconnect()` on each `Reconnector` object, adding each `auth` individually
-2. calling `reconnect_all(obj, **auth)` on an entire object
-3. (most automatic) using `@autoreconnect(start_threads=True, **auth)` to decorate a `Skprocess` class
+2. calling `<suitkaise-api>reconnect_all</suitkaise-api>(obj, **auth)` on an entire object
+3. (most automatic) using `@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)` to decorate a `<suitkaise-api>Skprocess</suitkaise-api>` class
 
 We can automatically reconnect for you, but it is controlled and requires you to provide authentication through a decorator and use a specific class.
 

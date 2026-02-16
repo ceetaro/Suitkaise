@@ -8,8 +8,8 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link active" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
+        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
@@ -19,7 +19,7 @@
     <details>
         <summary>Code</summary>
         <div class="dropdown-content">
-    <pre><code class="language-python"># each level will have all cucumber-supported objects (primitives and complex objects that handlers can handle) as attributes
+    <pre><code class="language-python"># each level will have all <suitkaise-api>cucumber</suitkaise-api>-supported objects (primitives and complex objects that handlers can handle) as attributes
 # outside of collections
 
 # each level will also generate a random nested collection for every collection type
@@ -27,7 +27,7 @@
 # - adds random objects (primitives and complex objects) to the collection at each level
 # - if the depth is != to random depth generated, adds a random collection to the current level and repeats process
 
-# this randomness from each WorstPossibleObject instance shows that cucumber can actually handle everything.
+# this randomness from each WorstPossibleObject instance shows that <suitkaise-api>cucumber</suitkaise-api> can actually handle everything.
 
 import random
 import threading
@@ -65,7 +65,7 @@ COLLECTION_TYPES = [tuple, list, set, frozenset, dict, range, slice]
 
 BASE_PICKLE_SUPPORTED_TYPES = [None, True, False, int, float, complex, str, bytes, bytearray, type, Ellipsis, NotImplemented]
 
-# From concept.md - all complex types cucumber handlers can handle
+# From concept.md - all complex types <suitkaise-api>cucumber</suitkaise-api> handlers can handle
 COMPLEX_TYPES_THAT_CUCUMBER_CAN_HANDLE = [
     &#x27;function&#x27;,
     &#x27;logger&#x27;, 
@@ -100,34 +100,34 @@ COMPLEX_TYPES_THAT_CUCUMBER_CAN_HANDLE = [
 
 # sktime
 # skpath
-from suitkaise.paths import *
-from suitkaise.timing import *
-from suitkaise.circuits import *
-from suitkaise.processing import *
-# NOTE: processing configs are intentionally internal (not public API).
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import *
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import *
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>circuits</suitkaise-api> import *
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import *
+# NOTE: <suitkaise-api>processing</suitkaise-api> configs are intentionally internal (not public API).
 # WorstPossibleObject still exercises them for serialization coverage.
-from suitkaise.processing._int.config import ProcessConfig, TimeoutConfig
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>._int.config import ProcessConfig, TimeoutConfig
 
 # Suitkaise-specific types that WPO tests
 SUITKAISE_SPECIFIC_TYPES = [
     # skpath - project-aware path handling
-    &#x27;Skpath&#x27;,           # Main path class with project root awareness
-    &#x27;CustomRoot&#x27;,       # Custom root management
-    &#x27;autopath&#x27;,         # Decorator (handled by function handler)
+    &#x27;<suitkaise-api>Skpath</suitkaise-api>&#x27;,           # Main path class with project root awareness
+    &#x27;<suitkaise-api>CustomRoot</suitkaise-api>&#x27;,       # Custom root management
+    &#x27;<suitkaise-api>autopath</suitkaise-api>&#x27;,         # Decorator (handled by function handler)
     
-    # timing - timing utilities  
-    &#x27;Sktimer&#x27;,            # Elapsed time tracker with laps
-    &#x27;TimeThis&#x27;,         # Context manager for timing
-    &#x27;timethis&#x27;,         # Decorator (handled by function handler)
+    # <suitkaise-api>timing</suitkaise-api> - <suitkaise-api>timing</suitkaise-api> utilities  
+    &#x27;<suitkaise-api>Sktimer</suitkaise-api>&#x27;,            # Elapsed time tracker with laps
+    &#x27;<suitkaise-api>TimeThis</suitkaise-api>&#x27;,         # Context manager for <suitkaise-api>timing</suitkaise-api>
+    &#x27;<suitkaise-api>timethis</suitkaise-api>&#x27;,         # Decorator (handled by function handler)
     
     # circuit - circuit breaker pattern
-    &#x27;Circuit&#x27;,          # Circuit breaker for fault tolerance
+    &#x27;<suitkaise-api>Circuit</suitkaise-api>&#x27;,          # <suitkaise-api>Circuit</suitkaise-api> breaker for fault tolerance
     
-    # processing - process management
+    # <suitkaise-api>processing</suitkaise-api> - process management
     &#x27;Process&#x27;,          # Main process class
     &#x27;ProcessConfig&#x27;,    # Configuration for processes
     &#x27;TimeoutConfig&#x27;,    # Timeout configuration
-    &#x27;ProcessTimers&#x27;,    # Timing data for processes
+    &#x27;<suitkaise-api>ProcessTimers</suitkaise-api>&#x27;,    # Timing data for processes
 ]
 
 class WorstPossibleObject:
@@ -362,11 +362,11 @@ class WorstPossibleObject:
         self.path_current = Path(&#x27;.&#x27;)
         self.path_home = Path.home()
         self.path_absolute = Path(__file__).absolute()
-        self.path_parent = Path(__file__).parent
+        self.path_parent = Path(__file__).<suitkaise-api>parent</suitkaise-api>
         self._track_init(&#x27;primitives&#x27;, &#x27;path objects (current/home/absolute/parent)&#x27;, self.path_current)
 
     def init_all_complex_types_in_random_order(self):
-        &quot;&quot;&quot;Initialize all complex, unpickleable objects that cucumber handlers must handle.&quot;&quot;&quot;
+        &quot;&quot;&quot;Initialize all complex, unpickleable objects that <suitkaise-api>cucumber</suitkaise-api> handlers must handle.&quot;&quot;&quot;
         
         # Create list of all complex types to initialize
         complex_init_funcs = [
@@ -437,14 +437,14 @@ class WorstPossibleObject:
         
         self._log(&quot;  [INIT] Loggers&quot;)
         
-        self.logger = logging.getLogger(f&quot;test_logger_{id(self)}&quot;)
+        self.logger = logging.getLogger(f&quot;test_logger_{<suitkaise-api>id</suitkaise-api>(self)}&quot;)
         self.logger.setLevel(logging.DEBUG)
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter(&#x27;%(name)s - %(levelname)s - %(message)s&#x27;))
         self.logger.addHandler(handler)
         self._track_init(&#x27;complex&#x27;, &#x27;logger&#x27;, self.logger)
         
-        self.logger_warning = logging.getLogger(f&quot;warning_logger_{id(self)}&quot;)
+        self.logger_warning = logging.getLogger(f&quot;warning_logger_{<suitkaise-api>id</suitkaise-api>(self)}&quot;)
         self.logger_warning.setLevel(logging.WARNING)
         self._track_init(&#x27;complex&#x27;, &#x27;logger_warning&#x27;, self.logger_warning)
     
@@ -710,13 +710,13 @@ class WorstPossibleObject:
         
         self._log(&quot;  [INIT] Subprocesses&quot;)
         
-        # CompletedProcess - result from subprocess.run()
+        # CompletedProcess - <suitkaise-api>result</suitkaise-api> from subprocess.<suitkaise-api>run</suitkaise-api>()
         # Use a simple, fast command that works on all platforms
         if sys.platform == &quot;win32&quot;:
             completed_cmd = [&quot;cmd&quot;, &quot;/c&quot;, &quot;echo&quot;, &quot;test output&quot;]
         else:
             completed_cmd = [&quot;echo&quot;, &quot;test output&quot;]
-        self.subprocess_completed = subprocess.run(
+        self.subprocess_completed = subprocess.<suitkaise-api>run</suitkaise-api>(
             completed_cmd,
             capture_output=True,
             text=True
@@ -736,11 +736,11 @@ class WorstPossibleObject:
             text=True
         )
         # Wait for it to complete so we have a stable state
-        self.subprocess_popen.wait()
+        self.subprocess_popen.<suitkaise-api>wait</suitkaise-api>()
         self._track_init(&#x27;complex&#x27;, &#x27;subprocess_popen (completed)&#x27;, self.subprocess_popen)
         
         # Another CompletedProcess with different args (use sys.executable for portability)
-        self.subprocess_completed_with_args = subprocess.run(
+        self.subprocess_completed_with_args = subprocess.<suitkaise-api>run</suitkaise-api>(
             [sys.executable, &#x27;-c&#x27;, &#x27;print(&quot;hello from subprocess&quot;)&#x27;],
             capture_output=True,
             text=True
@@ -769,117 +769,117 @@ class WorstPossibleObject:
         self.socket_with_options = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket_with_options.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket_with_options.setblocking(False)
-        self._track_init(&#x27;complex&#x27;, &#x27;socket_with_options (non-blocking)&#x27;, self.socket_with_options)
+        self._track_init(&#x27;complex&#x27;, &#x27;socket_with_options (non-<suitkaise-api>blocking</suitkaise-api>)&#x27;, self.socket_with_options)
     
     def _init_suitkaise_objects(self):
-        &quot;&quot;&quot;Initialize suitkaise-specific objects (skpath, sktime, circuit, processing).&quot;&quot;&quot;
-        if &#x27;suitkaise&#x27; in self.skip_types:
+        &quot;&quot;&quot;Initialize <suitkaise-api>suitkaise</suitkaise-api>-specific objects (skpath, sktime, circuit, <suitkaise-api>processing</suitkaise-api>).&quot;&quot;&quot;
+        if &#x27;<suitkaise-api>suitkaise</suitkaise-api>&#x27; in self.skip_types:
             self._log(&quot;  [SKIPPED] Suitkaise objects&quot;)
             return
         
         self._log(&quot;  [INIT] Suitkaise objects&quot;)
         
-        # === Skpath objects ===
-        # Skpath - project-aware path object
-        self.skpath_current_file = Skpath(__file__)
+        # === <suitkaise-api>Skpath</suitkaise-api> objects ===
+        # <suitkaise-api>Skpath</suitkaise-api> - project-aware path object
+        self.skpath_current_file = <suitkaise-api>Skpath</suitkaise-api>(__file__)
         self._track_init(&#x27;complex&#x27;, &#x27;skpath_current_file&#x27;, self.skpath_current_file)
         
-        self.skpath_project_root = Skpath(&#x27;.&#x27;)
+        self.skpath_project_root = <suitkaise-api>Skpath</suitkaise-api>(&#x27;.&#x27;)
         self._track_init(&#x27;complex&#x27;, &#x27;skpath_project_root&#x27;, self.skpath_project_root)
         
-        # CustomRoot - for custom project root management
+        # <suitkaise-api>CustomRoot</suitkaise-api> - for custom project root management
         temp_project_root = Path(tempfile.gettempdir()) / &quot;suitkaise_test_project&quot;
         temp_project_root.mkdir(parents=True, exist_ok=True)
-        self.custom_root = CustomRoot(str(temp_project_root))
+        self.custom_root = <suitkaise-api>CustomRoot</suitkaise-api>(str(temp_project_root))
         self._track_init(&#x27;complex&#x27;, &#x27;custom_root&#x27;, self.custom_root)
         
         # === SKTime objects ===
-        # Sktimer - elapsed time tracker
-        self.timer = Sktimer()
-        self.timer.start()
-        self.timer.lap()  # Record first lap
-        self.timer.lap()  # Record second lap
-        self._track_init(&#x27;complex&#x27;, &#x27;timer (with laps)&#x27;, self.timer)
+        # <suitkaise-api>Sktimer</suitkaise-api> - <suitkaise-api>elapsed</suitkaise-api> time tracker
+        self.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+        self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+        self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()  # Record first lap
+        self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()  # Record second lap
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>timer</suitkaise-api> (with laps)&#x27;, self.<suitkaise-api>timer</suitkaise-api>)
         
-        self.timer_empty = Sktimer()
+        self.timer_empty = <suitkaise-api>Sktimer</suitkaise-api>()
         self._track_init(&#x27;complex&#x27;, &#x27;timer_empty&#x27;, self.timer_empty)
         
-        # Circuit - auto-resetting circuit (from circuits module)
-        self.circuit_auto = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=0.001)
+        # <suitkaise-api>Circuit</suitkaise-api> - auto-resetting circuit (from <suitkaise-api>circuits</suitkaise-api> module)
+        self.circuit_auto = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=0.001)
         self._track_init(&#x27;complex&#x27;, &#x27;circuit_auto&#x27;, self.circuit_auto)
         
-        # TimeThis - context manager for timing
-        self.timethis_ctx = TimeThis(&quot;test_operation&quot;)
+        # <suitkaise-api>TimeThis</suitkaise-api> - context manager for <suitkaise-api>timing</suitkaise-api>
+        self.timethis_ctx = <suitkaise-api>TimeThis</suitkaise-api>(&quot;test_operation&quot;)
         self._track_init(&#x27;complex&#x27;, &#x27;timethis_ctx&#x27;, self.timethis_ctx)
         
-        # Skpath module-level functions
-        self.skpath_autopath_decorator = autopath
-        self._track_init(&#x27;complex&#x27;, &#x27;autopath (decorator)&#x27;, self.skpath_autopath_decorator)
+        # <suitkaise-api>Skpath</suitkaise-api> module-level functions
+        self.skpath_autopath_decorator = <suitkaise-api>autopath</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>autopath</suitkaise-api> (decorator)&#x27;, self.skpath_autopath_decorator)
         
-        self.skpath_get_project_root_func = get_project_root
-        self._track_init(&#x27;complex&#x27;, &#x27;get_project_root (function)&#x27;, self.skpath_get_project_root_func)
+        self.skpath_get_project_root_func = <suitkaise-api>get_project_root</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>get_project_root</suitkaise-api> (function)&#x27;, self.skpath_get_project_root_func)
         
-        self.skpath_set_custom_root_func = set_custom_root
-        self._track_init(&#x27;complex&#x27;, &#x27;set_custom_root (function)&#x27;, self.skpath_set_custom_root_func)
+        self.skpath_set_custom_root_func = <suitkaise-api>set_custom_root</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>set_custom_root</suitkaise-api> (function)&#x27;, self.skpath_set_custom_root_func)
         
-        self.skpath_get_custom_root_func = get_custom_root
-        self._track_init(&#x27;complex&#x27;, &#x27;get_custom_root (function)&#x27;, self.skpath_get_custom_root_func)
+        self.skpath_get_custom_root_func = <suitkaise-api>get_custom_root</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>get_custom_root</suitkaise-api> (function)&#x27;, self.skpath_get_custom_root_func)
         
-        self.skpath_clear_custom_root_func = clear_custom_root
-        self._track_init(&#x27;complex&#x27;, &#x27;clear_custom_root (function)&#x27;, self.skpath_clear_custom_root_func)
+        self.skpath_clear_custom_root_func = <suitkaise-api>clear_custom_root</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>clear_custom_root</suitkaise-api> (function)&#x27;, self.skpath_clear_custom_root_func)
         
         # === SKTime module-level functions ===
-        # note &#x27;time&#x27; shadows datetime.time so we reference it via timing module
-        from suitkaise import timing as timing_module
+        # note &#x27;time&#x27; shadows datetime.time so we reference it via <suitkaise-api>timing</suitkaise-api> module
+        from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api> as timing_module
         self.sktime_time_func = timing_module.time
-        self._track_init(&#x27;complex&#x27;, &#x27;timing.time (function)&#x27;, self.sktime_time_func)
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>timing</suitkaise-api>.time (function)&#x27;, self.sktime_time_func)
         
         self.sktime_sleep_func = sleep
         self._track_init(&#x27;complex&#x27;, &#x27;sleep (function)&#x27;, self.sktime_sleep_func)
         
-        self.sktime_elapsed_func = elapsed
-        self._track_init(&#x27;complex&#x27;, &#x27;elapsed (function)&#x27;, self.sktime_elapsed_func)
+        self.sktime_elapsed_func = <suitkaise-api>elapsed</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>elapsed</suitkaise-api> (function)&#x27;, self.sktime_elapsed_func)
         
-        self.sktime_timethis_decorator = timethis
-        self._track_init(&#x27;complex&#x27;, &#x27;timethis (decorator)&#x27;, self.sktime_timethis_decorator)
+        self.sktime_timethis_decorator = <suitkaise-api>timethis</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>timethis</suitkaise-api> (decorator)&#x27;, self.sktime_timethis_decorator)
         
-        self.sktime_clear_global_timers_func = clear_global_timers
-        self._track_init(&#x27;complex&#x27;, &#x27;clear_global_timers (function)&#x27;, self.sktime_clear_global_timers_func)
+        self.sktime_clear_global_timers_func = <suitkaise-api>clear_global_timers</suitkaise-api>
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>clear_global_timers</suitkaise-api> (function)&#x27;, self.sktime_clear_global_timers_func)
         
-        # === Circuit objects ===
-        # Circuit - circuit breaker pattern (num_shorts_to_trip required)
-        self.circuit = Circuit(num_shorts_to_trip=5)
+        # === <suitkaise-api>Circuit</suitkaise-api> objects ===
+        # <suitkaise-api>Circuit</suitkaise-api> - circuit breaker pattern (num_shorts_to_trip required)
+        self.circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5)
         self._track_init(&#x27;complex&#x27;, &#x27;circuit (fresh)&#x27;, self.circuit)
         
-        self.circuit_with_shorts = Circuit(num_shorts_to_trip=3, sleep_time_after_trip=0.01)
+        self.circuit_with_shorts = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=0.01)
         # Simulate some activity - short it a couple times
-        self.circuit_with_shorts.short()
-        self.circuit_with_shorts.short()
+        self.circuit_with_shorts.<suitkaise-api>short</suitkaise-api>()
+        self.circuit_with_shorts.<suitkaise-api>short</suitkaise-api>()
         self._track_init(&#x27;complex&#x27;, &#x27;circuit_with_shorts&#x27;, self.circuit_with_shorts)
         
         # === Processing objects ===
         # ProcessConfig - configuration for processes (dataclass)
-        self.process_config = ProcessConfig(
-            runs=100,
-            join_in=60.0,
-            lives=3
+        self.<suitkaise-api>process_config</suitkaise-api> = ProcessConfig(
+            <suitkaise-api>runs</suitkaise-api>=100,
+            <suitkaise-api>join_in</suitkaise-api>=60.0,
+            <suitkaise-api>lives</suitkaise-api>=3
         )
-        self._track_init(&#x27;complex&#x27;, &#x27;process_config&#x27;, self.process_config)
+        self._track_init(&#x27;complex&#x27;, &#x27;<suitkaise-api>process_config</suitkaise-api>&#x27;, self.<suitkaise-api>process_config</suitkaise-api>)
         
         # TimeoutConfig - timeout configuration (dataclass)
         self.timeout_config = TimeoutConfig(
-            prerun=30.0,
-            run=300.0,
-            postrun=60.0,
-            onfinish=60.0
+            <suitkaise-api>prerun</suitkaise-api>=30.0,
+            <suitkaise-api>run</suitkaise-api>=300.0,
+            <suitkaise-api>postrun</suitkaise-api>=60.0,
+            <suitkaise-api>onfinish</suitkaise-api>=60.0
         )
         self._track_init(&#x27;complex&#x27;, &#x27;timeout_config&#x27;, self.timeout_config)
         
-        # ProcessTimers - timing data container
-        self.process_timers = ProcessTimers()
+        # <suitkaise-api>ProcessTimers</suitkaise-api> - <suitkaise-api>timing</suitkaise-api> data container
+        self.process_timers = <suitkaise-api>ProcessTimers</suitkaise-api>()
         self._track_init(&#x27;complex&#x27;, &#x27;process_timers&#x27;, self.process_timers)
         
-        # Note: timesection decorator removed - not in current processing API
+        # Note: timesection decorator removed - not in current <suitkaise-api>processing</suitkaise-api> API
 
     def generate_random_nested_collection(self, collection_type):
         &quot;&quot;&quot;Generate a random nested collection of primitives, collections, and complex objects.&quot;&quot;&quot;
@@ -899,27 +899,27 @@ class WorstPossibleObject:
         ]
         
         # Generate and store the collection
-        result = self._generate_nested(collection_type, max_depth, 0, all_primitives, all_complex)
+        <suitkaise-api>result</suitkaise-api> = self._generate_nested(collection_type, max_depth, 0, all_primitives, all_complex)
         
         # Store with a descriptive attribute name
         if collection_type == tuple:
-            setattr(self, f&#x27;random_tuple_{id(result)}&#x27;, result)
+            setattr(self, f&#x27;random_tuple_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, <suitkaise-api>result</suitkaise-api>)
         elif collection_type == list:
-            setattr(self, f&#x27;random_list_{id(result)}&#x27;, result)
+            setattr(self, f&#x27;random_list_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, <suitkaise-api>result</suitkaise-api>)
         elif collection_type == set:
-            setattr(self, f&#x27;random_set_{id(result)}&#x27;, result)
+            setattr(self, f&#x27;random_set_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, <suitkaise-api>result</suitkaise-api>)
         elif collection_type == frozenset:
-            setattr(self, f&#x27;random_frozenset_{id(result)}&#x27;, result)
+            setattr(self, f&#x27;random_frozenset_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, <suitkaise-api>result</suitkaise-api>)
         elif collection_type == dict:
-            setattr(self, f&#x27;random_dict_{id(result)}&#x27;, result)
+            setattr(self, f&#x27;random_dict_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, <suitkaise-api>result</suitkaise-api>)
         elif collection_type == range:
             # range objects are immutable and predefined
-            setattr(self, f&#x27;random_range_{id(result)}&#x27;, range(random.randint(5, 20)))
+            setattr(self, f&#x27;random_range_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, range(random.randint(5, 20)))
         elif collection_type == slice:
             # slice objects are immutable and predefined
-            setattr(self, f&#x27;random_slice_{id(result)}&#x27;, slice(random.randint(0, 5), random.randint(10, 20)))
+            setattr(self, f&#x27;random_slice_{<suitkaise-api>id</suitkaise-api>(<suitkaise-api>result</suitkaise-api>)}&#x27;, slice(random.randint(0, 5), random.randint(10, 20)))
         
-        return result
+        return <suitkaise-api>result</suitkaise-api>
     
     def _generate_nested(self, coll_type, max_depth, current_depth, primitives, complex_objs):
         &quot;&quot;&quot;Recursively generate nested collection structure.&quot;&quot;&quot;
@@ -1035,7 +1035,7 @@ class WorstPossibleObject:
         self.queue_full.put(1)
         self.queue_full.put(2)
         self.queue_full.put(3)
-        # Now full - can&#x27;t add more without blocking
+        # Now full - can&#x27;t add more without <suitkaise-api>blocking</suitkaise-api>
         
         # Deeply acquired RLock (reentrant lock acquired multiple times)
         self.rlock_deep = threading.RLock()
@@ -1083,7 +1083,7 @@ class WorstPossibleObject:
         self.string_io_positioned.seek(50)
         
         # Multiple loggers with different configurations
-        self.logger_with_multiple_handlers = logging.getLogger(f&quot;complex_logger_{id(self)}&quot;)
+        self.logger_with_multiple_handlers = logging.getLogger(f&quot;complex_logger_{<suitkaise-api>id</suitkaise-api>(self)}&quot;)
         self.logger_with_multiple_handlers.setLevel(logging.INFO)
         
         handler1 = logging.StreamHandler()
@@ -1220,7 +1220,7 @@ class WorstPossibleObject:
             &#x27;frozenset_value&#x27;: self.frozenset_value,
             &#x27;dict_value&#x27;: self.dict_value,
             &#x27;range_value&#x27;: tuple(self.range_value),  # Convert to comparable
-            &#x27;slice_value&#x27;: (self.slice_value.start, self.slice_value.stop, self.slice_value.step),
+            &#x27;slice_value&#x27;: (self.slice_value.<suitkaise-api>start</suitkaise-api>, self.slice_value.<suitkaise-api>stop</suitkaise-api>, self.slice_value.step),
             
             # Advanced collections
             &#x27;defaultdict_value_keys&#x27;: sorted(self.defaultdict_value.keys()),
@@ -1238,7 +1238,7 @@ class WorstPossibleObject:
             # Threading states
             &#x27;lock_acquired_locked&#x27;: self.lock_acquired.locked(),
             # Note: RLock doesn&#x27;t have .locked() method, check via acquire
-            &#x27;rlock_acquired_locked&#x27;: not self.rlock_acquired.acquire(blocking=False) or (self.rlock_acquired.release() or False),
+            &#x27;rlock_acquired_locked&#x27;: not self.rlock_acquired.acquire(<suitkaise-api>blocking</suitkaise-api>=False) or (self.rlock_acquired.release() or False),
             &#x27;event_is_set&#x27;: self.event.is_set(),
             &#x27;event_set_is_set&#x27;: self.event_set.is_set(),
             &#x27;semaphore_value&#x27;: self.semaphore._value,
@@ -1261,12 +1261,12 @@ class WorstPossibleObject:
             
             # File states
             &#x27;temp_file_name&#x27;: self.temp_file.name,
-            &#x27;temp_file_position&#x27;: self.temp_file.tell(),
+            &#x27;temp_file_position&#x27;: self.temp_file.<suitkaise-api>tell</suitkaise-api>(),
             &#x27;temp_file_binary_name&#x27;: self.temp_file_binary.name,
             &#x27;string_io_value&#x27;: self.string_io.getvalue(),
             &#x27;bytes_io_value&#x27;: self.bytes_io.getvalue(),
-            &#x27;temp_file_mid_position_pos&#x27;: self.temp_file_mid_position.tell(),
-            &#x27;string_io_positioned_pos&#x27;: self.string_io_positioned.tell(),
+            &#x27;temp_file_mid_position_pos&#x27;: self.temp_file_mid_position.<suitkaise-api>tell</suitkaise-api>(),
+            &#x27;string_io_positioned_pos&#x27;: self.string_io_positioned.<suitkaise-api>tell</suitkaise-api>(),
             
             # Regex patterns
             &#x27;regex_pattern_pattern&#x27;: self.regex_pattern.pattern,
@@ -1323,14 +1323,14 @@ class WorstPossibleObject:
             &#x27;skpath_current_file_type&#x27;: type(self.skpath_current_file).__name__,
             &#x27;skpath_project_root_type&#x27;: type(self.skpath_project_root).__name__,
             &#x27;custom_root_type&#x27;: type(self.custom_root).__name__,
-            &#x27;timer_type&#x27;: type(self.timer).__name__,
+            &#x27;timer_type&#x27;: type(self.<suitkaise-api>timer</suitkaise-api>).__name__,
             &#x27;circuit_auto_sleep_time&#x27;: self.circuit_auto.sleep_time_after_trip,
-            &#x27;circuit_auto_threshold&#x27;: self.circuit_auto.num_shorts_to_trip,
-            &#x27;circuit_num_shorts_to_trip&#x27;: self.circuit.num_shorts_to_trip,
-            &#x27;process_config_runs&#x27;: self.process_config.runs,
-            &#x27;process_config_lives&#x27;: self.process_config.lives,
-            &#x27;timeout_config_prerun&#x27;: self.timeout_config.prerun,
-            &#x27;timeout_config_run&#x27;: self.timeout_config.run,
+            &#x27;circuit_auto_threshold&#x27;: self.circuit_auto.<suitkaise-api>num_shorts_to_trip</suitkaise-api>,
+            &#x27;circuit_num_shorts_to_trip&#x27;: self.circuit.<suitkaise-api>num_shorts_to_trip</suitkaise-api>,
+            &#x27;process_config_runs&#x27;: self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api>,
+            &#x27;process_config_lives&#x27;: self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api>,
+            &#x27;timeout_config_prerun&#x27;: self.timeout_config.<suitkaise-api>prerun</suitkaise-api>,
+            &#x27;timeout_config_run&#x27;: self.timeout_config.<suitkaise-api>run</suitkaise-api>,
             
             # Suitkaise module-level functions (verify they&#x27;re callable)
             &#x27;autopath_callable&#x27;: callable(self.skpath_autopath_decorator),
@@ -1386,10 +1386,10 @@ class WorstPossibleObject:
                 elif key == &#x27;thread_local_number&#x27;:
                     actual_value = getattr(other.thread_local, &#x27;number&#x27;, None)
                 elif key.endswith(&#x27;_name&#x27;) and &#x27;file&#x27; in key:
-                    # For file names, just check they exist (paths may differ)
+                    # For file names, just check they exist (<suitkaise-api>paths</suitkaise-api> may differ)
                     actual_value = getattr(other, key.replace(&#x27;_name&#x27;, &#x27;&#x27;)).name
                     if actual_value:
-                        continue  # Don&#x27;t compare paths directly
+                        continue  # Don&#x27;t compare <suitkaise-api>paths</suitkaise-api> directly
                 elif key == &#x27;sqlite_table_count&#x27;:
                     actual_value = len(other.sqlite_cursor.execute(&quot;SELECT * FROM test&quot;).fetchall())
                 elif key == &#x27;sqlite_complex_users_count&#x27;:
@@ -1403,20 +1403,20 @@ class WorstPossibleObject:
                 if actual_value != expected_value:
                     failures.append(f&quot;{key}: expected {expected_value!r}, got {actual_value!r}&quot;)
             except Exception as e:
-                failures.append(f&quot;{key}: error during verification - {e}&quot;)
+                failures.append(f&quot;{key}: <suitkaise-api>error</suitkaise-api> during verification - {e}&quot;)
         
         # Test that functions actually work
         try:
             if other.function(5, 10) != 15:
                 failures.append(&quot;function: does not compute correctly&quot;)
         except Exception as e:
-            failures.append(f&quot;function: error calling - {e}&quot;)
+            failures.append(f&quot;function: <suitkaise-api>error</suitkaise-api> calling - {e}&quot;)
         
         try:
             if other.lambda_function(10) != 20:
                 failures.append(&quot;lambda_function: does not compute correctly&quot;)
         except Exception as e:
-            failures.append(f&quot;lambda_function: error calling - {e}&quot;)
+            failures.append(f&quot;lambda_function: <suitkaise-api>error</suitkaise-api> calling - {e}&quot;)
         
         try:
             # In _init_functions:
@@ -1430,7 +1430,7 @@ class WorstPossibleObject:
             if other.partial_function(y=5) != 10:
                 failures.append(&quot;partial_function: does not compute correctly (override y)&quot;)
         except Exception as e:
-            failures.append(f&quot;partial_function: error calling - {e}&quot;)
+            failures.append(f&quot;partial_function: <suitkaise-api>error</suitkaise-api> calling - {e}&quot;)
         
         # Test regex works
         try:
@@ -1438,7 +1438,7 @@ class WorstPossibleObject:
             if not match:
                 failures.append(&quot;regex_pattern: does not match correctly&quot;)
         except Exception as e:
-            failures.append(f&quot;regex_pattern: error matching - {e}&quot;)
+            failures.append(f&quot;regex_pattern: <suitkaise-api>error</suitkaise-api> matching - {e}&quot;)
         
         # Test circular references maintain identity
         if not (other.circular_dict[&quot;self&quot;] is other.circular_dict and 
@@ -1547,7 +1547,7 @@ class WorstPossibleObject:
                 else:
                     attrs[&#x27;other&#x27;].append(f&quot;{name} ({obj_type})&quot;)
             except Exception as e:
-                attrs[&#x27;other&#x27;].append(f&quot;{name} (error: {e})&quot;)
+                attrs[&#x27;other&#x27;].append(f&quot;{name} (<suitkaise-api>error</suitkaise-api>: {e})&quot;)
         
         return attrs
     
@@ -1590,10 +1590,10 @@ class WorstPossibleObject:
                 lines.append(f&quot;Queue size: {obj.qsize()}&quot;)
                 lines.append(f&quot;Max size: {obj.maxsize}&quot;)
             
-            # Check for file-like tell() method
+            # Check for file-like <suitkaise-api>tell</suitkaise-api>() method
             try:
                 if callable(getattr(obj, &#x27;tell&#x27;, None)):
-                    lines.append(f&quot;File position: {obj.tell()}&quot;)  # type: ignore
+                    lines.append(f&quot;File position: {obj.<suitkaise-api>tell</suitkaise-api>()}&quot;)  # type: ignore
             except:
                 pass
         except Exception as e:
@@ -1616,7 +1616,7 @@ class WorstPossibleObject:
         
         attrs = self.list_all_attributes()
         if type_category not in attrs:
-            return {&quot;error&quot;: (False, f&quot;Unknown category: {type_category}&quot;)}
+            return {&quot;<suitkaise-api>error</suitkaise-api>&quot;: (False, f&quot;Unknown category: {type_category}&quot;)}
         
         results = {}
         for attr_desc in attrs[type_category]:

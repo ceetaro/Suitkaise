@@ -7,7 +7,7 @@ module bar for suitkaise.processing
 rows = 1
 columns = 9
 
-order = [why, quick start, how to use, how it works, examples, videos, tests, learn]
+order = [why, quick start, how to use, how it works, examples, tests, videos, learn]
 
 # 1.1
 
@@ -40,13 +40,13 @@ link = "processing-examples.md"
 
 # 1.7
 
-button = "videos"
-link = "processing-videos.md"
+button = "tests"
+link = "processing-tests.md"
 
 # 1.8
 
-button = "tests"
-link = "processing-tests.md"
+button = "videos"
+link = "processing-videos.md"
 
 # 1.9
 

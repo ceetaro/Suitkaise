@@ -7,7 +7,7 @@ module bar for suitkaise.timing
 rows = 1
 columns = 9
 
-order = [why, quick start, how to use, how it works, examples, videos, tests, learn]
+order = [why, quick start, how to use, how it works, examples, tests, videos, learn]
 
 # 1.1
 
@@ -40,13 +40,13 @@ link = "timing-examples.md"
 
 # 1.7
 
-button = "videos"
-link = "timing-videos.md"
+button = "tests"
+link = "timing-tests.md"
 
 # 1.8
 
-button = "tests"
-link = "timing-tests.md"
+button = "videos"
+link = "timing-videos.md"
 
 # 1.9
 

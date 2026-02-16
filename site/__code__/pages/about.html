@@ -1,13 +1,13 @@
 <section class="module-page about-page">
-    <h1>About <code>suitkaise</code></h1>
+    <h1>About <code><suitkaise-api>suitkaise</suitkaise-api></code></h1>
 
-    <p><code>suitkaise</code> is a Python code library.</p>
+    <p><code><suitkaise-api>suitkaise</suitkaise-api></code> is a Python code library.</p>
 
     <details>
         <summary>Installation and technical info</summary>
-        <p>To install <code>suitkaise</code>, run this in your terminal:</p>
-<pre><code class="language-bash">pip install suitkaise</code></pre>
-        <p><code>suitkaise</code> is currently version <code>0.2.4</code>.</p>
+        <p>To install <code><suitkaise-api>suitkaise</suitkaise-api></code>, run this in your terminal:</p>
+<pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
+        <p><code><suitkaise-api>suitkaise</suitkaise-api></code> is currently version <code>0.2.4</code>.</p>
 
         <details>
             <summary><code>README</code></summary>
@@ -15,13 +15,13 @@
             <p>Making things easier for developers of all skill levels to develop complex applications.</p>
             
             <h4>Installation</h4>
-<pre><code class="language-bash">pip install suitkaise</code></pre>
+<pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
 
             <h4>Info</h4>
             <p>Supported Python versions: 3.11 and above</p>
-            <p>Currently, <code>suitkaise</code> is version <code>0.2.4</code>.</p>
+            <p>Currently, <code><suitkaise-api>suitkaise</suitkaise-api></code> is version <code>0.2.4</code>.</p>
             <p>All files and code in this repository is licensed under the Apache License 2.0.</p>
-            <p><code>suitkaise</code> contains the following modules:</p>
+            <p><code><suitkaise-api>suitkaise</suitkaise-api></code> contains the following modules:</p>
             <ul>
                 <li>cucumber: serialization engine</li>
                 <li>circuit: flow control</li>
@@ -32,22 +32,22 @@
 
             <h4>Documentation</h4>
             <p>All documentation is available for download:</p>
-<pre><code class="language-python">from suitkaise import docs
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>docs</suitkaise-api>
 
-docs.download("path/where/you/want/them/to/go")
+<suitkaise-api>docs</suitkaise-api>.download("path/where/you/want/them/to/go")
 
 # auto send them to project root
-docs.download()</code></pre>
+<suitkaise-api>docs</suitkaise-api>.download()</code></pre>
             <p>To send them outside of your project root, use the <code>Permission</code> class:</p>
-<pre><code class="language-python">from suitkaise import docs, Permission
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>docs</suitkaise-api>, Permission
 
 with Permission():
-    docs.download("Users/joe/Documents")</code></pre>
+    <suitkaise-api>docs</suitkaise-api>.download("Users/joe/Documents")</code></pre>
             <p>You can also view more at <a href="https://suitkaise.info">suitkaise.info</a>.</p>
         </details>
 
         <details>
-            <summary><code>suitkaise</code> is licensed under the Apache License 2.0. View license here.</summary>
+            <summary><code><suitkaise-api>suitkaise</suitkaise-api></code> is licensed under the Apache License 2.0. View license here.</summary>
             <p><strong>Apache License 2.0</strong></p>
             <p>Copyright (c) 2025 Casey Eddings</p>
             <p>Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.</p>
@@ -57,7 +57,7 @@ with Permission():
         </details>
     </details>
 
-    <p><code>suitkaise</code> is for developers of all skill levels, and was created with 3 main goals in mind:</p>
+    <p><code><suitkaise-api>suitkaise</suitkaise-api></code> is for developers of all skill levels, and was created with 3 main goals in mind:</p>
     <ol>
         <li>To bridge the knowledge gap for inexperienced developers to create professional level programs</li>
         <li>To make things easier and faster for all developers.</li>
@@ -71,7 +71,7 @@ with Permission():
     <p><em>"If it worked like this..."</em></p>
     <p><em>"I would use this so much more if it looked like this..."</em></p>
     <p>I created things that I wished worked like the concepts I wrote, and then went backwards to actually make it work.</p>
-    <p>I'm not a fan of trying to explain why without specifics, so I'm just going to list a bunch of annoying things that I've had to deal with over time and how <code>suitkaise</code> solves them.</p>
+    <p>I'm not a fan of trying to explain why without specifics, so I'm just going to list a bunch of annoying things that I've had to deal with over time and how <code><suitkaise-api>suitkaise</suitkaise-api></code> solves them.</p>
 
     <details>
         <summary>Multiprocessing</summary>
@@ -89,14 +89,14 @@ with Permission():
         <p>Trying to do all of this manually for each individual scenario is overwhelming and time consuming.</p>
         <p>So, I turned processing into one class.</p>
         <p>Inherit from the special <code>Process</code> class to create your own custom processes.</p>
-<pre><code class="language-python">from suitkaise.processing import Process
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import Process
 
 class MyProcess(Process):
 
     def __init__(self, num_loops: int):
         self.counter = 0
 
-        # run N times
+        # <suitkaise-api>run</suitkaise-api> N times
         self.config.num_loops = num_loops
 
 
@@ -122,7 +122,7 @@ class MyProcess(Process):
         # add results to attributes
 
     
-    def __onfinish__(self):
+    def <suitkaise-api>__onfinish__</suitkaise-api>(self):
 
         # this is when you clean up the process
         # calculate summaries
@@ -130,30 +130,30 @@ class MyProcess(Process):
         # send emails
 
 
-    def __result__(self):
+    def <suitkaise-api>__result__</suitkaise-api>(self):
 
-        # this returns the result of the process
+        # this returns the <suitkaise-api>result</suitkaise-api> of the process
         # don't have to worry about confusing returns
         # store your results as instance attributes
         # and return them here
 
 
-    def __error__(self):
+    def <suitkaise-api>__error__</suitkaise-api>(self):
 
-        # this is __result__() when an error occurs</code></pre>
+        # this is <suitkaise-api>__result__</suitkaise-api>() when an <suitkaise-api>error</suitkaise-api> occurs</code></pre>
         <p>Everything is separated into pieces that make much more sense.</p>
         <p>Everything is encapsulated into a single class.</p>
         <p>You can start the process with one line.</p>
 <pre><code class="language-python">p = MyProcess(num_loops=10)
 
 # start the process
-p.start()
+p.<suitkaise-api>start</suitkaise-api>()
 
 # wait for the process to finish
-p.wait()
+p.<suitkaise-api>wait</suitkaise-api>()
 
-# access the result
-result = p.result</code></pre>
+# access the <suitkaise-api>result</suitkaise-api>
+<suitkaise-api>result</suitkaise-api> = p.<suitkaise-api>result</suitkaise-api></code></pre>
         <a href="#processing" class="learn-more-link arrow-right nav-link" data-page="processing">
             learn more <span class="arrow">⟶</span>
         </a>
@@ -169,7 +169,7 @@ result = p.result</code></pre>
         <p>Your functions don't pickle.</p>
         <p>Your loggers don't pickle.</p>
         <p>Your class objects don't pickle.</p>
-        <p>Solution: use <code>cucumber</code> to serialize your objects.</p>
+        <p>Solution: use <code><suitkaise-api>cucumber</suitkaise-api></code> to serialize your objects.</p>
         <p>I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.</p>
         <p>But being able to serialize "anything" is a steep challenge. I needed a rival, an enemy, a final boss to defeat. One that, after winning, would let me say "I think I can serialize anything now."</p>
         <p>So, I created the <code>WorstPossibleObject</code>.</p>
@@ -182,9 +182,9 @@ result = p.result</code></pre>
         <p>And battled it thousands of times, forcing the engine to successfully serialize it and deserialize it multiple times per battle. Not a single error was allowed to occur.</p>
         <p>Once the engine won, I felt confident that I could serialize anything.</p>
         <p>But even if I can't, I have written a special way for you to.</p>
-        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code>cucumber</code>, before it uses the default handling.</p>
+        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code><suitkaise-api>cucumber</suitkaise-api></code>, before it uses the default handling.</p>
         <p>You can use them to override the default serialization and deserialization behavior for your own objects.</p>
-        <p>As a bonus, <code>cucumber</code> processes dataclasses 2x faster than <code>cloudpickle</code>, the fastest serializer for dataclasses.</p>
+        <p>As a bonus, <code><suitkaise-api>cucumber</suitkaise-api></code> processes dataclasses 2x faster than <code>cloudpickle</code>, the fastest serializer for dataclasses.</p>
         <a href="#cucumber" class="learn-more-link arrow-right nav-link" data-page="cucumber">
             learn more <span class="arrow">⟶</span>
         </a>
@@ -206,78 +206,78 @@ result = p.result</code></pre>
 
     <details>
         <summary>I'm newer to programming and I'm having trouble organizing my <code>while</code> loop code in a way that makes sense to me.</summary>
-        <p>Try using <code>Circuit</code> to manage your loops.</p>
+        <p>Try using <code><suitkaise-api>Circuit</suitkaise-api></code> to manage your loops.</p>
         <ul>
             <li>cleaner code</li>
             <li>easy to think about</li>
             <li>automatic error handling</li>
         </ul>
-<pre><code class="language-python">from suitkaise import Circuit
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
 results = []
-circ = Circuit(shorts=3)
+circ = <suitkaise-api>Circuit</suitkaise-api>(shorts=3)
 
 while circ.flowing:
-    result = risky_operation()
+    <suitkaise-api>result</suitkaise-api> = risky_operation()
 
-    if result:
-        results.append(result)
+    if <suitkaise-api>result</suitkaise-api>:
+        results.append(<suitkaise-api>result</suitkaise-api>)
     
     else:
-        circ.short()</code></pre>
+        circ.<suitkaise-api>short</suitkaise-api>()</code></pre>
     </details>
 
     <details>
         <summary>I hate having to write code to time things.</summary>
 
-<p>You can use the <code>timethis</code> decorator to time a function.</p>
+<p>You can use the <code><suitkaise-api>timethis</suitkaise-api></code> decorator to time a function.</p>
 
-<pre><code class="language-python">from suitkaise import sktime
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import sktime
 
 # automatically times the function every time it is called
-@sktime.timethis()
+@sktime.<suitkaise-api>timethis</suitkaise-api>()
 def my_function():
     # Your real code here
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
 
-# run my_function many times
+# <suitkaise-api>run</suitkaise-api> my_function many times
 for i in range(100):
     my_function()
 
 # get stats
-mean = my_function.timer.mean
-stdev = my_function.timer.stdev</code></pre>
+mean = my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>
+stdev = my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api></code></pre>
 
-<p>You can also use the <code>TimeThis</code> context manager to time a block of code.</p>
+<p>You can also use the <code><suitkaise-api>TimeThis</suitkaise-api></code> context manager to time a block of code.</p>
 
-<pre><code class="language-python">from suitkaise import sktime
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import sktime
 
-with sktime.TimeThis() as timer:
+with sktime.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
 
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
 
-most_recent = timer.most_recent
-first_time = timer.get_time(0)</code></pre>
+most_recent = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>
+first_time = <suitkaise-api>timer</suitkaise-api>.get_time(0)</code></pre>
     </details>
 
     <details>
         <summary>Something is lagging severely and I don't know what.</summary>
-        <p>Just add <code>sktime.timethis()</code> to each function you want to time.</p>
-<pre><code class="language-python">from suitkaise import sktime
+        <p>Just add <code>sktime.<suitkaise-api>timethis</suitkaise-api>()</code> to each function you want to time.</p>
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import sktime
 
-@sktime.timethis()
+@sktime.<suitkaise-api>timethis</suitkaise-api>()
 def potential_lagger_1():
     # Your real code here
     pass
 
-@sktime.timethis()
+@sktime.<suitkaise-api>timethis</suitkaise-api>()
 def potential_lagger_2():
     # Your real code here
     pass
 
-@sktime.timethis()
+@sktime.<suitkaise-api>timethis</suitkaise-api>()
 def potential_lagger_3():
     # Your real code here
     pass</code></pre>
@@ -297,16 +297,16 @@ print(f"Potential lagger 3: {mean_3:.3f}s")</code></pre>
     <details>
         <summary>Some of my team uses <code>pathlib</code> and some use strings, and I am tired of converting back and forth.</summary>
         <p>And I don't want to use <code>pathlib.Path.resolve()</code> every single time.</p>
-        <p>Use <code>skpath.autopath()</code> to automatically convert paths to whatever the function accepts.</p>
-<pre><code class="language-python">from suitkaise import skpath
+        <p>Use <code>skpath.<suitkaise-api>autopath</suitkaise-api>()</code> to automatically convert paths to whatever the function accepts.</p>
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import skpath
 
-@skpath.autopath()
+@skpath.<suitkaise-api>autopath</suitkaise-api>()
 def my_function(path: str):
     
     # all Paths are converted to strings
     # all strings are left as is
 
-@skpath.autopath()
+@skpath.<suitkaise-api>autopath</suitkaise-api>()
 def my_function_2(path: Path)
 
     # all strings are converted to Paths
@@ -315,38 +315,38 @@ def my_function_2(path: Path)
 
     <hr>
 
-    <h2>Using <code>suitkaise</code> with AI</h2>
+    <h2>Using <code><suitkaise-api>suitkaise</suitkaise-api></code> with AI</h2>
 
-    <p>Currently (since I have no motion), AI agents like ChatGPT that you use with something like Cursor are not trained to use <code>suitkaise</code>.</p>
-    <p>Even with AI, using <code>suitkaise</code> benefits you.</p>
+    <p>Currently (since I have no motion), AI agents like ChatGPT that you use with something like Cursor are not trained to use <code><suitkaise-api>suitkaise</suitkaise-api></code>.</p>
+    <p>Even with AI, using <code><suitkaise-api>suitkaise</suitkaise-api></code> benefits you.</p>
     <p>Why? Because I tried to have AI do all of these kinds of things for me and it failed miserably (I still say Please and Thank You, don't worry).</p>
-    <p>However, there are 2 ways to let AI use <code>suitkaise</code>:</p>
+    <p>However, there are 2 ways to let AI use <code><suitkaise-api>suitkaise</suitkaise-api></code>:</p>
     <p><strong>1. Have it search this page!</strong> Copy this into your prompt:</p>
 
-<pre><code class="language-text">I would like you to understand and use the suitkaise modules in my project.
+<pre><code class="language-text">I would like you to understand and use the <suitkaise-api>suitkaise</suitkaise-api> modules in my project.
 
-It is installable using `pip install suitkaise`.
+It is installable using `pip install <suitkaise-api>suitkaise</suitkaise-api>`.
 
-Can you go to the website (suitkaise.info) and look at the "how to use" section for each module?</code></pre>
+Can you go to the website (<suitkaise-api>suitkaise</suitkaise-api>.info) and look at the "how to use" section for each module?</code></pre>
 
     <p><strong>2. Download the official docs and place them in your project.</strong></p>
     <p>Run this as python code in your terminal:</p>
-<pre><code class="language-python">from suitkaise import docs
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>docs</suitkaise-api>
 
-docs.download("path/where/you/want/them/to/go")
+<suitkaise-api>docs</suitkaise-api>.download("path/where/you/want/them/to/go")
 
 # auto send them to project root
-docs.download()</code></pre>
+<suitkaise-api>docs</suitkaise-api>.download()</code></pre>
     <p>In order for the docs to install outside of your project root:</p>
-<pre><code class="language-python">from suitkaise import docs, Permission
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>docs</suitkaise-api>, Permission
 
 with Permission():
-    docs.download("Users/joe/Documents")</code></pre>
+    <suitkaise-api>docs</suitkaise-api>.download("Users/joe/Documents")</code></pre>
     <p>They will appear as a folder in the specified directory.</p>
 
     <hr>
 
-    <h3>Has <code>suitkaise</code> solved your problem? We want to know!</h3>
-    <p>That's the whole point of <code>suitkaise</code>, so yeah, let us know at suitkaise@suitkaise.info.</p>
+    <h3>Has <code><suitkaise-api>suitkaise</suitkaise-api></code> solved your problem? We want to know!</h3>
+    <p>That's the whole point of <code><suitkaise-api>suitkaise</suitkaise-api></code>, so yeah, let us know at suitkaise@suitkaise.info.</p>
 
 </section>

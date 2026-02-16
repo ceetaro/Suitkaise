@@ -6,44 +6,44 @@
         <a href="#circuits" class="module-bar-link" data-page="circuits">how to use</a>
         <a href="#circuits-how-it-works" class="module-bar-link" data-page="circuits-how-it-works">how it works</a>
         <a href="#circuits-examples" class="module-bar-link" data-page="circuits-examples">examples</a>
-        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-tests" class="module-bar-link" data-page="circuits-tests">tests</a>
+        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-learn" class="module-bar-link" data-page="circuits-learn">learn</a>
     </nav>
 </div>
 <section class="module-page why-page">
-    <h1>Why you should use <code>circuits</code></h1>
+    <h1>Why you should use <code><suitkaise-api>circuits</suitkaise-api></code></h1>
     <h2>TLDR</h2>
     <ul>
         <li><strong>Prevent cascading failures</strong> - Stop hammering a failing service</li>
         <li><strong>Built-in exponential backoff</strong> - Automatic retry delay increase</li>
         <li><strong>Jitter</strong> - Prevent thundering herd when multiple clients retry simultaneously</li>
-        <li><strong>Two patterns</strong> - Auto-reset (<code>Circuit</code>) vs manual control (<code>BreakingCircuit</code>)</li>
+        <li><strong>Two patterns</strong> - Auto-reset (<code><suitkaise-api>Circuit</suitkaise-api></code>) vs manual control (<code><suitkaise-api>BreakingCircuit</suitkaise-api></code>)</li>
         <li><strong>Thread-safe</strong> - Safe for concurrent use without manual locking</li>
-        <li><strong>Native async support</strong> - <code>.asynced()</code> for async/await contexts</li>
+        <li><strong>Native async support</strong> - <code>.<suitkaise-api>asynced</suitkaise-api>()</code> for async/await contexts</li>
         <li><strong>Rate limiting</strong> - Natural fit for API rate limits</li>
     </ul>
     <hr>
-    <h2>What makes <code>circuits</code> different</h2>
-    <p>Most circuit breaker libraries handle a single use case: retry an external service with backoff. <code>circuits</code> does that, but it also does something others can&#x27;t: <strong>coordinate failure handling across threads and processes</strong>.</p>
-    <pre><code class="language-python">from suitkaise import BreakingCircuit
+    <h2>What makes <code><suitkaise-api>circuits</suitkaise-api></code> different</h2>
+    <p>Most circuit breaker libraries handle a single use case: retry an external service with backoff. <code><suitkaise-api>circuits</suitkaise-api></code> does that, but it also does something others can&#x27;t: <strong>coordinate failure handling across threads and processes</strong>.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 import threading
 
-shutdown = BreakingCircuit(num_shorts_to_trip=1)
+shutdown = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=1)
 
 def worker(worker_id):
-    while not shutdown.broken:
+    while not shutdown.<suitkaise-api>broken</suitkaise-api>:
         try:
             process_next_item()
         except FatalError:
-            shutdown.short()  # all workers see this immediately
+            shutdown.<suitkaise-api>short</suitkaise-api>()  # all workers see this immediately
     print(f&quot;Worker {worker_id}: shutting down gracefully&quot;)
 
 threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
 for t in threads:
-    t.start()</code></pre>
-    <p>One worker hits a fatal error. All four workers see <code>shutdown.broken</code> and stop gracefully. Thread-safe out of the box.</p>
-    <p>And with <code>Share</code> from <code>processing</code>, this works across processes too -- not just threads. More on that below.</p>
+    t.<suitkaise-api>start</suitkaise-api>()</code></pre>
+    <p>One worker hits a fatal error. All four workers see <code>shutdown.<suitkaise-api>broken</suitkaise-api></code> and stop gracefully. Thread-safe out of the box.</p>
+    <p>And with <code><suitkaise-api>Share</suitkaise-api></code> from <code><suitkaise-api>processing</suitkaise-api></code>, this works across processes too -- not just threads. More on that below.</p>
     <hr>
     <p>Your code calls an external service. Sometimes that service fails.</p>
     <p>What do you do?</p>
@@ -52,7 +52,7 @@ for t in threads:
     </ol>
     <pre><code class="language-python">while True:
     try:
-        result = call_external_service()
+        <suitkaise-api>result</suitkaise-api> = call_external_service()
         break
     except ServiceError:
         pass  # retry immediately</code></pre>
@@ -64,7 +64,7 @@ for t in threads:
 
 while True:
     try:
-        result = call_external_service()
+        <suitkaise-api>result</suitkaise-api> = call_external_service()
         break
     except ServiceError:
         time.sleep(1)</code></pre>
@@ -86,7 +86,7 @@ max_delay = 30.0
 
 for attempt in range(max_retries):
     try:
-        result = call_external_service()
+        <suitkaise-api>result</suitkaise-api> = call_external_service()
         break
     except ServiceError:
         if attempt == max_retries - 1:
@@ -107,10 +107,10 @@ for attempt in range(max_retries):
     <ol start="4">
         <li>The Solution</li>
     </ol>
-    <p>The solution is <code>circuits</code>.</p>
-    <pre><code class="language-python">from suitkaise import Circuit
+    <p>The solution is <code><suitkaise-api>circuits</suitkaise-api></code>.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(
+circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,
@@ -120,41 +120,41 @@ circuit = Circuit(
 
 while True:
     try:
-        result = call_external_service()
+        <suitkaise-api>result</suitkaise-api> = call_external_service()
         break
     except ServiceError:
-        circuit.short()  # handles everything</code></pre>
+        circuit.<suitkaise-api>short</suitkaise-api>()  # handles everything</code></pre>
     <p>One object. Clear and simple API.</p>
     <hr>
-    <h2><code>Circuit</code> vs <code>BreakingCircuit</code>: the difference</h2>
-    <h3><code>Circuit</code> - Auto-resets</h3>
+    <h2><code><suitkaise-api>Circuit</suitkaise-api></code> vs <code><suitkaise-api>BreakingCircuit</suitkaise-api></code>: the difference</h2>
+    <h3><code><suitkaise-api>Circuit</suitkaise-api></code> - Auto-resets</h3>
     <p>After N failures, sleeps and continues. The counter resets automatically.</p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 for request in requests:
     try:
         process(request)
     except RateLimitError:
-        circuit.short()  # after 5 shorts, sleeps 1s and continues</code></pre>
+        circuit.<suitkaise-api>short</suitkaise-api>()  # after 5 shorts, sleeps 1s and continues</code></pre>
     <ul>
         <li>Rate limit requests</li>
         <li>Throttle request rates</li>
         <li>When you have temporary failures that resolve themselves</li>
     </ul>
-    <h3><code>BreakingCircuit</code> - Manual Reset</h3>
+    <h3><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> - Manual Reset</h3>
     <p>After N failures, stays broken until you manually reset.</p>
-    <pre><code class="language-python">breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+    <pre><code class="language-python">breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-while not breaker.broken:
+while not breaker.<suitkaise-api>broken</suitkaise-api>:
     try:
-        result = risky_operation()
+        <suitkaise-api>result</suitkaise-api> = risky_operation()
     except CriticalError:
-        breaker.short()  # after 3 failures, circuit breaks
+        breaker.<suitkaise-api>short</suitkaise-api>()  # after 3 failures, circuit breaks
 
-if breaker.broken:
+if breaker.<suitkaise-api>broken</suitkaise-api>:
     # decide what to do - fail gracefully, alert, etc.
     handle_failure()
-    breaker.reset()  # manually reset when ready</code></pre>
+    breaker.<suitkaise-api>reset</suitkaise-api>()  # manually reset when ready</code></pre>
     <ul>
         <li>Operations where you need to decide how to proceed</li>
         <li>Coordinating multiple workers (one breaks, others see it)</li>
@@ -163,7 +163,7 @@ if breaker.broken:
     <hr>
     <h2>Exponential Backoff</h2>
     <p>Each trip increases the sleep time.</p>
-    <p>Without <code>circuits</code></p>
+    <p>Without <code><suitkaise-api>circuits</suitkaise-api></code></p>
     <pre><code class="language-python">delay = 1.0
 max_delay = 30.0
 backoff_factor = 2.0
@@ -175,8 +175,8 @@ time.sleep(delay)
 # don&#x27;t forget to track this state!
 # don&#x27;t forget thread safety!
 # don&#x27;t forget to reset it so it doesn&#x27;t snowball!</code></pre>
-    <p>With <code>circuits</code></p>
-    <pre><code class="language-python">circuit = Circuit(
+    <p>With <code><suitkaise-api>circuits</suitkaise-api></code></p>
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,
@@ -192,12 +192,12 @@ time.sleep(delay)
 # 6th trip: 30.0s (capped)
 # 7th+ trip: 30.0s (capped)</code></pre>
     <p>Need to reset the backoff after a successful operation?</p>
-    <pre><code class="language-python">circuit.reset_backoff()  # back to original sleep time</code></pre>
+    <pre><code class="language-python">circuit.<suitkaise-api>reset_backoff</suitkaise-api>()  # back to original sleep time</code></pre>
     <hr>
     <h2>Jitter</h2>
     <p>When many clients fail at the same time, they all retry at the same time. This causes a &quot;thundering herd&quot; that overwhelms the recovering service. This is especially bad if the service call needs to be rate limited.</p>
     <p>Jitter adds randomness to the sleep time.</p>
-    <p>Without <code>circuits</code></p>
+    <p>Without <code><suitkaise-api>circuits</suitkaise-api></code></p>
     <pre><code class="language-python">import random
 
 delay = 5.0
@@ -205,8 +205,8 @@ jitter_percent = 0.1
 
 jittered_delay = delay + random.uniform(-delay * jitter_percent, delay * jitter_percent)
 time.sleep(jittered_delay)</code></pre>
-    <p>With <code>circuits</code></p>
-    <pre><code class="language-python">circuit = Circuit(
+    <p>With <code><suitkaise-api>circuits</suitkaise-api></code></p>
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=5.0,
     jitter=0.1  # +/- 10% randomness
@@ -217,7 +217,7 @@ time.sleep(jittered_delay)</code></pre>
     <hr>
     <h2>Thread Safety</h2>
     <p>Multiple threads calling the same circuit? No problem.</p>
-    <p>Without <code>circuits</code></p>
+    <p>Without <code><suitkaise-api>circuits</suitkaise-api></code></p>
     <pre><code class="language-python">import threading
 
 lock = threading.Lock()
@@ -231,17 +231,17 @@ def handle_failure():
         if failure_count &gt;= max_failures:
             # do something
             failure_count = 0</code></pre>
-    <p>With <code>circuits</code></p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+    <p>With <code><suitkaise-api>circuits</suitkaise-api></code></p>
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 def worker():
     # multiple threads can call this safely
-    circuit.short()</code></pre>
-    <p><code>Circuit</code> and <code>BreakingCircuit</code> use <code>threading.RLock</code> internally. All operations are atomic.</p>
+    circuit.<suitkaise-api>short</suitkaise-api>()</code></pre>
+    <p><code><suitkaise-api>Circuit</suitkaise-api></code> and <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> use <code>threading.RLock</code> internally. All operations are atomic.</p>
     <hr>
     <h2>Native Async Support</h2>
-    <p>Using asyncio? Just add <code>.asynced()</code>.</p>
-    <p>Without <code>circuits</code></p>
+    <p>Using asyncio? Just add <code>.<suitkaise-api>asynced</suitkaise-api>()</code>.</p>
+    <p>Without <code><suitkaise-api>circuits</suitkaise-api></code></p>
     <pre><code class="language-python">import asyncio
 
 # you need separate sync and async implementations
@@ -250,112 +250,112 @@ def sync_sleep_with_backoff():
 
 async def async_sleep_with_backoff():
     await asyncio.sleep(delay)</code></pre>
-    <p>With <code>circuits</code></p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+    <p>With <code><suitkaise-api>circuits</suitkaise-api></code></p>
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 # sync
-circuit.short()
+circuit.<suitkaise-api>short</suitkaise-api>()
 
 # async
-await circuit.short.asynced()()</code></pre>
+await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
     <p>Same circuit, same state, works in both contexts.</p>
     <hr>
     <h2>Rate Limiting</h2>
-    <p><code>Circuit</code> is perfect for rate limiting.</p>
-    <pre><code class="language-python">rate_limiter = Circuit(
+    <p><code><suitkaise-api>Circuit</suitkaise-api></code> is perfect for rate limiting.</p>
+    <pre><code class="language-python">rate_limiter = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=100,      # 100 requests per window
     sleep_time_after_trip=60.0,  # wait 60s when limit hit
 )
 
 for request in requests:
-    rate_limiter.short()  # counts each request
+    rate_limiter.<suitkaise-api>short</suitkaise-api>()  # counts each request
     process(request)</code></pre>
     <p>Every 100 requests, it pauses for 60 seconds. No external rate limit tracking needed.</p>
     <hr>
     <h2>Immediate Trip</h2>
     <p>Sometimes you know something is catastrophically wrong and want to trip immediately.</p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=10, sleep_time_after_trip=5.0)
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=10, sleep_time_after_trip=5.0)
 
 try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except CriticalError:
-    circuit.trip()  # skip the counter, trip immediately
+    circuit.<suitkaise-api>trip</suitkaise-api>()  # skip the counter, trip immediately
 except MinorError:
-    circuit.short()  # increment counter normally</code></pre>
+    circuit.<suitkaise-api>short</suitkaise-api>()  # increment counter normally</code></pre>
     <hr>
     <h2>Custom Sleep Per Call</h2>
     <p>Override the sleep time for a specific failure.</p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except RateLimitError as e:
     # API told us to wait 30 seconds
-    circuit.short(custom_sleep=e.retry_after)
+    circuit.<suitkaise-api>short</suitkaise-api>(custom_sleep=e.retry_after)
 except OtherError:
-    circuit.short()  # use default</code></pre>
+    circuit.<suitkaise-api>short</suitkaise-api>()  # use default</code></pre>
     <hr>
     <h2>Coordinated Shutdown</h2>
-    <p><code>BreakingCircuit</code> is great for coordinating multiple workers.</p>
+    <p><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> is great for coordinating multiple workers.</p>
     <pre><code class="language-python">import threading
 
-shutdown_circuit = BreakingCircuit(num_shorts_to_trip=1)
+shutdown_circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=1)
 
 def worker(worker_id):
-    while not shutdown_circuit.broken:
+    while not shutdown_circuit.<suitkaise-api>broken</suitkaise-api>:
         try:
             process_next_item()
         except FatalError:
-            shutdown_circuit.short()  # signals all workers to stop
+            shutdown_circuit.<suitkaise-api>short</suitkaise-api>()  # signals all workers to stop
     
     print(f&quot;Worker {worker_id} shutting down&quot;)
 
 # start workers
 threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
 for t in threads:
-    t.start()
+    t.<suitkaise-api>start</suitkaise-api>()
 
-# one worker hits a fatal error
-# all workers see shutdown_circuit.broken and stop gracefully</code></pre>
+# one worker hits a fatal <suitkaise-api>error</suitkaise-api>
+# all workers see shutdown_circuit.<suitkaise-api>broken</suitkaise-api> and stop gracefully</code></pre>
     <hr>
     <h2>Tracking State</h2>
     <p>Both circuits track useful state:</p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
-circuit.times_shorted      # failures since last trip
-circuit.total_trips        # lifetime trip count
-circuit.current_sleep_time # current backoff delay
+circuit.<suitkaise-api>times_shorted</suitkaise-api>      # failures since last trip
+circuit.<suitkaise-api>total_trips</suitkaise-api>        # lifetime trip count
+circuit.<suitkaise-api>current_sleep_time</suitkaise-api> # current backoff delay
 
-breaker = BreakingCircuit(num_shorts_to_trip=3)
+breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3)
 
-breaker.broken             # is it broken?
-breaker.times_shorted      # failures since last reset
-breaker.total_trips        # lifetime trip count</code></pre>
+breaker.<suitkaise-api>broken</suitkaise-api>             # is it broken?
+breaker.<suitkaise-api>times_shorted</suitkaise-api>      # failures since last reset
+breaker.<suitkaise-api>total_trips</suitkaise-api>        # lifetime trip count</code></pre>
     <hr>
-    <h2>Cross-process circuit breaking with <code>Share</code></h2>
-    <p>The coordinated shutdown example above works with threads. But with <code>Share</code> from <code>processing</code>, it works across entirely separate processes.</p>
-    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
-from suitkaise import BreakingCircuit
+    <h2>Cross-process circuit breaking with <code><suitkaise-api>Share</suitkaise-api></code></h2>
+    <p>The coordinated shutdown example above works with threads. But with <code><suitkaise-api>Share</suitkaise-api></code> from <code><suitkaise-api>processing</suitkaise-api></code>, it works across entirely separate processes.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 
-share = Share()
-share.circuit = BreakingCircuit(num_shorts_to_trip=3)
+share = <suitkaise-api>Share</suitkaise-api>()
+share.circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3)
 
-class ResilientWorker(Skprocess):
+class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
 
-    def __run__(self):
-        if self.share.circuit.broken:
-            self.stop()
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        if self.share.circuit.<suitkaise-api>broken</suitkaise-api>:
+            self.<suitkaise-api>stop</suitkaise-api>()
             return
         
         try:
-            result = call_flaky_service()
+            <suitkaise-api>result</suitkaise-api> = call_flaky_service()
         except ServiceError:
-            self.share.circuit.short()
+            self.share.circuit.<suitkaise-api>short</suitkaise-api>()
 
-pool = Pool(workers=8)
-pool.map(ResilientWorker, [share] * 8)</code></pre>
+pool = <suitkaise-api>Pool</suitkaise-api>(workers=8)
+pool.<suitkaise-api>map</suitkaise-api>(ResilientWorker, [share] * 8)</code></pre>
     <p>Eight separate processes, each with their own GIL, their own memory space -- and they all see the same circuit state. When three failures accumulate from any combination of workers, the circuit trips and all workers can respond.</p>
-    <p>This is the kind of cross-process coordination that normally requires Redis or a database. With <code>circuits</code> + <code>Share</code>, it&#x27;s zero infrastructure.</p>
+    <p>This is the kind of cross-process coordination that normally requires Redis or a database. With <code><suitkaise-api>circuits</suitkaise-api></code> + <code><suitkaise-api>Share</suitkaise-api></code>, it&#x27;s zero infrastructure.</p>
 </section>

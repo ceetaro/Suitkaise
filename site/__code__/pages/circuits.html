@@ -6,63 +6,64 @@
         <a href="#circuits" class="module-bar-link active" data-page="circuits">how to use</a>
         <a href="#circuits-how-it-works" class="module-bar-link" data-page="circuits-how-it-works">how it works</a>
         <a href="#circuits-examples" class="module-bar-link" data-page="circuits-examples">examples</a>
-        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-tests" class="module-bar-link" data-page="circuits-tests">tests</a>
+        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-learn" class="module-bar-link" data-page="circuits-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>How to use <code>circuits</code></h1>
-    <p><code>circuits</code> provides two circuit breaker classes for managing failures and rate limiting in your code.</p>
+    <h1>How to use <code><suitkaise-api>circuits</suitkaise-api></code></h1>
+    <p><code><suitkaise-api>circuits</suitkaise-api></code> provides two circuit breaker classes for managing failures and rate limiting in your code.</p>
     <ul>
-        <li><code>Circuit</code> — auto-resets after sleeping. Use for rate limiting and temporary failures.</li>
-        <li><code>BreakingCircuit</code> — stays broken until you manually reset. Use for failure thresholds and coordinated shutdown.</li>
+        <li><code><suitkaise-api>Circuit</suitkaise-api></code> — auto-resets after sleeping. Use for rate limiting and temporary failures.</li>
+        <li><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> — stays broken until you manually reset. Use for failure thresholds and coordinated shutdown.</li>
     </ul>
     <h2>Importing</h2>
-    <pre><code class="language-python">from suitkaise import Circuit, BreakingCircuit</code></pre>
-    <h2><code>Circuit</code></h2>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>, <suitkaise-api>BreakingCircuit</suitkaise-api></code></pre>
+    <h2><code><suitkaise-api>Circuit</suitkaise-api></code></h2>
     <h3>Creating a Circuit</h3>
-    <pre><code class="language-python">circuit = Circuit(
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,           # shorts before the circuit trips
     sleep_time_after_trip=1.0,      # seconds to sleep on trip
-    backoff_factor=1.0,             # multiply sleep time after each trip (1.0 = no backoff)
+    backoff_factor=1.0,             # multiply sleep time after each <suitkaise-api>trip</suitkaise-api> (1.0 = no backoff)
     max_sleep_time=30.0,            # maximum sleep time cap
     jitter=0.0                      # randomness added to sleep (0.0 to 1.0)
 )</code></pre>
     <p>All parameters except <code>num_shorts_to_trip</code> and <code>sleep_time_after_trip</code> have defaults.</p>
     <p>Minimal:</p>
-    <pre><code class="language-python">circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)</code></pre>
-    <h3><code>short(custom_sleep=None)</code></h3>
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)</code></pre>
+    <h3><code><suitkaise-api>short</suitkaise-api>(custom_sleep=None)</code></h3>
     <p>Record a failure. After <code>num_shorts_to_trip</code> failures, the circuit trips: sleeps, then resets the counter automatically.</p>
     <pre><code class="language-python">try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except ServiceError:
-    circuit.short()  # count the failure</code></pre>
-    <p>Returns <code>True</code> if the circuit tripped and slept, <code>False</code> otherwise.</p>
+    circuit.<suitkaise-api>short</suitkaise-api>()  # count the failure</code></pre>
+    <p><strong>Returns</strong></p>
+    <p><code>True</code> if the circuit tripped and slept, <code>False</code> otherwise.</p>
     <p>Pass <code>custom_sleep</code> to override the sleep duration for this specific trip:</p>
     <pre><code class="language-python">except RateLimitError as e:
-    circuit.short(custom_sleep=e.retry_after)  # use the server&#x27;s suggested wait time</code></pre>
-    <h3><code>trip(custom_sleep=None)</code></h3>
+    circuit.<suitkaise-api>short</suitkaise-api>(custom_sleep=e.retry_after)  # use the server&#x27;s suggested wait time</code></pre>
+    <h3><code><suitkaise-api>trip</suitkaise-api>(custom_sleep=None)</code></h3>
     <p>Immediately trip the circuit, bypassing the counter. Use for catastrophic failures where you don&#x27;t want to wait for the threshold.</p>
     <pre><code class="language-python">try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except CriticalError:
-    circuit.trip()  # skip the counter, trip immediately
+    circuit.<suitkaise-api>trip</suitkaise-api>()  # skip the counter, trip immediately
 except MinorError:
-    circuit.short()  # count normally</code></pre>
+    circuit.<suitkaise-api>short</suitkaise-api>()  # count normally</code></pre>
     <p>Always returns <code>True</code> (always sleeps).</p>
-    <h3><code>reset_backoff()</code></h3>
+    <h3><code><suitkaise-api>reset_backoff</suitkaise-api>()</code></h3>
     <p>Reset the sleep duration back to the original <code>sleep_time_after_trip</code>. Use after a successful operation to prevent the backoff from snowballing.</p>
-    <pre><code class="language-python">result = call_service()  # success!
-circuit.reset_backoff()   # back to original sleep time</code></pre>
+    <pre><code class="language-python"><suitkaise-api>result</suitkaise-api> = call_service()  # success!
+circuit.<suitkaise-api>reset_backoff</suitkaise-api>()   # back to original sleep time</code></pre>
     <h3>Properties</h3>
-    <pre><code class="language-python">circuit.num_shorts_to_trip   # int — threshold before trip (read-only)
-circuit.times_shorted        # int — failures since last trip
-circuit.total_trips          # int — lifetime trip count
-circuit.current_sleep_time   # float — current sleep duration (after backoff)</code></pre>
+    <pre><code class="language-python">circuit.<suitkaise-api>num_shorts_to_trip</suitkaise-api>   # int — threshold before <suitkaise-api>trip</suitkaise-api> (read-only)
+circuit.<suitkaise-api>times_shorted</suitkaise-api>        # int — failures since last trip
+circuit.<suitkaise-api>total_trips</suitkaise-api>          # int — lifetime trip count
+circuit.<suitkaise-api>current_sleep_time</suitkaise-api>   # float — current sleep duration (after backoff)</code></pre>
     <h3>Exponential Backoff</h3>
     <p>Set <code>backoff_factor</code> &gt; 1.0 to increase sleep time after each trip:</p>
-    <pre><code class="language-python">circuit = Circuit(
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,
@@ -77,7 +78,7 @@ circuit.current_sleep_time   # float — current sleep duration (after backoff)<
 # Trip 6+: sleeps 30.0s (capped)</code></pre>
     <h3>Jitter</h3>
     <p>Set <code>jitter</code> to add randomness and prevent thundering herd:</p>
-    <pre><code class="language-python">circuit = Circuit(
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=5.0,
     jitter=0.2  # ±20% randomness
@@ -86,9 +87,9 @@ circuit.current_sleep_time   # float — current sleep duration (after backoff)<
 # sleep durations will be between 4.0s and 6.0s</code></pre>
     <p>The <code>jitter</code> parameter is a decimal (0.2), not a percentage (20). Values are clamped to <code>[0.0, 1.0]</code>.</p>
     <hr>
-    <h2><code>BreakingCircuit</code></h2>
+    <h2><code><suitkaise-api>BreakingCircuit</suitkaise-api></code></h2>
     <h3>Creating a BreakingCircuit</h3>
-    <pre><code class="language-python">breaker = BreakingCircuit(
+    <pre><code class="language-python">breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(
     num_shorts_to_trip=3,           # shorts before the circuit breaks
     sleep_time_after_trip=1.0,      # seconds to sleep when breaking
     backoff_factor=1.0,             # multiply sleep time after each reset
@@ -96,46 +97,48 @@ circuit.current_sleep_time   # float — current sleep duration (after backoff)<
     jitter=0.0                      # randomness added to sleep (0.0 to 1.0)
 )</code></pre>
     <p>Minimal:</p>
-    <pre><code class="language-python">breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)</code></pre>
-    <h3><code>short(custom_sleep=None)</code></h3>
+    <pre><code class="language-python">breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)</code></pre>
+    <h3><code><suitkaise-api>short</suitkaise-api>(custom_sleep=None)</code></h3>
     <p>Record a failure. After <code>num_shorts_to_trip</code> failures, the circuit breaks: sleeps, then stays broken.</p>
-    <pre><code class="language-python">while not breaker.broken:
+    <pre><code class="language-python">while not breaker.<suitkaise-api>broken</suitkaise-api>:
     try:
-        result = risky_operation()
+        <suitkaise-api>result</suitkaise-api> = risky_operation()
         break  # success
     except OperationError:
-        breaker.short()  # count the failure
+        breaker.<suitkaise-api>short</suitkaise-api>()  # count the failure
 
-if breaker.broken:
+if breaker.<suitkaise-api>broken</suitkaise-api>:
     handle_failure()</code></pre>
-    <p>Returns <code>None</code>.</p>
-    <h3><code>trip(custom_sleep=None)</code></h3>
+    <p><strong>Returns</strong></p>
+    <p><code>None</code>.</p>
+    <h3><code><suitkaise-api>trip</suitkaise-api>(custom_sleep=None)</code></h3>
     <p>Immediately break the circuit, bypassing the counter.</p>
     <pre><code class="language-python">try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except CriticalError:
-    breaker.trip()  # immediately broken</code></pre>
-    <p>Returns <code>None</code>.</p>
-    <h3><code>reset()</code></h3>
+    breaker.<suitkaise-api>trip</suitkaise-api>()  # immediately broken</code></pre>
+    <p><strong>Returns</strong></p>
+    <p><code>None</code>.</p>
+    <h3><code><suitkaise-api>reset</suitkaise-api>()</code></h3>
     <p>Reset the circuit to operational state. Clears the broken flag, resets the short counter, and applies exponential backoff to the sleep time.</p>
-    <pre><code class="language-python">if breaker.broken:
+    <pre><code class="language-python">if breaker.<suitkaise-api>broken</suitkaise-api>:
     # decide what to do...
     handle_failure()
-    breaker.reset()  # ready to use again</code></pre>
-    <p>Note: <code>reset()</code> applies the backoff factor. This means the next time the circuit breaks, it will sleep longer.</p>
-    <h3><code>reset_backoff()</code></h3>
+    breaker.<suitkaise-api>reset</suitkaise-api>()  # ready to use again</code></pre>
+    <p>Note: <code><suitkaise-api>reset</suitkaise-api>()</code> applies the backoff factor. This means the next time the circuit breaks, it will sleep longer.</p>
+    <h3><code><suitkaise-api>reset_backoff</suitkaise-api>()</code></h3>
     <p>Reset the sleep duration back to the original <code>sleep_time_after_trip</code> without changing the broken state.</p>
-    <pre><code class="language-python">breaker.reset()           # reset broken state (applies backoff)
-breaker.reset_backoff()   # also reset sleep time to original</code></pre>
+    <pre><code class="language-python">breaker.<suitkaise-api>reset</suitkaise-api>()           # reset broken state (applies backoff)
+breaker.<suitkaise-api>reset_backoff</suitkaise-api>()   # also reset sleep time to original</code></pre>
     <h3>Properties</h3>
-    <pre><code class="language-python">breaker.num_shorts_to_trip   # int — threshold before break (read-only)
-breaker.broken               # bool — whether circuit is currently broken
-breaker.times_shorted        # int — failures since last trip/reset
-breaker.total_trips          # int — lifetime trip count
-breaker.current_sleep_time   # float — current sleep duration (after backoff)</code></pre>
+    <pre><code class="language-python">breaker.<suitkaise-api>num_shorts_to_trip</suitkaise-api>   # int — threshold before break (read-only)
+breaker.<suitkaise-api>broken</suitkaise-api>               # bool — whether circuit is currently broken
+breaker.<suitkaise-api>times_shorted</suitkaise-api>        # int — failures since last trip/reset
+breaker.<suitkaise-api>total_trips</suitkaise-api>          # int — lifetime trip count
+breaker.<suitkaise-api>current_sleep_time</suitkaise-api>   # float — current sleep duration (after backoff)</code></pre>
     <h3>Exponential Backoff</h3>
-    <p>Unlike <code>Circuit</code> (which applies backoff on trip), <code>BreakingCircuit</code> applies backoff on <code>reset()</code>. This means the sleep time increases each time you reset and the circuit breaks again.</p>
-    <pre><code class="language-python">breaker = BreakingCircuit(
+    <p>Unlike <code><suitkaise-api>Circuit</suitkaise-api></code> (which applies backoff on trip), <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> applies backoff on <code><suitkaise-api>reset</suitkaise-api>()</code>. This means the sleep time increases each time you reset and the circuit breaks again.</p>
+    <pre><code class="language-python">breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(
     num_shorts_to_trip=3,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,
@@ -143,51 +146,51 @@ breaker.current_sleep_time   # float — current sleep duration (after backoff)<
 )
 
 # Break 1: sleeps 1.0s
-# reset() → next sleep will be 2.0s
+# <suitkaise-api>reset</suitkaise-api>() → next sleep will be 2.0s
 # Break 2: sleeps 2.0s
-# reset() → next sleep will be 4.0s
+# <suitkaise-api>reset</suitkaise-api>() → next sleep will be 4.0s
 # Break 3: sleeps 4.0s
 # ...</code></pre>
     <hr>
     <h2>Thread Safety</h2>
-    <p>Both <code>Circuit</code> and <code>BreakingCircuit</code> are thread-safe. All state access is protected by <code>threading.RLock</code>.</p>
+    <p>Both <code><suitkaise-api>Circuit</suitkaise-api></code> and <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> are thread-safe. All state access is protected by <code>threading.RLock</code>.</p>
     <pre><code class="language-python">import threading
-from suitkaise import Circuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 def worker():
     for _ in range(100):
         try:
             process_item()
         except ItemError:
-            circuit.short()  # safe from multiple threads
+            circuit.<suitkaise-api>short</suitkaise-api>()  # safe from multiple threads
 
 threads = [threading.Thread(target=worker) for _ in range(4)]
 for t in threads:
-    t.start()
+    t.<suitkaise-api>start</suitkaise-api>()
 for t in threads:
     t.join()</code></pre>
     <p>The sleep operation happens outside the lock, so other threads aren&#x27;t blocked while one thread sleeps.</p>
     <hr>
     <h2>Async Support</h2>
-    <p>Both classes support async usage via <code>.asynced()</code>. The async versions use <code>asyncio.sleep()</code> instead of blocking <code>time.sleep()</code>.</p>
+    <p>Both classes support async usage via <code>.<suitkaise-api>asynced</suitkaise-api>()</code>. The async versions use <code>asyncio.sleep()</code> instead of blocking <code>time.sleep()</code>.</p>
     <pre><code class="language-python"># sync
-circuit.short()
+circuit.<suitkaise-api>short</suitkaise-api>()
 
 # async
-await circuit.short.asynced()()
+await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
 
 # sync
-circuit.trip()
+circuit.<suitkaise-api>trip</suitkaise-api>()
 
 # async
-await circuit.trip.asynced()()</code></pre>
-    <p>Methods that don&#x27;t sleep (<code>reset()</code>, <code>reset_backoff()</code>, property access) don&#x27;t need async versions.</p>
+await circuit.<suitkaise-api>trip</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+    <p>Methods that don&#x27;t sleep (<code><suitkaise-api>reset</suitkaise-api>()</code>, <code><suitkaise-api>reset_backoff</suitkaise-api>()</code>, property access) don&#x27;t need async versions.</p>
     <pre><code class="language-python">import asyncio
-from suitkaise import Circuit
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(
+circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=2.0,
     backoff_factor=2.0,
@@ -198,51 +201,51 @@ async def fetch(session, url):
     try:
         async with session.get(url) as response:
             if response.status == 429:
-                await circuit.short.asynced()()
+                await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
                 return None
             return await response.json()
     except aiohttp.ClientError:
-        await circuit.short.asynced()()
+        await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
         return None</code></pre>
     <hr>
-    <h2><code>Share</code> Integration</h2>
-    <p>Both circuit classes include <code>_shared_meta</code> for integration with <code>suitkaise.processing.Share</code>. This enables cross-process circuit breaking.</p>
-    <pre><code class="language-python">from suitkaise.processing import Share, Pool, Skprocess
-from suitkaise import BreakingCircuit
+    <h2><code><suitkaise-api>Share</suitkaise-api></code> Integration</h2>
+    <p>Both circuit classes include <code>_shared_meta</code> for integration with <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Share</suitkaise-api></code>. This enables cross-process circuit breaking.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 
-share = Share()
-share.circuit = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+share = <suitkaise-api>Share</suitkaise-api>()
+share.circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-class Worker(Skprocess):
+class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
 
-    def __run__(self):
-        if self.share.circuit.broken:
-            self.stop()
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        if self.share.circuit.<suitkaise-api>broken</suitkaise-api>:
+            self.<suitkaise-api>stop</suitkaise-api>()
             return
 
         try:
-            result = process_item()
+            <suitkaise-api>result</suitkaise-api> = process_item()
         except FatalError:
-            self.share.circuit.short()
+            self.share.circuit.<suitkaise-api>short</suitkaise-api>()
 
-pool = Pool(workers=4)
-pool.map(Worker, [share] * 4)</code></pre>
-    <p>When any process trips the circuit, all other processes see <code>share.circuit.broken == True</code> on their next check. This gives you cross-process coordinated failure handling with zero infrastructure.</p>
+pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+pool.<suitkaise-api>map</suitkaise-api>(Worker, [share] * 4)</code></pre>
+    <p>When any process trips the circuit, all other processes see <code>share.circuit.<suitkaise-api>broken</suitkaise-api> == True</code> on their next check. This gives you cross-process coordinated failure handling with zero infrastructure.</p>
     <hr>
-    <h2>Choosing Between <code>Circuit</code> and <code>BreakingCircuit</code></h2>
-    <p>| Use Case | Class | Why | |----------|-------|-----| | Rate limiting API calls | <code>Circuit</code> | Auto-resets after cooldown, keeps processing | | Retry with backoff | <code>Circuit</code> | Sleeps and continues automatically | | Stop after too many failures | <code>BreakingCircuit</code> | Stays broken, you decide what to do | | Coordinated worker shutdown | <code>BreakingCircuit</code> | One worker breaks it, all see it | | Graceful degradation | Both | <code>Circuit</code> for primary, <code>BreakingCircuit</code> for fallback |</p>
+    <h2>Choosing Between <code><suitkaise-api>Circuit</suitkaise-api></code> and <code><suitkaise-api>BreakingCircuit</suitkaise-api></code></h2>
+    <p>| Use Case | Class | Why | |----------|-------|-----| | Rate limiting API calls | <code><suitkaise-api>Circuit</suitkaise-api></code> | Auto-resets after cooldown, keeps processing | | Retry with backoff | <code><suitkaise-api>Circuit</suitkaise-api></code> | Sleeps and continues automatically | | Stop after too many failures | <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> | Stays broken, you decide what to do | | Coordinated worker shutdown | <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> | One worker breaks it, all see it | | Graceful degradation | Both | <code><suitkaise-api>Circuit</suitkaise-api></code> for primary, <code><suitkaise-api>BreakingCircuit</suitkaise-api></code> for fallback |</p>
     <hr>
     <h2>Error Handling</h2>
     <p>Circuits don&#x27;t raise exceptions themselves. They sleep (Circuit) or set a flag (BreakingCircuit). You handle the logic:</p>
-    <pre><code class="language-python"># Circuit: check the return value of short()
-tripped = circuit.short()
+    <pre><code class="language-python"># <suitkaise-api>Circuit</suitkaise-api>: check the return value of <suitkaise-api>short</suitkaise-api>()
+tripped = circuit.<suitkaise-api>short</suitkaise-api>()
 if tripped:
-    print(&quot;Circuit tripped, just paused&quot;)
+    print(&quot;<suitkaise-api>Circuit</suitkaise-api> tripped, just paused&quot;)
 
-# BreakingCircuit: check the broken property
-breaker.short()
-if breaker.broken:
-    print(&quot;Circuit broken, stopping&quot;)</code></pre>
+# <suitkaise-api>BreakingCircuit</suitkaise-api>: check the broken property
+breaker.<suitkaise-api>short</suitkaise-api>()
+if breaker.<suitkaise-api>broken</suitkaise-api>:
+    print(&quot;<suitkaise-api>Circuit</suitkaise-api> broken, stopping&quot;)</code></pre>
 </section>

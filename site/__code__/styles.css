@@ -694,7 +694,7 @@ body {
     border-radius: 4px;
     padding: 6px 12px;
     cursor: pointer;
-    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, text-shadow 0.2s ease;
     color: var(--text-color);
 }
 
@@ -704,11 +704,31 @@ body {
 
 .module-bar-title.highlight-active {
     opacity: 1;
-    color: rgb(255, 215, 100);
+    color: rgb(93, 198, 127);
+    font-weight: 600;
+    text-shadow:
+        0 0 2px rgba(93, 198, 127, 0.32),
+        0 0 6px rgba(93, 198, 127, 0.18);
+    box-shadow:
+        inset 0 0 0 1px rgba(109, 233, 149, 0.30),
+        inset 0 0 10px rgba(109, 233, 149, 0.16),
+        0 0 0 1px rgba(109, 233, 149, 0.35),
+        0 0 10px rgba(109, 233, 149, 0.30),
+        0 0 18px rgba(109, 233, 149, 0.18);
 }
 
 .module-bar-title.highlight-active:hover {
-    border-color: rgba(255, 215, 100, 0.4);
+    border-color: rgba(109, 233, 149, 0.45);
+    text-shadow:
+        0 0 5px rgba(109, 233, 149, 0.78),
+        0 0 12px rgba(109, 233, 149, 0.52),
+        0 0 22px rgba(109, 233, 149, 0.28);
+    box-shadow:
+        inset 0 0 0 1px rgba(109, 233, 149, 0.38),
+        inset 0 0 12px rgba(109, 233, 149, 0.22),
+        0 0 0 1px rgba(109, 233, 149, 0.45),
+        0 0 14px rgba(109, 233, 149, 0.36),
+        0 0 24px rgba(109, 233, 149, 0.24);
 }
 
 .module-bar-nav {
@@ -767,7 +787,7 @@ body {
     padding-top: 8px;
     padding-bottom: 6px;
     /* Dim body text so headers stand out more */
-    color: rgba(109, 233, 149, 0.76);
+    color: rgb(191, 255, 211);
 }
 
 /* ============================================
@@ -828,7 +848,21 @@ body {
     font-size: 0.95rem;
     line-height: 1.7;
     margin-bottom: 6px;
-    color: rgba(109, 233, 149, 0.77);
+    color: rgb(102, 176, 126);
+}
+
+/* Normalize list items to one consistent green tone */
+.module-page ul > li,
+.module-page ol > li {
+    color: rgb(102, 176, 126);
+}
+
+/* Keep list item child text on the alternating tone (p was overriding this before) */
+.module-page li > p,
+.module-page li > span,
+.module-page li > em,
+.module-page li > strong {
+    color: inherit;
 }
 
 /* Nested lists */
@@ -852,9 +886,27 @@ body {
     color: var(--text-color);
 }
 
+/* Inline code default: regular font when API highlight is inactive */
+.module-page code.inline-code,
+.about-page code.inline-code,
+.why-page code.inline-code {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-weight: 400;
+    color: rgb(191, 255, 211);
+    background: rgb(10, 20, 14) !important;
+    border: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    padding: 0.13em 0.38em 0.27em !important;
+    border-radius: 4px;
+    line-height: 1.1 !important;
+    text-shadow: none;
+}
+
 /* Code blocks */
 .module-page pre {
-    background: rgb(8, 12, 10) !important;
+    background: rgb(9, 13, 11) !important;
     border: 1px solid rgba(109, 233, 149, 0.08);
     border-radius: 6px;
     padding: 26px 22px;
@@ -862,78 +914,66 @@ body {
     margin: 24px 0 40px 0; /* extra bottom margin for spacing after code blocks */
 }
 
-/* Override Prism theme background */
-.module-page pre[class*="language-"],
-.module-page code[class*="language-"] {
-    background: none !important;
-}
-
 .module-page pre code {
-    background: none !important;
     padding: 0;
-    border-radius: 0;
-    color: rgba(109, 233, 149, 0.8);
+    border-radius: 3px;
     font-size: 0.85rem;
     line-height: 1.65;
     display: block;
     white-space: pre;
 }
 
-/* Prism.js syntax highlighting overrides to match green theme */
-.module-page pre code.language-python {
-    color: rgba(109, 233, 149, 0.8);
+/* Inline code styling only when API highlighting is active */
+.module-page.highlight-active code.inline-code,
+.about-page.highlight-active code.inline-code,
+.why-page.highlight-active code.inline-code {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    color: rgb(191, 255, 211);
+    background: rgb(10, 20, 14) !important;
+    border: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    padding: 0.13em 0.38em 0.27em !important;
+    border-radius: 4px;
+    line-height: 1.1 !important;
+    text-shadow: none !important; /* regular inline code should not glow */
+    filter: none !important;
 }
 
-/* Comments - darker/dimmer */
+/* Inline code text color by context (inactive + active for non-suitkaise inline) */
+.module-page p code.inline-code,
+.about-page p code.inline-code,
+.why-page p code.inline-code,
+.module-page.highlight-active p code.inline-code,
+.about-page.highlight-active p code.inline-code,
+.why-page.highlight-active p code.inline-code {
+    color: rgb(191, 255, 211) !important;
+}
+
+.module-page li code.inline-code,
+.about-page li code.inline-code,
+.why-page li code.inline-code,
+.module-page.highlight-active li code.inline-code,
+.about-page.highlight-active li code.inline-code,
+.why-page.highlight-active li code.inline-code {
+    color: rgb(102, 176, 126) !important;
+}
+
+/* Keep VS Code-like token colors, but dim comments much more */
 .module-page .token.comment,
 .module-page .token.prolog,
 .module-page .token.doctype,
-.module-page .token.cdata {
-    color: rgba(72, 96, 140, 0.78);
-}
-
-/* Strings */
-.module-page .token.string,
-.module-page .token.attr-value {
-    color: rgba(140, 245, 175, 0.85);
-}
-
-/* Keywords (from, import, def, class, if, else, etc.) */
-.module-page .token.keyword {
-    color: rgba(140, 245, 175, 0.95);
-}
-
-/* Function names */
-.module-page .token.function {
-    color: rgba(140, 245, 175, 0.9);
-}
-
-/* Numbers */
-.module-page .token.number {
-    color: rgba(140, 245, 175, 0.9);
-}
-
-/* Operators */
-.module-page .token.operator {
-    color: rgba(140, 245, 175, 0.7);
-    background: none;
-}
-
-/* Punctuation */
-.module-page .token.punctuation {
-    color: rgba(140, 245, 175, 0.6);
-}
-
-/* Built-ins and class names */
-.module-page .token.builtin,
-.module-page .token.class-name {
-    color: rgba(140, 245, 175, 0.95);
-}
-
-/* Boolean and None */
-.module-page .token.boolean,
-.module-page .token.constant {
-    color: rgba(140, 245, 175, 0.85);
+.module-page .token.cdata,
+.about-page .token.comment,
+.about-page .token.prolog,
+.about-page .token.doctype,
+.about-page .token.cdata,
+.why-page .token.comment,
+.why-page .token.prolog,
+.why-page .token.doctype,
+.why-page .token.cdata {
+    color: rgba(140, 146, 158, 0.42) !important;
 }
 
 /* Horizontal separators removed across doc pages */
@@ -943,9 +983,14 @@ body {
     display: none;
 }
 
-.module-page strong {
-    color: rgb(232, 224, 202);
+.module-page strong,
+.about-page strong,
+.why-page strong {
+    color: rgb(93, 198, 127);
     font-weight: 600;
+    text-shadow:
+        0 0 2px rgba(93, 198, 127, 0.14),
+        0 0 5px rgba(93, 198, 127, 0.08);
 }
 
 .module-page em {
@@ -967,6 +1012,54 @@ body {
     transition: color 0.2s ease;
 }
 
+.line-count-row {
+    font-weight: 700;
+}
+
+.line-count-number {
+    font-weight: 700;
+    color: rgb(214, 86, 214) !important;
+}
+
+/* Reduce oversized vertical gaps in Pros/Cons sections */
+.module-page p.before-pros-cons,
+.about-page p.before-pros-cons,
+.why-page p.before-pros-cons {
+    margin-bottom: 8px;
+    padding-bottom: 0;
+}
+
+.module-page p.pros-cons-line,
+.about-page p.pros-cons-line,
+.why-page p.pros-cons-line {
+    margin-top: 0;
+    margin-bottom: 4px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Keep Pros/Cons tight together but separate from the next numbered item block */
+.module-page p.pros-cons-line + p.pros-cons-line,
+.about-page p.pros-cons-line + p.pros-cons-line,
+.why-page p.pros-cons-line + p.pros-cons-line {
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+
+.module-page p.pros-cons-line + ol,
+.about-page p.pros-cons-line + ol,
+.why-page p.pros-cons-line + ol {
+    margin-top: 14px;
+}
+
+.pros-cons-label {
+    color: rgb(93, 198, 127) !important;
+    font-weight: 700;
+    text-shadow:
+        0 0 2px rgba(93, 198, 127, 0.16),
+        0 0 5px rgba(93, 198, 127, 0.09);
+}
+
 /* When highlight is active, line-count becomes yellow */
 .module-page.highlight-active .line-count,
 .about-page.highlight-active .line-count {
@@ -975,23 +1068,25 @@ body {
 
 /* Dropdown/Details styling */
 .module-page details {
-    background: rgba(109, 233, 149, 0.03);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    margin: 20px 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 16px 0;
     padding: 0;
+    transition: none;
 }
 
 .module-page details summary {
-    padding: 14px 18px;
+    padding: 8px 0;
     cursor: pointer;
     font-style: normal;
-    color: rgba(150, 245, 180, 0.9);
+    color: rgba(150, 245, 180, 0.88);
     font-size: 1.1rem;
     font-weight: 500;
     line-height: 1.45;
     user-select: none;
     list-style: none;
+    transition: color 0.16s ease;
 }
 
 .module-page details summary::marker {
@@ -1006,26 +1101,41 @@ body {
 .module-page details summary:not(.dropdown-title-h2) {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     margin: 0;
-    padding-top: 8px;
+    padding-top: 6px;
     padding-bottom: 6px;
 }
 
 .module-page details summary:not(.dropdown-title-h2)::before {
     content: "▸";
-    font-size: 0.95em;
+    font-size: 1.08em;
+    font-weight: 700;
     color: inherit;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
 }
 
-.module-page details[open] summary:not(.dropdown-title-h2)::before {
+.module-page details[open] > summary:not(.dropdown-title-h2)::before {
     content: "▾";
 }
 
 .module-page details summary.dropdown-title-h2 {
     display: block;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* Slightly more breathing room under collapsed h2 dropdown titles */
+.module-page details:not([open]) summary.dropdown-title-h2 {
+    padding-bottom: 8px;
+}
+
+/* Fallback: generated pages currently don't tag h2 dropdown summaries with a class.
+   Apply the same subtle collapsed-state bottom padding to visible summaries. */
+.module-page details:not([open]) summary {
+    padding-bottom: 8px;
 }
 
 .module-page details summary.dropdown-title-h2::marker {
@@ -1039,60 +1149,127 @@ body {
 .module-page details summary.dropdown-title-h2 h2 {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     margin: 0;
     padding-bottom: 0;
     border-bottom: none;
+    font-size: 1.4rem;
+    line-height: 1.2;
 }
 
 .module-page details summary.dropdown-title-h2 h2::before {
     content: "▸";
-    font-size: inherit;
+    font-size: 1.08em;
+    font-weight: 700;
     color: inherit;
 }
 
-.module-page details[open] summary.dropdown-title-h2 h2::before {
+/* Nested dropdown titles may be injected as h3/h4 elements inside summary.
+   Reset heading box-model so arrow/text stay aligned and spacing remains uniform. */
+.module-page details summary > h3,
+.module-page details summary > h4 {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+    font-size: inherit;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    line-height: inherit;
+}
+
+.module-page details[open] > summary.dropdown-title-h2 h2::before {
     content: "▾";
 }
 
 .module-page details summary:hover {
-    color: rgba(109, 233, 149, 0.7);
+    color: rgba(176, 248, 203, 0.94);
 }
 
 .module-page details summary code {
     font-style: normal;
     color: rgb(150, 245, 180);
-    background: rgba(150, 245, 180, 0.1);
-    padding: 3px 8px;
+    background: rgba(109, 233, 149, 0.08);
+    border: none;
+    padding: 2px 7px;
+    border-radius: 4px;
     font-size: 1rem;
 }
 
 .module-page details[open] summary {
-    color: rgba(109, 233, 149, 0.7);
+    color: rgba(169, 244, 196, 0.92);
+}
+
+.module-page details:hover {
+    border-color: transparent;
 }
 
 /* Padding for all content inside open details (except summary) */
 .module-page details[open] > *:not(summary) {
-    margin-left: 18px;
-    margin-right: 18px;
+    margin-left: 28px;
+    margin-right: 0;
 }
 
 .module-page details[open] > *:not(summary):first-of-type {
-    margin-top: 8px;
+    margin-top: 4px;
 }
 
 .module-page details[open] > *:not(summary):last-child {
-    margin-bottom: 18px;
+    margin-bottom: 12px;
 }
 
 /* Pre/code blocks need to offset the margin with negative values */
 .module-page details[open] > pre {
-    margin-left: 18px;
-    margin-right: 18px;
+    margin-left: 28px;
+    margin-right: 0;
 }
 
 .module-page details .dropdown-content {
-    padding: 18px 20px;
+    padding: 0;
+}
+
+/* Benchmark tables (cucumber performance) */
+.module-page .benchmark-table-wrap {
+    overflow-x: auto;
+    margin: 16px 0 20px;
+}
+
+.module-page .benchmark-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border-color);
+    background: rgba(109, 233, 149, 0.03);
+}
+
+.module-page .benchmark-table th,
+.module-page .benchmark-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+    white-space: normal;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.module-page .benchmark-table th {
+    color: rgba(150, 245, 180, 0.92);
+    font-weight: 600;
+    background: rgba(109, 233, 149, 0.06);
+}
+
+.module-page .benchmark-table td {
+    color: rgba(109, 233, 149, 0.77);
+}
+
+.module-page .benchmark-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.module-page .benchmark-table td.benchmark-fail {
+    color: rgb(255, 132, 84) !important;
+    font-weight: 600;
 }
 
 .module-page details .dropdown-content p:first-child {
@@ -1134,10 +1311,6 @@ body {
     color: rgba(62, 180, 137, 0.85);
 }
 
-.about-page strong {
-    color: rgb(232, 224, 202);
-}
-
 .about-page .learn-more-link {
     color: rgba(109, 233, 149, 0.5);
 }
@@ -1156,7 +1329,7 @@ body {
 .about-page pre .api-highlight,
 .about-page pre code .api-highlight,
 pre code .api-highlight {
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, text-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 /* When highlight is active */
@@ -1168,7 +1341,19 @@ pre code .api-highlight {
 .about-page.highlight-active .api-highlight,
 .about-page.highlight-active pre .api-highlight,
 .about-page.highlight-active pre code .api-highlight {
-    color: rgb(255, 215, 100) !important;
+    color: rgb(98, 204, 132) !important;
+    display: inline;
+    padding: 0;
+    border-radius: 0;
+    font-weight: 700;
+    text-shadow:
+        0 0 1px rgba(150, 230, 178, 0.40),
+        0 0 4px rgba(93, 198, 127, 0.22),
+        0 0 8px rgba(93, 198, 127, 0.12) !important;
+    filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.18)) !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    animation: none !important;
 }
 
 /* ============================================
@@ -1191,14 +1376,30 @@ pre code .api-highlight {
     color: rgba(62, 180, 137, 0.85);
 }
 
-.why-page strong {
-    color: rgb(232, 224, 202);
+.callout-label {
+    color: rgb(93, 198, 127) !important;
+    font-weight: 700;
+    text-shadow:
+        0 0 2px rgba(93, 198, 127, 0.16),
+        0 0 5px rgba(93, 198, 127, 0.09);
 }
 
 .why-page.highlight-active .api-highlight,
 .why-page.highlight-active pre .api-highlight,
 .why-page.highlight-active pre code .api-highlight {
-    color: rgb(255, 215, 100) !important;
+    color: rgb(98, 204, 132) !important;
+    display: inline;
+    padding: 0;
+    border-radius: 0;
+    font-weight: 700;
+    text-shadow:
+        0 0 1px rgba(150, 230, 178, 0.40),
+        0 0 4px rgba(93, 198, 127, 0.22),
+        0 0 8px rgba(93, 198, 127, 0.12) !important;
+    filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.18)) !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    animation: none !important;
 }
 
 /* ============================================
@@ -1235,3 +1436,232 @@ pre code .api-highlight {
         font-size: 1.5rem;
     }
 }
+
+/* Final API glow override (keep last in file) */
+.module-page.highlight-active pre code .api-highlight:not(.api-flicker),
+.module-page.highlight-active pre .api-highlight:not(.api-flicker),
+.about-page.highlight-active pre code .api-highlight:not(.api-flicker),
+.about-page.highlight-active pre .api-highlight:not(.api-flicker),
+.why-page.highlight-active pre code .api-highlight:not(.api-flicker),
+.why-page.highlight-active pre .api-highlight:not(.api-flicker) {
+    color: rgb(122, 224, 156) !important;
+    display: inline !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow:
+        0 0 0.35px rgba(236, 255, 245, 0.34),
+        0 0 0.9px rgba(98, 204, 132, 0.78),
+        0 0 3px rgba(112, 214, 146, 0.30),
+        0 0 9px rgba(93, 198, 127, 0.22) !important;
+    filter: drop-shadow(0 0 4px rgba(93, 198, 127, 0.30)) !important;
+    font-weight: 700 !important;
+    animation: api-pre-glow-pulse 2.2s ease-in-out infinite !important;
+}
+
+.module-page.highlight-active code.inline-code .api-highlight:not(.api-flicker),
+.about-page.highlight-active code.inline-code .api-highlight:not(.api-flicker),
+.why-page.highlight-active code.inline-code .api-highlight:not(.api-flicker) {
+    color: rgb(122, 224, 156) !important;
+    display: inline !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow:
+        0 0 0.35px rgba(236, 255, 245, 0.36),
+        0 0 1px rgba(98, 204, 132, 0.80),
+        0 0 3px rgba(112, 214, 146, 0.32),
+        0 0 9px rgba(93, 198, 127, 0.24) !important;
+    filter: drop-shadow(0 0 4px rgba(93, 198, 127, 0.32)) !important;
+    font-weight: 700 !important;
+    animation: api-inline-glow-pulse 2.1s ease-in-out infinite !important;
+}
+
+.module-page.highlight-active code.inline-code.inline-code-suitkaise,
+.about-page.highlight-active code.inline-code.inline-code-suitkaise,
+.why-page.highlight-active code.inline-code.inline-code-suitkaise {
+    /* Keep same wrapper box metrics to prevent toggle-time layout shifts. */
+    color: inherit !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    padding: 0.13em 0.38em 0.27em !important;
+    border-radius: 4px !important;
+    background: rgb(10, 20, 14) !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    font-weight: inherit !important;
+}
+
+/* Keep API text inside suitkaise inline code from reintroducing bright box glow. */
+.module-page.highlight-active code.inline-code.inline-code-suitkaise .api-highlight:not(.api-flicker),
+.about-page.highlight-active code.inline-code.inline-code-suitkaise .api-highlight:not(.api-flicker),
+.why-page.highlight-active code.inline-code.inline-code-suitkaise .api-highlight:not(.api-flicker) {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: rgb(122, 224, 156) !important;
+    text-shadow:
+        0 0 0.35px rgba(236, 255, 245, 0.36),
+        0 0 1px rgba(98, 204, 132, 0.80),
+        0 0 3px rgba(112, 214, 146, 0.32),
+        0 0 9px rgba(93, 198, 127, 0.24) !important;
+    filter: drop-shadow(0 0 4px rgba(93, 198, 127, 0.32)) !important;
+    animation: api-inline-glow-pulse 2.1s ease-in-out infinite !important;
+}
+
+@keyframes api-inline-glow-pulse {
+    0%, 100% {
+        text-shadow:
+            0 0 0.35px rgba(236, 255, 245, 0.28),
+            0 0 0.9px rgba(98, 204, 132, 0.70),
+            0 0 2px rgba(170, 241, 198, 0.24),
+            0 0 7px rgba(93, 198, 127, 0.20);
+        filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.26));
+    }
+    50% {
+        text-shadow:
+            0 0 0.35px rgba(244, 255, 250, 0.38),
+            0 0 1px rgba(98, 204, 132, 0.82),
+            0 0 3px rgba(184, 246, 208, 0.36),
+            0 0 10px rgba(93, 198, 127, 0.28);
+        filter: drop-shadow(0 0 5px rgba(93, 198, 127, 0.36));
+    }
+}
+
+@keyframes api-pre-glow-pulse {
+    0%, 100% {
+        text-shadow:
+            0 0 0.35px rgba(236, 255, 245, 0.26),
+            0 0 0.9px rgba(98, 204, 132, 0.68),
+            0 0 2px rgba(168, 240, 196, 0.22),
+            0 0 7px rgba(93, 198, 127, 0.20);
+        filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.26));
+    }
+    50% {
+        text-shadow:
+            0 0 0.35px rgba(244, 255, 250, 0.36),
+            0 0 1px rgba(98, 204, 132, 0.80),
+            0 0 3px rgba(184, 246, 208, 0.34),
+            0 0 10px rgba(93, 198, 127, 0.26);
+        filter: drop-shadow(0 0 5px rgba(93, 198, 127, 0.36));
+    }
+}
+
+@keyframes api-neon-suitkaise-pulse {
+    0%, 100% {
+        text-shadow:
+            0 0 0.4px rgba(255, 255, 255, 1),
+            0 0 2px rgba(238, 255, 246, 0.98),
+            0 0 6px rgba(204, 255, 227, 0.86),
+            0 0 14px rgba(126, 226, 162, 0.72),
+            0 0 28px rgba(93, 198, 127, 0.52),
+            0 0 48px rgba(93, 198, 127, 0.30);
+        filter: drop-shadow(0 0 11px rgba(93, 198, 127, 0.58));
+    }
+    45% {
+        text-shadow:
+            0 0 0.4px rgba(255, 255, 255, 1),
+            0 0 3px rgba(250, 255, 252, 1),
+            0 0 9px rgba(230, 255, 243, 0.98),
+            0 0 18px rgba(160, 244, 192, 0.94),
+            0 0 38px rgba(93, 198, 127, 0.76),
+            0 0 68px rgba(93, 198, 127, 0.50);
+        filter: drop-shadow(0 0 16px rgba(93, 198, 127, 0.82));
+    }
+}
+
+/* One-shot flicker-on effect (same idea as homepage module images).
+   Must be at least as specific as the active-state "animation: none !important" rules. */
+.highlight-active .api-highlight.api-flicker,
+.module-page.highlight-active .api-highlight.api-flicker,
+.module-page.highlight-active pre .api-highlight.api-flicker,
+.module-page.highlight-active pre code .api-highlight.api-flicker,
+.module-page.highlight-active code .api-highlight.api-flicker,
+.about-page.highlight-active .api-highlight.api-flicker,
+.about-page.highlight-active pre .api-highlight.api-flicker,
+.about-page.highlight-active pre code .api-highlight.api-flicker,
+.why-page.highlight-active .api-highlight.api-flicker,
+.why-page.highlight-active pre .api-highlight.api-flicker,
+.why-page.highlight-active pre code .api-highlight.api-flicker {
+    animation: api-token-flicker-on 0.8s ease forwards !important;
+}
+
+/* Inline-code flicker keeps wrapper background visually stable (no opacity dips). */
+.module-page.highlight-active code.inline-code .api-highlight.api-flicker,
+.about-page.highlight-active code.inline-code .api-highlight.api-flicker,
+.why-page.highlight-active code.inline-code .api-highlight.api-flicker {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    animation: api-token-flicker-on-inline 0.82s ease forwards !important;
+}
+
+@keyframes api-token-flicker-on {
+    0%   { opacity: 0.02; text-shadow: none; filter: none; }
+    8%   { opacity: 0.85; }
+    14%  { opacity: 0.18; text-shadow: none; }
+    24%  { opacity: 0.92; text-shadow: 0 0 3px rgba(164, 236, 190, 0.62), 0 0 8px rgba(93, 198, 127, 0.34); }
+    31%  { opacity: 0.26; text-shadow: none; }
+    43%  { opacity: 0.78; }
+    50%  { opacity: 0.20; }
+    63%  { opacity: 0.95; text-shadow: 0 0 3px rgba(164, 236, 190, 0.72), 0 0 10px rgba(93, 198, 127, 0.42); }
+    71%  { opacity: 0.42; text-shadow: none; }
+    84%  { opacity: 0.98; }
+    100% { opacity: 1; text-shadow: inherit; filter: inherit; }
+}
+
+@keyframes api-token-flicker-on-inline {
+    0% {
+        color: rgba(98, 204, 132, 0.62);
+        text-shadow: none;
+        filter: none;
+    }
+    12% {
+        color: rgba(98, 204, 132, 0.92);
+        text-shadow:
+            0 0 1px rgba(170, 241, 197, 0.66),
+            0 0 5px rgba(93, 198, 127, 0.32);
+        filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.24));
+    }
+    24% {
+        color: rgba(98, 204, 132, 0.74);
+        text-shadow: none;
+        filter: none;
+    }
+    41% {
+        color: rgba(98, 204, 132, 0.96);
+        text-shadow:
+            0 0 1px rgba(188, 250, 213, 0.80),
+            0 0 8px rgba(93, 198, 127, 0.48),
+            0 0 14px rgba(93, 198, 127, 0.26);
+        filter: drop-shadow(0 0 7px rgba(93, 198, 127, 0.40));
+    }
+    58% {
+        color: rgba(98, 204, 132, 0.80);
+        text-shadow:
+            0 0 1px rgba(170, 241, 197, 0.58),
+            0 0 4px rgba(93, 198, 127, 0.24);
+        filter: drop-shadow(0 0 3px rgba(93, 198, 127, 0.20));
+    }
+    76% {
+        color: rgba(98, 204, 132, 0.98);
+        text-shadow:
+            0 0 1px rgba(205, 255, 227, 0.88),
+            0 0 10px rgba(93, 198, 127, 0.56),
+            0 0 18px rgba(93, 198, 127, 0.34);
+        filter: drop-shadow(0 0 9px rgba(93, 198, 127, 0.46));
+    }
+    100% {
+        color: rgb(122, 224, 156);
+        text-shadow:
+            0 0 0.35px rgba(244, 255, 250, 0.36),
+            0 0 1px rgba(98, 204, 132, 0.80),
+            0 0 3px rgba(182, 246, 207, 0.34),
+            0 0 10px rgba(93, 198, 127, 0.26);
+        filter: drop-shadow(0 0 5px rgba(93, 198, 127, 0.36));
+    }
+}
+

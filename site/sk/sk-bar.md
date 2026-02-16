@@ -7,7 +7,7 @@ module bar for suitkaise.sk
 rows = 1
 columns = 10
 
-order = [why, quick start, how to use, how it works, examples, blocking calls, videos, tests, learn]
+order = [why, quick start, how to use, how it works, examples, blocking calls, tests, videos, learn]
 
 # 1.1
 
@@ -45,13 +45,13 @@ link = "sk-blocking-calls.md"
 
 # 1.8
 
-button = "videos"
-link = "sk-videos.md"
+button = "tests"
+link = "sk-tests.md"
 
 # 1.9
 
-button = "tests"
-link = "sk-tests.md"
+button = "videos"
+link = "sk-videos.md"
 
 # 1.10
 

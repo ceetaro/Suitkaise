@@ -8,22 +8,22 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link active" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
+        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1><code>cucumber</code> performance</h1>
+    <h1><code><suitkaise-api>cucumber</suitkaise-api></code> performance</h1>
     <p>Note from future me: I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).</p>
-    <p>Here are the performance benchmarks for <code>cucumber</code> compared to other serialization libraries.</p>
+    <p>Here are the performance benchmarks for <code><suitkaise-api>cucumber</suitkaise-api></code> compared to other serialization libraries.</p>
     <p>These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.</p>
     <p>Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.</p>
-    <p>Note: <code>cucumber</code> is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.</p>
+    <p>Note: <code><suitkaise-api>cucumber</suitkaise-api></code> is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.</p>
     <p>To run the benchmarks yourself, run the following command:</p>
-    <pre><code class="language-bash">python -m tests.cucumber.run_all_benchmarks</code></pre>
+    <pre><code class="language-bash">python -m tests.<suitkaise-api>cucumber</suitkaise-api>.run_all_benchmarks</code></pre>
     <details>
-        <summary>Types only <code>cucumber</code> can handle</summary>
+        <summary>Types only <code><suitkaise-api>cucumber</suitkaise-api></code> can handle</summary>
         <div class="dropdown-content">
     <ul>
         <li><code>threading.local</code></li>
@@ -48,187 +48,217 @@
         <li><code>subprocess.Popen</code></li>
         <li><code>FrameType</code></li>
     </ul>
-    <h3><code>suitkaise</code> specific types that only <code>cucumber</code> can handle</h3>
+    <h3><code><suitkaise-api>suitkaise</suitkaise-api></code> specific types that only <code><suitkaise-api>cucumber</suitkaise-api></code> can handle</h3>
     <ul>
-        <li><code>Pool</code></li>
-        <li><code>Share</code></li>
+        <li><code><suitkaise-api>Pool</suitkaise-api></code></li>
+        <li><code><suitkaise-api>Share</suitkaise-api></code></li>
     </ul>
         </div>
     </details>
-    <h2><code>cucumber</code> vs <code>pickle</code></h2>
-    <p><code>cucumber</code> actually handles <code>requests.Session</code> 1.45x faster than base <code>pickle</code>.</p>
+    <h2><code><suitkaise-api>cucumber</suitkaise-api></code> vs <code>pickle</code></h2>
+    <p><code><suitkaise-api>cucumber</suitkaise-api></code> actually handles <code>requests.Session</code> 1.45x faster than base <code>pickle</code>.</p>
     <h2>Primitive type comparison (excluding base <code>pickle</code>)</h2>
-    <p><code>bool</code>: <code>cucumber</code> is fastest</p>
+    <p><code>bool</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 6.4µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 6.4µs</li>
         <li><code>cloudpickle</code> 10.4µs</li>
         <li><code>dill</code> 55.1µs</li>
     </ul>
-    <p><code>int</code>: <code>cucumber</code> is fastest</p>
+    <p><code>int</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 1.2µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 1.2µs</li>
         <li><code>cloudpickle</code> 2.6µs</li>
         <li><code>dill</code> 10.7µs</li>
     </ul>
-    <p><code>float</code>: <code>cucumber</code> is fastest</p>
+    <p><code>float</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 1.6µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 1.6µs</li>
         <li><code>cloudpickle</code> 1.7µs</li>
         <li><code>dill</code> 8.5µs</li>
     </ul>
-    <p><code>complex</code>: <code>cucumber</code> is fastest</p>
+    <p><code>complex</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 5.8µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 5.8µs</li>
         <li><code>cloudpickle</code> 14.2µs</li>
         <li><code>dill</code> 41.8µs</li>
     </ul>
-    <p><code>str</code>: <code>cucumber</code> is fastest</p>
+    <p><code>str</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 1.0µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 1.0µs</li>
         <li><code>cloudpickle</code> 1.5µs</li>
         <li><code>dill</code> 7.3µs</li>
     </ul>
-    <p><code>bytes</code>: <code>cucumber</code> is fastest</p>
+    <p><code>bytes</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> is fastest</p>
     <ul>
-        <li><code>cucumber</code> 0.9µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 0.9µs</li>
         <li><code>cloudpickle</code> 1.4µs</li>
         <li><code>dill</code> 7.2µs</li>
     </ul>
     <p><code>bytearray</code>: <code>cloudpickle</code> is fastest</p>
     <ul>
         <li><code>cloudpickle</code> 2.0µs</li>
-        <li><code>cucumber</code> 2.5µs</li>
+        <li><code><suitkaise-api>cucumber</suitkaise-api></code> 2.5µs</li>
         <li><code>dill</code> 24.0µs</li>
     </ul>
-    <p>This is mainly because <code>cucumber</code> fast paths basic types directly to the IR instead of handling them normally.</p>
-    <h2><code>cucumber</code> vs <code>cloudpickle</code> vs <code>dill</code></h2>
+    <p>This is mainly because <code><suitkaise-api>cucumber</suitkaise-api></code> fast paths basic types directly to the IR instead of handling them normally.</p>
+    <h2><code><suitkaise-api>cucumber</suitkaise-api></code> vs <code>cloudpickle</code> vs <code>dill</code></h2>
     <details>
-        <summary>Types <code>cucumber</code> handles the fastest (&gt;1.33x faster)</summary>
+        <summary>Types <code><suitkaise-api>cucumber</suitkaise-api></code> handles the fastest (&gt;1.33x faster)</summary>
         <div class="dropdown-content">
-    <p>Here is a table of types that <code>cucumber</code> handles the fastest (&gt;1.33x faster) compared to <code>cloudpickle</code> and <code>dill</code>, and how much faster <code>cucumber</code> is than the second fastest serializer.</p>
-    <p>If a 2nd place speed is less than 1.33x faster than <code>cucumber</code>, we consider this not significant enough to list, as times in microseconds (µs) are very small and can easily be affected by external factors.</p>
-    <pre><code class="language-text">────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  Type                                  speed with `cucumber`              How much faster than 2nd place?
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  `NamedTemporaryFile`                  26.6µs                           33.62x (`dill`)
-  `TextIOWrapper`                       46.0µs                           21.83x (`dill`)
-  `queue.PriorityQueue`                 12.6µs                           7.49x (`dill`)
-  `typing.NamedTuple`                   4.9µs                            6.98x (`dill`)
-  `queue.LifoQueue`                     14.9µs                           6.95x (`dill`)
-  `StreamHandler`                       9.3µs                            6.92x (`dill`)
-  `threading.Barrier`                   11.0µs                           6.43x (`dill`)
-  `threading.Event`                     9.6µs                            5.88x (`dill`)
-  `queue.Queue`                         23.2µs                           5.76x (`dill`)
-  `namedtuple`                          5.7µs                            5.51x (`dill`)
-  `threading.Thread`                    57.0µs                           5.33x (`dill`)
-  `FileHandler`                         19.1µs                           4.60x (`dill`)
-  `dataclass`                           89.6µs                           2.65x (`cloudpickle`)
-  `map`                                 14.0µs                           2.55x (`cloudpickle`)
-  `filter`                              14.5µs                           2.51x (`cloudpickle`)
-  `complex`                             5.8µs                            2.45x (`cloudpickle`)
-  `int`                                 1.2µs                            2.17x (`cloudpickle`)
-  `defaultdict`                         4.9µs                            2.02x (`cloudpickle`)
-  `IntEnum`                             2.5µs                            2.00x (`cloudpickle`)
-  `IntFlag`                             2.4µs                            1.92x (`cloudpickle`)
-  `slots+dict class`                    31.0µs                           1.80x (`cloudpickle`)
-  `threading.Semaphore`                 0.8µs                            1.75x (`cloudpickle`)
-  `slice`                               3.3µs                            1.73x (`cloudpickle`)
-  `threading.BoundedSemaphore`          0.7µs                            1.71x (`cloudpickle`)
-  `classmethod`                         16.6µs                           1.70x (`cloudpickle`)
-  `bool`                                6.4µs                            1.62x (`cloudpickle`)
-  `threading.RLock`                     0.8µs                            1.62x (`cloudpickle`)
-  `bytes`                               0.9µs                            1.56x (`cloudpickle`)
-  `slots class`                         37.1µs                           1.51x (`cloudpickle`)
-  `str`                                 1.0µs                            1.50x (`cloudpickle`)
-  `range`                               4.2µs                            1.40x (`cloudpickle`)
-  `FunctionType`                        49.1µs                           1.37x (`dill`)</code></pre>
+    <p>Here is a table of types that <code><suitkaise-api>cucumber</suitkaise-api></code> handles the fastest (&gt;1.33x faster) compared to <code>cloudpickle</code> and <code>dill</code>, and how much faster <code><suitkaise-api>cucumber</suitkaise-api></code> is than the second fastest serializer.</p>
+    <p>If a 2nd place speed is less than 1.33x faster than <code><suitkaise-api>cucumber</suitkaise-api></code>, we consider this not significant enough to list, as times in microseconds (µs) are very small and can easily be affected by external factors.</p>
+    <div class="benchmark-table-wrap">
+        <table class="benchmark-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Speed with <code><suitkaise-api>cucumber</suitkaise-api></code></th>
+                    <th>How much faster than 2nd place?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>NamedTemporaryFile</code></td><td>26.6µs</td><td>33.62x (<code>dill</code>)</td></tr>
+                <tr><td><code>TextIOWrapper</code></td><td>46.0µs</td><td>21.83x (<code>dill</code>)</td></tr>
+                <tr><td><code>queue.PriorityQueue</code></td><td>12.6µs</td><td>7.49x (<code>dill</code>)</td></tr>
+                <tr><td><code>typing.NamedTuple</code></td><td>4.9µs</td><td>6.98x (<code>dill</code>)</td></tr>
+                <tr><td><code>queue.LifoQueue</code></td><td>14.9µs</td><td>6.95x (<code>dill</code>)</td></tr>
+                <tr><td><code>StreamHandler</code></td><td>9.3µs</td><td>6.92x (<code>dill</code>)</td></tr>
+                <tr><td><code>threading.Barrier</code></td><td>11.0µs</td><td>6.43x (<code>dill</code>)</td></tr>
+                <tr><td><code>threading.Event</code></td><td>9.6µs</td><td>5.88x (<code>dill</code>)</td></tr>
+                <tr><td><code>queue.Queue</code></td><td>23.2µs</td><td>5.76x (<code>dill</code>)</td></tr>
+                <tr><td><code>namedtuple</code></td><td>5.7µs</td><td>5.51x (<code>dill</code>)</td></tr>
+                <tr><td><code>threading.Thread</code></td><td>57.0µs</td><td>5.33x (<code>dill</code>)</td></tr>
+                <tr><td><code>FileHandler</code></td><td>19.1µs</td><td>4.60x (<code>dill</code>)</td></tr>
+                <tr><td><code>dataclass</code></td><td>89.6µs</td><td>2.65x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>map</code></td><td>14.0µs</td><td>2.55x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>filter</code></td><td>14.5µs</td><td>2.51x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>complex</code></td><td>5.8µs</td><td>2.45x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>int</code></td><td>1.2µs</td><td>2.17x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>defaultdict</code></td><td>4.9µs</td><td>2.02x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>IntEnum</code></td><td>2.5µs</td><td>2.00x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>IntFlag</code></td><td>2.4µs</td><td>1.92x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>slots+dict class</code></td><td>31.0µs</td><td>1.80x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>threading.Semaphore</code></td><td>0.8µs</td><td>1.75x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>slice</code></td><td>3.3µs</td><td>1.73x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>threading.BoundedSemaphore</code></td><td>0.7µs</td><td>1.71x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>classmethod</code></td><td>16.6µs</td><td>1.70x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>bool</code></td><td>6.4µs</td><td>1.62x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>threading.RLock</code></td><td>0.8µs</td><td>1.62x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>bytes</code></td><td>0.9µs</td><td>1.56x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>slots class</code></td><td>37.1µs</td><td>1.51x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>str</code></td><td>1.0µs</td><td>1.50x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>range</code></td><td>4.2µs</td><td>1.40x (<code>cloudpickle</code>)</td></tr>
+                <tr><td><code>FunctionType</code></td><td>49.1µs</td><td>1.37x (<code>dill</code>)</td></tr>
+            </tbody>
+        </table>
+    </div>
         </div>
     </details>
     <details>
         <summary>Types <code>cloudpickle</code> handles the fastest (&gt;1.33x faster)</summary>
         <div class="dropdown-content">
     <p><code>cloudpickle</code> is great for fast handling of simple classes, but it has a much smaller list of supported types than even <code>dill</code>.</p>
-    <pre><code class="language-text">───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  Type                                  speed with `cloudpickle`         How much faster than 2nd place?
-───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  `Skclass`                             9.8µs                            5.24x (`cucumber`)
-  `multiprocessing.Pipe`                6.6µs                            4.77x (`dill`)
-  `SQLiteReconnector`                   5.1µs                            4.06x (`cucumber`)
-  `CodeType`                            9.4µs                            3.82x (`cucumber`)
-  `PurePath`                            3.8µs                            3.82x (`dill`)
-  `SpooledTemporaryFile`                9.9µs                            3.69x (`cucumber`)
-  `Logger`                              4.0µs                            3.65x (`dill`)
-  `SharedMemory`                        12.0µs                           3.61x (`dill`)
-  `list`                                1.7µs                            3.29x (`cucumber`)
-  `CompletedProcess`                    5.8µs                            3.19x (`cucumber`)
-  `Enum`                                6.4µs                            2.95x (`dill`)
-  `re.Pattern`                          6.4µs                            2.80x (`cucumber`)
-  `tuple`                               1.5µs                            2.73x (`cucumber`)
-  `Flag`                                5.1µs                            2.65x (`cucumber`)
-  `Skpath`                              8.5µs                            2.65x (`cucumber`)
-  `ModuleType`                          7.2µs                            2.58x (`dill`)
-  `Class object`                        3.3µs                            2.58x (`cucumber`)
-  `set`                                 1.4µs                            2.50x (`cucumber`)
-  `OS pipes`                            1.7µs                            2.47x (`cucumber`)
-  `functools.partial`                   22.4µs                           2.46x (`cucumber`)
-  `date`                                4.0µs                            2.42x (`cucumber`)
-  `Skfunction`                          34.4µs                           2.40x (`cucumber`)
-  `frozenset`                           1.3µs                            2.31x (`cucumber`)
-  `typing.TypedDict`                    2.0µs                            2.25x (`cucumber`)
-  `enumerate`                           7.5µs                            2.23x (`cucumber`)
-  `dict`                                1.8µs                            2.06x (`cucumber`)
-  `timezone`                            6.6µs                            1.98x (`cucumber`)
-  `StringIO`                            5.8µs                            1.90x (`cucumber`)
-  `deque`                               5.7µs                            1.84x (`cucumber`)
-  `ErrorHandlerError`                   4.1µs                            1.78x (`cucumber`)
-  `PipeReconnector`                     6.2µs                            1.77x (`cucumber`)
-  `Path`                                4.0µs                            1.75x (`cucumber`)
-  `Formatter`                           7.3µs                            1.74x (`cucumber`)
-  `ProcessTimeoutError`                 4.1µs                            1.73x (`cucumber`)
-  `BytesIO`                             6.3µs                            1.73x (`cucumber`)
-  `FunctionTimeoutError`                3.7µs                            1.70x (`cucumber`)
-  `UUID`                                4.8µs                            1.69x (`cucumber`)
-  `CustomRoot`                          4.7µs                            1.68x (`cucumber`)
-  `Fraction`                            4.2µs                            1.67x (`cucumber`)
-  `DeserializationError`                4.2µs                            1.67x (`cucumber`)
-  `ProcessError`                        6.2µs                            1.66x (`cucumber`)
-  `range_iterator`                      8.5µs                            1.65x (`cucumber`)
-  `Class instance`                      4.2µs                            1.62x (`cucumber`)
-  `zip`                                 9.2µs                            1.60x (`cucumber`)
-  `PreRunError`                         5.0µs                            1.58x (`cucumber`)
-  `PathDetectionError`                  4.1µs                            1.54x (`cucumber`)
-  `ResultTimeoutError`                  4.0µs                            1.48x (`cucumber`)
-  `PostRunError`                        4.2µs                            1.45x (`cucumber`)
-  `ResultError`                         4.1µs                            1.44x (`cucumber`)
-  `SkModifierError`                     3.9µs                            1.44x (`cucumber`)
-  `timedelta`                           3.7µs                            1.43x (`cucumber`)
-  `PosixPath`                           3.5µs                            1.43x (`cucumber`)
-  `Decimal`                             4.6µs                            1.41x (`cucumber`)
-  `OnFinishError`                       4.1µs                            1.37x (`cucumber`)
-  `time`                                3.7µs                            1.35x (`cucumber`)</code></pre>
+    <div class="benchmark-table-wrap">
+        <table class="benchmark-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Speed with <code>cloudpickle</code></th>
+                    <th>How much faster than 2nd place?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>Skclass</code></td><td>9.8µs</td><td>5.24x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code></td><td>6.6µs</td><td>4.77x (<code>dill</code>)</td></tr>
+                <tr><td><code>SQLiteReconnector</code></td><td>5.1µs</td><td>4.06x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>CodeType</code></td><td>9.4µs</td><td>3.82x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>PurePath</code></td><td>3.8µs</td><td>3.82x (<code>dill</code>)</td></tr>
+                <tr><td><code>SpooledTemporaryFile</code></td><td>9.9µs</td><td>3.69x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Logger</code></td><td>4.0µs</td><td>3.65x (<code>dill</code>)</td></tr>
+                <tr><td><code>SharedMemory</code></td><td>12.0µs</td><td>3.61x (<code>dill</code>)</td></tr>
+                <tr><td><code>list</code></td><td>1.7µs</td><td>3.29x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>CompletedProcess</code></td><td>5.8µs</td><td>3.19x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Enum</code></td><td>6.4µs</td><td>2.95x (<code>dill</code>)</td></tr>
+                <tr><td><code>re.Pattern</code></td><td>6.4µs</td><td>2.80x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>tuple</code></td><td>1.5µs</td><td>2.73x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Flag</code></td><td>5.1µs</td><td>2.65x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>Skpath</suitkaise-api></code></td><td>8.5µs</td><td>2.65x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>ModuleType</code></td><td>7.2µs</td><td>2.58x (<code>dill</code>)</td></tr>
+                <tr><td><code>Class object</code></td><td>3.3µs</td><td>2.58x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>set</code></td><td>1.4µs</td><td>2.50x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>OS pipes</code></td><td>1.7µs</td><td>2.47x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>functools.partial</code></td><td>22.4µs</td><td>2.46x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>date</code></td><td>4.0µs</td><td>2.42x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Skfunction</code></td><td>34.4µs</td><td>2.40x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>frozenset</code></td><td>1.3µs</td><td>2.31x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>typing.TypedDict</code></td><td>2.0µs</td><td>2.25x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>enumerate</code></td><td>7.5µs</td><td>2.23x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>dict</code></td><td>1.8µs</td><td>2.06x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>timezone</code></td><td>6.6µs</td><td>1.98x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>StringIO</code></td><td>5.8µs</td><td>1.90x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>deque</code></td><td>5.7µs</td><td>1.84x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>ErrorHandlerError</suitkaise-api></code></td><td>4.1µs</td><td>1.78x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>PipeReconnector</code></td><td>6.2µs</td><td>1.77x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Path</code></td><td>4.0µs</td><td>1.75x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Formatter</code></td><td>7.3µs</td><td>1.74x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code></td><td>4.1µs</td><td>1.73x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>BytesIO</code></td><td>6.3µs</td><td>1.73x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>FunctionTimeoutError</suitkaise-api></code></td><td>3.7µs</td><td>1.70x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>UUID</code></td><td>4.8µs</td><td>1.69x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>CustomRoot</suitkaise-api></code></td><td>4.7µs</td><td>1.68x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Fraction</code></td><td>4.2µs</td><td>1.67x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>DeserializationError</suitkaise-api></code></td><td>4.2µs</td><td>1.67x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>ProcessError</suitkaise-api></code></td><td>6.2µs</td><td>1.66x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>range_iterator</code></td><td>8.5µs</td><td>1.65x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Class instance</code></td><td>4.2µs</td><td>1.62x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>zip</code></td><td>9.2µs</td><td>1.60x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>PreRunError</suitkaise-api></code></td><td>5.0µs</td><td>1.58x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>PathDetectionError</suitkaise-api></code></td><td>4.1µs</td><td>1.54x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>ResultTimeoutError</suitkaise-api></code></td><td>4.0µs</td><td>1.48x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>PostRunError</suitkaise-api></code></td><td>4.2µs</td><td>1.45x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>ResultError</suitkaise-api></code></td><td>4.1µs</td><td>1.44x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>SkModifierError</suitkaise-api></code></td><td>3.9µs</td><td>1.44x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>timedelta</code></td><td>3.7µs</td><td>1.43x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>PosixPath</code></td><td>3.5µs</td><td>1.43x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>Decimal</code></td><td>4.6µs</td><td>1.41x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code><suitkaise-api>OnFinishError</suitkaise-api></code></td><td>4.1µs</td><td>1.37x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>time</code></td><td>3.7µs</td><td>1.35x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+            </tbody>
+        </table>
+    </div>
         </div>
     </details>
     <details>
         <summary>Types <code>dill</code> handles the fastest (&gt;1.33x faster)</summary>
         <div class="dropdown-content">
     <p><code>dill</code> handles more types than <code>cloudpickle</code>, but it pretty slow.</p>
-    <p><code>cucumber</code> handles more types than <code>dill</code> and is almost always faster.</p>
-    <pre><code class="language-text">───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  Type                                  speed with `dill`                How much faster than 2nd place?
-───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  `BufferedReader`                      28.7µs                           3.19x (`cucumber`)
-  `BufferedWriter`                      25.5µs                           1.84x (`cucumber`)
-  `FileIO`                              24.7µs                           1.81x (`cucumber`)</code></pre>
+    <p><code><suitkaise-api>cucumber</suitkaise-api></code> handles more types than <code>dill</code> and is almost always faster.</p>
+    <div class="benchmark-table-wrap">
+        <table class="benchmark-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Speed with <code>dill</code></th>
+                    <th>How much faster than 2nd place?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>BufferedReader</code></td><td>28.7µs</td><td>3.19x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>BufferedWriter</code></td><td>25.5µs</td><td>1.84x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+                <tr><td><code>FileIO</code></td><td>24.7µs</td><td>1.81x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
+            </tbody>
+        </table>
+    </div>
         </div>
     </details>
     <details>
         <summary>All Benchmarks</summary>
         <div class="dropdown-content">
-    <pre><code class="language-python">────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    <pre data-benchmark-table="all"><code class="language-text">────────────────────────────────────────────────────────────────────────────────────────────────────────────────
                                    Supported Types Compatibility Benchmarks                                   
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-  Type                           cucumber             pickle             dill               cloudpickle
+  Type                           <suitkaise-api>cucumber</suitkaise-api>             pickle             dill               cloudpickle
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   bool                           6.4µs              0.8µs              55.1µs             10.4µs            
   int                            1.2µs              0.3µs              10.7µs             2.6µs             
@@ -278,7 +308,7 @@
   threading.local                17.0µs             fail               fail               fail              
   multiprocessing.Queue          14.0µs             fail               fail               fail              
   multiprocessing.Event          35.1µs             fail               fail               fail              
-  multiprocessing.Pipe           44.6µs             3.4µs              31.5µs             6.6µs             
+  multiprocessing.<suitkaise-api>Pipe</suitkaise-api>           44.6µs             3.4µs              31.5µs             6.6µs             
   multiprocessing.Manager        190.5µs            fail               fail               fail              
   SharedMemory                   52.8µs             5.9µs              43.3µs             12.0µs            
   queue.Queue                    23.2µs             fail               133.7µs            fail              
@@ -348,33 +378,33 @@
   dataclass                      89.6µs             fail               752.2µs            237.6µs           
   slots class                    37.1µs             fail               107.1µs            56.0µs            
   slots+dict class               31.0µs             fail               107.5µs            55.8µs            
-  Sktimer                        28.9µs             fail               42.3µs             fail              
-  TimeThis                       54.6µs             fail               74.4µs             fail              
-  Circuit                        25.5µs             fail               37.7µs             fail              
-  BreakingCircuit                24.7µs             fail               38.7µs             fail              
-  Skpath                         22.5µs             11.3µs             40.9µs             8.5µs             
-  CustomRoot                     7.9µs              3.6µs              20.2µs             4.7µs             
-  Skprocess                      212.1µs            fail               402.9µs            201.8µs           
-  Pool                           115.5µs            fail               fail               fail              
-  Share                          852.0µs            fail               fail               fail              
-  ProcessTimers                  106.4µs            fail               100.8µs            fail              
-  ProcessError                   10.3µs             2.0µs              22.3µs             6.2µs             
-  PreRunError                    7.9µs              1.5µs              20.3µs             5.0µs             
-  RunError                       6.4µs              1.4µs              18.6µs             5.0µs             
-  PostRunError                   6.1µs              1.3µs              17.5µs             4.2µs             
-  OnFinishError                  5.6µs              1.2µs              17.6µs             4.1µs             
-  ResultError                    5.9µs              1.3µs              16.8µs             4.1µs             
-  ErrorHandlerError              7.3µs              1.2µs              18.3µs             4.1µs             
-  ProcessTimeoutError            7.1µs              1.5µs              22.7µs             4.1µs             
-  ResultTimeoutError             5.9µs              1.3µs              17.2µs             4.0µs             
-  PathDetectionError             6.3µs              2.7µs              17.5µs             4.1µs             
-  SerializationError             5.4µs              1.3µs              17.9µs             4.3µs             
-  DeserializationError           7.0µs              1.3µs              14.4µs             4.2µs             
-  SkModifierError                5.6µs              3.5µs              15.2µs             3.9µs             
-  FunctionTimeoutError           6.3µs              1.5µs              14.3µs             3.7µs             
+  <suitkaise-api>Sktimer</suitkaise-api>                        28.9µs             fail               42.3µs             fail              
+  <suitkaise-api>TimeThis</suitkaise-api>                       54.6µs             fail               74.4µs             fail              
+  <suitkaise-api>Circuit</suitkaise-api>                        25.5µs             fail               37.7µs             fail              
+  <suitkaise-api>BreakingCircuit</suitkaise-api>                24.7µs             fail               38.7µs             fail              
+  <suitkaise-api>Skpath</suitkaise-api>                         22.5µs             11.3µs             40.9µs             8.5µs             
+  <suitkaise-api>CustomRoot</suitkaise-api>                     7.9µs              3.6µs              20.2µs             4.7µs             
+  <suitkaise-api>Skprocess</suitkaise-api>                      212.1µs            fail               402.9µs            201.8µs           
+  <suitkaise-api>Pool</suitkaise-api>                           115.5µs            fail               fail               fail              
+  <suitkaise-api>Share</suitkaise-api>                          852.0µs            fail               fail               fail              
+  <suitkaise-api>ProcessTimers</suitkaise-api>                  106.4µs            fail               100.8µs            fail              
+  <suitkaise-api>ProcessError</suitkaise-api>                   10.3µs             2.0µs              22.3µs             6.2µs             
+  <suitkaise-api>PreRunError</suitkaise-api>                    7.9µs              1.5µs              20.3µs             5.0µs             
+  <suitkaise-api>RunError</suitkaise-api>                       6.4µs              1.4µs              18.6µs             5.0µs             
+  <suitkaise-api>PostRunError</suitkaise-api>                   6.1µs              1.3µs              17.5µs             4.2µs             
+  <suitkaise-api>OnFinishError</suitkaise-api>                  5.6µs              1.2µs              17.6µs             4.1µs             
+  <suitkaise-api>ResultError</suitkaise-api>                    5.9µs              1.3µs              16.8µs             4.1µs             
+  <suitkaise-api>ErrorHandlerError</suitkaise-api>              7.3µs              1.2µs              18.3µs             4.1µs             
+  <suitkaise-api>ProcessTimeoutError</suitkaise-api>            7.1µs              1.5µs              22.7µs             4.1µs             
+  <suitkaise-api>ResultTimeoutError</suitkaise-api>             5.9µs              1.3µs              17.2µs             4.0µs             
+  <suitkaise-api>PathDetectionError</suitkaise-api>             6.3µs              2.7µs              17.5µs             4.1µs             
+  <suitkaise-api>SerializationError</suitkaise-api>             5.4µs              1.3µs              17.9µs             4.3µs             
+  <suitkaise-api>DeserializationError</suitkaise-api>           7.0µs              1.3µs              14.4µs             4.2µs             
+  <suitkaise-api>SkModifierError</suitkaise-api>                5.6µs              3.5µs              15.2µs             3.9µs             
+  <suitkaise-api>FunctionTimeoutError</suitkaise-api>           6.3µs              1.5µs              14.3µs             3.7µs             
   Skclass                        51.4µs             7.5µs              170.0µs            9.8µs             
   Skfunction                     82.6µs             fail               92.8µs             34.4µs            
-  Skfunction.asynced()           59.7µs             fail               78.7µs             65.0µs</code></pre>
+  Skfunction.<suitkaise-api>asynced</suitkaise-api>()           59.7µs             fail               78.7µs             65.0µs</code></pre>
         </div>
     </details>
 </section>

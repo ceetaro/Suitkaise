@@ -9,21 +9,21 @@ columns = 1
 
 # 1.1
 
-title = "Why you would use `paths`"
+title = "Why you would use `<suitkaise-api>paths</suitkaise-api>`"
 
 # 1.2
 
 text = "
 ## TLDR
 
-`paths` exists because path handling in Python is:
+`<suitkaise-api>paths</suitkaise-api>` exists because path handling in Python is:
 
 1. **Inconsistent** — `\` vs `/`, absolute vs relative, string vs Path
 2. **Manual** — find root, resolve, normalize, convert, repeat
 3. **Error-prone** — works on your machine, breaks on theirs
 4. **Tedious** — same boilerplate in every project
 
-`paths` makes it:
+`<suitkaise-api>paths</suitkaise-api>` makes it:
 
 1. **Consistent** — normalized slashes, project-relative paths, cross-platform by default
 2. **Automatic** — root detection, type conversion, caller detection
@@ -48,34 +48,34 @@ I don't want to `.resolve()` every single path.
 
 I just want path handling to be easy, consistent, and have some basic level of standardization.
 
-So I made `paths`.
+So I made `<suitkaise-api>paths</suitkaise-api>`.
 
 ### Drop-in upgrade from `pathlib`
 
-`Skpath` wraps `pathlib.Path`. Everything `pathlib.Path` does, `Skpath` does too -- same methods, same interface, same behavior. You don't have to relearn anything.
+`<suitkaise-api>Skpath</suitkaise-api>` wraps `pathlib.Path`. Everything `pathlib.Path` does, `<suitkaise-api>Skpath</suitkaise-api>` does too -- same methods, same interface, same behavior. You don't have to relearn anything.
 
-What `Skpath` adds on top:
+What `<suitkaise-api>Skpath</suitkaise-api>` adds on top:
 - project-relative paths (`rp`) that are identical on every machine and OS
 - automatic project root detection
 - platform-aware absolute paths
 - reversible path IDs for database storage
 
-If you already use `pathlib`, switching to `Skpath` is a one-word change in your imports with zero risk of breaking existing code.
+If you already use `pathlib`, switching to `<suitkaise-api>Skpath</suitkaise-api>` is a one-word change in your imports with zero risk of breaking existing code.
 
-### Automatic path detection — `Skpath()` with no arguments
+### Automatic path detection — `<suitkaise-api>Skpath</suitkaise-api>()` with no arguments
 
 Need to know the path of the current file? Don't inspect the stack yourself.
 
 ```python
-# get the current file's path as an Skpath, automatically
-here = Skpath()
+# get the current file's path as an <suitkaise-api>Skpath</suitkaise-api>, automatically
+here = <suitkaise-api>Skpath</suitkaise-api>()
 ```
 
-That's it. `Skpath()` with no arguments detects the caller's file path. Works in scripts, modules, notebooks, and test runners.
+That's it. `<suitkaise-api>Skpath</suitkaise-api>()` with no arguments detects the caller's file path. Works in scripts, modules, notebooks, and test runners.
 
-## `Skpath` paths
+## `<suitkaise-api>Skpath</suitkaise-api>` paths
 
-Every `Skpath` stores three paths:
+Every `<suitkaise-api>Skpath</suitkaise-api>` stores three paths:
 
 - `ap` — absolute path, always forward slashes (`/Users/me/project/data/file.txt`)
 
@@ -87,25 +87,25 @@ Every `Skpath` stores three paths:
 
 On a serious note, this changes everything -- and is a huge jump in path standardization.
 
-## `@autopath` — make any function path-safe
+## `@<suitkaise-api>autopath</suitkaise-api>` — make any function path-safe
 
-The fastest way to make your codebase cross-platform: slap `@autopath()` on any function that takes paths.
+The fastest way to make your codebase cross-platform: slap `@<suitkaise-api>autopath</suitkaise-api>()` on any function that takes paths.
 
 ```python
-from suitkaise.paths import autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
-@autopath()
-def process_file(path: AnyPath):
-    # path is now an Skpath, regardless of what was passed in
-    # str, Path, or Skpath -- all converted automatically
+@<suitkaise-api>autopath</suitkaise-api>()
+def process_file(path: <suitkaise-api>AnyPath</suitkaise-api>):
+    # path is now an <suitkaise-api>Skpath</suitkaise-api>, regardless of what was passed in
+    # str, Path, or <suitkaise-api>Skpath</suitkaise-api> -- all converted automatically
     print(path.rp)  # always cross-platform
 ```
 
-Pass a `str`, a `Path`, or an `Skpath` -- `@autopath()` reads the type annotation and converts it for you. Your function just works, no matter what the caller gives it.
+Pass a `str`, a `Path`, or an `<suitkaise-api>Skpath</suitkaise-api>` -- `@<suitkaise-api>autopath</suitkaise-api>()` reads the type annotation and converts it for you. Your function just works, no matter what the caller gives it.
 
-Combined with `AnyPath` (a union of `str`, `Path`, and `Skpath`), you can upgrade your entire codebase to use `Skpath` incrementally without breaking anything that already passes strings or Paths.
+Combined with `<suitkaise-api>AnyPath</suitkaise-api>` (a union of `str`, `Path`, and `<suitkaise-api>Skpath</suitkaise-api>`), you can upgrade your entire codebase to use `<suitkaise-api>Skpath</suitkaise-api>` incrementally without breaking anything that already passes strings or Paths.
 
-This is the "pit of success" -- once `@autopath()` is on a function, it's impossible to accidentally use a platform-specific path inside it.
+This is the "pit of success" -- once `@<suitkaise-api>autopath</suitkaise-api>()` is on a function, it's impossible to accidentally use a platform-specific path inside it.
 
 ## What about just using `pathlib`?
 
@@ -113,9 +113,9 @@ This is the "pit of success" -- once `@autopath()` is on a function, it's imposs
 
 But it doesn't know about your project. It doesn't auto-detect the root. It doesn't give you a consistent path that works everywhere. And it doesn't convert types for you.
 
-`Skpath` wraps `pathlib.Path` and adds project awareness, so you don't have to make it aware of things yourself.
+`<suitkaise-api>Skpath</suitkaise-api>` wraps `pathlib.Path` and adds project awareness, so you don't have to make it aware of things yourself.
 
-The `paths` module also adds a bunch of cool things like `@autopath` and `AnyPath` to help you in your quest to make paths easy and standardized for your entire team.
+The `<suitkaise-api>paths</suitkaise-api>` module also adds a bunch of cool things like `@<suitkaise-api>autopath</suitkaise-api>` and `<suitkaise-api>AnyPath</suitkaise-api>` to help you in your quest to make paths easy and standardized for your entire team.
 
 `pathlib.Path` handles cross-platform normalization internally, but the moment you convert to a string (for logging, storing, or passing to a library), you're back to platform-specific slashes. What's the point?
 
@@ -126,7 +126,7 @@ str(path)
 # "config/settings.yaml" on Mac, "config\\settings.yaml" on Windows
 ```
 
-Here is a set of problems that `paths` solves.
+Here is a set of problems that `<suitkaise-api>paths</suitkaise-api>` solves.
 
 (start of dropdown "1. `\` vs `/`")
 ### 1. `\` vs `/`
@@ -153,10 +153,10 @@ print(Path(config_path).resolve())
 # Now you have mixed slashes in your system
 ```
 
-With `Skpath`
+With `<suitkaise-api>Skpath</suitkaise-api>`
 
 ```python
-path = Skpath("config/settings.yaml")
+path = <suitkaise-api>Skpath</suitkaise-api>("config/settings.yaml")
 
 path.ap  # Always forward slashes: "/Users/me/project/config/settings.yaml"
 
@@ -169,7 +169,7 @@ str(path)  # Always forward slashes (same as ap)
 
 Need to pass a path to a Windows-specific tool or open a file? Use `path.platform`. Want to log or store paths consistently? Use `path.rp` (or `path.ap`).
 
-`Skpath` normalizes to forward slashes everywhere, except for `platform`, which you would want to use for OS-specific operations.
+`<suitkaise-api>Skpath</suitkaise-api>` normalizes to forward slashes everywhere, except for `platform`, which you would want to use for OS-specific operations.
 
 (end of dropdown "1. `\` vs `/`")
 
@@ -196,25 +196,25 @@ You could do it in one long line if you want, I guess.
 path = str(Path("data/file.txt").resolve())
 ```
 
-With `Skpath`, you just create it and it's ready to use cross-platform.
+With `<suitkaise-api>Skpath</suitkaise-api>`, you just create it and it's ready to use cross-platform.
 
 ```python
-path = Skpath("data/file.txt")
+path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
 ```
 
 So much cleaner, so much simpler.
 
-`Skpath`s are awesome because they actually store 3 paths.
+`Skpaths` are awesome because they actually store 3 paths.
 
 - stores absolute path
 - also auto detects the project root and stores the path relative to it
 - stores platform specific separator absolute path
 
-`Skpath`s are automatically cross-platform compatible.
+`Skpaths` are automatically cross-platform compatible.
 
-When you work with `Skpath` objects across machines or even operating systems, as long as the project root is the same, the paths will work the same.
+When you work with `<suitkaise-api>Skpath</suitkaise-api>` objects across machines or even operating systems, as long as the project root is the same, the paths will work the same.
 
-So now you can just `Skpath` everything and not have to worry about platform issues, or having to manually relate paths to the root.
+So now you can just `<suitkaise-api>Skpath</suitkaise-api>` everything and not have to worry about platform issues, or having to manually relate paths to the root.
 
 No more "relative path" confusion. Everything is project root based.
 
@@ -233,13 +233,13 @@ You end up having to copy paste something like this every time:
 
 ```python
 def find_project_root():
-    current = Path(__file__).resolve().parent
-    while current != current.parent:
+    current = Path(__file__).resolve().<suitkaise-api>parent</suitkaise-api>
+    while current != current.<suitkaise-api>parent</suitkaise-api>:
         if (current / "pyproject.toml").exists():
             return current
         if (current / ".git").exists():
             return current
-        current = current.parent
+        current = current.<suitkaise-api>parent</suitkaise-api>
     raise RuntimeError("Could not find project root")
 
 PROJECT_ROOT = find_project_root()
@@ -247,43 +247,43 @@ PROJECT_ROOT = find_project_root()
 
 Which is cloudy and relies on exact indicators.
 
-With `Skpath`, you can just do this:
+With `<suitkaise-api>Skpath</suitkaise-api>`, you can just do this:
 
 ```python
-# 1 line into Skpath
-PROJECT_ROOT = Skpath().root
+# 1 line into <suitkaise-api>Skpath</suitkaise-api>
+PROJECT_ROOT = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>
 ```
 
 Or this:
 
 ```python
 # 1 line into Path
-PROJECT_ROOT = Skpath().root_path
+PROJECT_ROOT = <suitkaise-api>Skpath</suitkaise-api>().root_path
 ```
 
 Or this:
 
 ```python
 # 1 line into str
-PROJECT_ROOT = Skpath().root_str
+PROJECT_ROOT = <suitkaise-api>Skpath</suitkaise-api>().root_str
 ```
 
 Or this:
 
 ```python
-# 1 line into Skpath
-PROJECT_ROOT = paths.get_project_root()
+# 1 line into <suitkaise-api>Skpath</suitkaise-api>
+PROJECT_ROOT = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
 ```
 
-With `paths` you can also use different roots quickly and easily.
+With `<suitkaise-api>paths</suitkaise-api>` you can also use different roots quickly and easily.
 
-- you can add a `setup.sk` file to your project root to guarantee detection (it will look for things like `setup.py` even if you don't do this, but it will look for this first)
+- you can add a `setup.<suitkaise-api>sk</suitkaise-api>` file to your project root to guarantee detection (it will look for things like `setup.py` even if you don't do this, but it will look for this first)
 
-- you can use `set_custom_root` to set a custom root that all `Skpath` objects will use
+- you can use `<suitkaise-api>set_custom_root</suitkaise-api>` to set a custom root that all `<suitkaise-api>Skpath</suitkaise-api>` objects will use
 
-- you can use the `CustomRoot` context manager to temporarily set a custom root for a code block for things like testing
+- you can use the `<suitkaise-api>CustomRoot</suitkaise-api>` context manager to temporarily set a custom root for a code block for things like testing
 
-Note that `Skpath`s are created with the project root they were given, so either use a custom root or don't.
+Note that `Skpaths` are created with the project root they were given, so either use a custom root or don't.
 
 (end of dropdown "3. Project root related issues")
 
@@ -294,34 +294,34 @@ Even if you are in an IDE/code editor, figuring out what type of path you need t
 
 You have to make everyone use either `Path` or `str`, or let everyone code how they want and then hover over every function using paths to see the expected types.
 
-`@autopath` does this for you.
+`@<suitkaise-api>autopath</suitkaise-api>` does this for you.
 
 ```python
-@autopath()
+@<suitkaise-api>autopath</suitkaise-api>()
 def function_that_uses_strs(path: str, ...):
 
     # changes all Paths to strings for you before passing them in
 ```
 
 ```python
-@autopath()
+@<suitkaise-api>autopath</suitkaise-api>()
 def function_that_uses_paths(path: Path, ...):
 
     # changes all strings to Paths for you before passing them in
 ```
 
-All you have to do is slap `@autopath()` on the function and it will automatically convert the paths to the types that you expect, and automatically normalize them through `Skpath` as well, guaranteeing cross-platform compatibility.
+All you have to do is slap `@<suitkaise-api>autopath</suitkaise-api>()` on the function and it will automatically convert the paths to the types that you expect, and automatically normalize them through `<suitkaise-api>Skpath</suitkaise-api>` as well, guaranteeing cross-platform compatibility.
 
-There is also another way to do this: the `AnyPath` type.
+There is also another way to do this: the `<suitkaise-api>AnyPath</suitkaise-api>` type.
 
-`AnyPath` is a union of `str`, `Path`, and `Skpath`.
+`<suitkaise-api>AnyPath</suitkaise-api>` is a union of `str`, `Path`, and `<suitkaise-api>Skpath</suitkaise-api>`.
 
-This allows you to quickly update your code to use the superior `Skpath` type, while not breaking previous code.
+This allows you to quickly update your code to use the superior `<suitkaise-api>Skpath</suitkaise-api>` type, while not breaking previous code.
 
 ```python
-from suitkaise.paths import AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>AnyPath</suitkaise-api>
 
-def function_that_uses_any_paths(path: AnyPath, ...):
+def function_that_uses_any_paths(path: <suitkaise-api>AnyPath</suitkaise-api>, ...):
 
     # allows you to accept all 3 path types 
     # without having to create unions every time
@@ -330,13 +330,13 @@ def function_that_uses_any_paths(path: AnyPath, ...):
 And when you combine them...
 
 ```python
-from suitkaise.paths import autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
-@autopath()
-def function_that_uses_any_paths(path: AnyPath, ...):
+@<suitkaise-api>autopath</suitkaise-api>()
+def function_that_uses_any_paths(path: <suitkaise-api>AnyPath</suitkaise-api>, ...):
 
     # automatically converts strs and Paths to Skpaths for you
-    # gives you access to the more awesome Skpath quickly
+    # gives you access to the more awesome <suitkaise-api>Skpath</suitkaise-api> quickly
 ```
 
 I do a lot of solo coding, and even I was having trouble standardizing path code! When working in a team, don't even get me started.
@@ -370,7 +370,7 @@ def process_file(path, processed):
         print(f"Skipping {path}, already processed")
         return
 
-    # ... do the actual processing ...
+    # ... do the actual <suitkaise-api>processing</suitkaise-api> ...
 
     processed.add(path_str)
     save_processed(processed)
@@ -414,22 +414,22 @@ But now you need to find `PROJECT_ROOT` consistently and correctly, and fix the 
 
 The funniest thing here is that the log file might not even load in the first place because the paths are different.
 
-With `paths`
+With `<suitkaise-api>paths</suitkaise-api>`
 
 ```python
-from suitkaise.paths import Skpath, autopath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>autopath</suitkaise-api>
 import json
 
 LOG_FILE = "processed_files.json"
 
-@autopath()
-def process_file(path: Skpath, processed: set[Skpath]):
+@<suitkaise-api>autopath</suitkaise-api>()
+def process_file(path: <suitkaise-api>Skpath</suitkaise-api>, processed: set[<suitkaise-api>Skpath</suitkaise-api>]):
 
     if path.rp in processed:
         print(f"Skipping {path.rp}, already processed")
         return
     
-    # ... do the actual processing ...
+    # ... do the actual <suitkaise-api>processing</suitkaise-api> ...
     
     processed.add(path.rp)
     save_processed(processed)
@@ -454,7 +454,7 @@ You have to normalize paths, resolve them, convert to strings, and more.
 
 Sometimes you need to know which file called your function -- for logging, for relative path resolution, for debugging.
 
-Without `paths` - *13 lines*
+Without `<suitkaise-api>paths</suitkaise-api>` - *13 lines*
 ```python
 import inspect # 1
 from pathlib import Path # 2
@@ -480,20 +480,20 @@ caller = get_caller_file() # 13
 
 And this doesn't even handle edge cases like notebook environments, compiled code, or filtering out your own library's frames.
 
-With `paths` - *1 line*
+With `<suitkaise-api>paths</suitkaise-api>` - *1 line*
 ```python
-caller = Skpath()
+caller = <suitkaise-api>Skpath</suitkaise-api>()
 ```
 
 Or this:
 ```python
-caller = get_caller_path()
+caller = <suitkaise-api>get_caller_path</suitkaise-api>()
 ```
 
 Or this:
 ```python
-@autopath(use_caller=True) # 1
-def function_that_uses_caller_path(path: Skpath):
+@<suitkaise-api>autopath</suitkaise-api>(use_caller=True) # 1
+def function_that_uses_caller_path(path: <suitkaise-api>Skpath</suitkaise-api>):
 
     # path will be the caller's file path if not explicitly provided
 ```
@@ -510,17 +510,17 @@ Absolute paths are different on every machine. Relative paths need context. Back
 What if you could store a single, URL-safe string that reconstructs the original path? And have it take up less space than the full path?
 
 ```python
-path = Skpath("data/reports/2024/q1.csv")
+path = <suitkaise-api>Skpath</suitkaise-api>("data/reports/2024/q1.csv")
 
 # get a reversible, URL-safe ID
-path_id = path.id
+path_id = path.<suitkaise-api>id</suitkaise-api>
 # "ZGF0YS9yZXBvcnRzLzIwMjQvcTEuY3N2"
 
 # store it in your database, pass it in URLs, use it as a cache key
 db.execute("INSERT INTO files (path_id, ...) VALUES (?, ...)", (path_id, ...))
 
 # later, reconstruct the full path from the ID
-same_path = Skpath(path_id)
+same_path = <suitkaise-api>Skpath</suitkaise-api>(path_id)
 print(same_path.rp)
 # "data/reports/2024/q1.csv"
 ```
@@ -552,25 +552,25 @@ from requests import Session
 # ... now what?
 ```
 
-With `paths`:
+With `<suitkaise-api>paths</suitkaise-api>`:
 
 ```python
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 import json
 from requests import Session
 
 # get the file path for any module, class, or function
-json_path = paths.get_module_path(json)
+json_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(json)
 print(json_path.ap)
 # "/usr/lib/python3.11/json/__init__.py"
 
-session_path = paths.get_module_path(Session)
+session_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(Session)
 print(session_path.ap)
 # "/home/user/.venv/lib/python3.11/site-packages/requests/sessions.py"
 
 # works with your own code too
 from myapp.utils import MyHelper
-my_path = paths.get_module_path(MyHelper)
+my_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(MyHelper)
 print(my_path.rp)
 # "myapp/utils.py"
 ```
@@ -585,15 +585,15 @@ Useful for debugging, documentation generation, or even if you are just curious 
 Need to see what's in your project? Generate a file list? Create documentation?
 
 ```python
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
 # get all files in your project (respects .gitignore automatically)
-all_files = paths.get_project_paths()
+all_files = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>()
 py_files = [f for f in all_files if f.suffix == ".py"]
 print(f"Found {len(py_files)} Python files")
 
 # get a nested dictionary structure
-structure = paths.get_project_structure()
+structure = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_structure</suitkaise-api>()
 # {
 #     "src": {
 #         "main.py": {},
@@ -606,7 +606,7 @@ structure = paths.get_project_structure()
 # }
 
 # or a nice tree string for documentation
-tree = paths.get_formatted_project_tree(depth=2)
+tree = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_formatted_project_tree</suitkaise-api>(depth=2)
 print(tree)
 # myproject/
 # ├── src/
@@ -628,20 +628,20 @@ User uploads a file called `<script>alert('xss')</script>.txt`. Or `CON.txt` (re
 Now what?
 
 ```python
-from suitkaise.paths import is_valid_filename, streamline_path, streamline_path_quick
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
 
 # check if a filename is valid on all platforms
-is_valid_filename("report.pdf")           # True
-is_valid_filename("file<name>.txt")       # False - contains < and >
-is_valid_filename("CON")                  # False - Windows reserved name
-is_valid_filename("file\twith\ttabs.txt") # False - contains tabs
+<suitkaise-api>is_valid_filename</suitkaise-api>("report.pdf")           # True
+<suitkaise-api>is_valid_filename</suitkaise-api>("file<name>.txt")       # False - contains < and >
+<suitkaise-api>is_valid_filename</suitkaise-api>("CON")                  # False - Windows reserved name
+<suitkaise-api>is_valid_filename</suitkaise-api>("file\twith\ttabs.txt") # False - contains tabs
 
 # sanitize a filename to be safe everywhere
-clean = streamline_path_quick("My Report (Final) — версия 2.pdf")
+clean = <suitkaise-api>streamline_path_quick</suitkaise-api>("My Report (Final) — версия 2.pdf")
 # "My_Report__Final______2.pdf"
 
 # more control over sanitization
-clean = streamline_path(
+clean = <suitkaise-api>streamline_path</suitkaise-api>(
     "User Upload: <script>.txt",
     replacement_char="-",
     lowercase=True,
@@ -650,7 +650,7 @@ clean = streamline_path(
 # "user-upload---script.txt"
 ```
 
-Never trust user input. Sanitize everything. `paths` makes it easy.
+Never trust user input. Sanitize everything. `<suitkaise-api>paths</suitkaise-api>` makes it easy.
 
 (end of dropdown "10. Filename validation and sanitization")
 
@@ -660,19 +660,19 @@ Never trust user input. Sanitize everything. `paths` makes it easy.
 Testing code that uses project paths is annoying. Your tests run from a different directory, your CI runs from yet another place.
 
 ```python
-from suitkaise.paths import CustomRoot, Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>CustomRoot</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
 # in your test file
 def test_config_loading():
     # temporarily set a custom root for this test
-    with CustomRoot("/tmp/test_project"):
-        # all Skpath operations now use /tmp/test_project as root
-        config = Skpath("config/settings.yaml")
+    with <suitkaise-api>CustomRoot</suitkaise-api>("/tmp/test_project"):
+        # all <suitkaise-api>Skpath</suitkaise-api> operations now use /tmp/test_project as root
+        config = <suitkaise-api>Skpath</suitkaise-api>("config/settings.yaml")
         assert config.root_str == "/tmp/test_project"
         
         # your code that depends on project root works correctly
-        result = load_config()
-        assert result["setting"] == "test_value"
+        <suitkaise-api>result</suitkaise-api> = load_config()
+        assert <suitkaise-api>result</suitkaise-api>["setting"] == "test_value"
     
     # outside the block, normal root detection resumes
 ```
@@ -686,7 +686,7 @@ No more patching, no more environment variables, no more test fixtures that set 
 
 You want to track which files you've seen. Simple, right?
 
-Without `paths` - *8 lines*
+Without `<suitkaise-api>paths</suitkaise-api>` - *8 lines*
 ```python
 from pathlib import Path # 1
 
@@ -706,30 +706,30 @@ def is_seen(path: str):
     normalized = str(normalized) # 8
     return normalized in seen
 
-# this STILL might mess up and have duplicate paths
+# this STILL might mess up and have duplicate <suitkaise-api>paths</suitkaise-api>
 len(seen)
 ```
 
 You have to manually normalize every time you add or check. And if you forget once, you get duplicates or missed lookups.
 
-With `paths`
+With `<suitkaise-api>paths</suitkaise-api>`
 ```python
-from suitkaise import paths # 1
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api> # 1
 
 seen = set() # 2
 
-@paths.autopath() # 3
-def mark_seen(path: paths.AnyPath):
+@<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>autopath</suitkaise-api>() # 3
+def mark_seen(path: <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>AnyPath</suitkaise-api>):
     seen.add(path)
 
-@paths.autopath() # 4
-def is_seen(path: paths.AnyPath):
+@<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>autopath</suitkaise-api>() # 4
+def is_seen(path: <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>AnyPath</suitkaise-api>):
     return path in seen
 
 len(seen) # no duplicates
 ```
 
-`Skpath` objects hash and compare using their normalized path (`rp`), so different representations of the same file are recognized as equal.
+`<suitkaise-api>Skpath</suitkaise-api>` objects hash and compare using their normalized path (`rp`), so different representations of the same file are recognized as equal.
 
 Works in sets, works as dict keys, no extra effort.
 

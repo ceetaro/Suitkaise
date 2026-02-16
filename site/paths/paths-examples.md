@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "`paths` examples"
+title = "`<suitkaise-api>paths</suitkaise-api>` examples"
 
 # 1.2
 
@@ -23,11 +23,11 @@ text = "
 Getting the path of the file you're currently writing code in - usually a pain with `__file__` and `Path`.
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-# Skpath() with no arguments returns the caller's file path
+# <suitkaise-api>Skpath</suitkaise-api>() with no arguments returns the caller's file path
 # this is the file where this line of code is written
-current_file = Skpath()
+current_file = <suitkaise-api>Skpath</suitkaise-api>()
 
 # get the absolute path (always uses forward slashes)
 print(current_file.ap)
@@ -46,10 +46,10 @@ print(current_file.name)
 ### Get the current directory
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-# Skpath().parent gives you the directory containing the current file
-current_dir = Skpath().parent
+# <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>parent</suitkaise-api> gives you the directory containing the current file
+current_dir = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>parent</suitkaise-api>
 
 # now you can access sibling files easily using truediv
 config_file = current_dir / "config.json"
@@ -63,68 +63,68 @@ if config_file.exists:
 ### Alternative: use the helper functions
 
 ```python
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
-# get_caller_path() is equivalent to Skpath()
-current_file = paths.get_caller_path()
+# <suitkaise-api>get_caller_path</suitkaise-api>() is equivalent to <suitkaise-api>Skpath</suitkaise-api>()
+current_file = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_caller_path</suitkaise-api>()
 
-# get_current_dir() is equivalent to Skpath().parent
-current_dir = paths.get_current_dir()
+# <suitkaise-api>get_current_dir</suitkaise-api>() is equivalent to <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>parent</suitkaise-api>
+current_dir = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_current_dir</suitkaise-api>()
 
-# get_cwd() returns the current working directory (where you ran python from)
-cwd = paths.get_cwd()
+# <suitkaise-api>get_cwd</suitkaise-api>() returns the current working directory (where you ran python from)
+cwd = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_cwd</suitkaise-api>()
 
 # these are different!
 # - current_dir: directory containing THIS file
-# - cwd: directory where `python script.py` was run from
+# - cwd: directory where `python script.py` was <suitkaise-api>run</suitkaise-api> from
 ```
 
 ### Project root detection
 
 ```python
-from suitkaise import paths
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-# get the project root (auto-detected)
-root = paths.get_project_root()
-print(root.ap)
+# get the project <suitkaise-api>root</suitkaise-api> (auto-detected)
+root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
+print(<suitkaise-api>root</suitkaise-api>.ap)
 # "/Users/me/myproject"
 
 # project root is detected by looking for:
-# 1. setup.sk (suitkaise marker - highest priority)
+# 1. setup.<suitkaise-api>sk</suitkaise-api> (<suitkaise-api>suitkaise</suitkaise-api> marker - highest priority)
 # 2. setup.py, setup.cfg, pyproject.toml
 # 3. .git, .gitignore
 # 4. LICENSE, README files
 # 5. requirements.txt
 
-# you can also access root from any Skpath
-some_file = Skpath("src/main.py")
-print(some_file.root.ap)
+# you can also access root from any <suitkaise-api>Skpath</suitkaise-api>
+some_file = <suitkaise-api>Skpath</suitkaise-api>("src/main.py")
+print(some_file.<suitkaise-api>root</suitkaise-api>.ap)
 # "/Users/me/myproject"
 ```
 
 ### Override project root detection
 
 ```python
-from suitkaise import paths
-from suitkaise.paths import CustomRoot
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>CustomRoot</suitkaise-api>
 
 # set a custom root manually
-paths.set_custom_root("/my/custom/root")
+<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>set_custom_root</suitkaise-api>("/my/custom/root")
 
-# now all Skpath objects use this root
-path = paths.get_project_root()
+# now all <suitkaise-api>Skpath</suitkaise-api> objects use this root
+path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
 print(path.ap)
 # "/my/custom/root"
 
 # clear it to go back to auto-detection
-paths.clear_custom_root()
+<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>clear_custom_root</suitkaise-api>()
 
 # or use a context manager for temporary override
-with CustomRoot("/temp/project"):
+with <suitkaise-api>CustomRoot</suitkaise-api>("/temp/project"):
     # inside this block, root is /temp/project
-    root = paths.get_project_root()
-    print(root.ap)
+    root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
+    print(<suitkaise-api>root</suitkaise-api>.ap)
     # "/temp/project"
 
 # outside the block, root is auto-detected again
@@ -133,15 +133,15 @@ with CustomRoot("/temp/project"):
 ### Path joining with `/`
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-# Skpath supports the / operator like pathlib.Path
-root = Skpath().root
+# <suitkaise-api>Skpath</suitkaise-api> supports the / operator like pathlib.Path
+root = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>
 data_file = root / "data" / "users.json"
 
-# the result is always an Skpath
+# the <suitkaise-api>result</suitkaise-api> is always an <suitkaise-api>Skpath</suitkaise-api>
 print(type(data_file))
-# <class 'suitkaise.paths._int.skpath.Skpath'>
+# <class '<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api>._int.skpath.<suitkaise-api>Skpath</suitkaise-api>'>
 
 print(data_file.ap)
 # "/Users/me/myproject/data/users.json"
@@ -153,9 +153,9 @@ print(data_file.rp)
 ### Core properties: `ap`, `rp`, `id`, `platform`
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-path = Skpath("src/utils/helpers.py")
+path = <suitkaise-api>Skpath</suitkaise-api>("src/utils/helpers.py")
 
 # ap: absolute path (always forward slashes, even on Windows)
 print(path.ap)
@@ -171,11 +171,11 @@ print(path.platform)
 # "/Users/me/project/src/utils/helpers.py" on Mac/Linux
 
 # id: reversible base64url encoded ID
-print(path.id)
+print(path.<suitkaise-api>id</suitkaise-api>)
 # "c3JjL3V0aWxzL2hlbHBlcnMucHk"
 
 # you can recreate the path from its ID!
-same_path = Skpath(path.id)
+same_path = <suitkaise-api>Skpath</suitkaise-api>(path.<suitkaise-api>id</suitkaise-api>)
 print(same_path.rp)
 # "src/utils/helpers.py"
 ```
@@ -183,32 +183,32 @@ print(same_path.rp)
 ### `pathlib` compatibility
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-path = Skpath("src/main.py")
+path = <suitkaise-api>Skpath</suitkaise-api>("src/main.py")
 
 # all the familiar pathlib properties work
 print(path.name)      # "main.py"
 print(path.stem)      # "main"
 print(path.suffix)    # ".py"
-print(path.parent)    # Skpath("src")
+print(path.<suitkaise-api>parent</suitkaise-api>)    # <suitkaise-api>Skpath</suitkaise-api>("src")
 print(path.exists)    # True or False
 
 # pathlib methods work too
-for py_file in path.parent.glob("*.py"):
+for py_file in path.<suitkaise-api>parent</suitkaise-api>.glob("*.py"):
     print(py_file.name)
 
 # recursive glob
-for py_file in Skpath().root.rglob("*.py"):
+for py_file in <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>.rglob("*.py"):
     print(py_file.rp)
 ```
 
 ### File operations
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-root = Skpath().root
+root = <suitkaise-api>Skpath</suitkaise-api>().<suitkaise-api>root</suitkaise-api>
 
 # create directories
 new_dir = root / "output/reports"
@@ -221,7 +221,7 @@ new_file.touch()
 # copy files
 source = root / "data/input.csv"
 dest = source.copy_to(root / "backup/input.csv", parents=True)
-# dest is an Skpath pointing to the copied file
+# dest is an <suitkaise-api>Skpath</suitkaise-api> pointing to the copied file
 
 # move files
 temp_file = root / "temp/data.json"
@@ -239,11 +239,11 @@ empty_dir.rmdir()
 ### Cross-platform compatibility
 
 ```python
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
-# Skpath always uses forward slashes internally
+# <suitkaise-api>Skpath</suitkaise-api> always uses forward slashes internally
 # this works on Windows, Mac, and Linux
-path = Skpath("data\\subdir\\file.txt")  # Windows-style input
+path = <suitkaise-api>Skpath</suitkaise-api>("data\\subdir\\file.txt")  # Windows-style input
 print(path.ap)
 # "/Users/me/project/data/subdir/file.txt" (forward slashes)
 
@@ -260,29 +260,29 @@ with open(path, "r") as f:  # uses __fspath__()
 ### Path validation
 
 ```python
-from suitkaise.paths import is_valid_filename, streamline_path, streamline_path_quick
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
 
 # check if a filename is valid on all platforms
-print(is_valid_filename("my_file.txt"))      # True
-print(is_valid_filename("file<name>.txt"))   # False (< and > are invalid)
-print(is_valid_filename("CON"))              # False (Windows reserved name)
-print(is_valid_filename(""))                 # False (empty)
+print(<suitkaise-api>is_valid_filename</suitkaise-api>("my_file.txt"))      # True
+print(<suitkaise-api>is_valid_filename</suitkaise-api>("file<name>.txt"))   # False (< and > are invalid)
+print(<suitkaise-api>is_valid_filename</suitkaise-api>("CON"))              # False (Windows reserved name)
+print(<suitkaise-api>is_valid_filename</suitkaise-api>(""))                 # False (empty)
 
 # sanitize a filename
-clean = streamline_path("My File<1>.txt", chars_to_replace=" ")
+clean = <suitkaise-api>streamline_path</suitkaise-api>("My File<1>.txt", chars_to_replace=" ")
 print(clean)
 # "My_File_1_.txt"
 
-# streamline_path_quick: simple version with common defaults
+# <suitkaise-api>streamline_path_quick</suitkaise-api>: simple version with common defaults
 # - strips whitespace
 # - replaces spaces
 # - removes unicode
-clean = streamline_path_quick("My File наме.txt")
+clean = <suitkaise-api>streamline_path_quick</suitkaise-api>("My File наме.txt")
 print(clean)
 # "My_File_____.txt"
 
 # limit length (preserves file extension)
-short = streamline_path("Very Long Filename That Needs Truncating.txt", max_len=10, chars_to_replace=" ")
+short = <suitkaise-api>streamline_path</suitkaise-api>("Very Long Filename That Needs Truncating.txt", max_len=10, chars_to_replace=" ")
 print(short)
 # "Very_Long_.txt"
 ```
@@ -290,21 +290,21 @@ print(short)
 ### Get project structure
 
 ```python
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
-# get all paths in the project (respects .gitignore)
-all_paths = paths.get_project_paths()
+# get all <suitkaise-api>paths</suitkaise-api> in the project (respects .gitignore)
+all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>()
 for p in all_paths[:5]:
     print(p.rp)
 
 # get as strings (more memory efficient for large projects)
-all_paths_str = paths.get_project_paths(as_strings=True)
+all_paths_str = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(as_strings=True)
 
 # exclude certain directories
-paths_filtered = paths.get_project_paths(exclude=["node_modules", "dist", ".git"])
+paths_filtered = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(exclude=["node_modules", "dist", ".git"])
 
 # get nested dictionary structure for something like a UI tree
-structure = paths.get_project_structure()
+structure = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_structure</suitkaise-api>()
 # {
 #     "myproject": {
 #         "src": {
@@ -317,7 +317,7 @@ structure = paths.get_project_structure()
 # }
 
 # get formatted tree string for something like a README
-tree = paths.get_formatted_project_tree(depth=2)
+tree = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_formatted_project_tree</suitkaise-api>(depth=2)
 print(tree)
 # myproject/
 # ├── src/
@@ -329,22 +329,22 @@ print(tree)
 ### Get module path
 
 ```python
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 import json
 
 # get the file path where a module is defined
-json_path = paths.get_module_path(json)
+json_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(json)
 print(json_path.ap)
 # "/usr/lib/python3.11/json/__init__.py"
 
 # works with classes too
 from collections import OrderedDict
-od_path = paths.get_module_path(OrderedDict)
+od_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(OrderedDict)
 print(od_path.ap)
 
 # works with your own modules
 from myapp.utils import MyClass
-my_path = paths.get_module_path(MyClass)
+my_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(MyClass)
 print(my_path.rp)
 # "myapp/utils.py"
 ```
@@ -353,20 +353,20 @@ print(my_path.rp)
 
 ```python
 import threading
-from suitkaise.paths import Skpath, CustomRoot
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>CustomRoot</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
-# Skpath and root management functions are thread-safe
+# <suitkaise-api>Skpath</suitkaise-api> and root management functions are thread-safe
 # multiple threads can safely:
-# - create Skpath objects
+# - create <suitkaise-api>Skpath</suitkaise-api> objects
 # - access project root
-# - use CustomRoot context manager
+# - use <suitkaise-api>CustomRoot</suitkaise-api> context manager
 
 results = []
 
 def worker(worker_id: int):
-    # each thread can safely create paths
-    path = Skpath(f"data/file_{worker_id}.txt")
+    # each thread can safely create <suitkaise-api>paths</suitkaise-api>
+    path = <suitkaise-api>Skpath</suitkaise-api>(f"data/file_{worker_id}.txt")
     
     # thread-safe access to properties
     results.append({
@@ -379,113 +379,113 @@ def worker(worker_id: int):
 threads = []
 for i in range(10):
     t = threading.Thread(target=worker, args=(i,))
-    t.start()
+    t.<suitkaise-api>start</suitkaise-api>()
     threads.append(t)
 
 for t in threads:
     t.join()
 
-print(f"Processed {len(results)} paths safely")
+print(f"Processed {len(results)} <suitkaise-api>paths</suitkaise-api> safely")
 ```
 (end of dropdown "Basic Examples")
 
 (start of dropdown "Advanced Examples")
 ## Advanced Examples
 
-### Using `autopath` decorator
+### Using `<suitkaise-api>autopath</suitkaise-api>` decorator
 
-The `autopath` decorator automatically converts path parameters based on type hints.
+The `<suitkaise-api>autopath</suitkaise-api>` decorator automatically converts path parameters based on type hints.
 
 ```python
-# WITHOUT autopath - you have to handle type conversion manually
+# WITHOUT <suitkaise-api>autopath</suitkaise-api> - you have to handle type conversion manually
 def process_file_manual(path):
     if isinstance(path, str):
         path = Path(path)
-    elif isinstance(path, Skpath):
+    elif isinstance(path, <suitkaise-api>Skpath</suitkaise-api>):
         path = Path(path.ap)
     # ... now path is a Path
     return path.read_text()
 ```
 
 ```python
-from suitkaise.paths import autopath, Skpath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 from pathlib import Path
 
-# WITH autopath - conversion is automatic based on type hints
-@autopath()
-def process_file(path: Skpath) -> str:
-    # path is guaranteed to be an Skpath
-    # you can pass str, Path, or Skpath - all get converted
+# WITH <suitkaise-api>autopath</suitkaise-api> - conversion is automatic based on type hints
+@<suitkaise-api>autopath</suitkaise-api>()
+def process_file(path: <suitkaise-api>Skpath</suitkaise-api>) -> str:
+    # path is guaranteed to be an <suitkaise-api>Skpath</suitkaise-api>
+    # you can pass str, Path, or <suitkaise-api>Skpath</suitkaise-api> - all get converted
     return path.ap
 
 # all of these work:
-process_file("src/main.py")            # str → Skpath
-process_file(Path("src/main.py"))      # Path → Skpath
-process_file(Skpath("src/main.py"))    # Skpath → Skpath (no conversion needed)
+process_file("src/main.py")            # str → <suitkaise-api>Skpath</suitkaise-api>
+process_file(Path("src/main.py"))      # Path → <suitkaise-api>Skpath</suitkaise-api>
+process_file(<suitkaise-api>Skpath</suitkaise-api>("src/main.py"))    # <suitkaise-api>Skpath</suitkaise-api> → <suitkaise-api>Skpath</suitkaise-api> (no conversion needed)
 ```
 
-### `autopath` with different target types
+### `<suitkaise-api>autopath</suitkaise-api>` with different target types
 
 ```python
-from suitkaise.paths import autopath, Skpath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 from pathlib import Path
 
-@autopath()
-def needs_skpath(path: Skpath) -> str:
-    # input is converted to Skpath
+@<suitkaise-api>autopath</suitkaise-api>()
+def needs_skpath(path: <suitkaise-api>Skpath</suitkaise-api>) -> str:
+    # input is converted to <suitkaise-api>Skpath</suitkaise-api>
     return path.rp
 
-@autopath()
+@<suitkaise-api>autopath</suitkaise-api>()
 def needs_path(path: Path) -> str:
-    # input is normalized through Skpath, then converted to Path
+    # input is normalized through <suitkaise-api>Skpath</suitkaise-api>, then converted to Path
     return str(path)
 
-@autopath()
+@<suitkaise-api>autopath</suitkaise-api>()
 def needs_string(path: str) -> str:
-    # input is normalized through Skpath, returns absolute path string
+    # input is normalized through <suitkaise-api>Skpath</suitkaise-api>, returns absolute path string
     return path
 
-@autopath()
-def needs_anypath(path: AnyPath) -> str:
-    # AnyPath is a union of str | Path | Skpath
-    # autopath converts to Skpath (the richest type in the union)
-    return path.rp  # path is Skpath
+@<suitkaise-api>autopath</suitkaise-api>()
+def needs_anypath(path: <suitkaise-api>AnyPath</suitkaise-api>) -> str:
+    # <suitkaise-api>AnyPath</suitkaise-api> is a union of str | Path | <suitkaise-api>Skpath</suitkaise-api>
+    # <suitkaise-api>autopath</suitkaise-api> converts to <suitkaise-api>Skpath</suitkaise-api> (the richest type in the union)
+    return path.rp  # path is <suitkaise-api>Skpath</suitkaise-api>
 ```
 
-### `autopath` with lists
+### `<suitkaise-api>autopath</suitkaise-api>` with lists
 
 ```python
-from suitkaise.paths import autopath, Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 from pathlib import Path
 
-@autopath()
-def process_files(paths: list[Skpath]) -> list[str]:
-    # each element in the list is converted to Skpath
-    return [p.rp for p in paths]
+@<suitkaise-api>autopath</suitkaise-api>()
+def process_files(<suitkaise-api>paths</suitkaise-api>: list[<suitkaise-api>Skpath</suitkaise-api>]) -> list[str]:
+    # each element in the list is converted to <suitkaise-api>Skpath</suitkaise-api>
+    return [p.rp for p in <suitkaise-api>paths</suitkaise-api>]
 
 # works with mixed input types
-result = process_files([
+<suitkaise-api>result</suitkaise-api> = process_files([
     "src/a.py",              # str
     Path("src/b.py"),        # Path
-    Skpath("src/c.py"),      # Skpath
+    <suitkaise-api>Skpath</suitkaise-api>("src/c.py"),      # <suitkaise-api>Skpath</suitkaise-api>
 ])
-print(result)
+print(<suitkaise-api>result</suitkaise-api>)
 # ["src/a.py", "src/b.py", "src/c.py"]
 
 # also works with tuple, set, frozenset
-@autopath()
-def process_set(paths: set[Skpath]) -> int:
-    return len(paths)
+@<suitkaise-api>autopath</suitkaise-api>()
+def process_set(<suitkaise-api>paths</suitkaise-api>: set[<suitkaise-api>Skpath</suitkaise-api>]) -> int:
+    return len(<suitkaise-api>paths</suitkaise-api>)
 ```
 
-### `autopath` with `use_caller` option
+### `<suitkaise-api>autopath</suitkaise-api>` with `use_caller` option
 
 ```python
-from suitkaise.paths import autopath, Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
 # use_caller=True fills in missing path arguments with caller's file
-@autopath(use_caller=True)
-def log_location(message: str, path: Skpath = None):
+@<suitkaise-api>autopath</suitkaise-api>(use_caller=True)
+def log_location(message: str, path: <suitkaise-api>Skpath</suitkaise-api> = None):
     # if path is not provided, it becomes the file where log_location() was called
     print(f"[{path.rp}] {message}")
 
@@ -494,24 +494,24 @@ log_location("Starting process")
 # prints: [src/main.py] Starting process
 
 # called with explicit path
-log_location("Found file", Skpath("data/input.csv"))
+log_location("Found file", <suitkaise-api>Skpath</suitkaise-api>("data/input.csv"))
 # prints: [data/input.csv] Found file
 ```
 
-### `autopath` with `only` option
+### `<suitkaise-api>autopath</suitkaise-api>` with `only` option
 
 ```python
-from suitkaise.paths import autopath, Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
 # only convert specific parameters (faster for large lists)
-@autopath(only="file_path")
+@<suitkaise-api>autopath</suitkaise-api>(only="file_path")
 def process(file_path: str, tags: list[str], ids: list[str]):
     # only file_path is normalized
     # tags and ids are left unchanged (no conversion overhead)
     return file_path
 
-# useful when you have list[str] that aren't paths
-result = process(
+# useful when you have list[str] that aren't <suitkaise-api>paths</suitkaise-api>
+<suitkaise-api>result</suitkaise-api> = process(
     file_path="src/main.py",
     tags=["python", "backend"],
     ids=["abc123", "def456"]
@@ -524,8 +524,8 @@ Path IDs are perfect for database storage - they're URL-safe, reversible, and cr
 
 ```python
 import sqlite3
-from suitkaise.paths import Skpath
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
 # SETUP
 
@@ -541,15 +541,15 @@ conn.execute("""
 
 # STORING PATHS
 
-def store_file(path: Skpath, size: int):
+def store_file(path: <suitkaise-api>Skpath</suitkaise-api>, size: int):
     """Store a file record using its path ID."""
     conn.execute(
         "INSERT INTO files (id, name, size, processed) VALUES (?, ?, ?, ?)",
-        (path.id, path.name, size, False)
+        (path.<suitkaise-api>id</suitkaise-api>, path.name, size, False)
     )
 
 # store some files
-for file_path in paths.get_project_paths():
+for file_path in <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>():
     if file_path.is_file and file_path.suffix == ".py":
         store_file(file_path, file_path.stat.st_size)
 
@@ -557,14 +557,14 @@ conn.commit()
 
 # RETRIEVING PATHS
 
-def get_unprocessed_files() -> list[Skpath]:
-    """Get all unprocessed files as Skpath objects."""
+def get_unprocessed_files() -> list[<suitkaise-api>Skpath</suitkaise-api>]:
+    """Get all unprocessed files as <suitkaise-api>Skpath</suitkaise-api> objects."""
     cursor = conn.execute(
         "SELECT id FROM files WHERE processed = 0"
     )
     
-    # reconstruct Skpath from stored ID
-    return [Skpath(row[0]) for row in cursor.fetchall()]
+    # reconstruct <suitkaise-api>Skpath</suitkaise-api> from stored ID
+    return [<suitkaise-api>Skpath</suitkaise-api>(row[0]) for row in cursor.fetchall()]
 
 # get files and process them
 for file_path in get_unprocessed_files():
@@ -573,7 +573,7 @@ for file_path in get_unprocessed_files():
     # mark as processed
     conn.execute(
         "UPDATE files SET processed = 1 WHERE id = ?",
-        (file_path.id,)
+        (file_path.<suitkaise-api>id</suitkaise-api>,)
     )
 
 conn.commit()
@@ -584,16 +584,16 @@ conn.commit()
 ```python
 import json
 from pathlib import Path
-from suitkaise.paths import Skpath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
 CACHE_DIR = Path(".cache")
 CACHE_DIR.mkdir(exist_ok=True)
 
-def get_cached_result(source_path: Skpath) -> dict | None:
-    """Get cached result for a file, or None if not cached."""
+def get_cached_result(source_path: <suitkaise-api>Skpath</suitkaise-api>) -> dict | None:
+    """Get cached <suitkaise-api>result</suitkaise-api> for a file, or None if not cached."""
     
-    # use path.id as cache key - it's safe for filenames
-    cache_file = CACHE_DIR / f"{source_path.id}.json"
+    # use path.<suitkaise-api>id</suitkaise-api> as cache key - it's safe for filenames
+    cache_file = CACHE_DIR / f"{source_path.<suitkaise-api>id</suitkaise-api>}.json"
     
     if cache_file.exists():
         # check if cache is still valid (source hasn't changed)
@@ -606,12 +606,12 @@ def get_cached_result(source_path: Skpath) -> dict | None:
     
     return None
 
-def save_cached_result(source_path: Skpath, result: dict):
-    """Save result to cache."""
-    cache_file = CACHE_DIR / f"{source_path.id}.json"
-    cache_file.write_text(json.dumps(result))
+def save_cached_result(source_path: <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>result</suitkaise-api>: dict):
+    """Save <suitkaise-api>result</suitkaise-api> to cache."""
+    cache_file = CACHE_DIR / f"{source_path.<suitkaise-api>id</suitkaise-api>}.json"
+    cache_file.write_text(json.dumps(<suitkaise-api>result</suitkaise-api>))
 
-def process_with_cache(path: Skpath) -> dict:
+def process_with_cache(path: <suitkaise-api>Skpath</suitkaise-api>) -> dict:
     """Process a file with caching."""
     
     # try cache first
@@ -620,32 +620,32 @@ def process_with_cache(path: Skpath) -> dict:
         print(f"Cache hit: {path.rp}")
         return cached
     
-    # cache miss - do expensive processing
+    # cache miss - do expensive <suitkaise-api>processing</suitkaise-api>
     print(f"Processing: {path.rp}")
-    result = expensive_processing(path)
+    <suitkaise-api>result</suitkaise-api> = expensive_processing(path)
     
     # save to cache
-    save_cached_result(path, result)
-    return result
+    save_cached_result(path, <suitkaise-api>result</suitkaise-api>)
+    return <suitkaise-api>result</suitkaise-api>
 ```
 
 ### Building a file index
 
 ```python
-from suitkaise.paths import Skpath
-from suitkaise import paths
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 from dataclasses import dataclass
 from datetime import datetime
 
 @dataclass
 class FileInfo:
-    path: Skpath
+    path: <suitkaise-api>Skpath</suitkaise-api>
     size: int
     modified: datetime
     
     def to_dict(self) -> dict:
         return {
-            "id": self.path.id,
+            "id": self.path.<suitkaise-api>id</suitkaise-api>,
             "rp": self.path.rp,
             "name": self.path.name,
             "size": self.size,
@@ -653,7 +653,7 @@ class FileInfo:
         }
     
     @classmethod
-    def from_path(cls, path: Skpath) -> "FileInfo":
+    def from_path(cls, path: <suitkaise-api>Skpath</suitkaise-api>) -> "FileInfo":
         stat = path.stat
         return cls(
             path=path,
@@ -661,17 +661,17 @@ class FileInfo:
             modified=datetime.fromtimestamp(stat.st_mtime),
         )
 
-def build_index(root: Skpath = None, extensions: list[str] = None) -> list[FileInfo]:
+def build_index(root: <suitkaise-api>Skpath</suitkaise-api> = None, extensions: list[str] = None) -> list[FileInfo]:
     """Build an index of files in the project."""
     
     # use provided root or auto-detect
     if root is None:
-        root = paths.get_project_root()
+        root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
     
     index = []
     
-    # get all project paths (respects .gitignore)
-    for file_path in paths.get_project_paths(root=root):
+    # get all project <suitkaise-api>paths</suitkaise-api> (respects .gitignore)
+    for file_path in <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(root=root):
         # skip directories
         if not file_path.is_file:
             continue
@@ -695,15 +695,15 @@ for info in py_index[:5]:
 
 ```python
 import json
-from suitkaise.paths import Skpath, autopath, AnyPath
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
 
 class ConfigLoader:
-    """Load config files with paths relative to config location."""
+    """Load config files with <suitkaise-api>paths</suitkaise-api> relative to config location."""
     
-    def __init__(self, config_path: AnyPath):
-        # convert to Skpath for easy path manipulation
-        self.config_path = Skpath(config_path)
-        self.config_dir = self.config_path.parent
+    def __init__(self, config_path: <suitkaise-api>AnyPath</suitkaise-api>):
+        # convert to <suitkaise-api>Skpath</suitkaise-api> for easy path manipulation
+        self.config_path = <suitkaise-api>Skpath</suitkaise-api>(config_path)
+        self.config_dir = self.config_path.<suitkaise-api>parent</suitkaise-api>
         self.config = self._load()
     
     def _load(self) -> dict:
@@ -711,19 +711,19 @@ class ConfigLoader:
         with open(self.config_path, "r") as f:
             return json.load(f)
     
-    def resolve_path(self, relative_path: str) -> Skpath:
+    def resolve_path(self, relative_path: str) -> <suitkaise-api>Skpath</suitkaise-api>:
         """Resolve a path relative to the config file location."""
         return self.config_dir / relative_path
     
-    def get_data_dir(self) -> Skpath:
+    def get_data_dir(self) -> <suitkaise-api>Skpath</suitkaise-api>:
         """Get the data directory from config."""
         # config might specify: "data_dir": "./data"
         # we need to resolve it relative to config location
         data_dir = self.config.get("data_dir", "data")
         return self.resolve_path(data_dir)
     
-    def get_input_files(self) -> list[Skpath]:
-        """Get input file paths from config."""
+    def get_input_files(self) -> list[<suitkaise-api>Skpath</suitkaise-api>]:
+        """Get input file <suitkaise-api>paths</suitkaise-api> from config."""
         # config might specify: "input_files": ["input1.csv", "input2.csv"]
         input_files = self.config.get("input_files", [])
         data_dir = self.get_data_dir()
@@ -740,9 +740,9 @@ for input_file in config.get_input_files():
 (end of dropdown "Advanced Examples")
 
 (no dropdown for the full script needed)
-## Full Script Using `paths`
+## Full Script Using `<suitkaise-api>paths</suitkaise-api>`
 
-A complete file organizer that demonstrates cross-platform compatibility, advanced Skpath usage, `autopath`, and `AnyPath`.
+A complete file organizer that demonstrates cross-platform compatibility, advanced Skpath usage, `<suitkaise-api>autopath</suitkaise-api>`, and `<suitkaise-api>AnyPath</suitkaise-api>`.
 
 ```python
 """
@@ -751,8 +751,8 @@ File Organizer
 Organizes files by type into categorized directories.
 Demonstrates:
 - Cross-platform path handling
-- autopath decorator
-- AnyPath type hints
+- <suitkaise-api>autopath</suitkaise-api> decorator
+- <suitkaise-api>AnyPath</suitkaise-api> type hints
 - Project root detection
 - Path ID encoding
 - File operations
@@ -764,13 +764,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from suitkaise import paths
-from suitkaise.paths import (
-    Skpath,
-    AnyPath,
-    autopath,
-    PathDetectionError,
-    streamline_path_quick,
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import (
+    <suitkaise-api>Skpath</suitkaise-api>,
+    <suitkaise-api>AnyPath</suitkaise-api>,
+    <suitkaise-api>autopath</suitkaise-api>,
+    <suitkaise-api>PathDetectionError</suitkaise-api>,
+    <suitkaise-api>streamline_path_quick</suitkaise-api>,
 )
 
 
@@ -811,8 +811,8 @@ class OrganizeResult:
 
 
 # HELPER FUNCTIONS
-@autopath()
-def get_category(file_path: Skpath) -> str | None:
+@<suitkaise-api>autopath</suitkaise-api>()
+def get_category(file_path: <suitkaise-api>Skpath</suitkaise-api>) -> str | None:
     """
     Get the category for a file based on its extension.
     Returns None if file doesn't match any category.
@@ -826,19 +826,19 @@ def get_category(file_path: Skpath) -> str | None:
     return None
 
 
-@autopath()
-def ensure_directory(path: Skpath) -> Skpath:
+@<suitkaise-api>autopath</suitkaise-api>()
+def ensure_directory(path: <suitkaise-api>Skpath</suitkaise-api>) -> <suitkaise-api>Skpath</suitkaise-api>:
     """
     Ensure a directory exists, creating it if necessary.
-    Uses autopath so you can pass str, Path, or Skpath.
+    Uses <suitkaise-api>autopath</suitkaise-api> so you can pass str, Path, or <suitkaise-api>Skpath</suitkaise-api>.
     """
     if not path.exists:
         path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-@autopath()
-def safe_copy(source: Skpath, dest: Skpath, overwrite: bool = False) -> Skpath | None:
+@<suitkaise-api>autopath</suitkaise-api>()
+def safe_copy(source: <suitkaise-api>Skpath</suitkaise-api>, dest: <suitkaise-api>Skpath</suitkaise-api>, overwrite: bool = False) -> <suitkaise-api>Skpath</suitkaise-api> | None:
     """
     Safely copy a file, handling name conflicts.
     Returns the destination path, or None if skipped.
@@ -848,7 +848,7 @@ def safe_copy(source: Skpath, dest: Skpath, overwrite: bool = False) -> Skpath |
         # generate unique name
         stem = dest.stem
         suffix = dest.suffix
-        parent = dest.parent
+        parent = dest.<suitkaise-api>parent</suitkaise-api>
         counter = 1
         
         while dest.exists:
@@ -857,7 +857,7 @@ def safe_copy(source: Skpath, dest: Skpath, overwrite: bool = False) -> Skpath |
             counter += 1
     
     # ensure parent directory exists
-    ensure_directory(dest.parent)
+    ensure_directory(dest.<suitkaise-api>parent</suitkaise-api>)
     
     # copy the file
     return source.copy_to(dest, overwrite=overwrite)
@@ -870,31 +870,31 @@ class FileOrganizer:
     Organizes files from a source directory into categorized folders.
     
     Cross-platform compatible:
-    - Uses Skpath for normalized path handling
+    - Uses <suitkaise-api>Skpath</suitkaise-api> for normalized path handling
     - Works on Windows, Mac, and Linux
     - Stores path IDs for database compatibility
     """
     
-    def __init__(self, output_dir: AnyPath = None):
+    def __init__(self, output_dir: <suitkaise-api>AnyPath</suitkaise-api> = None):
         """
         Initialize the organizer.
         
         Args:
             output_dir: Where to organize files to.
-                       If None, uses "organized" in project root.
+                       If None, uses "organized" in project <suitkaise-api>root</suitkaise-api>.
         """
-        # get project root for default paths
+        # get project root for default <suitkaise-api>paths</suitkaise-api>
         try:
-            self.project_root = paths.get_project_root()
-        except PathDetectionError:
+            self.project_root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
+        except <suitkaise-api>PathDetectionError</suitkaise-api>:
             # no project root found - use current directory
-            self.project_root = paths.get_cwd()
+            self.project_root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_cwd</suitkaise-api>()
         
         # set output directory
         if output_dir is None:
             self.output_dir = self.project_root / "organized"
         else:
-            self.output_dir = Skpath(output_dir)
+            self.output_dir = <suitkaise-api>Skpath</suitkaise-api>(output_dir)
         
         # ensure output directory exists
         ensure_directory(self.output_dir)
@@ -924,10 +924,10 @@ class FileOrganizer:
                 indent=2
             )
     
-    @autopath()
+    @<suitkaise-api>autopath</suitkaise-api>()
     def organize(
         self,
-        source_dir: Skpath,
+        source_dir: <suitkaise-api>Skpath</suitkaise-api>,
         recursive: bool = True,
         dry_run: bool = False
     ) -> OrganizeResult:
@@ -936,14 +936,14 @@ class FileOrganizer:
         
         Args:
             source_dir: Directory to organize files from.
-                       Accepts str, Path, or Skpath (via autopath).
+                       Accepts str, Path, or <suitkaise-api>Skpath</suitkaise-api> (via <suitkaise-api>autopath</suitkaise-api>).
             recursive: Whether to process subdirectories.
             dry_run: If True, don't actually move files.
         
         Returns:
             OrganizeResult with summary of operations.
         """
-        result = OrganizeResult(
+        <suitkaise-api>result</suitkaise-api> = OrganizeResult(
             source_dir=source_dir.rp,
             output_dir=self.output_dir.rp,
         )
@@ -961,24 +961,24 @@ class FileOrganizer:
             
             # skip hidden files
             if file_path.name.startswith("."):
-                result.files_skipped += 1
+                <suitkaise-api>result</suitkaise-api>.files_skipped += 1
                 continue
             
             # get category
             category = get_category(file_path)
             if category is None:
-                result.files_skipped += 1
+                <suitkaise-api>result</suitkaise-api>.files_skipped += 1
                 continue
             
             # build destination path
             # sanitize filename for cross-platform compatibility
-            safe_name = streamline_path_quick(file_path.name)
+            safe_name = <suitkaise-api>streamline_path_quick</suitkaise-api>(file_path.name)
             dest_path = self.output_dir / category / safe_name
             
             if dry_run:
                 # just record what would happen
                 print(f"Would organize: {file_path.rp} → {dest_path.rp}")
-                result.files_organized += 1
+                <suitkaise-api>result</suitkaise-api>.files_organized += 1
                 continue
             
             # actually copy the file
@@ -993,24 +993,24 @@ class FileOrganizer:
                         category=category,
                         size=file_path.stat.st_size,
                         organized_at=datetime.now().isoformat(),
-                        path_id=copied.id,  # store path ID for database
+                        path_id=copied.<suitkaise-api>id</suitkaise-api>,  # store path ID for database
                     )
                     self.manifest.append(record)
-                    result.organized_files.append(record)
-                    result.files_organized += 1
+                    <suitkaise-api>result</suitkaise-api>.organized_files.append(record)
+                    <suitkaise-api>result</suitkaise-api>.files_organized += 1
                 else:
-                    result.files_skipped += 1
+                    <suitkaise-api>result</suitkaise-api>.files_skipped += 1
                     
             except Exception as e:
-                result.errors.append(f"{file_path.rp}: {str(e)}")
+                <suitkaise-api>result</suitkaise-api>.errors.append(f"{file_path.rp}: {str(e)}")
         
         # save manifest
         if not dry_run:
             self._save_manifest()
         
-        return result
+        return <suitkaise-api>result</suitkaise-api>
     
-    def get_file_by_id(self, path_id: str) -> Skpath | None:
+    def get_file_by_id(self, path_id: str) -> <suitkaise-api>Skpath</suitkaise-api> | None:
         """
         Get an organized file by its path ID.
         
@@ -1020,13 +1020,13 @@ class FileOrganizer:
         # find in manifest
         for record in self.manifest:
             if record.path_id == path_id:
-                return Skpath(path_id)
+                return <suitkaise-api>Skpath</suitkaise-api>(path_id)
         return None
     
-    def get_files_by_category(self, category: str) -> list[Skpath]:
+    def get_files_by_category(self, category: str) -> list[<suitkaise-api>Skpath</suitkaise-api>]:
         """Get all organized files in a category."""
         return [
-            Skpath(record.path_id)
+            <suitkaise-api>Skpath</suitkaise-api>(record.path_id)
             for record in self.manifest
             if record.category == category
         ]
@@ -1052,7 +1052,7 @@ class FileOrganizer:
         # show directory tree
         print()
         print("Directory structure:")
-        tree = paths.get_formatted_project_tree(
+        tree = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_formatted_project_tree</suitkaise-api>(
             root=self.output_dir,
             depth=2,
             include_files=False
@@ -1067,7 +1067,7 @@ def main():
     import tempfile
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_root = Skpath(tmpdir)
+        tmp_root = <suitkaise-api>Skpath</suitkaise-api>(tmpdir)
         source_dir = tmp_root / "downloads"
         output_dir = tmp_root / "organized"
         
@@ -1084,25 +1084,25 @@ def main():
         print(f"Output directory: {organizer.output_dir.rp}")
         print()
         
-        # dry run
-        print("Dry run:")
-        result = organizer.organize(source_dir, dry_run=True)
-        print(f"Would organize {result.files_organized} files")
-        print(f"Would skip {result.files_skipped} files")
+        # dry <suitkaise-api>run</suitkaise-api>
+        print("Dry <suitkaise-api>run</suitkaise-api>:")
+        <suitkaise-api>result</suitkaise-api> = organizer.organize(source_dir, dry_run=True)
+        print(f"Would organize {<suitkaise-api>result</suitkaise-api>.files_organized} files")
+        print(f"Would skip {<suitkaise-api>result</suitkaise-api>.files_skipped} files")
         print()
         
         # actually organize
         print("Organizing...")
-        result = organizer.organize(source_dir, dry_run=False)
+        <suitkaise-api>result</suitkaise-api> = organizer.organize(source_dir, dry_run=False)
     
     # print results
-        print(f"Organized: {result.files_organized} files")
-        print(f"Skipped: {result.files_skipped} files")
+        print(f"Organized: {<suitkaise-api>result</suitkaise-api>.files_organized} files")
+        print(f"Skipped: {<suitkaise-api>result</suitkaise-api>.files_skipped} files")
         
-        if result.errors:
-            print(f"Errors: {len(result.errors)}")
-            for error in result.errors[:5]:
-                print(f"  - {error}")
+        if <suitkaise-api>result</suitkaise-api>.errors:
+            print(f"Errors: {len(<suitkaise-api>result</suitkaise-api>.errors)}")
+            for <suitkaise-api>error</suitkaise-api> in <suitkaise-api>result</suitkaise-api>.errors[:5]:
+                print(f"  - {<suitkaise-api>error</suitkaise-api>}")
         
         # show summary
         organizer.print_summary()
@@ -1116,7 +1116,7 @@ def main():
             print(f"  Path ID: {record.path_id}")
             
             # reconstruct path from ID
-            reconstructed = Skpath(record.path_id)
+            reconstructed = <suitkaise-api>Skpath</suitkaise-api>(record.path_id)
             print(f"  Reconstructed: {reconstructed.rp}")
 
 

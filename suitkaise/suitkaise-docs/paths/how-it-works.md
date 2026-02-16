@@ -1,37 +1,37 @@
-# How `paths` actually works
+# How `<suitkaise-api>paths</suitkaise-api>` actually works
 
-`paths` provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.
+`<suitkaise-api>paths</suitkaise-api>` provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.
 
-- `Skpath` - enhanced path object with automatic project root detection
-- `autopath` - decorator for automatic path type conversion
-- `AnyPath` - streamline path handling using this union type
+- `<suitkaise-api>Skpath</suitkaise-api>` - enhanced path object with automatic project root detection
+- `<suitkaise-api>autopath</suitkaise-api>` - decorator for automatic path type conversion
+- `<suitkaise-api>AnyPath</suitkaise-api>` - streamline path handling using this union type
 - utility functions for project paths, validation, and sanitization
 
 All paths use normalized separators (`/`) internally for cross-platform consistency.
 
-## `Skpath`
+## `<suitkaise-api>Skpath</suitkaise-api>`
 
 Enhanced path object that wraps `pathlib.Path`.
 
 Arguments
 `path`: Path to wrap.
-- `str | Path | Skpath | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
 - If `None`, uses the caller's file path
 
 Returns
-`Skpath`: A new `Skpath` object.
+`<suitkaise-api>Skpath</suitkaise-api>`: A new `<suitkaise-api>Skpath</suitkaise-api>` object.
 
-When you create an `Skpath`, it automatically:
+When you create an `<suitkaise-api>Skpath</suitkaise-api>`, it automatically:
 1. Detects the project root
 2. Computes the absolute path (`ap`)
 3. Computes the relative path to root (`rp`)
 4. Generates a reversible encoded ID (`id`)
 
-```
-Skpath("feature/file.txt") → detects root → computes ap, rp, id
+```text
+<suitkaise-api>Skpath</suitkaise-api>("feature/file.txt") → detects root → computes ap, rp, id
 ```
 
-`Skpath` defines a module-level `threading.RLock` (`_skpath_lock`) for potential thread-safe operations.
+`<suitkaise-api>Skpath</suitkaise-api>` defines a module-level `threading.RLock` (`_skpath_lock`) for potential thread-safe operations.
 
 ### Tracking state
 
@@ -53,12 +53,12 @@ Cached base64url encoded ID. Lazily computed.
 `_hash: int | None`
 Cached hash value for use in sets and dicts.
 
-### `__init__(path: str | Path | Skpath | None = None)`
+### `__init__(path: str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None)`
 
 The constructor handles four input types.
 
 ```python
-def __init__(self, path: str | Path | Skpath | None = None):
+def __init__(self, path: str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None):
     # initialize cached values
     self._path: Path
     self._root: Path | None = None
@@ -71,7 +71,7 @@ def __init__(self, path: str | Path | Skpath | None = None):
         # detect caller's file path using frame inspection
         self._path = detect_caller_path()
     
-    elif isinstance(path, Skpath):
+    elif isinstance(path, <suitkaise-api>Skpath</suitkaise-api>):
         # copy all values from source (avoids recomputation)
         self._path = path._path
         self._root = path._root
@@ -90,9 +90,9 @@ def __init__(self, path: str | Path | Skpath | None = None):
 ```
 
 If `path` is `None`:
-Uses `detect_caller_path()` which inspects the call stack to find the file that called `Skpath()`. This allows `Skpath()` to return a path to "this file" without passing any argument.
+Uses `detect_caller_path()` which inspects the call stack to find the file that called `<suitkaise-api>Skpath</suitkaise-api>()`. This allows `<suitkaise-api>Skpath</suitkaise-api>()` to return a path to "this file" without passing any argument.
 
-If `path` is `Skpath`:
+If `path` is `<suitkaise-api>Skpath</suitkaise-api>`:
 Copies all cached values directly. This is an optimization - if someone passes an existing Skpath, we don't recompute `ap`, `rp`, `id`, etc.
 
 If `path` is `Path`:
@@ -147,7 +147,7 @@ def _compute_rp(self) -> str:
         root = self.root_path
         rel_path = self._path.relative_to(root)
         return normalize_separators(str(rel_path))
-    except (ValueError, PathDetectionError):
+    except (ValueError, <suitkaise-api>PathDetectionError</suitkaise-api>):
         return ""  # outside project root
 ```
 
@@ -159,7 +159,7 @@ Reversible base64url encoded ID.
 
 ```python
 @property
-def id(self) -> str:
+def <suitkaise-api>id</suitkaise-api>(self) -> str:
     if self._id is None:
         path_to_encode = self.rp if self.rp else self.ap
         self._id = encode_path_id(path_to_encode)
@@ -168,19 +168,19 @@ def id(self) -> str:
 
 Uses `rp` if available (for cross-platform compatibility), otherwise `ap`.
 
-Can be used to reconstruct the path: `Skpath(encoded_id)`.
+Can be used to reconstruct the path: `<suitkaise-api>Skpath</suitkaise-api>(encoded_id)`.
 
 #### `root`, `root_str`, `root_path`
 
 Project root access in different formats.
 
-- `root` → `Skpath` object
+- `root` → `<suitkaise-api>Skpath</suitkaise-api>` object
 - `root_str` → `str` with normalized separators
 - `root_path` → `pathlib.Path` object
 
 ### pathlib compatibility
 
-`Skpath` mirrors most `pathlib.Path` properties and methods, including file IO helpers like `read_text()`, `write_text()`, `read_bytes()`, and `write_bytes()`.
+`<suitkaise-api>Skpath</suitkaise-api>` mirrors most `pathlib.Path` properties and methods, including file IO helpers like `read_text()`, `write_text()`, `read_bytes()`, and `write_bytes()`.
 
 Properties: `name`, `stem`, `suffix`, `suffixes`, `parent`, `parents`, `parts`, `exists`, `is_file`, `is_dir`, `is_symlink`, `is_empty`, `stat`, `lstat`
 
@@ -194,11 +194,11 @@ Additional properties:
 
 ### Path joining
 
-`Skpath` supports the `/` operator for joining paths.
+`<suitkaise-api>Skpath</suitkaise-api>` supports the `/` operator for joining paths.
 
 ```python
-def __truediv__(self, other: str | Path | Skpath) -> Skpath:
-    return Skpath(self._path / other_str)
+def __truediv__(self, other: str | Path | <suitkaise-api>Skpath</suitkaise-api>) -> <suitkaise-api>Skpath</suitkaise-api>:
+    return <suitkaise-api>Skpath</suitkaise-api>(self._path / other_str)
 ```
 
 ### Equality and hashing
@@ -216,7 +216,7 @@ Hashing uses MD5 of `rp` (or `ap` if outside project root).
 
 ### `__fspath__` compatibility
 
-`Skpath` implements `__fspath__()` to work with `open()`, `os.path`, etc.:
+`<suitkaise-api>Skpath</suitkaise-api>` implements `__fspath__()` to work with `open()`, `os.path`, etc.:
 
 ```python
 def __fspath__(self) -> str:
@@ -231,8 +231,8 @@ Root detection walks up from a path looking for project indicators.
 
 ### Detection priority
 
-1. Custom root (if set via `set_custom_root()`)
-2. `setup.sk` file (`suitkaise` marker - highest priority)
+1. Custom root (if set via `<suitkaise-api>set_custom_root</suitkaise-api>()`)
+2. `setup.<suitkaise-api>sk</suitkaise-api>` file (`<suitkaise-api>suitkaise</suitkaise-api>` marker - highest priority)
 3. Definitive indicators: `setup.py`, `setup.cfg`, `pyproject.toml`
 4. Strong indicators: `.git`, `.gitignore`
 5. License files: `LICENSE`, `LICENSE.txt`, etc. (case-insensitive)
@@ -243,21 +243,21 @@ Root detection walks up from a path looking for project indicators.
 
 ```python
 def _find_root_from_path(start_path: Path) -> Path | None:
-    # First pass: look for setup.sk specifically
+    # First pass: look for setup.<suitkaise-api>sk</suitkaise-api> specifically
     check_path = current
-    while check_path != check_path.parent:
-        if (check_path / "setup.sk").exists():
+    while check_path != check_path.<suitkaise-api>parent</suitkaise-api>:
+        if (check_path / "setup.<suitkaise-api>sk</suitkaise-api>").exists():
             return check_path
-        check_path = check_path.parent
+        check_path = check_path.<suitkaise-api>parent</suitkaise-api>
     
     # Second pass: look for any indicator
-    # Keep going up to find outermost root (handles nested projects)
+    # Keep going up to find outermost <suitkaise-api>root</suitkaise-api> (handles nested projects)
     check_path = current
     best_root = None
-    while check_path != check_path.parent:
+    while check_path != check_path.<suitkaise-api>parent</suitkaise-api>:
         if _has_indicator(check_path):
             best_root = check_path
-        check_path = check_path.parent
+        check_path = check_path.<suitkaise-api>parent</suitkaise-api>
     
     return best_root
 ```
@@ -277,22 +277,22 @@ Use `clear_root_cache()` to manually clear the cache.
 
 ### Custom root management
 
-`set_custom_root(path)`: Override automatic detection.
+`<suitkaise-api>set_custom_root</suitkaise-api>(path)`: Override automatic detection.
 
-`get_custom_root()`: Get current custom root (or `None`).
+`<suitkaise-api>get_custom_root</suitkaise-api>()`: Get current custom root (or `None`).
 
-`clear_custom_root()`: Revert to automatic detection.
+`<suitkaise-api>clear_custom_root</suitkaise-api>()`: Revert to automatic detection.
 
-`CustomRoot(path)`: Context manager for temporary override.
+`<suitkaise-api>CustomRoot</suitkaise-api>(path)`: Context manager for temporary override.
 
 All operations are thread-safe using `threading.RLock`.
 
-## `autopath` Decorator
+## `<suitkaise-api>autopath</suitkaise-api>` Decorator
 
 Decorator that automatically converts path parameters based on type annotations.
 
 Arguments
-`use_caller`: If True, parameters that accept `Skpath` or `Path` will use the caller's file path if no value was provided.
+`use_caller`: If True, parameters that accept `<suitkaise-api>Skpath</suitkaise-api>` or `Path` will use the caller's file path if no value was provided.
 - `bool = False`
 - keyword only
 
@@ -311,36 +311,36 @@ Arguments
 3. Wraps the function to convert inputs before calling
 
 ```python
-@autopath()
-def process(path: Skpath):
-    # path is guaranteed to be Skpath
+@<suitkaise-api>autopath</suitkaise-api>()
+def process(path: <suitkaise-api>Skpath</suitkaise-api>):
+    # path is guaranteed to be <suitkaise-api>Skpath</suitkaise-api>
     ...
 
 # Equivalent to:
 def process(path):
-    path = Skpath(path) # conversion happens here
+    path = <suitkaise-api>Skpath</suitkaise-api>(path) # conversion happens here
     ...
 ```
 
 ### Type detection
 
 The decorator recognizes:
-- Direct types: `Skpath`, `Path`, `str`
-- Union types: `str | Path | Skpath` (AnyPath)
-- Iterables: `list[Skpath]`, `tuple[Path, ...]`, `set[str]`
+- Direct types: `<suitkaise-api>Skpath</suitkaise-api>`, `Path`, `str`
+- Union types: `str | Path | <suitkaise-api>Skpath</suitkaise-api>` (AnyPath)
+- Iterables: `list[<suitkaise-api>Skpath</suitkaise-api>]`, `tuple[Path, ...]`, `set[str]`
 
 For union types, it picks the richest type.
 
-- If `Skpath` is in the union → convert to `Skpath`
+- If `<suitkaise-api>Skpath</suitkaise-api>` is in the union → convert to `<suitkaise-api>Skpath</suitkaise-api>`
 - Else if `Path` is in the union → convert to `Path`
 - Else if `str` is in the union → convert to `str`
 
 ### Conversion
 
-All path-like inputs flow through `Skpath` for normalization.
+All path-like inputs flow through `<suitkaise-api>Skpath</suitkaise-api>` for normalization.
 
-```
-input → Skpath → target type
+```text
+input → <suitkaise-api>Skpath</suitkaise-api> → target type
 ```
 
 This ensures:
@@ -350,12 +350,12 @@ This ensures:
 
 ```python
 def _convert_value(value, target_type, ...):
-    if target_type is Skpath:
-        return Skpath(value)
+    if target_type is <suitkaise-api>Skpath</suitkaise-api>:
+        return <suitkaise-api>Skpath</suitkaise-api>(value)
     elif target_type is Path:
-        return Path(Skpath(value).ap)
+        return Path(<suitkaise-api>Skpath</suitkaise-api>(value).ap)
     elif target_type is str:
-        return Skpath(value).ap
+        return <suitkaise-api>Skpath</suitkaise-api>(value).ap
 ```
 
 ### `use_caller` option
@@ -363,8 +363,8 @@ def _convert_value(value, target_type, ...):
 When `use_caller=True`, missing path parameters are filled with the caller's file path.
 
 ```python
-@autopath(use_caller=True)
-def log_from(path: Skpath = None):
+@<suitkaise-api>autopath</suitkaise-api>(use_caller=True)
+def log_from(path: <suitkaise-api>Skpath</suitkaise-api> = None):
     print(f"Logging from: {path.rp}")
 
 # Called without argument - uses caller's file
@@ -376,7 +376,7 @@ log_from() # logs the file that called log_from()
 Restrict conversion to specific parameters.
 
 ```python
-@autopath(only="file_path")
+@<suitkaise-api>autopath</suitkaise-api>(only="file_path")
 def process(file_path: str, names: list[str]):
     # only file_path is normalized
     # names is left unchanged (faster for large lists)
@@ -385,14 +385,14 @@ def process(file_path: str, names: list[str]):
 
 ## General Utility Functions
 
-### `get_project_root()`
+### `<suitkaise-api>get_project_root</suitkaise-api>()`
 
 Get the project root directory.
 
 ```python
-def get_project_root(expected_name: str | None = None) -> Skpath:
+def <suitkaise-api>get_project_root</suitkaise-api>(expected_name: str | None = None) -> <suitkaise-api>Skpath</suitkaise-api>:
     root_path = detect_project_root(expected_name=expected_name)
-    return Skpath(root_path)
+    return <suitkaise-api>Skpath</suitkaise-api>(root_path)
 ```
 
 Arguments
@@ -401,66 +401,66 @@ Arguments
 - positional or keyword
 
 Returns
-`Skpath`: Project root directory.
+`<suitkaise-api>Skpath</suitkaise-api>`: Project root directory.
 
 Raises
-`PathDetectionError`: If root cannot be detected or doesn't match expected name.
+`<suitkaise-api>PathDetectionError</suitkaise-api>`: If root cannot be detected or doesn't match expected name.
 
-### `get_caller_path()`
+### `<suitkaise-api>get_caller_path</suitkaise-api>()`
 
 Get the file path of the caller.
 
 ```python
-def get_caller_path() -> Skpath:
+def <suitkaise-api>get_caller_path</suitkaise-api>() -> <suitkaise-api>Skpath</suitkaise-api>:
     caller = detect_caller_path(skip_frames=1)
-    return Skpath(caller)
+    return <suitkaise-api>Skpath</suitkaise-api>(caller)
 ```
 
 Uses `detect_caller_path()` which inspects the call stack, skipping internal frames to find the actual caller.
 
 Returns
-`Skpath`: Caller's file path.
+`<suitkaise-api>Skpath</suitkaise-api>`: Caller's file path.
 
 Raises
-`PathDetectionError`: If caller detection fails.
+`<suitkaise-api>PathDetectionError</suitkaise-api>`: If caller detection fails.
 
-### `get_current_dir()`
+### `<suitkaise-api>get_current_dir</suitkaise-api>()`
 
 Get the directory containing the caller's file.
 
 ```python
-def get_current_dir() -> Skpath:
+def <suitkaise-api>get_current_dir</suitkaise-api>() -> <suitkaise-api>Skpath</suitkaise-api>:
     caller = detect_caller_path(skip_frames=1)
-    return Skpath(caller.parent)
+    return <suitkaise-api>Skpath</suitkaise-api>(caller.<suitkaise-api>parent</suitkaise-api>)
 ```
 
 Returns
-`Skpath`: Caller's directory.
+`<suitkaise-api>Skpath</suitkaise-api>`: Caller's directory.
 
-### `get_cwd()`
+### `<suitkaise-api>get_cwd</suitkaise-api>()`
 
 Get the current working directory.
 
 ```python
-def get_cwd() -> Skpath:
-    return Skpath(get_cwd_path())
+def <suitkaise-api>get_cwd</suitkaise-api>() -> <suitkaise-api>Skpath</suitkaise-api>:
+    return <suitkaise-api>Skpath</suitkaise-api>(get_cwd_path())
 ```
 
 Uses `Path.cwd()` internally.
 
 Returns
-`Skpath`: Current working directory.
+`<suitkaise-api>Skpath</suitkaise-api>`: Current working directory.
 
-### `get_module_path()`
+### `<suitkaise-api>get_module_path</suitkaise-api>()`
 
 Get the file path where an object is defined.
 
 ```python
-def get_module_path(obj: Any) -> Skpath | None:
+def <suitkaise-api>get_module_path</suitkaise-api>(obj: Any) -> <suitkaise-api>Skpath</suitkaise-api> | None:
     path = get_module_file_path(obj)
     if path is None:
         return None
-    return Skpath(path)
+    return <suitkaise-api>Skpath</suitkaise-api>(path)
 ```
 
 Arguments
@@ -474,41 +474,41 @@ The function handles:
 - Objects with `__module__`: Gets the module, then uses `__file__`
 
 Returns
-`Skpath | None`: Module file path, or None if not found.
+`<suitkaise-api>Skpath</suitkaise-api> | None`: Module file path, or None if not found.
 
 Raises
 `ImportError`: If obj is a module name string that cannot be imported.
 
-### `get_id()`
+### `<suitkaise-api>get_id</suitkaise-api>()`
 
 Get the reversible encoded ID for a path.
 
 ```python
-def get_id(path: str | Path | Skpath) -> str:
-    if isinstance(path, Skpath):
-        return path.id
-    return Skpath(path).id
+def <suitkaise-api>get_id</suitkaise-api>(path: str | Path | <suitkaise-api>Skpath</suitkaise-api>) -> str:
+    if isinstance(path, <suitkaise-api>Skpath</suitkaise-api>):
+        return path.<suitkaise-api>id</suitkaise-api>
+    return <suitkaise-api>Skpath</suitkaise-api>(path).<suitkaise-api>id</suitkaise-api>
 ```
 
 Arguments
 `path`: Path to generate ID for.
-- `str | Path | Skpath`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api>`
 - required
 
 Returns
 `str`: Base64url encoded ID.
 
-### `get_project_paths()`
+### `<suitkaise-api>get_project_paths</suitkaise-api>()`
 
 Get all paths in the project.
 
 ```python
-def get_project_paths(
-    root: str | Path | Skpath | None = None,
-    exclude: str | Path | Skpath | list[...] | None = None,
+def <suitkaise-api>get_project_paths</suitkaise-api>(
+    root: str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None,
+    exclude: str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None,
     as_strings: bool = False,
     use_ignore_files: bool = True,
-) -> list[Skpath] | list[str]:
+) -> list[<suitkaise-api>Skpath</suitkaise-api>] | list[str]:
     return _get_project_paths(
         root=root,
         exclude=exclude,
@@ -519,11 +519,11 @@ def get_project_paths(
 
 Arguments
 `root`: Custom root directory (defaults to detected project root).
-- `str | Path | Skpath | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
 - keyword only
 
 `exclude`: Paths to exclude (single path or list).
-- `str | Path | Skpath | list[...] | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
 - keyword only
 
 `as_strings`: Return string paths instead of Skpath objects.
@@ -542,19 +542,19 @@ The function:
 5. Returns as Skpath objects or strings
 
 Returns
-`list[Skpath] | list[str]`: All project paths.
+`list[<suitkaise-api>Skpath</suitkaise-api>] | list[str]`: All project paths.
 
 Raises
-`PathDetectionError`: If project root cannot be detected.
+`<suitkaise-api>PathDetectionError</suitkaise-api>`: If project root cannot be detected.
 
-### `get_project_structure()`
+### `<suitkaise-api>get_project_structure</suitkaise-api>()`
 
 Get a nested dict representing the project structure.
 
 ```python
-def get_project_structure(
-    root: str | Path | Skpath | None = None,
-    exclude: str | Path | Skpath | list[...] | None = None,
+def <suitkaise-api>get_project_structure</suitkaise-api>(
+    root: str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None,
+    exclude: str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None,
     use_ignore_files: bool = True,
 ) -> dict:
     return _get_project_structure(
@@ -566,11 +566,11 @@ def get_project_structure(
 
 Arguments
 `root`: Custom root directory.
-- `str | Path | Skpath | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
 - keyword only
 
 `exclude`: Paths to exclude.
-- `str | Path | Skpath | list[...] | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
 - keyword only
 
 `use_ignore_files`: Respect .gitignore, .cursorignore, etc.
@@ -597,16 +597,16 @@ Returns
 `dict`: Nested dictionary of project structure.
 
 Raises
-`PathDetectionError`: If project root cannot be detected.
+`<suitkaise-api>PathDetectionError</suitkaise-api>`: If project root cannot be detected.
 
-### `get_formatted_project_tree()`
+### `<suitkaise-api>get_formatted_project_tree</suitkaise-api>()`
 
 Get a formatted tree string for the project structure.
 
 ```python
-def get_formatted_project_tree(
-    root: str | Path | Skpath | None = None,
-    exclude: str | Path | Skpath | list[...] | None = None,
+def <suitkaise-api>get_formatted_project_tree</suitkaise-api>(
+    root: str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None,
+    exclude: str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None,
     use_ignore_files: bool = True,
     depth: int | None = None,
     include_files: bool = True,
@@ -622,11 +622,11 @@ def get_formatted_project_tree(
 
 Arguments
 `root`: Custom root directory.
-- `str | Path | Skpath | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
 - keyword only
 
 `exclude`: Paths to exclude.
-- `str | Path | Skpath | list[...] | None = None`
+- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
 - keyword only
 
 `use_ignore_files`: Respect .gitignore, .cursorignore, etc.
@@ -643,7 +643,7 @@ Arguments
 
 Uses box-drawing characters (`│`, `├─`, `└─`) to create visual hierarchy:
 
-```
+```text
 myproject/
 ├── src/
 │   ├── main.py
@@ -656,7 +656,7 @@ Returns
 `str`: Formatted tree string.
 
 Raises
-`PathDetectionError`: If project root cannot be detected.
+`<suitkaise-api>PathDetectionError</suitkaise-api>`: If project root cannot be detected.
 
 ## Path ID Encoding
 
@@ -691,7 +691,7 @@ The encoding is:
 
 ## Path Validation and Sanitization
 
-### `is_valid_filename()`
+### `<suitkaise-api>is_valid_filename</suitkaise-api>()`
 
 Arguments
 `filename`: Filename to validate.
@@ -709,7 +709,7 @@ Checks if a filename is valid across common operating systems.
 4. Not a Windows reserved name: `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`
 5. Doesn't end with space or period
 
-### `streamline_path()`
+### `<suitkaise-api>streamline_path</suitkaise-api>()`
 
 Sanitizes a path by replacing invalid characters.
 
@@ -755,18 +755,18 @@ Returns
 7. Truncate to max length (preserving suffix)
 8. Clean up trailing spaces/periods
 
-### `streamline_path_quick()`
+### `<suitkaise-api>streamline_path_quick</suitkaise-api>()`
 
-Simple version of `streamline_path` with common defaults.
+Simple version of `<suitkaise-api>streamline_path</suitkaise-api>` with common defaults.
 
 ```python
-def streamline_path_quick(
+def <suitkaise-api>streamline_path_quick</suitkaise-api>(
     path: str,
     max_len: int | None = None,
     replacement_char: str = "_",
     lowercase: bool = False
 ) -> str:
-    return streamline_path(
+    return <suitkaise-api>streamline_path</suitkaise-api>(
         path,
         max_len=max_len,
         replacement_char=replacement_char,
@@ -804,7 +804,7 @@ This version:
 
 ## Exceptions
 
-### `PathDetectionError`
+### `<suitkaise-api>PathDetectionError</suitkaise-api>`
 
 Raised when path or project root detection fails.
 
@@ -813,15 +813,15 @@ Examples:
 - Custom root path doesn't exist or isn't a directory
 - Expected root name doesn't match detected root
 
-### `NotAFileError`
+### `<suitkaise-api>NotAFileError</suitkaise-api>`
 
 Raised when a file operation is attempted on a directory.
 
-Example: Calling `Skpath.unlink()` on a directory.
+Example: Calling `<suitkaise-api>Skpath</suitkaise-api>.unlink()` on a directory.
 
 ## Types
 
-### `AnyPath`
+### `<suitkaise-api>AnyPath</suitkaise-api>`
 
 Type alias for path parameters that accept multiple types.
 
@@ -829,19 +829,19 @@ Type alias for path parameters that accept multiple types.
 from typing import Union
 
 # using Union for forward reference compatibility at runtime
-AnyPath = Union[str, Path, "Skpath"]
+<suitkaise-api>AnyPath</suitkaise-api> = Union[str, Path, "<suitkaise-api>Skpath</suitkaise-api>"]
 ```
 
-Note: Does NOT include `None` - use `AnyPath | None` when `None` is acceptable.
+Note: Does NOT include `None` - use `<suitkaise-api>AnyPath</suitkaise-api> | None` when `None` is acceptable.
 
 Use in function annotations to indicate a parameter accepts any path type:
 
 ```python
-def process(path: AnyPath) -> None:
+def process(path: <suitkaise-api>AnyPath</suitkaise-api>) -> None:
     ...
 ```
 
-When used with `@autopath()`, parameters annotated with `AnyPath` are converted to `Skpath` (the richest type in the union).
+When used with `@<suitkaise-api>autopath</suitkaise-api>()`, parameters annotated with `<suitkaise-api>AnyPath</suitkaise-api>` are converted to `<suitkaise-api>Skpath</suitkaise-api>` (the richest type in the union).
 
 ## Thread Safety
 
@@ -853,6 +853,6 @@ Module-level state is protected by `threading.RLock` instances.
 - `_autopath_lock`: Defined for potential autopath operations (currently unused)
 - `_id_lock`: Defined in id_utils for potential ID operations (currently unused)
 
-RLock (reentrant lock) is used because operations may call each other (e.g., `detect_project_root()` is called from both `Skpath()` and custom root validation).
+RLock (reentrant lock) is used because operations may call each other (e.g., `detect_project_root()` is called from both `<suitkaise-api>Skpath</suitkaise-api>()` and custom root validation).
 
-The root detection functions (`set_custom_root`, `get_custom_root`, `clear_custom_root`, `detect_project_root`) actively use locks to protect shared state.
+The root detection functions (`<suitkaise-api>set_custom_root</suitkaise-api>`, `<suitkaise-api>get_custom_root</suitkaise-api>`, `<suitkaise-api>clear_custom_root</suitkaise-api>`, `detect_project_root`) actively use locks to protect shared state.

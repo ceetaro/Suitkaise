@@ -9,15 +9,15 @@ columns = 1
 
 # 1.1
 
-title = "How `circuits` actually works"
+title = "How `<suitkaise-api>circuits</suitkaise-api>` actually works"
 
 # 1.2
 
 text = "
-`circuits` is 2 circuit breaker classes, that help you manage failures in your code.
+`<suitkaise-api>circuits</suitkaise-api>` is 2 circuit breaker classes, that help you manage failures in your code.
 
-- `Circuit` - auto-resetting circuit that sleeps and continues
-- `BreakingCircuit` - stays broken until manually reset
+- `<suitkaise-api>Circuit</suitkaise-api>` - auto-resetting circuit that sleeps and continues
+- `<suitkaise-api>BreakingCircuit</suitkaise-api>` - stays broken until manually reset
 
 Both classes have:
 - thread safety
@@ -26,17 +26,17 @@ Both classes have:
 - super simple API
 
 
-## `Circuit`
+## `<suitkaise-api>Circuit</suitkaise-api>`
 
-`Circuit` is an auto-resetting circuit that sleeps, and then automatically resets to continue.
+`<suitkaise-api>Circuit</suitkaise-api>` is an auto-resetting circuit that sleeps, and then automatically resets to continue.
 
 When the short counter reaches the `num_shorts_to_trip` threshold, the circuit trips.
 
 ```
-short() -> increment counter -> if shorts == num_shorts_to_trip? -> trip -> sleep and reset
+<suitkaise-api>short</suitkaise-api>() -> increment counter -> if shorts == num_shorts_to_trip? -> trip -> sleep and reset
 ```
 
-`Circuit` uses a `threading.RLock` to ensure that internal state is thread-safe.
+`<suitkaise-api>Circuit</suitkaise-api>` uses a `threading.RLock` to ensure that internal state is thread-safe.
 
 ### Tracking state
 
@@ -75,7 +75,7 @@ Reentrant lock for thread-safe state access.
 
 ### Methods
 
-#### `short(custom_sleep: float | None = None) -> bool`
+#### `<suitkaise-api>short</suitkaise-api>(custom_sleep: float | None = None) -> bool`
 
 Increments `_times_shorted` by 1, calling `_trip_circuit()` if the `num_shorts_to_trip` threshold is reached.
 
@@ -96,9 +96,9 @@ If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
    - Sleeps for `sleep_duration`
 6. Returns `True` if slept, `False` otherwise
 
-#### `trip(custom_sleep: float | None = None) -> bool`
+#### `<suitkaise-api>trip</suitkaise-api>(custom_sleep: float | None = None) -> bool`
 
-`trip()` immediately triggers the circuit, bypassing the short counter.
+`<suitkaise-api>trip</suitkaise-api>()` immediately triggers the circuit, bypassing the short counter.
 
 If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
 
@@ -113,7 +113,7 @@ If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
    - Sleeps for `sleep_duration`
 2. Returns `True` (always sleeps)
 
-#### `reset_backoff() -> None`
+#### `<suitkaise-api>reset_backoff</suitkaise-api>() -> None`
 
 Restores the original sleep time to `sleep_time_after_trip`.
 
@@ -124,10 +124,10 @@ Restores the original sleep time to `sleep_time_after_trip`.
 
 ### Exponential Backoff
 
-`Circuit` supports exponential backoff to progressively increase sleep time after repeated trips.
+`<suitkaise-api>Circuit</suitkaise-api>` supports exponential backoff to progressively increase sleep time after repeated trips.
  
 ```python
-circ = Circuit(
+circ = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,  # initial sleep time == 1.0s
     backoff_factor=2.0,         # double it each time it is tripped
@@ -170,14 +170,14 @@ For a `jitter` of 0.2 and a `sleep_duration` of 1.0, the range is `[0.8, 1.2]`.
 
 All state access is protected by a reentrant lock (`threading.RLock`).
 
-A reentrant lock is needed because  `_trip_circuit()` may be called from `short()` and `trip()` and both need lock access.
+A reentrant lock is needed because  `_trip_circuit()` may be called from `<suitkaise-api>short</suitkaise-api>()` and `<suitkaise-api>trip</suitkaise-api>()` and both need lock access.
 
 The sleep operation itself happens outside the lock to avoid blocking other threads during the sleep.
 
 All public properties acquire the lock for reads.
 ```python
 @property
-def times_shorted(self) -> int:
+def <suitkaise-api>times_shorted</suitkaise-api>(self) -> int:
     with self._lock:
         return self._times_shorted
 ```
@@ -186,7 +186,7 @@ This ensures that all reads are consistent and thread-safe.
 
 ### Async Support
 
-`Circuit` supports async usage via the `_AsyncableMethod` pattern from `suitkaise.sk`.
+`<suitkaise-api>Circuit</suitkaise-api>` supports async usage via the `_AsyncableMethod` pattern from `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api>`.
 
 `_AsyncableMethod` wraps a sync method and an async method into a single attribute that can be called either way.
 
@@ -197,10 +197,10 @@ short = _AsyncableMethod(_sync_short, _async_short)
 Usage:
 ```python
 # sync usage
-circ.short()
+circ.<suitkaise-api>short</suitkaise-api>()
 
 # async usage
-await circ.short.asynced()()
+await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 The async versions use `asyncio.sleep()` instead of blocking `time.sleep()`:
@@ -228,16 +228,16 @@ async def _async_trip_circuit(self, custom_sleep: float | None = None) -> bool:
 The lock usage is the same - only the sleep call differs.
 
 Methods with async support:
-- `short()` - via `short.asynced()()`
-- `trip()` - via `trip.asynced()()`
+- `<suitkaise-api>short</suitkaise-api>()` - via `<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()`
+- `<suitkaise-api>trip</suitkaise-api>()` - via `<suitkaise-api>trip</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()`
 
-Methods like `reset_backoff()` and properties do not need async versions because they don't sleep.
+Methods like `<suitkaise-api>reset_backoff</suitkaise-api>()` and properties do not need async versions because they don't sleep.
 
 ### Share Integration
 
-`Circuit` includes `_shared_meta` for integration with `suitkaise.processing.Share`.
+`<suitkaise-api>Circuit</suitkaise-api>` includes `_shared_meta` for integration with `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Share</suitkaise-api>`.
 
-`_shared_meta` is a dictionary that declares which attributes each method/property reads from or writes to. The `Share` class uses this metadata to synchronize state across processes.
+`_shared_meta` is a dictionary that declares which attributes each method/property reads from or writes to. The `<suitkaise-api>Share</suitkaise-api>` class uses this metadata to synchronize state across processes.
 
 ```python
 _shared_meta = {
@@ -254,34 +254,34 @@ _shared_meta = {
 }
 ```
 
-This allows a `Share` instance to wrap a circuit and automatically synchronize state across multiple processes.
+This allows a `<suitkaise-api>Share</suitkaise-api>` instance to wrap a circuit and automatically synchronize state across multiple processes.
 
 ### Sleep Implementation
 
-`Circuit` uses `suitkaise.timing.sleep()` for blocking sleeps:
+`<suitkaise-api>Circuit</suitkaise-api>` uses `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api>.sleep()` for blocking sleeps:
 
 ```python
-from suitkaise.timing import api as timing
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import api as <suitkaise-api>timing</suitkaise-api>
 
 # in _trip_circuit():
-timing.sleep(sleep_duration)
+<suitkaise-api>timing</suitkaise-api>.sleep(sleep_duration)
 ```
 
 This uses the timing module's sleep implementation, which provides consistent behavior across different environments.
 
-## `BreakingCircuit`
+## `<suitkaise-api>BreakingCircuit</suitkaise-api>`
 
 Breaking circuit that stops when the failure threshold is reached.
 
-Unlike `Circuit`, it stays broken until you manually reset it. Use this for stopping after a threshold is reached and deciding what to do next.
+Unlike `<suitkaise-api>Circuit</suitkaise-api>`, it stays broken until you manually reset it. Use this for stopping after a threshold is reached and deciding what to do next.
 
 When the short counter reaches the `num_shorts_to_trip` threshold, the circuit breaks.
 
 ```
-short() -> increment counter -> if shorts >= num_shorts_to_trip? -> break -> sleep (but stay broken)
+<suitkaise-api>short</suitkaise-api>() -> increment counter -> if shorts >= num_shorts_to_trip? -> break -> sleep (but stay broken)
 ```
 
-`BreakingCircuit` uses a `threading.RLock` to ensure that internal state is thread-safe.
+`<suitkaise-api>BreakingCircuit</suitkaise-api>` uses a `threading.RLock` to ensure that internal state is thread-safe.
 
 ### Tracking state
 
@@ -292,13 +292,13 @@ Number of shorts required before the circuit breaks. Set at initialization.
 Counter tracking shorts since the last trip/reset. Resets to 0 after each trip or reset.
 
 `_total_trips: int`
-Lifetime count of all trips. Incremented on every `short()` call, never resets.
+Lifetime count of all trips. Incremented on every `<suitkaise-api>short</suitkaise-api>()` call, never resets.
 
 `_current_sleep_time: float`
-Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `reset()`.
+Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `<suitkaise-api>reset</suitkaise-api>()`.
 
 `_broken: bool`
-Whether the circuit is currently broken. Set to `True` on trip, cleared by `reset()`.
+Whether the circuit is currently broken. Set to `True` on trip, cleared by `<suitkaise-api>reset</suitkaise-api>()`.
 
 `_lock: threading.RLock`
 Reentrant lock for thread-safe state access.
@@ -321,13 +321,13 @@ Reentrant lock for thread-safe state access.
 - `int`
 - read-only
 
-`current_sleep_time`: Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `reset()`.
+`current_sleep_time`: Current sleep duration after backoff is applied. Starts at `sleep_time_after_trip` and grows with each `<suitkaise-api>reset</suitkaise-api>()`.
 - `float`
 - read-only
 
 ### Methods
 
-#### `short(custom_sleep: float | None = None) -> None`
+#### `<suitkaise-api>short</suitkaise-api>(custom_sleep: float | None = None) -> None`
 
 Increments `_times_shorted` and `_total_trips` by 1, calling `_break_circuit()` if the `num_shorts_to_trip` threshold is reached.
 
@@ -348,11 +348,11 @@ If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
    - Sleeps for `sleep_duration`
 8. Returns `None`
 
-Note: Unlike `Circuit`, `BreakingCircuit` increments `_total_trips` on every `short()` call, not just when the circuit trips.
+Note: Unlike `<suitkaise-api>Circuit</suitkaise-api>`, `<suitkaise-api>BreakingCircuit</suitkaise-api>` increments `_total_trips` on every `<suitkaise-api>short</suitkaise-api>()` call, not just when the circuit trips.
 
-#### `trip(custom_sleep: float | None = None) -> None`
+#### `<suitkaise-api>trip</suitkaise-api>(custom_sleep: float | None = None) -> None`
 
-`trip()` immediately breaks the circuit, bypassing the short counter.
+`<suitkaise-api>trip</suitkaise-api>()` immediately breaks the circuit, bypassing the short counter.
 
 If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
 
@@ -369,7 +369,7 @@ If `custom_sleep` is provided, it will be used instead of `_current_sleep_time`.
    - Sleeps for `sleep_duration`
 6. Returns `None`
 
-#### `reset() -> None`
+#### `<suitkaise-api>reset</suitkaise-api>() -> None`
 
 Resets the circuit to operational state and applies exponential backoff.
 
@@ -381,9 +381,9 @@ Resets the circuit to operational state and applies exponential backoff.
 5. Releases `self._lock`
 6. Returns `None`
 
-Note: Unlike `Circuit` which applies backoff on trip, `BreakingCircuit` applies backoff on `reset()`. This means the next trip will use the increased sleep time.
+Note: Unlike `<suitkaise-api>Circuit</suitkaise-api>` which applies backoff on trip, `<suitkaise-api>BreakingCircuit</suitkaise-api>` applies backoff on `<suitkaise-api>reset</suitkaise-api>()`. This means the next trip will use the increased sleep time.
 
-#### `reset_backoff() -> None`
+#### `<suitkaise-api>reset_backoff</suitkaise-api>() -> None`
 
 Restores the original sleep time to `sleep_time_after_trip`.
 
@@ -392,17 +392,17 @@ Restores the original sleep time to `sleep_time_after_trip`.
 3. Releases `self._lock`
 4. Returns `None`
 
-Note: Does NOT reset the broken state - use `reset()` for that.
+Note: Does NOT reset the broken state - use `<suitkaise-api>reset</suitkaise-api>()` for that.
 
 ### Exponential Backoff
 
-`BreakingCircuit` supports exponential backoff to progressively increase sleep time after repeated resets.
+`<suitkaise-api>BreakingCircuit</suitkaise-api>` supports exponential backoff to progressively increase sleep time after repeated resets.
 
 ```python
-circ = BreakingCircuit(
+circ = <suitkaise-api>BreakingCircuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,  # initial sleep time == 1.0s
-    backoff_factor=2.0,         # double it each time reset() is called
+    backoff_factor=2.0,         # double it each time <suitkaise-api>reset</suitkaise-api>() is called
     max_sleep_time=30.0         # sleep time is capped at 30s
 )
 ```
@@ -415,7 +415,7 @@ With the above parameters:
 - Trip 3: sleep 4.0s
 - ...
 
-Formula for calculating the next sleep time (applied on `reset()`):
+Formula for calculating the next sleep time (applied on `<suitkaise-api>reset</suitkaise-api>()`):
 ```python
 _current_sleep_time = min(
     _current_sleep_time * backoff_factor,
@@ -439,14 +439,14 @@ For a `jitter` of 0.2 and a `sleep_duration` of 1.0, the range is `[0.8, 1.2]`.
 
 All state access is protected by a reentrant lock (`threading.RLock`).
 
-A reentrant lock is needed because `_break_circuit()` may be called from `short()` and `trip()` and both need lock access.
+A reentrant lock is needed because `_break_circuit()` may be called from `<suitkaise-api>short</suitkaise-api>()` and `<suitkaise-api>trip</suitkaise-api>()` and both need lock access.
 
 The sleep operation itself happens outside the lock to avoid blocking other threads during the sleep.
 
 All public properties acquire the lock for reads.
 ```python
 @property
-def broken(self) -> bool:
+def <suitkaise-api>broken</suitkaise-api>(self) -> bool:
     with self._lock:
         return self._broken
 ```
@@ -455,7 +455,7 @@ This ensures that all reads are consistent and thread-safe.
 
 ### Async Support
 
-`BreakingCircuit` supports async usage via the `_AsyncableMethod` pattern from `suitkaise.sk`.
+`<suitkaise-api>BreakingCircuit</suitkaise-api>` supports async usage via the `_AsyncableMethod` pattern from `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api>`.
 
 `_AsyncableMethod` wraps a sync method and an async method into a single attribute that can be called either way.
 
@@ -466,10 +466,10 @@ short = _AsyncableMethod(_sync_short, _async_short)
 Usage:
 ```python
 # sync usage
-circ.short()
+circ.<suitkaise-api>short</suitkaise-api>()
 
 # async usage
-await circ.short.asynced()()
+await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 The async versions use `asyncio.sleep()` instead of blocking `time.sleep()`:
@@ -488,16 +488,16 @@ async def _async_break_circuit(self, sleep_duration: float) -> None:
 The lock usage is the same - only the sleep call differs.
 
 Methods with async support:
-- `short()` - via `short.asynced()()`
-- `trip()` - via `trip.asynced()()`
+- `<suitkaise-api>short</suitkaise-api>()` - via `<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()`
+- `<suitkaise-api>trip</suitkaise-api>()` - via `<suitkaise-api>trip</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()`
 
-Methods like `reset()`, `reset_backoff()`, and properties do not need async versions because they don't sleep.
+Methods like `<suitkaise-api>reset</suitkaise-api>()`, `<suitkaise-api>reset_backoff</suitkaise-api>()`, and properties do not need async versions because they don't sleep.
 
 ### Share Integration
 
-`BreakingCircuit` includes `_shared_meta` for integration with `suitkaise.processing.Share`.
+`<suitkaise-api>BreakingCircuit</suitkaise-api>` includes `_shared_meta` for integration with `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Share</suitkaise-api>`.
 
-`_shared_meta` is a dictionary that declares which attributes each method/property reads from or writes to. The `Share` class uses this metadata to synchronize state across processes.
+`_shared_meta` is a dictionary that declares which attributes each method/property reads from or writes to. The `<suitkaise-api>Share</suitkaise-api>` class uses this metadata to synchronize state across processes.
 
 ```python
 _shared_meta = {
@@ -516,17 +516,17 @@ _shared_meta = {
 }
 ```
 
-This allows a `Share` instance to wrap a circuit and automatically synchronize state across multiple processes.
+This allows a `<suitkaise-api>Share</suitkaise-api>` instance to wrap a circuit and automatically synchronize state across multiple processes.
 
 ### Sleep Implementation
 
-`BreakingCircuit` uses `suitkaise.timing.sleep()` for blocking sleeps:
+`<suitkaise-api>BreakingCircuit</suitkaise-api>` uses `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api>.sleep()` for blocking sleeps:
 
 ```python
-from suitkaise.timing import api as timing
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import api as <suitkaise-api>timing</suitkaise-api>
 
 # in _break_circuit():
-timing.sleep(sleep_duration)
+<suitkaise-api>timing</suitkaise-api>.sleep(sleep_duration)
 ```
 
 This uses the timing module's sleep implementation, which provides consistent behavior across different environments.

@@ -1,12 +1,12 @@
-# How `sk` works
+# How `<suitkaise-api>sk</suitkaise-api>` works
 
-`sk` attaches modifiers and async support to classes and functions without changing how you call them. It also pre-computes `_shared_meta` for `Share` compatibility.
+`<suitkaise-api>sk</suitkaise-api>` attaches modifiers and async support to classes and functions without changing how you call them. It also pre-computes `_shared_meta` for `<suitkaise-api>Share</suitkaise-api>` compatibility.
 
 ## Architecture Overview
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                           @sk decorator or sk()                            │
+│                           @<suitkaise-api>sk</suitkaise-api> decorator or <suitkaise-api>sk</suitkaise-api>()                            │
 │                                                                            │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                         Input: class or function                     │  │
@@ -29,10 +29,10 @@
 │  │  Classes:                      Functions:                           │   │
 │  │  - _shared_meta                - has_blocking_calls                 │   │
 │  │  - _blocking_methods           - blocking_calls                     │   │
-│  │  - .asynced()                  - .asynced()                         │   │
-│  │  - Method modifiers            - .retry()                           │   │
-│  │                                - .timeout()                         │   │
-│  │                                - .background()                      │   │
+│  │  - .<suitkaise-api>asynced</suitkaise-api>()                  - .<suitkaise-api>asynced</suitkaise-api>()                         │   │
+│  │  - Method modifiers            - .<suitkaise-api>retry</suitkaise-api>()                           │   │
+│  │                                - .<suitkaise-api>timeout</suitkaise-api>()                         │   │
+│  │                                - .<suitkaise-api>background</suitkaise-api>()                      │   │
 │  │                                - .rate_limit()                      │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                       │
@@ -45,13 +45,13 @@
 
 ## Blocking Detection
 
-The sk module detects blocking code to decide whether `.asynced()` and `.background()` are allowed.
+The sk module detects blocking code to decide whether `.<suitkaise-api>asynced</suitkaise-api>()` and `.<suitkaise-api>background</suitkaise-api>()` are allowed.
 
 ### Detection Order
 
-1. Check for `@blocking` decorator - if a function/method has `@blocking`, it's immediately marked as blocking. AST analysis for blocking calls is skipped (performance optimization).
+1. Check for `@<suitkaise-api>blocking</suitkaise-api>` decorator - if a function/method has `@<suitkaise-api>blocking</suitkaise-api>`, it's immediately marked as blocking. AST analysis for blocking calls is skipped (performance optimization).
 
-2. AST analysis - if no `@blocking` decorator, parse the source code and look for known blocking patterns.
+2. AST analysis - if no `@<suitkaise-api>blocking</suitkaise-api>` decorator, parse the source code and look for known blocking patterns.
 
 ### Known Blocking Calls
 
@@ -66,7 +66,7 @@ BLOCKING_CALLS = {
     'open', 'read', 'write', 'readline', 'readlines',
     
     # subprocess
-    'subprocess.run', 'subprocess.call', 'subprocess.check_call',
+    'subprocess.<suitkaise-api>run</suitkaise-api>', 'subprocess.call', 'subprocess.check_call',
     
     # requests
     'requests.get', 'requests.post', 'requests.put', ...
@@ -74,7 +74,7 @@ BLOCKING_CALLS = {
     # database connectors
     'sqlite3.connect', 'psycopg2.connect', 'pymysql.connect', ...
     
-    # for the whole list, see the blocking calls page
+    # for the whole list, see the <suitkaise-api>blocking</suitkaise-api> calls page
 }
 ```
 
@@ -88,7 +88,7 @@ BLOCKING_METHOD_PATTERNS = {
     'recv', 'send', 'accept', 'connect',
     'read', 'write', 'fetch', 'fetchone', 'fetchall',
     'execute', 'commit', 'rollback',
-    # for the whole list, see the blocking calls page
+    # for the whole list, see the <suitkaise-api>blocking</suitkaise-api> calls page
 }
 ```
 
@@ -105,7 +105,7 @@ BLOCKING_METHOD_PATTERNS = {
 ```python
 class _BlockingCallVisitor(ast.NodeVisitor):
     def __init__(self):
-        self.blocking_calls: List[str] = []
+        self.<suitkaise-api>blocking_calls</suitkaise-api>: List[str] = []
     
     def visit_Call(self, node: ast.Call):
         call_name = self._get_call_name(node)
@@ -113,11 +113,11 @@ class _BlockingCallVisitor(ast.NodeVisitor):
         if call_name:
             # check exact match
             if call_name.lower() in BLOCKING_CALLS:
-                self.blocking_calls.append(call_name)
+                self.<suitkaise-api>blocking_calls</suitkaise-api>.append(call_name)
             
             # check method pattern
             elif call_name.split('.')[-1] in BLOCKING_METHOD_PATTERNS:
-                self.blocking_calls.append(call_name)
+                self.<suitkaise-api>blocking_calls</suitkaise-api>.append(call_name)
         
         self.generic_visit(node)
 ```
@@ -126,7 +126,7 @@ class _BlockingCallVisitor(ast.NodeVisitor):
 
 ## `_shared_meta` Generation
 
-`_shared_meta` tells `Share` which attributes each method reads and writes. This enables efficient synchronization.
+`_shared_meta` tells `<suitkaise-api>Share</suitkaise-api>` which attributes each method reads and writes. This enables efficient synchronization.
 
 ### How `_AttributeVisitor` Works
 
@@ -144,7 +144,7 @@ class _AttributeVisitor(ast.NodeVisitor):
         self.writes: Set[str] = set()
     
     def visit_Attribute(self, node: ast.Attribute):
-        if isinstance(node.value, ast.Name) and node.value.id == 'self':
+        if isinstance(node.value, ast.Name) and node.value.<suitkaise-api>id</suitkaise-api> == 'self':
             attr_name = node.attr
             
             if isinstance(node.ctx, ast.Store):
@@ -157,7 +157,7 @@ class _AttributeVisitor(ast.NodeVisitor):
     def visit_AugAssign(self, node: ast.AugAssign):
         # self.x += 1 is both read and write
         if isinstance(node.target, ast.Attribute):
-            if isinstance(node.target.value, ast.Name) and node.target.value.id == 'self':
+            if isinstance(node.target.value, ast.Name) and node.target.value.<suitkaise-api>id</suitkaise-api> == 'self':
                 attr_name = node.target.attr
                 self.reads.add(attr_name)
                 self.writes.add(attr_name)
@@ -183,13 +183,13 @@ _shared_meta = {
 
 
 
-## `sk` on Functions
+## `<suitkaise-api>sk</suitkaise-api>` on Functions
 
-When you apply `sk` to a function (as a decorator or function call):
+When you apply `<suitkaise-api>sk</suitkaise-api>` to a function (as a decorator or function call):
 
 ```python
 # as decorator
-@sk
+@<suitkaise-api>sk</suitkaise-api>
 def slow_fetch(url):
     return requests.get(url).text
 
@@ -197,31 +197,31 @@ def slow_fetch(url):
 def slow_fetch(url):
     return requests.get(url).text
 
-slow_fetch = sk(slow_fetch)
+slow_fetch = <suitkaise-api>sk</suitkaise-api>(slow_fetch)
 ```
 
 ### What Happens
 
-1. Detect blocking calls - check for `@blocking` or analyze AST
+1. Detect blocking calls - check for `@<suitkaise-api>blocking</suitkaise-api>` or analyze AST
 2. Attach attributes:
-   - `func.has_blocking_calls` - `bool`
-   - `func.blocking_calls` - list of detected calls
+   - `func.<suitkaise-api>has_blocking_calls</suitkaise-api>` - `bool`
+   - `func.<suitkaise-api>blocking_calls</suitkaise-api>` - list of detected calls
 3. Attach modifier methods - each returns an `Skfunction` for chaining
 
 ```python
-def sk(func):
-    # detect blocking calls
+def <suitkaise-api>sk</suitkaise-api>(func):
+    # detect <suitkaise-api>blocking</suitkaise-api> calls
     blocking_calls = detect_blocking(func)
     
     # attach attributes
-    func.has_blocking_calls = len(blocking_calls) > 0
-    func.blocking_calls = blocking_calls
+    func.<suitkaise-api>has_blocking_calls</suitkaise-api> = len(blocking_calls) > 0
+    func.<suitkaise-api>blocking_calls</suitkaise-api> = blocking_calls
     
     # attach modifier methods
-    func.asynced = lambda: Skfunction(func).asynced()
-    func.retry = lambda *args, **kwargs: Skfunction(func).retry(*args, **kwargs)
-    func.timeout = lambda seconds: Skfunction(func).timeout(seconds)
-    func.background = lambda: Skfunction(func).background()
+    func.<suitkaise-api>asynced</suitkaise-api> = lambda: Skfunction(func).<suitkaise-api>asynced</suitkaise-api>()
+    func.<suitkaise-api>retry</suitkaise-api> = lambda *args, **kwargs: Skfunction(func).<suitkaise-api>retry</suitkaise-api>(*args, **kwargs)
+    func.<suitkaise-api>timeout</suitkaise-api> = lambda seconds: Skfunction(func).<suitkaise-api>timeout</suitkaise-api>(seconds)
+    func.<suitkaise-api>background</suitkaise-api> = lambda: Skfunction(func).<suitkaise-api>background</suitkaise-api>()
     func.rate_limit = lambda per_second: Skfunction(func).rate_limit(per_second)
     
     return func  # return original function
@@ -232,22 +232,22 @@ def sk(func):
 When you call a modifier, it creates an `Skfunction` wrapper:
 
 ```python
-slow_fetch.retry(3).timeout(5.0)("https://example.com")
+slow_fetch.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)("https://example.com")
 ```
 
-1. `slow_fetch.retry(3)` → creates `Skfunction` with retry config
-2. `.timeout(5.0)` → returns new `Skfunction` with both retry and timeout
+1. `slow_fetch.<suitkaise-api>retry</suitkaise-api>(3)` → creates `Skfunction` with retry config
+2. `.<suitkaise-api>timeout</suitkaise-api>(5.0)` → returns new `Skfunction` with both retry and timeout
 3. `("https://example.com")` → executes with both modifiers applied
 
 
 
-## `sk` on Classes
+## `<suitkaise-api>sk</suitkaise-api>` on Classes
 
-When you apply `sk` to a class (as a decorator or function call):
+When you apply `<suitkaise-api>sk</suitkaise-api>` to a class (as a decorator or function call):
 
 ```python
 # as decorator
-@sk
+@<suitkaise-api>sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -263,35 +263,35 @@ class Counter:
     def increment(self):
         self.value += 1
 
-Counter = sk(Counter)
+Counter = <suitkaise-api>sk</suitkaise-api>(Counter)
 ```
 
 ### What Happens
 
 1. Analyze all methods - generate `_shared_meta` and detect blocking calls
 2. Attach class-level attributes:
-   - `cls._shared_meta` - for `Share` compatibility
+   - `cls._shared_meta` - for `<suitkaise-api>Share</suitkaise-api>` compatibility
    - `cls._blocking_methods` - dict of method → blocking calls
-   - `cls.has_blocking_calls` - `bool`
-   - `cls.asynced()` - static method returning async class
+   - `cls.<suitkaise-api>has_blocking_calls</suitkaise-api>` - `bool`
+   - `cls.<suitkaise-api>asynced</suitkaise-api>()` - static method returning async class
 3. Wrap methods with descriptors - each method gets modifier support
 
 ```python
-def sk(cls):
+def <suitkaise-api>sk</suitkaise-api>(cls):
     # analyze class
     shared_meta, blocking_methods = analyze_class(cls)
     
     # attach metadata
     cls._shared_meta = shared_meta
     cls._blocking_methods = blocking_methods
-    cls.has_blocking_calls = len(blocking_methods) > 0
+    cls.<suitkaise-api>has_blocking_calls</suitkaise-api> = len(blocking_methods) > 0
     
-    # attach asynced() static method
-    def asynced():
+    # attach <suitkaise-api>asynced</suitkaise-api>() static method
+    def <suitkaise-api>asynced</suitkaise-api>():
         if not blocking_methods:
-            raise SkModifierError(f"{cls.__name__} has no blocking calls")
+            raise <suitkaise-api>SkModifierError</suitkaise-api>(f"{cls.__name__} has no <suitkaise-api>blocking</suitkaise-api> calls")
         return create_async_class(cls, blocking_methods)
-    cls.asynced = staticmethod(asynced)
+    cls.<suitkaise-api>asynced</suitkaise-api> = staticmethod(asynced)
     
     # wrap methods with _ModifiableMethod descriptors
     for name, member in cls.__dict__.items():
@@ -320,10 +320,10 @@ When you access a method on an instance, you get a `_ModifiableBoundMethod` that
 
 ```python
 counter.increment()                    # direct call
-counter.increment.asynced()()          # async version using asyncio.to_thread()
-counter.increment.retry(3)()           # with retry
-counter.increment.timeout(5.0)()       # with timeout
-counter.increment.background()()       # returns Future
+counter.increment.<suitkaise-api>asynced</suitkaise-api>()()          # async version using asyncio.to_thread()
+counter.increment.<suitkaise-api>retry</suitkaise-api>(3)()           # with retry
+counter.increment.<suitkaise-api>timeout</suitkaise-api>(5.0)()       # with timeout
+counter.increment.<suitkaise-api>background</suitkaise-api>()()       # returns Future
 counter.increment.rate_limit(2.0)()    # rate limited
 ```
 
@@ -331,7 +331,7 @@ counter.increment.rate_limit(2.0)()    # rate limited
 
 ## Async Class Generation
 
-When you call `MyClass.asynced()`, it creates a new class with blocking methods wrapped.
+When you call `MyClass.<suitkaise-api>asynced</suitkaise-api>()`, it creates a new class with blocking methods wrapped.
 
 ### How `create_async_class` Works
 
@@ -377,8 +377,8 @@ Modifiers are always applied in a consistent order, regardless of how you chain 
 
 This means these are equivalent:
 ```python
-fn.retry(3).timeout(5.0)(...)
-fn.timeout(5.0).retry(3)(...)
+fn.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(...)
+fn.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>retry</suitkaise-api>(3)(...)
 ```
 
 Both will
@@ -402,9 +402,9 @@ Making this consistent means you don't have to worry about the exact order every
 
 When you chain modifiers, each one returns a new `Skfunction` with updated config:
 
-1. You call `.retry(3)` on an `Skfunction`
+1. You call `.<suitkaise-api>retry</suitkaise-api>(3)` on an `Skfunction`
 2. It creates a copy of itself with `retry: {times: 3, ...}` added to `_config`
-3. You call `.timeout(5.0)` on that copy
+3. You call `.<suitkaise-api>timeout</suitkaise-api>(5.0)` on that copy
 4. It creates another copy with `timeout: {seconds: 5.0}` added
 5. The final `Skfunction` has both retry and timeout in its `_config` dict
 
@@ -421,23 +421,23 @@ class Skfunction:
         new_config = {**self._config, **config_updates}
         return Skfunction(self._func, _config=new_config, _blocking_calls=self._blocking_calls)
     
-    def retry(self, times=3, delay=1.0, backoff_factor=1.0, exceptions=(Exception,)):
+    def <suitkaise-api>retry</suitkaise-api>(self, times=3, delay=1.0, backoff_factor=1.0, exceptions=(Exception,)):
         return self._copy_with(retry={'times': times, 'delay': delay, 'backoff_factor': backoff_factor, 'exceptions': exceptions})
     
-    def timeout(self, seconds):
+    def <suitkaise-api>timeout</suitkaise-api>(self, seconds):
         return self._copy_with(timeout={'seconds': seconds})
 ```
 
 ### How Execution Works
 
-When you finally call the `Skfunction` (e.g., `fn.retry(3).timeout(5.0)("arg")`):
+When you finally call the `Skfunction` (e.g., `fn.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)("arg")`):
 
 1. Extract all configs - pull retry, timeout, and rate_limit settings from `_config`
 
 2. Check rate limit first - if rate limiting is configured, block until we're allowed to proceed. This happens before any execution attempts.
 
 3. Build the execution function - create an inner function that:
-   - if timeout is set: run the real function in a `ThreadPoolExecutor` with a timeout on `future.result()`
+   - if timeout is set: run the real function in a `ThreadPoolExecutor` with a timeout on `future.<suitkaise-api>result</suitkaise-api>()`
    - if no timeout: just call the function directly
 
 4. Apply retry logic - if retry is configured:
@@ -464,9 +464,9 @@ def __call__(self, *args, **kwargs):
             with ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(func, *args, **kwargs)
                 try:
-                    return future.result(timeout=timeout_config['seconds'])
+                    return future.<suitkaise-api>result</suitkaise-api>(timeout=timeout_config['seconds'])
                 except TimeoutError:
-                    raise FunctionTimeoutError(f"{func.__name__} timed out")
+                    raise <suitkaise-api>FunctionTimeoutError</suitkaise-api>(f"{func.__name__} timed out")
         else:
             return func(*args, **kwargs)
     
@@ -491,16 +491,16 @@ def __call__(self, *args, **kwargs):
 Timeouts use a `ThreadPoolExecutor` with a single worker:
 
 1. Submit the function to the executor
-2. Call `future.result(timeout=seconds)` which blocks up to the timeout
-3. If it times out, raise `FunctionTimeoutError`
+2. Call `future.<suitkaise-api>result</suitkaise-api>(timeout=seconds)` which blocks up to the timeout
+3. If it times out, raise `<suitkaise-api>FunctionTimeoutError</suitkaise-api>`
 
 This approach can interrupt blocking I/O because the main thread stops waiting, even if the worker thread continues.
 
 ---
 
-## `AsyncSkfunction` Internals
+## `<suitkaise-api>AsyncSkfunction</suitkaise-api>` Internals
 
-Returned by `Skfunction.asynced()` for async execution.
+Returned by `Skfunction.<suitkaise-api>asynced</suitkaise-api>()` for async execution.
 
 ### How It Differs from Sync
 
@@ -539,7 +539,7 @@ async def __call__(self, *args, **kwargs):
                     timeout=timeout_config['seconds'],
                 )
             except asyncio.TimeoutError:
-                raise FunctionTimeoutError(f"{self._func.__name__} timed out")
+                raise <suitkaise-api>FunctionTimeoutError</suitkaise-api>(f"{self._func.__name__} timed out")
         else:
             return await asyncio.to_thread(self._func, *args, **kwargs)
     
@@ -611,7 +611,7 @@ class RateLimiter:
 
 ## Share Integration
 
-When `Share` receives an `@sk`-decorated class, it can use `_shared_meta` for efficient synchronization.
+When `<suitkaise-api>Share</suitkaise-api>` receives an `@<suitkaise-api>sk</suitkaise-api>`-decorated class, it can use `_shared_meta` for efficient synchronization.
 
 ### How It Works
 

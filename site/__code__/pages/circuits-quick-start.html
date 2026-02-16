@@ -6,43 +6,43 @@
         <a href="#circuits" class="module-bar-link" data-page="circuits">how to use</a>
         <a href="#circuits-how-it-works" class="module-bar-link" data-page="circuits-how-it-works">how it works</a>
         <a href="#circuits-examples" class="module-bar-link" data-page="circuits-examples">examples</a>
-        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-tests" class="module-bar-link" data-page="circuits-tests">tests</a>
+        <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-learn" class="module-bar-link" data-page="circuits-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Quick Start: <code>circuits</code></h1>
-    <pre><code class="language-bash">pip install suitkaise</code></pre>
-    <h2>Auto-resetting circuit (<code>Circuit</code>)</h2>
+    <h1>Quick Start: <code><suitkaise-api>circuits</suitkaise-api></code></h1>
+    <pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
+    <h2>Auto-resetting circuit (<code><suitkaise-api>Circuit</suitkaise-api></code>)</h2>
     <p>Sleeps after N failures, then resets and continues.</p>
-    <pre><code class="language-python">from suitkaise import Circuit
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
-circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 for request in incoming_requests:
     try:
         process(request)
     except ServiceError:
-        circuit.short()  # after 5 failures, sleeps 1s, then resets</code></pre>
-    <h2>Breaking circuit (<code>BreakingCircuit</code>)</h2>
+        circuit.<suitkaise-api>short</suitkaise-api>()  # after 5 failures, sleeps 1s, then resets</code></pre>
+    <h2>Breaking circuit (<code><suitkaise-api>BreakingCircuit</suitkaise-api></code>)</h2>
     <p>Stays broken after N failures until you manually reset.</p>
-    <pre><code class="language-python">from suitkaise import BreakingCircuit
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
 
-breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-while not breaker.broken:
+while not breaker.<suitkaise-api>broken</suitkaise-api>:
     try:
-        result = risky_operation()
+        <suitkaise-api>result</suitkaise-api> = risky_operation()
         break
     except OperationError:
-        breaker.short()
+        breaker.<suitkaise-api>short</suitkaise-api>()
 
-if breaker.broken:
+if breaker.<suitkaise-api>broken</suitkaise-api>:
     handle_failure()
-    breaker.reset()  # manually reset when ready</code></pre>
+    breaker.<suitkaise-api>reset</suitkaise-api>()  # manually reset when ready</code></pre>
     <h2>Exponential backoff (with jitter and max sleep time)</h2>
-    <pre><code class="language-python">circuit = Circuit(
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,    # double sleep time after each trip
@@ -50,35 +50,35 @@ if breaker.broken:
 )
 # Trip 1: 1s, Trip 2: 2s, Trip 3: 4s, Trip 4: 8s, ...</code></pre>
     <h2>Jitter (randomness to prevent thundering herd)</h2>
-    <pre><code class="language-python">circuit = Circuit(
+    <pre><code class="language-python">circuit = <suitkaise-api>Circuit</suitkaise-api>(
     num_shorts_to_trip=5,
     sleep_time_after_trip=5.0,
     jitter=0.2  # ±20% randomness to prevent thundering herd
 )</code></pre>
     <h2>Immediate trip (bypass the counter)</h2>
     <pre><code class="language-python">try:
-    result = call_service()
+    <suitkaise-api>result</suitkaise-api> = call_service()
 except CriticalError:
-    circuit.trip()  # skip the counter, trip immediately
+    circuit.<suitkaise-api>trip</suitkaise-api>()  # skip the counter, trip immediately
 except MinorError:
-    circuit.short()  # count normally</code></pre>
+    circuit.<suitkaise-api>short</suitkaise-api>()  # count normally</code></pre>
     <h2>Async support (native async support)</h2>
     <pre><code class="language-python"># sync
-circuit.short()
+circuit.<suitkaise-api>short</suitkaise-api>()
 
 # async
-await circuit.short.asynced()()</code></pre>
+await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
     <h2>Check state (get the current state of the circuit)</h2>
-    <pre><code class="language-python">circuit.times_shorted       # failures since last trip
-circuit.total_trips         # lifetime trip count
-circuit.current_sleep_time  # current backoff delay
+    <pre><code class="language-python">circuit.<suitkaise-api>times_shorted</suitkaise-api>       # failures since last trip
+circuit.<suitkaise-api>total_trips</suitkaise-api>         # lifetime trip count
+circuit.<suitkaise-api>current_sleep_time</suitkaise-api>  # current backoff delay
 
-breaker.broken              # is it broken?</code></pre>
+breaker.<suitkaise-api>broken</suitkaise-api>              # is it broken?</code></pre>
     <h2>Want to learn more?</h2>
     <ul>
-        <li><strong>Why page</strong> — why <code>circuits</code> exists, coordinated shutdown, and cross-process circuit breaking</li>
-        <li><strong>How to use</strong> — full API reference for <code>Circuit</code> and <code>BreakingCircuit</code></li>
+        <li><strong>Why page</strong> — why <code><suitkaise-api>circuits</suitkaise-api></code> exists, coordinated shutdown, and cross-process circuit breaking</li>
+        <li><strong>How to use</strong> — full API reference for <code><suitkaise-api>Circuit</suitkaise-api></code> and <code><suitkaise-api>BreakingCircuit</suitkaise-api></code></li>
         <li><strong>Examples</strong> — progressively complex examples into a full script</li>
-        <li><strong>How it works</strong> — internal architecture (locks, backoff, <code>Share</code> integration) (level: beginner-intermediate)</li>
+        <li><strong>How it works</strong> — internal architecture (locks, backoff, <code><suitkaise-api>Share</suitkaise-api></code> integration) (level: beginner-intermediate)</li>
     </ul>
 </section>
