@@ -1,20 +1,20 @@
-# `<suitkaise-api>circuits</suitkaise-api>` examples
+# `circuits` examples
 
 ## Common Patterns
 
-### `<suitkaise-api>Circuit</suitkaise-api>`
+### `Circuit`
 
-Use `<suitkaise-api>Circuit</suitkaise-api>` when you want to automatically continue after a cooldown.
+Use `Circuit` when you want to automatically continue after a cooldown.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+from suitkaise import Circuit
 
 # create a circuit that:
 # - trips after 10 shorts
 # - sleeps 1 second on first trip
-# - increases sleep by 1.5x after each <suitkaise-api>trip</suitkaise-api> (1s → 1.5s → 2.25s → ...)
+# - increases sleep by 1.5x after each trip (1s → 1.5s → 2.25s → ...)
 # - caps sleep at 30 seconds max
-rate_limiter = <suitkaise-api>Circuit</suitkaise-api>(
+rate_limiter = Circuit(
     num_shorts_to_trip=10,
     sleep_time_after_trip=1.0,
     backoff_factor=1.5,
@@ -26,71 +26,71 @@ for request in incoming_requests:
     if is_rate_limited(request):
         # count the rate limit as a "short"
         # after 10 shorts, circuit trips: sleeps, then auto-resets counter
-        # <suitkaise-api>short</suitkaise-api>() returns True if it slept, False otherwise
-        rate_limiter.<suitkaise-api>short</suitkaise-api>()
+        # short() returns True if it slept, False otherwise
+        rate_limiter.short()
     else:
         # not rate limited, process normally
         process(request)
 ```
 
-### `<suitkaise-api>BreakingCircuit</suitkaise-api>`
+### `BreakingCircuit`
 
-Use `<suitkaise-api>BreakingCircuit</suitkaise-api>` when you want to stop after too many failures.
+Use `BreakingCircuit` when you want to stop after too many failures.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import BreakingCircuit
 
 # create a circuit that:
 # - breaks after 3 shorts
 # - sleeps 1 second when it breaks
 # - stays broken until manually reset
-circ = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+circ = BreakingCircuit(
     num_shorts_to_trip=3,
     sleep_time_after_trip=1.0
 )
 
 # loop continues as long as circuit is not broken
-while not circ.<suitkaise-api>broken</suitkaise-api>:
+while not circ.broken:
     try:
         # attempt the risky operation
-        <suitkaise-api>result</suitkaise-api> = risky_operation()
+        result = risky_operation()
         # success - exit the retry loop
         break
     except OperationError:
         # failure - count it as a short
-        # after 3 failures, circuit.<suitkaise-api>broken</suitkaise-api> becomes True
-        circ.<suitkaise-api>short</suitkaise-api>()
+        # after 3 failures, circuit.broken becomes True
+        circ.short()
 
 # check if we exited because circuit broke
-if circ.<suitkaise-api>broken</suitkaise-api>:
+if circ.broken:
     # handle the failure case (e.g., log, alert, fallback)
     handle_failure()
 ```
 
 ### Dual usage
 
-Use `<suitkaise-api>BreakingCircuit</suitkaise-api>` for inner retries and `<suitkaise-api>Circuit</suitkaise-api>` for outer rate limiting.
+Use `BreakingCircuit` for inner retries and `Circuit` for outer rate limiting.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>, <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import Circuit, BreakingCircuit
 
 # outer circuit: rate limits the overall process
 # - trips after 5 item failures
 # - sleeps 5 seconds, then continues to next item
-outer = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=5.0)
+outer = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=5.0)
 
 # inner circuit: controls retries for each item
 # - breaks after 3 failed attempts
 # - sleeps 0.5 seconds between retries
-inner = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=0.5)
+inner = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=0.5)
 
 for item in items:
     # reset inner circuit for each new item
     # this clears the broken flag and short counter
-    inner.<suitkaise-api>reset</suitkaise-api>()
+    inner.reset()
     
     # retry loop for this item
-    while not inner.<suitkaise-api>broken</suitkaise-api>:
+    while not inner.broken:
         try:
             # attempt to process
             process(item)
@@ -98,14 +98,14 @@ for item in items:
             break
         except TransientError:
             # transient failure - count it
-            # after 3 failures, inner.<suitkaise-api>broken</suitkaise-api> becomes True
-            inner.<suitkaise-api>short</suitkaise-api>()
+            # after 3 failures, inner.broken becomes True
+            inner.short()
     
     # if inner circuit broke, this item completely failed
-    if inner.<suitkaise-api>broken</suitkaise-api>:
+    if inner.broken:
         # count it as a failure for the outer circuit
         # after 5 failed items, outer circuit sleeps
-        outer.<suitkaise-api>short</suitkaise-api>()
+        outer.short()
 ```
 
 ### Async pattern
@@ -113,14 +113,14 @@ for item in items:
 ```python
 import asyncio
 import aiohttp
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+from suitkaise import Circuit
 
 # create circuit for rate limiting
 # - trips after 5 rate limit responses
-# - sleeps 2 seconds (using asyncio.sleep, not <suitkaise-api>blocking</suitkaise-api>)
+# - sleeps 2 seconds (using asyncio.sleep, not blocking)
 # - doubles sleep time after each trip
 # - adds ±20% randomness to prevent thundering herd
-circ = <suitkaise-api>Circuit</suitkaise-api>(
+circ = Circuit(
     num_shorts_to_trip=5,
     sleep_time_after_trip=2.0,
     backoff_factor=2.0,
@@ -135,9 +135,9 @@ async def fetch_url(session: aiohttp.ClientSession, url: str) -> dict | None:
             # check for rate limiting (HTTP 429)
             if response.status == 429:
                 # count rate limit as a short
-                # .<suitkaise-api>asynced</suitkaise-api>()() returns an async version that uses asyncio.sleep
+                # .asynced()() returns an async version that uses asyncio.sleep
                 # first () gets the async function, second () calls it
-                await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
+                await circ.short.asynced()()
                 # return None to indicate we didn't get data
                 return None
             
@@ -145,8 +145,8 @@ async def fetch_url(session: aiohttp.ClientSession, url: str) -> dict | None:
             return await response.json()
     
     except aiohttp.ClientError:
-        # network <suitkaise-api>error</suitkaise-api> - also count as a short
-        await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
+        # network error - also count as a short
+        await circ.short.asynced()()
         return None
 
 async def fetch_all(urls: list[str]) -> list[dict]:
@@ -157,10 +157,10 @@ async def fetch_all(urls: list[str]) -> list[dict]:
     async with aiohttp.ClientSession() as session:
         for url in urls:
             # fetch each URL
-            <suitkaise-api>result</suitkaise-api> = await fetch_url(session, url)
+            result = await fetch_url(session, url)
             # only keep successful results
-            if <suitkaise-api>result</suitkaise-api>:
-                results.append(<suitkaise-api>result</suitkaise-api>)
+            if result:
+                results.append(result)
     
     return results
 
@@ -176,59 +176,59 @@ async def main():
     
     # print summary
     print(f"Fetched {len(results)} results")
-    print(f"<suitkaise-api>Circuit</suitkaise-api> tripped {circ.<suitkaise-api>total_trips</suitkaise-api>} times")
+    print(f"Circuit tripped {circ.total_trips} times")
 
-# <suitkaise-api>run</suitkaise-api> the async main function
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+# run the async main function
+asyncio.run(main())
 ```
 
 ### Multithreading with a shared circuit
 
-Multiple threads share a `<suitkaise-api>BreakingCircuit</suitkaise-api>`. When one thread breaks it, the others stop immediately.
+Multiple threads share a `BreakingCircuit`. When one thread breaks it, the others stop immediately.
 
 ```python
 import threading
 from queue import Queue
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import BreakingCircuit
 
-def worker(worker_id: int, queue: Queue, circuit: <suitkaise-api>BreakingCircuit</suitkaise-api>, results: list):
+def worker(worker_id: int, queue: Queue, circuit: BreakingCircuit, results: list):
     """Worker function that processes items from a shared queue."""
     
     # loop continues as long as circuit is not broken
     # when ANY thread breaks the circuit, ALL threads see it
-    while not circuit.<suitkaise-api>broken</suitkaise-api>:
+    while not circuit.broken:
         # try to get an item from the queue
         try:
-            # timeout allows us to periodically check circuit.<suitkaise-api>broken</suitkaise-api>
+            # timeout allows us to periodically check circuit.broken
             item = queue.get(timeout=0.1)
         except:
             # queue is empty or timed out
-            # loop back to check circuit.<suitkaise-api>broken</suitkaise-api> again
+            # loop back to check circuit.broken again
             continue
         
         try:
             # attempt to process the item
-            <suitkaise-api>result</suitkaise-api> = process_item(item)
+            result = process_item(item)
             # success - add to shared results
-            results.append(<suitkaise-api>result</suitkaise-api>)
+            results.append(result)
         
         except FatalError:
-            # fatal <suitkaise-api>error</suitkaise-api> - immediately break circuit for ALL workers
-            print(f"Worker {worker_id}: Fatal <suitkaise-api>error</suitkaise-api>, breaking circuit")
-            # <suitkaise-api>trip</suitkaise-api>() immediately sets circuit.<suitkaise-api>broken</suitkaise-api> = True
-            circuit.<suitkaise-api>trip</suitkaise-api>()
+            # fatal error - immediately break circuit for ALL workers
+            print(f"Worker {worker_id}: Fatal error, breaking circuit")
+            # trip() immediately sets circuit.broken = True
+            circuit.trip()
         
         except TransientError:
-            # transient <suitkaise-api>error</suitkaise-api> - count it
-            # after threshold, circuit.<suitkaise-api>broken</suitkaise-api> becomes True
-            circuit.<suitkaise-api>short</suitkaise-api>()
+            # transient error - count it
+            # after threshold, circuit.broken becomes True
+            circuit.short()
         
         finally:
             # always mark task as done (for queue.join())
             queue.task_done()
     
-    # we exit the loop when circuit.<suitkaise-api>broken</suitkaise-api> is True
-    print(f"Worker {worker_id}: <suitkaise-api>Circuit</suitkaise-api> broken, stopping")
+    # we exit the loop when circuit.broken is True
+    print(f"Worker {worker_id}: Circuit broken, stopping")
 
 
 # MAIN CODE
@@ -236,7 +236,7 @@ def worker(worker_id: int, queue: Queue, circuit: <suitkaise-api>BreakingCircuit
 # create a shared circuit
 # - breaks after 5 transient errors across ALL workers
 # - no sleep time (we just want to stop, not pause)
-circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=0.0)
+circuit = BreakingCircuit(num_shorts_to_trip=5, sleep_time_after_trip=0.0)
 
 # create a shared queue for work items
 queue = Queue()
@@ -253,7 +253,7 @@ threads = []
 for i in range(4):
     # each thread gets the same circuit, queue, and results list
     t = threading.Thread(target=worker, args=(i, queue, circuit, results))
-    t.<suitkaise-api>start</suitkaise-api>()
+    t.start()
     threads.append(t)
 
 # wait for all threads to finish
@@ -261,16 +261,16 @@ for t in threads:
     t.join()
 
 # check final state
-if circuit.<suitkaise-api>broken</suitkaise-api>:
+if circuit.broken:
     # some items were not processed
     print(f"Stopped early: {queue.qsize()} items remaining")
     # optionally reset and retry later
-    circuit.<suitkaise-api>reset</suitkaise-api>()
+    circuit.reset()
 else:
     print(f"All items processed: {len(results)} results")
 ```
 
-When any worker calls `circuit.<suitkaise-api>trip</suitkaise-api>()` or `circuit.<suitkaise-api>short</suitkaise-api>()` enough times, all workers see `circuit.<suitkaise-api>broken</suitkaise-api> == True` and exit their loops. This provides coordinated shutdown across threads.
+When any worker calls `circuit.trip()` or `circuit.short()` enough times, all workers see `circuit.broken == True` and exit their loops. This provides coordinated shutdown across threads.
 
 ## More specific examples
 
@@ -278,7 +278,7 @@ When any worker calls `circuit.<suitkaise-api>trip</suitkaise-api>()` or `circui
 
 ```python
 import requests
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import BreakingCircuit
 
 class APIClient:
     """API client with circuit breaker for fault tolerance."""
@@ -288,11 +288,11 @@ class APIClient:
         
         # create circuit breaker
         # - breaks after 3 consecutive failures
-        # - sleeps 1 second when <suitkaise-api>broken</suitkaise-api> (before user can retry)
-        # - doubles sleep time after each <suitkaise-api>reset</suitkaise-api> (1s → 2s → 4s → ...)
+        # - sleeps 1 second when broken (before user can retry)
+        # - doubles sleep time after each reset (1s → 2s → 4s → ...)
         # - caps at 60 seconds max
         # - adds ±10% randomness
-        self.circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+        self.circuit = BreakingCircuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=1.0,
             backoff_factor=2.0,
@@ -305,7 +305,7 @@ class APIClient:
         
         # first, check if circuit is broken
         # if broken, fail fast without making request
-        if self.circuit.<suitkaise-api>broken</suitkaise-api>:
+        if self.circuit.broken:
             return None
         
         try:
@@ -320,14 +320,14 @@ class APIClient:
             return response.json()
         
         except requests.RequestException:
-            # any request <suitkaise-api>error</suitkaise-api> (timeout, connection, HTTP <suitkaise-api>error</suitkaise-api>)
+            # any request error (timeout, connection, HTTP error)
             # count as a short - may break circuit
-            self.circuit.<suitkaise-api>short</suitkaise-api>()
+            self.circuit.short()
             return None
     
-    def <suitkaise-api>reset</suitkaise-api>(self):
+    def reset(self):
         """Reset the circuit to try again."""
-        self.circuit.<suitkaise-api>reset</suitkaise-api>()
+        self.circuit.reset()
 
 
 # USAGE
@@ -343,7 +343,7 @@ for user_id in user_ids:
         # success - process the data
         process_user(data)
     
-    elif client.circuit.<suitkaise-api>broken</suitkaise-api>:
+    elif client.circuit.broken:
         # circuit is broken - API is down
         # stop making requests
         print("API is down, stopping")
@@ -353,13 +353,13 @@ for user_id in user_ids:
     # continue to next user
 
 # later, when we want to try again
-client.<suitkaise-api>reset</suitkaise-api>()
+client.reset()
 ```
 
 ### Database connection pool
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import BreakingCircuit
 
 class ConnectionPool:
     """Connection pool with circuit breaker for database failures."""
@@ -372,7 +372,7 @@ class ConnectionPool:
         # - sleeps 0.5 seconds when broken
         # - increases sleep by 1.5x after each reset
         # - caps at 5 seconds
-        self.circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+        self.circuit = BreakingCircuit(
             num_shorts_to_trip=5,
             sleep_time_after_trip=0.5,
             backoff_factor=1.5,
@@ -383,8 +383,8 @@ class ConnectionPool:
         """Get a database connection with circuit breaker protection."""
         
         # fail fast if circuit is broken
-        if self.circuit.<suitkaise-api>broken</suitkaise-api>:
-            raise ConnectionPoolExhausted("<suitkaise-api>Circuit</suitkaise-api> breaker is open")
+        if self.circuit.broken:
+            raise ConnectionPoolExhausted("Circuit breaker is open")
         
         try:
             # attempt to acquire a connection
@@ -392,7 +392,7 @@ class ConnectionPool:
         
         except ConnectionError:
             # connection failed - count it
-            self.circuit.<suitkaise-api>short</suitkaise-api>()
+            self.circuit.short()
             # re-raise so caller knows it failed
             raise
     
@@ -400,11 +400,11 @@ class ConnectionPool:
         """Call when operations succeed to reset the circuit."""
         
         # only reset if currently broken
-        if self.circuit.<suitkaise-api>broken</suitkaise-api>:
+        if self.circuit.broken:
             # reset the broken flag
-            self.circuit.<suitkaise-api>reset</suitkaise-api>()
+            self.circuit.reset()
             # also reset backoff to original sleep time
-            self.circuit.<suitkaise-api>reset_backoff</suitkaise-api>()
+            self.circuit.reset_backoff()
     
     def _acquire_connection(self):
         """Internal method to actually get a connection."""
@@ -416,17 +416,17 @@ class ConnectionPool:
 
 ```python
 from pathlib import Path
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+from suitkaise import Circuit
 
 def process_files(directory: Path, max_errors_per_batch: int = 10):
     """Process all .txt files with automatic pausing on errors."""
     
-    # circuit for <suitkaise-api>error</suitkaise-api> rate limiting
+    # circuit for error rate limiting
     # - trips after max_errors_per_batch errors
     # - sleeps 5 seconds on first trip
     # - doubles sleep time after each trip
     # - caps at 60 seconds
-    circ = <suitkaise-api>Circuit</suitkaise-api>(
+    circ = Circuit(
         num_shorts_to_trip=max_errors_per_batch,
         sleep_time_after_trip=5.0,
         backoff_factor=2.0,
@@ -446,24 +446,24 @@ def process_files(directory: Path, max_errors_per_batch: int = 10):
             processed += 1
         
         except ProcessingError as e:
-            # <suitkaise-api>error</suitkaise-api> - increment counter and log
+            # error - increment counter and log
             errors += 1
-            print(f"Error <suitkaise-api>processing</suitkaise-api> {file_path}: {e}")
+            print(f"Error processing {file_path}: {e}")
             
-            # count the <suitkaise-api>error</suitkaise-api> as a short
-            # <suitkaise-api>short</suitkaise-api>() returns True if circuit tripped and slept
-            if circ.<suitkaise-api>short</suitkaise-api>():
+            # count the error as a short
+            # short() returns True if circuit tripped and slept
+            if circ.short():
                 # we just paused - log it
-                print(f"Too many errors, paused for {circ.<suitkaise-api>current_sleep_time</suitkaise-api>:.1f}s")
+                print(f"Too many errors, paused for {circ.current_sleep_time:.1f}s")
     
     # print summary
-    print(f"Processed: {processed}, Errors: {errors}, Trips: {circ.<suitkaise-api>total_trips</suitkaise-api>}")
+    print(f"Processed: {processed}, Errors: {errors}, Trips: {circ.total_trips}")
 ```
 
 ### Worker with graceful degradation
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>, <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import Circuit, BreakingCircuit
 
 class Worker:
     """Worker that falls back to secondary service if primary fails."""
@@ -474,7 +474,7 @@ class Worker:
         # - sleeps 1 second, then auto-resets
         # - doubles sleep time after each trip
         # - caps at 30 seconds
-        self.primary = <suitkaise-api>Circuit</suitkaise-api>(
+        self.primary = Circuit(
             num_shorts_to_trip=3,
             sleep_time_after_trip=1.0,
             backoff_factor=2.0,
@@ -484,7 +484,7 @@ class Worker:
         # fallback service circuit - stops if it also fails
         # - breaks after 5 failures
         # - sleeps 0.5 seconds when broken
-        self.fallback = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+        self.fallback = BreakingCircuit(
             num_shorts_to_trip=5,
             sleep_time_after_trip=0.5
         )
@@ -498,16 +498,16 @@ class Worker:
         except PrimaryServiceError:
             # primary failed - count it
             # circuit will sleep if threshold reached
-            self.primary.<suitkaise-api>short</suitkaise-api>()
+            self.primary.short()
         
         # STEP 2: try fallback service (only if not broken)
-        if not self.fallback.<suitkaise-api>broken</suitkaise-api>:
+        if not self.fallback.broken:
             try:
                 return self._process_fallback(item)
             except FallbackServiceError:
                 # fallback also failed - count it
                 # may break the fallback circuit
-                self.fallback.<suitkaise-api>short</suitkaise-api>()
+                self.fallback.short()
         
         # STEP 3: both services failed
         return None
@@ -526,32 +526,32 @@ class Worker:
 ### Monitoring circuit state
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>, <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import Circuit, BreakingCircuit
 
-def log_circuit_state(name: str, circ: <suitkaise-api>Circuit</suitkaise-api> | <suitkaise-api>BreakingCircuit</suitkaise-api>):
+def log_circuit_state(name: str, circ: Circuit | BreakingCircuit):
     """Log the current state of a circuit."""
     
     print(f"[{name}]")
     
     # shorts: how many failures since last trip/reset
     # num_shorts_to_trip: threshold before trip
-    print(f"  shorts: {circ.<suitkaise-api>times_shorted</suitkaise-api>}/{circ.<suitkaise-api>num_shorts_to_trip</suitkaise-api>}")
+    print(f"  shorts: {circ.times_shorted}/{circ.num_shorts_to_trip}")
     
     # total_trips: lifetime count of all trips
-    print(f"  total trips: {circ.<suitkaise-api>total_trips</suitkaise-api>}")
+    print(f"  total trips: {circ.total_trips}")
     
     # current_sleep_time: sleep duration (after backoff applied)
-    print(f"  current sleep: {circ.<suitkaise-api>current_sleep_time</suitkaise-api>:.2f}s")
+    print(f"  current sleep: {circ.current_sleep_time:.2f}s")
     
-    # broken: only exists on <suitkaise-api>BreakingCircuit</suitkaise-api>
-    if isinstance(circ, <suitkaise-api>BreakingCircuit</suitkaise-api>):
-        print(f"  broken: {circ.<suitkaise-api>broken</suitkaise-api>}")
+    # broken: only exists on BreakingCircuit
+    if isinstance(circ, BreakingCircuit):
+        print(f"  broken: {circ.broken}")
 
 
 # USAGE
 
 # create a circuit
-circ = <suitkaise-api>Circuit</suitkaise-api>(
+circ = Circuit(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0
@@ -561,7 +561,7 @@ circ = <suitkaise-api>Circuit</suitkaise-api>(
 from pathlib import Path
 import json
 
-data_dir = Path("data/<suitkaise-api>circuits</suitkaise-api>")
+data_dir = Path("data/circuits")
 data_dir.mkdir(parents=True, exist_ok=True)
 
 # seed files (some invalid)
@@ -577,15 +577,15 @@ for path in files:
         json.loads(path.read_text())
     except json.JSONDecodeError:
         # count a short on bad input
-        circ.<suitkaise-api>short</suitkaise-api>()
+        circ.short()
     
     # check if we just tripped (counter resets to 0 after trip)
-    if circ.<suitkaise-api>times_shorted</suitkaise-api> == 0:
+    if circ.times_shorted == 0:
         # log the state right after a trip
         log_circuit_state("my_circuit", circ)
 ```
 
-## Full script using `<suitkaise-api>circuits</suitkaise-api>`
+## Full script using `circuits`
 
 A web scraper with rate limiting and failure handling.
 
@@ -593,16 +593,16 @@ A web scraper with rate limiting and failure handling.
 """
 In-memory scraper with circuit breakers for rate limiting and failures.
 
-Uses two <suitkaise-api>circuits</suitkaise-api>:
-- <suitkaise-api>Circuit</suitkaise-api> for rate limiting (auto-recovers after cooldown)
-- <suitkaise-api>BreakingCircuit</suitkaise-api> for failures (stops after too many errors)
+Uses two circuits:
+- Circuit for rate limiting (auto-recovers after cooldown)
+- BreakingCircuit for failures (stops after too many errors)
 """
 
 import asyncio
 import json
 import hashlib
 from dataclasses import dataclass
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>, <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import Circuit, BreakingCircuit
 
 
 @dataclass
@@ -611,7 +611,7 @@ class ScrapeResult:
     url: str
     status: str  # "success", "rate_limited", "server_error", "client_error", "skipped"
     data: dict | None = None
-    <suitkaise-api>error</suitkaise-api>: str | None = None
+    error: str | None = None
 
 
 class WebScraper:
@@ -627,7 +627,7 @@ class WebScraper:
     ):
         self.data_store = data_store
         # CIRCUIT 1: rate limiting
-        self.rate_limiter = <suitkaise-api>Circuit</suitkaise-api>(
+        self.rate_limiter = Circuit(
             num_shorts_to_trip=max_rate_limits,
             sleep_time_after_trip=rate_limit_sleep,
             backoff_factor=1.5,
@@ -635,7 +635,7 @@ class WebScraper:
             jitter=0.2
         )
         # CIRCUIT 2: failure handling
-        self.failure_circuit = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+        self.failure_circuit = BreakingCircuit(
             num_shorts_to_trip=max_failures,
             sleep_time_after_trip=failure_sleep,
             backoff_factor=2.0,
@@ -647,19 +647,19 @@ class WebScraper:
         """Scrape multiple URLs with circuit breaker protection."""
         results = []
         for url in urls:
-            if self.failure_circuit.<suitkaise-api>broken</suitkaise-api>:
+            if self.failure_circuit.broken:
                 results.append(ScrapeResult(
                     url=url,
                     status="skipped",
-                    <suitkaise-api>error</suitkaise-api>="Too many failures, circuit broken"
+                    error="Too many failures, circuit broken"
                 ))
                 continue
-            <suitkaise-api>result</suitkaise-api> = await self._scrape_url(url)
-            results.append(<suitkaise-api>result</suitkaise-api>)
+            result = await self._scrape_url(url)
+            results.append(result)
         return results
     
     async def _scrape_url(self, url: str) -> ScrapeResult:
-        """Scrape a single URL with <suitkaise-api>error</suitkaise-api> handling."""
+        """Scrape a single URL with error handling."""
         status, payload = self.data_store[url]
         
         # perform real work regardless of status
@@ -667,15 +667,15 @@ class WebScraper:
         digest = hashlib.sha256(data_bytes).hexdigest()
         
         if status == 429:
-            await self.rate_limiter.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
+            await self.rate_limiter.short.asynced()()
             return ScrapeResult(url=url, status="rate_limited")
         
         if status >= 500:
-            await self.failure_circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
-            return ScrapeResult(url=url, status="server_error", <suitkaise-api>error</suitkaise-api>=f"HTTP {status}")
+            await self.failure_circuit.short.asynced()()
+            return ScrapeResult(url=url, status="server_error", error=f"HTTP {status}")
         
         if status >= 400:
-            return ScrapeResult(url=url, status="client_error", <suitkaise-api>error</suitkaise-api>=f"HTTP {status}")
+            return ScrapeResult(url=url, status="client_error", error=f"HTTP {status}")
         
         # success: parse and return with hash
         data = json.loads(data_bytes)
@@ -685,17 +685,17 @@ class WebScraper:
     def get_stats(self) -> dict:
         """Get current circuit statistics."""
         return {
-            "rate_limit_trips": self.rate_limiter.<suitkaise-api>total_trips</suitkaise-api>,
-            "rate_limit_sleep": self.rate_limiter.<suitkaise-api>current_sleep_time</suitkaise-api>,
-            "failure_trips": self.failure_circuit.<suitkaise-api>total_trips</suitkaise-api>,
-            "failure_circuit_broken": self.failure_circuit.<suitkaise-api>broken</suitkaise-api>,
+            "rate_limit_trips": self.rate_limiter.total_trips,
+            "rate_limit_sleep": self.rate_limiter.current_sleep_time,
+            "failure_trips": self.failure_circuit.total_trips,
+            "failure_circuit_broken": self.failure_circuit.broken,
         }
     
-    def <suitkaise-api>reset</suitkaise-api>(self):
-        """Reset <suitkaise-api>circuits</suitkaise-api> for a new batch of URLs."""
-        self.failure_circuit.<suitkaise-api>reset</suitkaise-api>()
-        self.rate_limiter.<suitkaise-api>reset_backoff</suitkaise-api>()
-        self.failure_circuit.<suitkaise-api>reset_backoff</suitkaise-api>()
+    def reset(self):
+        """Reset circuits for a new batch of URLs."""
+        self.failure_circuit.reset()
+        self.rate_limiter.reset_backoff()
+        self.failure_circuit.reset_backoff()
 
 
 async def main():
@@ -704,7 +704,7 @@ async def main():
         "mem://users/1": (200, {"id": 1, "name": "Ada"}),
         "mem://users/2": (200, {"id": 2, "name": "Lin"}),
         "mem://users/3": (429, {"detail": "rate limited"}),
-        "mem://users/4": (500, {"detail": "server <suitkaise-api>error</suitkaise-api>"}),
+        "mem://users/4": (500, {"detail": "server error"}),
         "mem://users/5": (404, {"detail": "not found"}),
     }
     
@@ -727,11 +727,11 @@ async def main():
     print(f"Results: {success} success, {failed} failed, {skipped} skipped")
     print(f"Stats: {scraper.get_stats()}")
     
-    if scraper.failure_circuit.<suitkaise-api>broken</suitkaise-api>:
-        print("<suitkaise-api>Circuit</suitkaise-api> broke, will reset and retry later...")
-        scraper.<suitkaise-api>reset</suitkaise-api>()
+    if scraper.failure_circuit.broken:
+        print("Circuit broke, will reset and retry later...")
+        scraper.reset()
 
 
 if __name__ == "__main__":
-    asyncio.<suitkaise-api>run</suitkaise-api>(main())
+    asyncio.run(main())
 ```

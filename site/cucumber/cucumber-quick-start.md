@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "Quick Start: `<suitkaise-api>cucumber</suitkaise-api>`"
+title = "`<suitkaise-api>cucumber</suitkaise-api>` quick start guide"
 
 # 1.2
 
@@ -23,10 +23,10 @@ pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
-# <suitkaise-api>serialize</suitkaise-api> any object to bytes
+# serialize any object to bytes
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(my_object)
 
-# <suitkaise-api>deserialize</suitkaise-api> back
+# deserialize back
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 ```
 
@@ -44,14 +44,38 @@ def make_multiplier(n):
 
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(make_multiplier(3))
 
-# classes defined in __main__
-class MyClass:
-    def __init__(self):
-        self.value = 42
+# classes defined in __main__ — the reason this matters is pickle
+# fails with __main__ classes across processes, cucumber doesn't
+class Task:
+    def __init__(self, n):
+        self.n = n
+    def compute(self):
+        return self.n ** 2
 
-data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(MyClass())
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(Task(7))
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-print(restored.value)  # 42
+print(restored.compute())  # 49 — class definition survived serialization
+```
+
+## Circular references? Handled automatically
+
+```python
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+
+class Node:
+    def __init__(self, name):
+        self.name = name
+        self.parent = None
+        self.children = []
+
+root = Node("root")
+child = Node("child")
+root.children.append(child)
+child.parent = root  # circular: child → root → child
+
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(root)
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
+print(restored.children[0].parent.name)  # "root" — cycle preserved
 ```
 
 ## Live resources become `Reconnector` objects
@@ -72,7 +96,7 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
 # now it's a live sqlite3 connection again
 ```
 
-For connections that require passwords:
+**For connections that require passwords:**
 
 ```python
 <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, **{
@@ -80,11 +104,11 @@ For connections that require passwords:
 })
 ```
 
-`Reconnectors` that don't require authentication will lazily reconnect on first access.
+`Reconnector`s that don't require authentication will lazily reconnect on first access.
 
 ## Debug mode
 
-When something goes wrong:
+**When something goes wrong:**
 
 ```python
 # see where serialization failed
@@ -98,7 +122,7 @@ When something goes wrong:
 
 ```python
 ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(my_object)
-print(ir)  # dict/list structure showing how <suitkaise-api>cucumber</suitkaise-api> sees your object
+print(ir)  # dict/list structure showing how cucumber sees your object
 ```
 
 ## Convert to JSON

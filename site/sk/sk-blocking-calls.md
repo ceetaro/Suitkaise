@@ -18,13 +18,13 @@ This page lists all function and method calls that the `<suitkaise-api>sk</suitk
 
 Note: Detection is case-insensitive.
 
-Note: You can always use the `@<suitkaise-api>blocking</suitkaise-api>` decorator to explicitly mark code as blocking when AST detection doesn't catch it (for things like heavy, time consuming CPU bound work)
+Note: You can always use the `<suitkaise-api>@blocking</suitkaise-api>` decorator to explicitly mark code as blocking when `AST` detection doesn't catch it (for things like heavy, time consuming CPU bound work)
 
 ---
 
 ## Exact Blocking Calls
 
-These are matched exactly (full call path).
+These are matched exactly (full `call path`).
 
 ### Time / Sleep
 
@@ -171,7 +171,7 @@ These are matched exactly (full call path).
 
 ## Blocking Method Patterns
 
-If any call ends with one of these method names, it's considered blocking.
+If any call ends with one of these `method names`, it's considered blocking.
 
 ### Core Blocking
 
@@ -318,7 +318,7 @@ If any call ends with one of these method names, it's considered blocking.
 
 ## Broad Blocking Patterns
 
-These method names are only considered blocking when the call path contains an I/O context keyword.
+These `method names` are only considered blocking when the `call path` contains an `I/O context keyword`.
 
 ### Broad Methods
 
@@ -341,7 +341,7 @@ These method names are only considered blocking when the call path contains an I
 
 ### I/O Context Keywords
 
-For a broad method to trigger blocking detection, the call path must contain one of these:
+For a broad method to trigger `blocking detection`, the `call path` must contain one of these:
 
 #### Databases
 
@@ -433,8 +433,8 @@ calculate()                      # unknown function
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def cpu_intensive():
     # pure computation, no I/O calls
     return sum(x**2 for x in range(10_000_000))

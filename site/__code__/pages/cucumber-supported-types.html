@@ -8,22 +8,21 @@
         <a href="#cucumber-supported-types" class="module-bar-link active" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1>cucumber supported types</h1>
-    <p>Note: Iterator-style objects (including <code>enumerate</code> and <code>zip</code>) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.</p>
-    <p>Note: Objects that turn into <code>Reconnector</code> objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit <code>reconnect(...)</code> call (or <code><suitkaise-api>reconnect_all</suitkaise-api>(...)</code> with credentials).</p>
-    <p>Note: Due to Python limitations, some types are not supported by <code><suitkaise-api>Share</suitkaise-api></code>.</p>
+    <p><strong>Note:</strong> Iterator-style objects (including <code>enumerate</code> and <code>zip</code>) are exhausted during <code>serialization</code>. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.</p>
+    <p><strong>Note:</strong> Objects that turn into <code>Reconnector</code> objects may need to be reconnected after <code>deserialization</code> to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit <code>reconnect(...)</code> call (or <code><suitkaise-api>reconnect_all</suitkaise-api>(...)</code> with credentials).</p>
+    <p><strong>Note:</strong> Due to Python limitations, some types are not supported by <code><suitkaise-api>Share</suitkaise-api></code>.</p>
     <ul>
         <li><code>multiprocessing.*</code> objects (queues, managers, events, shared_memory, connections)</li>
         <li><code>os.pipe()</code> file handles / pipe-backed <code>io.FileIO</code></li>
         <li><code>weakref.ref</code> objects (recreated as weak references; dead refs become placeholders)</li>
-        <li>tokens with authentication (cannot serialize authentication strings)</li>
-        <li>user-defined class instances --&gt; new instance of same type with same state</li>
+        <li>Tokens with authentication (cannot serialize authentication strings)</li>
+        <li>User-defined class instances --&gt; new instance of same type with same state</li>
         <li><code>None</code> --&gt; <code>None</code></li>
         <li><code>bool</code> --&gt; <code>bool</code></li>
         <li><code>int</code> --&gt; <code>int</code></li>

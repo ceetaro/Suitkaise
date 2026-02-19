@@ -1,4 +1,4 @@
-# Quick Start: `<suitkaise-api>cucumber</suitkaise-api>`
+# `<suitkaise-api>cucumber</suitkaise-api>` quick start guide
 
 ```bash
 pip install <suitkaise-api>suitkaise</suitkaise-api>
@@ -30,14 +30,38 @@ def make_multiplier(n):
 
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(make_multiplier(3))
 
-# classes defined in __main__
-class MyClass:
-    def __init__(self):
-        self.value = 42
+# classes defined in __main__ — the reason this matters is pickle
+# fails with __main__ classes across processes, cucumber doesn't
+class Task:
+    def __init__(self, n):
+        self.n = n
+    def compute(self):
+        return self.n ** 2
 
-data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(MyClass())
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(Task(7))
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-print(restored.value)  # 42
+print(restored.compute())  # 49 — class definition survived serialization
+```
+
+## Circular references? Handled automatically
+
+```python
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+
+class Node:
+    def __init__(self, name):
+        self.name = name
+        self.parent = None
+        self.children = []
+
+root = Node("root")
+child = Node("child")
+root.children.append(child)
+child.parent = root  # circular: child → root → child
+
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(root)
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
+print(restored.children[0].parent.name)  # "root" — cycle preserved
 ```
 
 ## Live resources become `Reconnector` objects
@@ -58,7 +82,7 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
 # now it's a live sqlite3 connection again
 ```
 
-For connections that require passwords:
+**For connections that require passwords:**
 
 ```python
 <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, **{
@@ -70,7 +94,7 @@ For connections that require passwords:
 
 ## Debug mode
 
-When something goes wrong:
+**When something goes wrong:**
 
 ```python
 # see where serialization failed

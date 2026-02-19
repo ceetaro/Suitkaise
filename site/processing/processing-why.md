@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "Why you should use `<suitkaise-api>processing</suitkaise-api>`"
+title = "Why you should use `processing`"
 
 # 1.2
 
@@ -17,12 +17,12 @@ text = "
 ## TLDR
 
 - **Anything works in parallel** - Locally-defined functions, lambdas, closures, live connections all work
-- **Easiest shared state possible** - `share.counter = 0` just works across processes
+- **Easiest shared state possible** - `<suitkaise-api>share.counter = 0</suitkaise-api>` just works across processes
 - **Class-based processes** - No more giant, messy functions. Lifecycle hooks organize your code naturally.
-- **Crash and restart** - `<suitkaise-api>lives</suitkaise-api>=3` and your process auto-retries. No try/except loops.
+- **Crash and restart** - `<suitkaise-api>lives=3</suitkaise-api>` and your process auto-retries. No try/except loops.
 - **Timeouts** - Advanced timeout system that works on all platforms.
-- **Database connections just work** - `@<suitkaise-api>autoreconnect</suitkaise-api>` brings live connections into subprocesses. Normally impossible.
-- **Sync and async in one API** - Same code, add `.<suitkaise-api>asynced</suitkaise-api>()` when you need it.
+- **Database connections just work** - `<suitkaise-api>@autoreconnect</suitkaise-api>` brings live connections into subprocesses. Normally impossible.
+- **Sync and async in one API** - Same code, add `<suitkaise-api>.asynced()</suitkaise-api>` when you need it.
 
 ---
 
@@ -44,8 +44,8 @@ Not with `<suitkaise-api>processing</suitkaise-api>`.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 import logging
 
-# put anything on <suitkaise-api>Share</suitkaise-api> — literally anything
-share = <suitkaise-api>Share</suitkaise-api>()
+# put anything on Share — literally anything
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 share.results = []
 share.log = logging.getLogger("worker")
@@ -56,13 +56,13 @@ class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.item = item
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
-        <suitkaise-api>result</suitkaise-api> = self.item * 2
-        self.share.results.append(<suitkaise-api>result</suitkaise-api>)       # shared list
+        result = self.item * 2
+        self.share.results.append(result)       # shared list
         self.share.counter += 1                 # shared counter
-        self.share.log.info(f"done: {<suitkaise-api>result</suitkaise-api>}")  # shared logger
+        self.share.log.info(f"done: {result}")  # shared logger
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(20)])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(20)])
 
 print(share.counter)         # 20
 print(len(share.results))    # 20
@@ -79,11 +79,12 @@ A list, a counter, and a logger — shared across 4 processes, all in sync, all 
 
 Python uses a Global Interpreter Lock (GIL).
 
-What this means
-- no memory leaks or corruption
-- no garbage collection issues
-- thread safe built-in types
-- can work with C extensions
+### What this means
+
+- No memory leaks or corruption
+- No garbage collection issues
+- Thread safe built-in types
+- Can work with C extensions
 
 Hey, that sounds pretty good! 
 
@@ -100,9 +101,9 @@ In a time where almost all major programs parallelize their code, Python is stuc
 ### Or is it?
 
 We can spawn multiple processes using Python's `multiprocessing` module.
-- each with their own GIL
-- each with their own interpreter
-- each with their own memory space
+- Each with their own GIL
+- Each with their own interpreter
+- Each with their own memory space
 
 True parallelism. Problem solved!
 
@@ -118,24 +119,24 @@ def process_data(items):
         return x * 2
 
     for item in items:
-        <suitkaise-api>result</suitkaise-api> = transform(item)
-        results.append(<suitkaise-api>result</suitkaise-api>)
+        result = transform(item)
+        results.append(result)
     return results
 
     
-with <suitkaise-api>Pool</suitkaise-api>(4) as pool:
-    return pool.<suitkaise-api>map</suitkaise-api>(transform, lists_of_items)
+with <suitkaise-api>Pool(</suitkaise-api>4) as pool:
+    return <suitkaise-api>pool.map(</suitkaise-api>transform, lists_of_items)
 ```
 
 This looks like it should work. But it doesn't, because you put a locally-defined function in the pool.
 
 There are a bunch of random things that `pickle` can't handle, many of which are pretty common things you use when writing code.
 
-- locally-defined functions
-- lambdas
-- closures
-- dynamically created classes
-- and most other complex code patterns that you would actually use when multiprocessing
+- Locally-defined functions
+- Lambdas
+- Closures
+- Dynamically created classes
+- And most other complex code patterns that you would actually use when multiprocessing
 
 Figuring out what works and what doesn't is a nightmare.
 
@@ -148,7 +149,7 @@ Figuring out what works and what doesn't is a nightmare.
 
 However: Python's `multiprocessing` doesn't use them by default.
 
-The standard library's `multiprocessing.<suitkaise-api>Pool</suitkaise-api>` is hardcoded to use `pickle`. To use `cloudpickle` or `dill`, you have to:
+The standard library's `multiprocessing.Pool` is hardcoded to use `pickle`. To use `cloudpickle` or `dill`, you have to:
 
 ```python
 # option 1: monkey-patch the serializer (risky, affects entire process)
@@ -166,8 +167,8 @@ multiprocessing.reduction.ForkingPickler.loads = cloudpickle.loads
 # pip install multiprocess
 import multiprocess as mp 
 
-with mp.<suitkaise-api>Pool</suitkaise-api>(4) as pool:
-    results = pool.<suitkaise-api>map</suitkaise-api>(my_function, items)
+with mp.Pool(4) as pool:
+    results = <suitkaise-api>pool.map(</suitkaise-api>my_function, items)
 
 # dill is slow
 # 2 libraries to keep track of
@@ -201,15 +202,34 @@ By default, `<suitkaise-api>processing</suitkaise-api>` uses `<suitkaise-api>cuc
 
 `<suitkaise-api>cucumber</suitkaise-api>` handles everything.
 
-- handles everything from ints to complex user created classes with live connections
-- better than `pickle`
-- better than `cloudpickle`
-- better than `dill`
-- automatically used by `<suitkaise-api>processing</suitkaise-api>`
+- Handles everything from ints to complex user created classes with live connections
+- Better than `pickle`
+- Better than `cloudpickle`
+- Better than `dill`
+- Automatically used by `<suitkaise-api>processing</suitkaise-api>`
 
 `<suitkaise-api>cucumber</suitkaise-api>` actually solves the problem of things not being serializable. And the problem of actually being compatible with multiprocessing.
 
 (For more info, see the `<suitkaise-api>cucumber</suitkaise-api>` pages)
+
+### <suitkaise-api>Pool</suitkaise-api> — parallel mapping without the pickle headaches
+
+With `multiprocessing`:
+```python
+from multiprocessing import Pool as MPPool
+
+with MPPool(4) as pool:
+    results = <suitkaise-api>pool.map(</suitkaise-api>my_function, items)
+    # PicklingError if my_function uses closures, lambdas, or local classes
+```
+
+With `<suitkaise-api>processing</suitkaise-api>`:
+```python
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+results = <suitkaise-api>pool.map(</suitkaise-api>my_function, items)  # closures, lambdas, anything
+```
 
 ## Python's `multiprocessing` module also has problems
 
@@ -222,16 +242,16 @@ Outside of the serialization problem, a large problem still exists with `multipr
 `multiprocessing` is a powerful tool, but it is also a pain in the ass to actually use, especially for complex tasks. A lot of this is just due to the fact that you sort of have to actually manage everything yourself.
 
 Python gives us the bare minimum to parallelize code, but outside of that, everything is left to you.
-- setup
-- cleanup
-- teardown
-- sharing state
-- error handling
-- performance timing
-- crash handling
-- looping code
-- more
-- and your actual task you need to do
+- Setup
+- Cleanup
+- Teardown
+- Sharing state
+- Error handling
+- Performance timing
+- Crash handling
+- Looping code
+- More
+- And your actual task you need to do
 
 This is a long list of things that you need in order to have solid code when parallelizing.
 
@@ -248,9 +268,9 @@ def process_data(items):
     return data
 
 
-# <suitkaise-api>run</suitkaise-api> the single process (not even in a <suitkaise-api>Pool</suitkaise-api>)
+# run the single process (not even in a Pool)
 process = multiprocessing.Process(target=process_data, args=(items,))
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 ```
 
 It's a function. 
@@ -284,47 +304,47 @@ class ProcessData(multiprocessing.Process):
     
     def <suitkaise-api>run</suitkaise-api>(self):
         # do work
-        <suitkaise-api>result</suitkaise-api> = process_items(self.items)
+        result = process_items(self.items)
         self.result_queue.put(<suitkaise-api>result</suitkaise-api>)  # send back via queue
 
 queue = multiprocessing.Queue()
 process = ProcessData(items, queue)
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 process.join()
-<suitkaise-api>result</suitkaise-api> = queue.get()  # retrieve from queue, not process.<suitkaise-api>result</suitkaise-api>
+result = queue.get()  # retrieve from queue, not process.result
 ```
 
 This is a step in the right direction, but it is by no means perfect.
-- still sort of confusing in general
-- you have to manually manage the queue
-- this will still use base `pickle`
-- you have to manually call `super().__init__()` and implement `<suitkaise-api>run</suitkaise-api>()`
-- still no automatic retries, timeouts, timing, or error handling
+- Still sort of confusing in general
+- You have to manually manage the queue
+- This will still use base `pickle`
+- You have to manually call `super().__init__()` and implement `run()`
+- Still no automatic retries, timeouts, timing, or error handling
 
 ## `<suitkaise-api>Skprocess</suitkaise-api>`
 
 A class is the overall solution that should've been used all along.
 
 But we still have no structure and no lifecycle.
-- missing actual methods to split up code into smaller pieces
-- missing good error handling
-- hard to share state, must bring in a different object just for that
-- overall, code is still missing a lot of the structure and automation that is expected
+- Missing actual methods to split up code into smaller pieces
+- Missing good error handling
+- Hard to share state, must bring in a different object just for that
+- Overall, code is still missing a lot of the structure and automation that is expected
 
 `<suitkaise-api>Skprocess</suitkaise-api>` is a class that goes above and beyond for you.
-- automatically uses `<suitkaise-api>cucumber</suitkaise-api>`
-- supports `<suitkaise-api>Share</suitkaise-api>` (very important later)
-- provides standard lifecycle methods to help you split up code into smaller pieces
-- all result gathering is done using attributes and regular return statements
-- clear error handling, even telling you what part of the code it failed on
-- retries when the process crashes
-- live resources can automatically reconnect
-- automatic timing of every lifecycle method
-- simple shared state, any object can be shared
-- code loops for you
-- no need to call `super().__init__()` when inheriting
-- high level of control using a simple config
-- fast and controlled bidirectional communication with `<suitkaise-api>Pipe</suitkaise-api>`
+- Automatically uses `<suitkaise-api>cucumber</suitkaise-api>`
+- Supports `<suitkaise-api>Share</suitkaise-api>` (very important later)
+- Provides standard lifecycle methods to help you split up code into smaller pieces
+- All result gathering is done using attributes and regular return statements
+- Clear error handling, even telling you what part of the code it failed on
+- Retries when the process crashes
+- Live resources can automatically reconnect
+- Automatic timing of every lifecycle method
+- Simple shared state, any object can be shared
+- Code loops for you
+- No need to call `super().__init__()` when inheriting
+- High level of control using a simple config
+- Fast and controlled bidirectional communication with `<suitkaise-api>Pipe</suitkaise-api>`
 
 Let's make a process that queries a database for user data based on given input from a parent process.
 
@@ -337,7 +357,7 @@ Requirements:
 - Return results to parent
 - Clean up connection on exit
 
-Without `<suitkaise-api>Skprocess</suitkaise-api>` - *92 lines*
+**Without it** - *92 lines*
 
 ```python
 # comments and whitespace excluded from line count
@@ -355,11 +375,11 @@ class DatabaseWorker(multiprocessing.Process):
         self.task_queue = task_queue
         self.result_queue = result_queue
         self.stats_lock = stats_lock
-        self.<suitkaise-api>total_time</suitkaise-api> = total_time
+        self.total_time = total_time
         self.query_count = query_count
         self.stop_event = stop_event
         self.db_config = db_config
-        self.<suitkaise-api>timeout</suitkaise-api> = 30
+        self.timeout = 30
         self.max_retries = 3
         self.conn = None
     
@@ -377,16 +397,16 @@ class DatabaseWorker(multiprocessing.Process):
     def _timeout_handler(self, signum, frame):
         raise TimeoutError("Query timed out")
     
-    def <suitkaise-api>run</suitkaise-api>(self):
+    def run(self):
         # manual connection setup
         self._connect()
         
-        # manual signal handling for <suitkaise-api>timeouts</suitkaise-api>
+        # manual signal handling for timeouts
         signal.signal(signal.SIGALRM, self._timeout_handler)
         
         try:
             while not self.stop_event.is_set():
-                # check for incoming query (non-<suitkaise-api>blocking</suitkaise-api>)
+                # check for incoming query (non-blocking)
                 try:
                     query_params = self.task_queue.get(timeout=0.1)
                 except:
@@ -394,9 +414,9 @@ class DatabaseWorker(multiprocessing.Process):
                     self.result_queue.put({'status': 'no query', 'data': None})
                     continue
                 
-                # manual <suitkaise-api>timing</suitkaise-api>
+                # manual timing
                 start = time.time()
-                signal.alarm(self.<suitkaise-api>timeout</suitkaise-api>)
+                signal.alarm(self.timeout)
                 
                 try:
                     cursor = self.conn.cursor()
@@ -405,25 +425,25 @@ class DatabaseWorker(multiprocessing.Process):
                     cursor.close()
                     
                     signal.alarm(0)
-                    <suitkaise-api>elapsed</suitkaise-api> = time.time() - start
+                    elapsed = time.time() - start
                     
                     # manual stats tracking with locks
                     with self.stats_lock:
-                        self.<suitkaise-api>total_time</suitkaise-api>.value += <suitkaise-api>elapsed</suitkaise-api>
+                        self.total_time.value += elapsed
                         self.query_count.value += 1
                     
                     # different status based on results
                     if not results:
-                        self.result_queue.put({'status': '<suitkaise-api>error</suitkaise-api>', 'data': None})
+                        self.result_queue.put({'status': 'error', 'data': None})
                     else:
                         self.result_queue.put({'status': 'ok', 'data': results})
                     
                 except TimeoutError:
                     signal.alarm(0)
-                    self.result_queue.put({'status': '<suitkaise-api>error</suitkaise-api>', '<suitkaise-api>error</suitkaise-api>': 'timeout'})
+                    self.result_queue.put({'status': 'error', 'error': 'timeout'})
                 except Exception as e:
                     signal.alarm(0)
-                    self.result_queue.put({'status': '<suitkaise-api>error</suitkaise-api>', '<suitkaise-api>error</suitkaise-api>': str(e)})
+                    self.result_queue.put({'status': 'error', 'error': str(e)})
         finally:
             # manual cleanup
             if self.conn:
@@ -450,9 +470,9 @@ worker = DatabaseWorker(
     query_count, stop_event, db_config,
     timeout=30, max_retries=3
 )
-worker.<suitkaise-api>start</suitkaise-api>()
+worker.start()
 
-# list of queries to <suitkaise-api>run</suitkaise-api> (counted as a single line)
+# list of queries to run (counted as a single line)
 queries = [
     {'sql': 'SELECT * FROM users WHERE id = %s', 'params': (123,)},
     {'sql': 'SELECT * FROM users WHERE id = %s', 'params': (456,)},
@@ -466,16 +486,16 @@ results = []
 # send each query to the worker
 for query in queries:
     task_queue.put(query)
-    <suitkaise-api>result</suitkaise-api> = result_queue.get(timeout=30)  # need manual timeout here too
-    results.append(<suitkaise-api>result</suitkaise-api>)
+    result = result_queue.get(timeout=30)  # need manual timeout here too
+    results.append(result)
 
 # signal stop and wait for cleanup
 stop_event.set()
 worker.join()
 
-# manual <suitkaise-api>timing</suitkaise-api> calculation
+# manual timing calculation
 if query_count.value > 0:
-    avg_time = <suitkaise-api>total_time</suitkaise-api>.value / query_count.value
+    avg_time = total_time.value / query_count.value
     print(f"Avg query time: {avg_time:.3f}s")
 ```
 
@@ -484,29 +504,29 @@ There are a lot of problems here.
 1. 6 import statements
 2. 12 parameters in `__init__`, most of which are just trying to setup infrastructure
 3. `super().__init__()` has to be called and is easy to forget
-4. manual retry logic
-5. manual performance timing
-6. multiple different timeouts need to be handled manually
-7. several queues to manage
-8. have to handle signals, which don't even work on Windows
-9. awkward `.value` access for shared state
-10. have to use a separate event object for stopping
+4. Manual retry logic
+5. Manual performance timing
+6. Multiple different timeouts need to be handled manually
+7. Several queues to manage
+8. Have to handle signals, which don't even work on Windows
+9. Awkward `.value` access for shared state
+10. Have to use a separate event object for stopping
 11. `Manager` for locks, something else that needs to be coordinated
-12. manual cleanup in `finally`
-13. statistics done by hand
-14. passing database credentials around as a dict
-15. uses `pickle`
+12. Manual cleanup in `finally`
+13. Statistics done by hand
+14. Passing database credentials around as a dict
+15. Uses `pickle`
 
 This is a simple example: you already have to do this much for this little.
 
-With `<suitkaise-api>Skprocess</suitkaise-api>` - *40 lines*
+**With `<suitkaise-api>Skprocess</suitkaise-api>`** - *40 lines*
 
 ```python
 # comments and whitespace excluded from line count
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
 import psycopg2
 
-@<suitkaise-api>autoreconnect</suitkaise-api>(**{"psycopg2.Connection": {"*": "password"}})
+<suitkaise-api>@autoreconnect</suitkaise-api>(**{"psycopg2.Connection": {"*": "password"}})
 class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
 
     def __init__(self, db_connection):
@@ -514,18 +534,18 @@ class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.db = db_connection
 
         # built in configuration
-        # <suitkaise-api>run</suitkaise-api> indefinitely until <suitkaise-api>stop</suitkaise-api>() is called
+        # run indefinitely until stop() is called
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None
         # NOTE: this is the default: here for clarity, not counted in line count
 
-        # 3 <suitkaise-api>lives</suitkaise-api> (2 extra attempts after the first failure)
+        # 3 lives (2 extra attempts after the first failure)
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3
 
         # 30 second timeout per query
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 30.0
     
     def <suitkaise-api>__prerun__</suitkaise-api>(self):
-        # receive query from <suitkaise-api>parent</suitkaise-api> (non-<suitkaise-api>blocking</suitkaise-api> check)
+        # receive query from parent (non-blocking check)
         msg = self.<suitkaise-api>listen</suitkaise-api>(timeout=0.1)
         self.query = msg if msg else None
     
@@ -541,7 +561,7 @@ class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
 
         if self.query:
             if not self.results:
-                self.<suitkaise-api>tell</suitkaise-api>({'status': '<suitkaise-api>error</suitkaise-api>', 'data': None})
+                self.<suitkaise-api>tell</suitkaise-api>({'status': 'error', 'data': None})
             else:
                 self.<suitkaise-api>tell</suitkaise-api>({'status': 'ok', 'data': self.results})
 
@@ -558,9 +578,9 @@ db = psycopg2.connect(host='localhost', database='mydb', password='secret')
 
 # init and start the worker process
 worker = DatabaseWorker(db)
-worker.<suitkaise-api>start</suitkaise-api>()
+worker.start()
 
-# list of queries to <suitkaise-api>run</suitkaise-api> (counted as a single line)
+# list of queries to run (counted as a single line)
 queries = [
     {'sql': 'SELECT * FROM users WHERE id = %s', 'params': (123,)},
     {'sql': 'SELECT * FROM users WHERE id = %s', 'params': (456,)},
@@ -573,25 +593,25 @@ results = []
 
 # send each query to the worker
 for query in queries:
-    worker.<suitkaise-api>tell</suitkaise-api>(query)
-    <suitkaise-api>result</suitkaise-api> = worker.<suitkaise-api>listen</suitkaise-api>(timeout=30)
-    results.append(<suitkaise-api>result</suitkaise-api>)
+    <suitkaise-api>worker.tell(</suitkaise-api>query)
+    result = <suitkaise-api>worker.listen(</suitkaise-api>timeout=30)
+    results.append(result)
 
-# request <suitkaise-api>stop</suitkaise-api> (join) and wait for it to finish
-worker.<suitkaise-api>stop</suitkaise-api>()
-worker.<suitkaise-api>wait</suitkaise-api>()
+# request stop (join) and wait for it to finish
+<suitkaise-api>worker.stop()</suitkaise-api>
+<suitkaise-api>worker.wait()</suitkaise-api>
 
 # automatically timed
-print(f"Avg query time: {worker.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Avg query time: {<suitkaise-api>worker.__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
 ```
 
 - 2x less code
 - 1 import line for all of your multiprocessing
-- nothing is manual
-- everything is organized
-- uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization
-- automatically reconnects the db connection
-- times, errors, and statistics are handled
+- Nothing is manual
+- Everything is organized
+- Uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization
+- Automatically reconnects the db connection
+- Times, errors, and statistics are handled
 
 
 
@@ -602,77 +622,77 @@ Sharing state across process boundaries is one of the most functionally importan
 
 There are generally 6 patterns for doing this:
 
-1. `Value` and `Array`
+### 1. `Value` and `Array`
 
 Shared memory, but just for primitive types.
 
-Pros: Fast, no serialization
-Cons: Only primitives, not even dicts or lists
+**Pros:** Fast, no serialization
+**Cons:** Only primitives, not even dicts or lists
 
-2. `multiprocessing.Manager`
+### 2. `multiprocessing.Manager`
 
 Proxy objects that wrap Python types.
 
-Pros: Supports dict, list, and other Python types (uses `pickle`)
-Cons: Slow. Manager is a separate process, so not truly shared memory
+**Pros:** Supports dict, list, and other Python types (uses `pickle`)
+**Cons:** Slow. Manager is a separate process, so not truly shared memory
 
-3. `multiprocessing.shared_memory`
+### 3. `multiprocessing.shared_memory`
 
 Raw shared memory blocks. Only available in Python 3.8+.
 
-Pros: True shared memory, fast
-Cons: Manual buffer management, no serialization, have to handle syncing yourself
+**Pros:** True shared memory, fast
+**Cons:** Manual buffer management, no serialization, have to handle syncing yourself
 
-4. Queues (message passing)
+### 4. Queues (message passing)
 
 Isn't exactly shared state, but functionally similar.
 
-Pros: Safe, decently fasts, works with any serializable object
-Cons: Not actually shared - each process has its own copy
+**Pros:** Safe, decently fast, works with any serializable object
+**Cons:** Not actually shared — each process has its own copy
 
-5. Files/Databases
+### 5. Files/Databases
 
 Write to disk so that other processes can read.
 
-Pros: simple and persistent
-Cons: slow IO, race conditions, not real-time
+**Pros:** Simple and persistent
+**Cons:** Slow IO, race conditions, not real-time
 
-6. External services
+### 6. External services
 
 Use an external process to hold state, like Redis or Memcached.
 
-Pros: atomic operations, pub/sub, works across machines
-Cons: External depedency, network overhead, more to manage
+**Pros:** Atomic operations, pub/sub, works across machines
+**Cons:** External dependency, network overhead, more to manage
 
-The problem with all of these:
-- none of these are easy or simple in practice
-- you have to choose the right mechanism
-- handle serialization, or be limited in what you can share
-- sync manually
-- lots of boilerplate
+### The problem with all of these
+- None of these are easy or simple in practice
+- You have to choose the right mechanism
+- Handle serialization, or be limited in what you can share
+- Sync manually
+- Lots of boilerplate
 
 
 ## `<suitkaise-api>Share</suitkaise-api>`
 
 `<suitkaise-api>Share</suitkaise-api>` is the ultimate solution to shared state in Python.
 
-Pros:
-- literally add any object to it and it will work the same exact way in shared memory
-- as simple as it gets
-- uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization, so all objects work
-- ensures that everything stays in sync
-- works across any number of processes
+**Pros:**
+- Literally add any object to it and it will work the same exact way in shared memory
+- As simple as it gets
+- Uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization, so all objects work
+- Ensures that everything stays in sync
+- Works across any number of processes
 
-Cons:
-- slowest overall option
-- overhead
-- cannot share `multiprocessing.*` objects (Python limitation)
+**Cons:**
+- Slowest overall option
+- Overhead
+- Cannot share `multiprocessing.*` objects (Python limitation)
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>
 import logging
 
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 share.log = logging.getLogger("ShareLog")
 
@@ -680,7 +700,7 @@ share.log = logging.getLogger("ShareLog")
 
 class ShareCounter(<suitkaise-api>Skprocess</suitkaise-api>):
 
-    # pass the <suitkaise-api>Share</suitkaise-api> instance to the process
+    # pass the Share instance to the process
     def __init__(self, share: <suitkaise-api>Share</suitkaise-api>):
         self.share = share
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
@@ -692,10 +712,10 @@ class ShareCounter(<suitkaise-api>Skprocess</suitkaise-api>):
 
 
 # just add share
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>map</suitkaise-api>(ShareCounter, [share] * 10)
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.map(</suitkaise-api>ShareCounter, [share] * 10)
 
-print(share.counter) # 100 (10 total workers, 10 <suitkaise-api>runs</suitkaise-api> each)
+print(share.counter) # 100 (10 total workers, 10 runs each)
 print(share.log.messages) # ['1', '2', '3', '4', '5', ..., '100'] in order
 ```
 
@@ -757,15 +777,15 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
 
 p = MyProcess()
-p.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>p.start()</suitkaise-api>
 for i in range(10):
-    p.<suitkaise-api>tell</suitkaise-api>("print")
-    <suitkaise-api>result</suitkaise-api> = p.<suitkaise-api>listen</suitkaise-api>(timeout=1.0)
-    if <suitkaise-api>result</suitkaise-api> != "command received":
+    <suitkaise-api>p.tell(</suitkaise-api>"print")
+    result = <suitkaise-api>p.listen(</suitkaise-api>timeout=1.0)
+    if result != "command received":
         break
 
-p.<suitkaise-api>tell</suitkaise-api>("stop")
-p.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>p.tell(</suitkaise-api>"stop")
+<suitkaise-api>p.wait()</suitkaise-api>
 ```
 
 ### 2. `<suitkaise-api>Pipe</suitkaise-api>`
@@ -775,7 +795,7 @@ The fastest, most direct way to communicate between processes.
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 
 class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
@@ -785,18 +805,18 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
         self.pipe.send("hello")
-        <suitkaise-api>result</suitkaise-api> = self.pipe.recv()
-        print(<suitkaise-api>result</suitkaise-api>)
+        result = self.pipe.recv()
+        print(result)
 
 process = MyProcess(point)
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 
 anchor.send("hello")
 
-<suitkaise-api>result</suitkaise-api> = anchor.recv()
-print(<suitkaise-api>result</suitkaise-api>)
+result = anchor.recv()
+print(result)
 
-process.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>process.wait()</suitkaise-api>
 ```
 
 One way pipe:
@@ -804,7 +824,7 @@ One way pipe:
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
 # one way pipe: only anchor can send data, point can only receive
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
 
 class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, pipe_point: <suitkaise-api>Pipe</suitkaise-api>.Point):
@@ -833,15 +853,15 @@ But if you still need speed, or want more manual control, use `<suitkaise-api>Pi
 
 Throughout this page, you might have seen something called `<suitkaise-api>Pool</suitkaise-api>`.
 
-`<suitkaise-api>Pool</suitkaise-api>` is an upgraded wrapper around `multiprocessing.<suitkaise-api>Pool</suitkaise-api>` used for parallel batch processing.
+`<suitkaise-api>Pool</suitkaise-api>` is an upgraded wrapper around `multiprocessing.Pool` used for parallel batch processing.
 
 What this enables:
-- process pools support `<suitkaise-api>Share</suitkaise-api>`
-- process pools using `<suitkaise-api>cucumber</suitkaise-api>` for serialization
-- process pools using `<suitkaise-api>Skprocess</suitkaise-api>` class objects
-- process pools get access to `<suitkaise-api>sk</suitkaise-api>` modifiers
+- Process pools support `<suitkaise-api>Share</suitkaise-api>`
+- Process pools using `<suitkaise-api>cucumber</suitkaise-api>` for serialization
+- Process pools using `<suitkaise-api>Skprocess</suitkaise-api>` class objects
+- Process pools get access to `<suitkaise-api>sk</suitkaise-api>` modifiers
 
-So, already, `<suitkaise-api>Pool</suitkaise-api>` is vastly more powerful than `multiprocessing.<suitkaise-api>Pool</suitkaise-api>`. especially because you can use `<suitkaise-api>Share</suitkaise-api>`.
+So, already, `<suitkaise-api>Pool</suitkaise-api>` is vastly more powerful than `multiprocessing.Pool`. especially because you can use `<suitkaise-api>Share</suitkaise-api>`.
 
 ### `<suitkaise-api>Pool</suitkaise-api>` is better, but still familiar to users
 
@@ -849,12 +869,12 @@ It has the 4 main map methods, with clearer names.
 
 `map`: returns a list, ordered by input. Each item gets added to the list in the order it was added to the pool.
 ```python
-list_in_order = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn_or_skprocess, items)
+<suitkaise-api>list_in_order</suitkaise-api> = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn_or_skprocess, items)
 ```
 
 `unordered_map`: returns a list, unordered. Whatever finishes first, gets added to the list first.
 ```python
-unordered_list = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn_or_skprocess, items)
+<suitkaise-api>unordered_list</suitkaise-api> = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn_or_skprocess, items)
 ```
 
 `imap`: returns an iterator, ordered by input. Each item gets added to the iterator in the order it was added to the pool.
@@ -875,9 +895,9 @@ Since you can use `<suitkaise-api>Skprocess</suitkaise-api>` objects that can `<
 
 `<suitkaise-api>sk</suitkaise-api>` modifiers are from another `<suitkaise-api>suitkaise</suitkaise-api>` module, and are available on most `<suitkaise-api>suitkaise</suitkaise-api>` functions and methods, including `<suitkaise-api>Pool</suitkaise-api>`.
 
-- timeouts
-- native async support
-- background execution with `Future`s
+- Timeouts
+- Native async support
+- Background execution with `Future`s
 
 And, `<suitkaise-api>Pool</suitkaise-api>` itself has a special modifier, `<suitkaise-api>star</suitkaise-api>()`, that allows you to unpack tuples into function arguments.
 
@@ -886,12 +906,12 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkai
 import asyncio
 
 # get a coroutine for map with a timeout
-coro = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(20.0).<suitkaise-api>asynced</suitkaise-api>()
+<suitkaise-api>coro</suitkaise-api> = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(20.0).<suitkaise-api>asynced</suitkaise-api>()
 results = await coro(fn_or_skprocess, items)
 
-# or, <suitkaise-api>run</suitkaise-api> in the background, get a Future
+# or, run in the background, get a Future
 # and unpack tuples across function arguments (instead of adding the whole tuple as a single argument)
-future = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn_or_skprocess, items)
+<suitkaise-api>future</suitkaise-api> = <suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn_or_skprocess, items)
 ```
 
 `<suitkaise-api>asynced</suitkaise-api>()` and `<suitkaise-api>background</suitkaise-api>()` do not work with each other (they do the same thing in different ways), but other than that, everything else is combinable.

@@ -1,50 +1,50 @@
-# Quick Start: `<suitkaise-api>circuits</suitkaise-api>`
+# `circuits` quick start guide
 
 ```bash
-pip install <suitkaise-api>suitkaise</suitkaise-api>
+pip install suitkaise
 ```
 
-## Auto-resetting circuit (`<suitkaise-api>Circuit</suitkaise-api>`)
+## Auto-resetting circuit (`Circuit`)
 
 Sleeps after N failures, then resets and continues.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+from suitkaise import Circuit
 
-circuit = <suitkaise-api>Circuit</suitkaise-api>(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+circuit = Circuit(num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
 for request in incoming_requests:
     try:
         process(request)
     except ServiceError:
-        circuit.<suitkaise-api>short</suitkaise-api>()  # after 5 failures, sleeps 1s, then resets
+        circuit.short()  # after 5 failures, sleeps 1s, then resets
 ```
 
-## Breaking circuit (`<suitkaise-api>BreakingCircuit</suitkaise-api>`)
+## Breaking circuit (`BreakingCircuit`)
 
 Stays broken after N failures until you manually reset.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+from suitkaise import BreakingCircuit
 
-breaker = <suitkaise-api>BreakingCircuit</suitkaise-api>(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+breaker = BreakingCircuit(num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-while not breaker.<suitkaise-api>broken</suitkaise-api>:
+while not breaker.broken:
     try:
-        <suitkaise-api>result</suitkaise-api> = risky_operation()
+        result = risky_operation()
         break
     except OperationError:
-        breaker.<suitkaise-api>short</suitkaise-api>()
+        breaker.short()
 
-if breaker.<suitkaise-api>broken</suitkaise-api>:
+if breaker.broken:
     handle_failure()
-    breaker.<suitkaise-api>reset</suitkaise-api>()  # manually reset when ready
+    breaker.reset()  # manually reset when ready
 ```
 
 ## Exponential backoff (with jitter and max sleep time)
 
 ```python
-circuit = <suitkaise-api>Circuit</suitkaise-api>(
+circuit = Circuit(
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,
     backoff_factor=2.0,    # double sleep time after each trip
@@ -56,7 +56,7 @@ circuit = <suitkaise-api>Circuit</suitkaise-api>(
 ## Jitter (randomness to prevent thundering herd)
 
 ```python
-circuit = <suitkaise-api>Circuit</suitkaise-api>(
+circuit = Circuit(
     num_shorts_to_trip=5,
     sleep_time_after_trip=5.0,
     jitter=0.2  # ±20% randomness to prevent thundering herd
@@ -67,36 +67,58 @@ circuit = <suitkaise-api>Circuit</suitkaise-api>(
 
 ```python
 try:
-    <suitkaise-api>result</suitkaise-api> = call_service()
+    result = call_service()
 except CriticalError:
-    circuit.<suitkaise-api>trip</suitkaise-api>()  # skip the counter, trip immediately
+    circuit.trip()  # skip the counter, trip immediately
 except MinorError:
-    circuit.<suitkaise-api>short</suitkaise-api>()  # count normally
+    circuit.short()  # count normally
 ```
 
 ## Async support (native async support)
 
 ```python
 # sync
-circuit.<suitkaise-api>short</suitkaise-api>()
+circuit.short()
 
-# async
-await circuit.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
+# async — .asynced() returns the async version, second () calls it
+await circuit.short.asynced()()
+
+# equivalent to:
+async_short = circuit.short.asynced()
+await async_short()
 ```
 
 ## Check state (get the current state of the circuit)
 
 ```python
-circuit.<suitkaise-api>times_shorted</suitkaise-api>       # failures since last trip
-circuit.<suitkaise-api>total_trips</suitkaise-api>         # lifetime trip count
-circuit.<suitkaise-api>current_sleep_time</suitkaise-api>  # current backoff delay
+circuit.times_shorted       # failures since last trip
+circuit.total_trips         # lifetime trip count
+circuit.current_sleep_time  # current backoff delay
 
-breaker.<suitkaise-api>broken</suitkaise-api>              # is it broken?
+breaker.broken              # is it broken?
+```
+
+## Reset backoff after success
+
+```python
+circuit = Circuit(
+    num_shorts_to_trip=3,
+    sleep_time_after_trip=1.0,
+    backoff_factor=2.0,
+    max_sleep_time=60.0
+)
+
+for batch in get_batches():
+    try:
+        result = process_batch(batch)
+        circuit.reset_backoff()  # success! next failure starts at 1s, not wherever backoff left off
+    except BatchError:
+        circuit.short()
 ```
 
 ## Want to learn more?
 
-- **Why page** — why `<suitkaise-api>circuits</suitkaise-api>` exists, coordinated shutdown, and cross-process circuit breaking
-- **How to use** — full API reference for `<suitkaise-api>Circuit</suitkaise-api>` and `<suitkaise-api>BreakingCircuit</suitkaise-api>`
+- **Why page** — why `circuits` exists, coordinated shutdown, and cross-process circuit breaking
+- **How to use** — full API reference for `Circuit` and `BreakingCircuit`
 - **Examples** — progressively complex examples into a full script
-- **How it works** — internal architecture (locks, backoff, `<suitkaise-api>Share</suitkaise-api>` integration) (level: beginner-intermediate)
+- **How it works** — internal architecture (locks, backoff, `Share` integration) (level: beginner-intermediate)

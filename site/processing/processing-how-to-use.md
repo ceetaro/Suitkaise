@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How to use `<suitkaise-api>processing</suitkaise-api>`"
+title = "How to use `processing`"
 
 # 1.2
 
@@ -17,17 +17,17 @@ text = "
 `<suitkaise-api>processing</suitkaise-api>` provides powerful subprocess execution, parallel processing, and shared memory across process boundaries.
 
 `<suitkaise-api>Skprocess</suitkaise-api>`: Base class for easy, class based subprocess execution.
-- inherit from `<suitkaise-api>Skprocess</suitkaise-api>`
-- implement the lifecycle methods
-- easy to make and use
+- Inherit from `<suitkaise-api>Skprocess</suitkaise-api>`
+- Implement the lifecycle methods
+- Easy to make and use
 - `<suitkaise-api>tell</suitkaise-api>()` and `<suitkaise-api>listen</suitkaise-api>()` for queue based communication
-- serializes with `<suitkaise-api>cucumber</suitkaise-api>`
-- automatic reconnection of live resources with `<suitkaise-api>autoreconnect</suitkaise-api>`
-- automatic timing
-- automatic retries
-- automatic timeouts
-- automatic looping
-- simple class pattern
+- Serializes with `<suitkaise-api>cucumber</suitkaise-api>`
+- Automatic reconnection of live resources with `<suitkaise-api>autoreconnect</suitkaise-api>`
+- Automatic timing
+- Automatic retries
+- Automatic timeouts
+- Automatic looping
+- Simple class pattern
 
 `<suitkaise-api>Pool</suitkaise-api>`: Parallel batch processing.
 - `map`: returns a list, ordered by input
@@ -35,20 +35,20 @@ text = "
 - `imap`: returns an iterator, ordered by input
 - `unordered_imap`: returns an iterator, unordered
 - `.<suitkaise-api>star</suitkaise-api>()` modifier: unpacks tuples as function arguments
-- supports `<suitkaise-api>sk</suitkaise-api>` modifiers: `.<suitkaise-api>timeout</suitkaise-api>()`, `.<suitkaise-api>background</suitkaise-api>()`, `.<suitkaise-api>asynced</suitkaise-api>()`
+- Supports `<suitkaise-api>sk</suitkaise-api>` modifiers: `.<suitkaise-api>timeout</suitkaise-api>()`, `.<suitkaise-api>background</suitkaise-api>()`, `.<suitkaise-api>asynced</suitkaise-api>()`
 
 `<suitkaise-api>Share</suitkaise-api>`: Shared memory container that works across processes.
-- best feature in the entire library
-- literally just create a `<suitkaise-api>Share</suitkaise-api>` and add any objects to it, like a regular class
-- pass the `<suitkaise-api>Share</suitkaise-api>` to your subprocesses
-- access and update the objects normally
-- everything remains in sync
+- Best feature in the entire library
+- Literally just create a `<suitkaise-api>Share</suitkaise-api>` and add any objects to it, like a regular class
+- Pass the `<suitkaise-api>Share</suitkaise-api>` to your subprocesses
+- Access and update the objects normally
+- Everything remains in sync
 
-`<suitkaise-api>Pipe</suitkaise-api>`: upgraded `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>`
-- super fast cross process communication
-- uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization
-- ensures one pipe endpoint remains locked in the parent process
-- easy to use and understand
+`<suitkaise-api>Pipe</suitkaise-api>`: upgraded `multiprocessing.Pipe`
+- Super fast cross process communication
+- Uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization
+- Ensures one pipe endpoint remains locked in the parent process
+- Easy to use and understand
 
 ## Importing
 
@@ -98,9 +98,9 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         return self.counter
 
 process = MyProcess()
-process.<suitkaise-api>start</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()  # 10
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+result = <suitkaise-api>process.result()</suitkaise-api>  # 10
 ```
 
 ### Lifecycle Methods
@@ -108,28 +108,28 @@ process.<suitkaise-api>wait</suitkaise-api>()
 Define any of these methods in your subclass. All are optional except `<suitkaise-api>__run__</suitkaise-api>()`.
 
 `<suitkaise-api>__run__</suitkaise-api>()`: main work method
-- required
-- no need to write looping code
+- Required
+- No need to write looping code
 
 `<suitkaise-api>__prerun__</suitkaise-api>()`: setup before each iteration (run)
-- optional
-- use for setup that needs to happen before each run
+- Optional
+- Use for setup that needs to happen before each run
 
 `<suitkaise-api>__postrun__</suitkaise-api>()`: cleanup after each iteration (run)
-- optional
-- use for cleanup that needs to happen after every run
+- Optional
+- Use for cleanup that needs to happen after every run
 
 `<suitkaise-api>__onfinish__</suitkaise-api>()`: cleanup/teardown after the process ends
-- optional
-- use for cleanup that needs to happen before the process ends
+- Optional
+- Use for cleanup that needs to happen before the process ends
 
 `<suitkaise-api>__result__</suitkaise-api>()`: return data when the process completes
-- optional
-- whatever is returned here is what `process.<suitkaise-api>result</suitkaise-api>()` returns
+- Optional
+- Whatever is returned here is what `<suitkaise-api>process.result()</suitkaise-api>` returns
 
 `<suitkaise-api>__error__</suitkaise-api>()`: return data when the process fails
-- optional
-- allows you more flexibility when an error occurs
+- Optional
+- Allows you more flexibility when an error occurs
 
 #### `<suitkaise-api>__prerun__</suitkaise-api>()`
 
@@ -189,7 +189,7 @@ Use for:
 
 #### `<suitkaise-api>__result__</suitkaise-api>()`
 
-Return data when process completes. This is what `process.<suitkaise-api>result</suitkaise-api>()` returns.
+Return data when process completes. This is what `<suitkaise-api>process.result()</suitkaise-api>` returns.
 
 ```python
 def <suitkaise-api>__result__</suitkaise-api>(self):
@@ -209,10 +209,10 @@ Handle errors when all lives are exhausted. Receives the error via `self.<suitka
 ```python
 def <suitkaise-api>__error__</suitkaise-api>(self):
     log_error(self.<suitkaise-api>error</suitkaise-api>)
-    return {'status': 'failed', '<suitkaise-api>error</suitkaise-api>': str(self.<suitkaise-api>error</suitkaise-api>)}
+    return {'status': 'failed', 'error': str(self.<suitkaise-api>error</suitkaise-api>)}
 ```
 
-Default behavior: Returns `self.<suitkaise-api>error</suitkaise-api>`, which will be raised by `process.<suitkaise-api>result</suitkaise-api>()`.
+Default behavior: Returns `self.<suitkaise-api>error</suitkaise-api>`, which will be raised by `<suitkaise-api>process.result()</suitkaise-api>`.
 
 ### `<suitkaise-api>process_config</suitkaise-api>`
 
@@ -224,7 +224,7 @@ Number of run iterations before auto-stopping.
 
 ```python
 def __init__(self):
-    # <suitkaise-api>run</suitkaise-api> 100 iterations, then stop
+    # run 100 iterations, then stop
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 100
 ```
 
@@ -250,14 +250,15 @@ Number of times to retry after a crash before giving up.
 
 ```python
 def __init__(self):
-    # retry up to 2 <suitkaise-api>times</suitkaise-api> (3 total attempts)
+    # retry up to 2 times (3 total attempts)
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3  
 ```
 
 - `1`: No retries (fail on first error)
 - `n > 1`: Retry `n-1` times on error
 
-When the process crashes:
+#### When the process crashes
+
 1. Current run state is preserved
 2. Process restarts from where it left off
 3. `<suitkaise-api>lives</suitkaise-api>` is decremented
@@ -273,7 +274,7 @@ def __init__(self):
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 30.0
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>postrun</suitkaise-api> = 5.0
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>onfinish</suitkaise-api> = 10.0
-    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>result</suitkaise-api> = 5.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.result = 5.0
     self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>error</suitkaise-api> = 5.0
 ```
 
@@ -291,7 +292,7 @@ Start the process in a new subprocess.
 
 ```python
 process = MyProcess()
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 ```
 
 - Serializes the `<suitkaise-api>Skprocess</suitkaise-api>` object
@@ -303,7 +304,7 @@ process.<suitkaise-api>start</suitkaise-api>()
 Signal the process to stop gracefully.
 
 ```python
-process.<suitkaise-api>stop</suitkaise-api>()
+<suitkaise-api>process.stop()</suitkaise-api>
 ```
 
 - Non-blocking (returns immediately)
@@ -316,7 +317,7 @@ process.<suitkaise-api>stop</suitkaise-api>()
 Forcefully terminate the process immediately.
 
 ```python
-process.<suitkaise-api>kill</suitkaise-api>()
+<suitkaise-api>process.kill()</suitkaise-api>
 ```
 
 - Bypasses the lives system
@@ -328,9 +329,9 @@ process.<suitkaise-api>kill</suitkaise-api>()
 Wait for the process to finish.
 
 ```python
-finished = process.<suitkaise-api>wait</suitkaise-api>() # blocks until done
+finished = <suitkaise-api>process.wait()</suitkaise-api> # blocks until done
 
-finished = process.<suitkaise-api>wait</suitkaise-api>(timeout=10.0) # returns False if timeout
+finished = <suitkaise-api>process.wait(</suitkaise-api>timeout=10.0) # returns False if timeout
 ```
 
 Arguments
@@ -358,7 +359,7 @@ Will block until the process finishes if not already done.
 Returns whatever `<suitkaise-api>__result__</suitkaise-api>()` returned.
 
 ```python
-data = process.<suitkaise-api>result</suitkaise-api>()  # blocks until <suitkaise-api>result</suitkaise-api> ready
+data = <suitkaise-api>process.result()</suitkaise-api>  # blocks until result ready
 ```
 
 Raises
@@ -382,14 +383,14 @@ data = await process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>asynce
 Start, wait, and return the result in one call.
 
 ```python
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>()
+result = <suitkaise-api>process.run()</suitkaise-api>
 ```
 
 Equivalent to:
 ```python
-process.<suitkaise-api>start</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+result = <suitkaise-api>process.result()</suitkaise-api>
 ```
 
 Returns whatever `<suitkaise-api>__result__</suitkaise-api>()` returned.
@@ -400,15 +401,15 @@ Raises
 Modifiers:
 ```python
 # with timeout
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)()
+result = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)()
 
 # background - returns Future
 future = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()()
 # ... do other work ...
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+result = future.<suitkaise-api>result</suitkaise-api>()
 
 # async
-<suitkaise-api>result</suitkaise-api> = await process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
+result = await process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 ### Queue based communication with `<suitkaise-api>tell</suitkaise-api>()` and `<suitkaise-api>listen</suitkaise-api>()`
@@ -421,7 +422,7 @@ Send data to the other side.
 
 ```python
 # from parent
-process.<suitkaise-api>tell</suitkaise-api>({"command": "update_config", "value": 100})
+<suitkaise-api>process.tell(</suitkaise-api>{"command": "update_config", "value": 100})
 
 # from subprocess (in lifecycle methods)
 def <suitkaise-api>__postrun__</suitkaise-api>(self):
@@ -441,8 +442,8 @@ Receive data from the other side.
 
 ```python
 # from parent
-data = process.<suitkaise-api>listen</suitkaise-api>() # blocks until data received
-data = process.<suitkaise-api>listen</suitkaise-api>(timeout=5.0) # returns None if timeout
+data = <suitkaise-api>process.listen()</suitkaise-api> # blocks until data received
+data = <suitkaise-api>process.listen(</suitkaise-api>timeout=5.0) # returns None if timeout
 
 # from subprocess (in lifecycle methods)
 def <suitkaise-api>__prerun__</suitkaise-api>(self):
@@ -473,16 +474,16 @@ data = await process.<suitkaise-api>listen</suitkaise-api>.<suitkaise-api>asynce
 Every lifecycle method is automatically timed.
 
 ```python
-process.<suitkaise-api>start</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
 
-# access <suitkaise-api>timing</suitkaise-api> data
-print(process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
-print(process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>)
-print(process.<suitkaise-api>__postrun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
+# access timing data
+print(<suitkaise-api>process.__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(<suitkaise-api>process.__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>)
+print(<suitkaise-api>process.__postrun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
 
-# aggregate timer for full iterations (<suitkaise-api>prerun</suitkaise-api> + <suitkaise-api>run</suitkaise-api> + <suitkaise-api>postrun</suitkaise-api>)
-print(process.process_timer.<suitkaise-api>mean</suitkaise-api>)
+# aggregate timer for full iterations (prerun + run + postrun)
+print(process.process_timer.mean)
 ```
 
 Each timer is an `<suitkaise-api>Sktimer</suitkaise-api>` with full statistics: `mean`, `median`, `stdev`, `min`, `max`, `<suitkaise-api>percentile</suitkaise-api>()`, ...
@@ -491,7 +492,7 @@ Each timer is an `<suitkaise-api>Sktimer</suitkaise-api>` with full statistics: 
 
 `current_run`: Current run iteration number (0-indexed).
 - `int`
-- first run is run 0
+- First run is run 0
 
 `is_alive`: Whether the subprocess is currently running.
 - `bool`
@@ -513,10 +514,10 @@ Process pool for parallel batch processing.
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
 
 # basic usage
-results = pool.<suitkaise-api>map</suitkaise-api>(process_item, items)
+results = <suitkaise-api>pool.map(</suitkaise-api>process_item, items)
 ```
 
 ### Constructor
@@ -531,7 +532,7 @@ Arguments
 Apply function to each item, return list of results.
 
 ```python
-results = pool.<suitkaise-api>map</suitkaise-api>(fn, items)
+results = <suitkaise-api>pool.map(</suitkaise-api>fn, items)
 ```
 
 - Blocks until all items are processed
@@ -554,27 +555,27 @@ Returns
 
 ```python
 # star - unpacks tuples as function arguments
-results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
 # fn(1, 2), fn(3, 4) instead of fn((1, 2), ), fn((3, 4), )
 
 # with timeout
-results = pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+results = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
 
 # background - returns Future
-future = pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+future = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
 results = future.<suitkaise-api>result</suitkaise-api>()
 
 # async
-results = await pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
+results = await <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
 
 # combine modifiers
-future = pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0).<suitkaise-api>background</suitkaise-api>()(fn, items)
-results = await pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+future = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0).<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = await <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
 
 # star composes with all modifiers
-results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
-future = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
-results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
 ```
 
 ### `unordered_map`
@@ -582,7 +583,7 @@ results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</s
 Apply function to each item, return list in completion order.
 
 ```python
-results = pool.<suitkaise-api>unordered_map</suitkaise-api>(fn, items)
+results = <suitkaise-api>pool.unordered_map(</suitkaise-api>fn, items)
 ```
 
 - Returns a list (like `map`)
@@ -595,22 +596,22 @@ Arguments and returns same as `map`, but results are in completion order.
 
 ```python
 # star - unpacks tuples as function arguments
-results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn, [(1, 2), (3, 4)])
 
 # with timeout
-results = pool.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+results = <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
 
 # background - returns Future
-future = pool.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+future = <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
 results = future.<suitkaise-api>result</suitkaise-api>()
 
 # async
-results = await pool.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
+results = await <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
 
 # star composes with all modifiers
-results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
-future = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
-results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
 ```
 
 ### `imap`
@@ -618,8 +619,8 @@ results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unorde
 Apply function to each item, return iterator of results.
 
 ```python
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>imap</suitkaise-api>(fn, items):
-    process(<suitkaise-api>result</suitkaise-api>)
+for result in <suitkaise-api>pool.imap(</suitkaise-api>fn, items):
+    process(result)
 ```
 
 - Results are yielded in order
@@ -632,25 +633,25 @@ Arguments and returns same as `map`, but returns `Iterator` instead of `list`.
 
 ```python
 # star - unpacks tuples as function arguments
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
-    process(<suitkaise-api>result</suitkaise-api>)
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
+    process(result)
 
-# with <suitkaise-api>timeout</suitkaise-api> (per-item)
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, items):
-    process(<suitkaise-api>result</suitkaise-api>)
+# with timeout (per-item)
+for result in <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, items):
+    process(result)
 
 # background - collects to list
-future = pool.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+future = <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
 results = future.<suitkaise-api>result</suitkaise-api>()  # list
 
 # async - collects to list
-results = await pool.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
+results = await <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
 
 # star composes with all modifiers
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, args_tuples):
-    process(<suitkaise-api>result</suitkaise-api>)
-future = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
-results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, args_tuples):
+    process(result)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
 ```
 
 ### `unordered_imap`
@@ -658,8 +659,8 @@ results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</
 Apply function to each item, yield results as they complete.
 
 ```python
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>unordered_imap</suitkaise-api>(fn, items):
-    process(<suitkaise-api>result</suitkaise-api>)
+for result in <suitkaise-api>pool.unordered_imap(</suitkaise-api>fn, items):
+    process(result)
 ```
 
 - Fastest way to get results
@@ -672,25 +673,25 @@ Arguments and returns same as `imap`.
 
 ```python
 # star - unpacks tuples as function arguments
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
-    process(<suitkaise-api>result</suitkaise-api>)
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
+    process(result)
 
 # with timeout
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items):
-    process(<suitkaise-api>result</suitkaise-api>)
+for result in <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items):
+    process(result)
 
 # background - collects to list
-future = pool.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+future = <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
 results = future.<suitkaise-api>result</suitkaise-api>()  # list
 
 # async - collects to list
-results = await pool.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
+results = await <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
 
 # star composes with all modifiers
-for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples):
-    process(<suitkaise-api>result</suitkaise-api>)
-future = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
-results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples):
+    process(result)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
 ```
 
 ### `<suitkaise-api>star</suitkaise-api>()` Modifier
@@ -699,26 +700,26 @@ Unpack tuples as function arguments.
 
 ```python
 # without star: fn receives a single tuple argument
-pool.<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+<suitkaise-api>pool.map(</suitkaise-api>fn, [(1, 2), (3, 4)])
 # fn((1, 2), ), fn((3, 4), )
 
 # with star: fn receives unpacked arguments
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
 # fn(1, 2), fn(3, 4)
 ```
 
 Works with all methods:
 ```python
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(fn, args_tuples)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>(fn, args_tuples)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>(fn, args_tuples)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_map</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn, args_tuples)
 ```
 
 Works with other modifiers:
 ```python
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
-await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)
 ```
 
 ### Using `<suitkaise-api>Skprocess</suitkaise-api>` with `<suitkaise-api>Pool</suitkaise-api>`
@@ -735,8 +736,8 @@ class ProcessItem(<suitkaise-api>Skprocess</suitkaise-api>):
     def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.result_data
 
-# <suitkaise-api>Pool</suitkaise-api> creates instances and <suitkaise-api>runs</suitkaise-api> them
-results = pool.<suitkaise-api>map</suitkaise-api>(ProcessItem, items)
+# Pool creates instances and runs them
+results = <suitkaise-api>pool.map(</suitkaise-api>ProcessItem, items)
 ```
 
 The pool:
@@ -747,9 +748,9 @@ The pool:
 ### Context Manager
 
 ```python
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with <suitkaise-api>Pool(</suitkaise-api>workers=4) as pool:
 
-    results = pool.<suitkaise-api>map</suitkaise-api>(fn, items)
+    results = <suitkaise-api>pool.map(</suitkaise-api>fn, items)
 
 # pool is closed on exit
 ```
@@ -776,15 +777,15 @@ Uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization, so now you can
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
 
-share = <suitkaise-api>Share</suitkaise-api>()
-share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+<suitkaise-api>share.timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 share.counter = 0
 ```
 
 ### Basic Usage
 
 ```python
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 
 class IncrementProcess(<suitkaise-api>Skprocess</suitkaise-api>):
@@ -795,10 +796,10 @@ class IncrementProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     def <suitkaise-api>__postrun__</suitkaise-api>(self):
         self.share.counter += 1
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>map</suitkaise-api>(IncrementProcess, [share] * 10)
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.map(</suitkaise-api>IncrementProcess, [share] * 10)
 
-print(share.counter)  # 100 (10 processes × 10 <suitkaise-api>runs</suitkaise-api> each)
+print(share.counter)  # 100 (10 processes × 10 runs each)
 ```
 
 ### How It Works
@@ -841,15 +842,15 @@ Share uses a coordinator-proxy system:
 ### Start and Stop
 
 ```python
-share = <suitkaise-api>Share</suitkaise-api>()  # auto-starts
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)  # auto-starts
 
 # stop sharing (frees resources)
-share.<suitkaise-api>stop</suitkaise-api>()
+<suitkaise-api>share.stop()</suitkaise-api>
 # or
 share.exit()
 
 # start again
-share.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>share.start()</suitkaise-api>
 ```
 
 While stopped, changes are queued but won't take effect until `<suitkaise-api>start</suitkaise-api>()` is called.
@@ -859,11 +860,11 @@ While stopped, changes are queued but won't take effect until `<suitkaise-api>st
 `<suitkaise-api>Share</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>()` reconnects all `<suitkaise-api>cucumber</suitkaise-api>` Reconnector objects currently stored in Share and returns a dict of reconnected objects by name.
 
 ```python
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.db = sqlite3.connect(":memory:")
 
-# share.db is a Reconnector in <suitkaise-api>Share</suitkaise-api>
-reconnected = share.<suitkaise-api>reconnect_all</suitkaise-api>()
+# share.db is a Reconnector in Share
+reconnected = <suitkaise-api>share.reconnect_all()</suitkaise-api>
 
 # now it's a live connection again
 conn = reconnected["db"]
@@ -872,7 +873,7 @@ conn = reconnected["db"]
 ### Context Manager
 
 ```python
-with <suitkaise-api>Share</suitkaise-api>() as share:
+with <suitkaise-api>Share(</suitkaise-api>) as share:
     share.counter = 0
     # ... use share ...
 # automatically stopped on exit
@@ -902,7 +903,7 @@ with <suitkaise-api>Share</suitkaise-api>() as share:
 (start of dropdown "`<suitkaise-api>Pipe</suitkaise-api>`")
 ## `<suitkaise-api>Pipe</suitkaise-api>`
 
-Fast, direct parent/child communication using `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>`.
+Fast, direct parent/child communication using `multiprocessing.Pipe`.
 
 This is the fastest way to communicate between processes.
 
@@ -910,17 +911,17 @@ This is the fastest way to communicate between processes.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>
 
 # create a pipe pair
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 ```
 
 ### Creating Pipes
 
 ```python
 # bidirectional (default)
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 
 # one-way
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
 ```
 
 For one-way pipes, the anchor is the send-only end (parent), and the point
@@ -971,21 +972,21 @@ class PipeProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         command = self.pipe.recv()
         
         # process it
-        <suitkaise-api>result</suitkaise-api> = process_command(command)
+        result = process_command(command)
         
-        # send <suitkaise-api>result</suitkaise-api> back
-        self.pipe.send(<suitkaise-api>result</suitkaise-api>)
+        # send result back
+        self.pipe.send(result)
 
 # parent
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 
 process = PipeProcess(point)
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 
 anchor.send({"action": "compute", "value": 42})
-<suitkaise-api>result</suitkaise-api> = anchor.recv()
+result = anchor.recv()
 
-process.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>process.wait()</suitkaise-api>
 ```
 
 ### Lock/Unlock
@@ -1009,12 +1010,12 @@ Since `<suitkaise-api>Skprocess</suitkaise-api>` is serialized with `<suitkaise-
 
 Usually, you need to call `<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>()` to reconnect all resources in an object.
 
-However, with `@<suitkaise-api>autoreconnect</suitkaise-api>`, you can decorate a `<suitkaise-api>Skprocess</suitkaise-api>` class and it will automatically reconnect all resources when the `<suitkaise-api>Skprocess</suitkaise-api>` is deserialized in the child process.
+However, with `<suitkaise-api>@autoreconnect</suitkaise-api>`, you can decorate a `<suitkaise-api>Skprocess</suitkaise-api>` class and it will automatically reconnect all resources when the `<suitkaise-api>Skprocess</suitkaise-api>` is deserialized in the child process.
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
 
-@<suitkaise-api>autoreconnect</suitkaise-api>(
+<suitkaise-api>@autoreconnect</suitkaise-api>(
     start_threads=True,
     **{
         "psycopg2.Connection": {"*": "secret"},
@@ -1043,14 +1044,14 @@ Arguments:
 
 When `<suitkaise-api>cucumber</suitkaise-api>` deserializes the `<suitkaise-api>Skprocess</suitkaise-api>`:
 1. Resources like database connections become `Reconnector` objects
-2. `@<suitkaise-api>autoreconnect</suitkaise-api>` calls `<suitkaise-api>reconnect_all</suitkaise-api>()` automatically
+2. `<suitkaise-api>@autoreconnect</suitkaise-api>` calls `<suitkaise-api>reconnect_all</suitkaise-api>()` automatically
 3. Each `Reconnector` is replaced with a live connection using the provided auth
 
 
 ### Multiple Connections
 
 ```python
-@<suitkaise-api>autoreconnect</suitkaise-api>(**{
+<suitkaise-api>@autoreconnect</suitkaise-api>(**{
     "psycopg2.Connection": {
         "*": "default_password",           # default for all psycopg2 connections
         "analytics_db": "analytics_secret", # specific override for analytics_db attr
@@ -1074,8 +1075,8 @@ Container for timing lifecycle sections.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessTimers</suitkaise-api>
 
 # usually accessed via process.timers
-process.<suitkaise-api>start</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
 
 timers = process.timers
 print(timers.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
@@ -1115,7 +1116,7 @@ Base class for all Process-related errors.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessError</suitkaise-api>
 
 try:
-    <suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
+    result = <suitkaise-api>process.result()</suitkaise-api>
 except <suitkaise-api>ProcessError</suitkaise-api> as e:
     print(f"Process failed: {e}")
 ```
@@ -1156,7 +1157,7 @@ Raised when a lifecycle section times out.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessTimeoutError</suitkaise-api>
 
 try:
-    <suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
+    result = <suitkaise-api>process.result()</suitkaise-api>
 except <suitkaise-api>ProcessTimeoutError</suitkaise-api> as e:
     print(f"Timeout in {e.section} after {e.<suitkaise-api>timeout</suitkaise-api>}s on <suitkaise-api>run</suitkaise-api> {e.current_run}")
 ```
@@ -1173,9 +1174,9 @@ Raised when `<suitkaise-api>result</suitkaise-api>()`, `<suitkaise-api>wait</sui
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ResultTimeoutError</suitkaise-api>
 
 try:
-    <suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)()
+    result = process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)()
 except <suitkaise-api>ResultTimeoutError</suitkaise-api> as e:
-    print("Timed out waiting for <suitkaise-api>result</suitkaise-api>")
+    print("Timed out waiting for result")
 ```
 (end of dropdown "Other features you should know about")
 

@@ -5,9 +5,9 @@ module bar for suitkaise.circuits
 */
 
 rows = 1
-columns = 9
+columns = 8
 
-order = [why, quick start, how to use, how it works, examples, tests, videos, learn]
+order = [why, quick start, how to use, how it works, examples, videos, learn]
 
 # 1.1
 
@@ -40,15 +40,10 @@ link = "circuits-examples.md"
 
 # 1.7
 
-button = "tests"
-link = "circuits-tests.md"
-
-# 1.8
-
 button = "videos"
 link = "circuits-videos.md"
 
-# 1.9
+# 1.8
 
 button = "learn"
 link = "circuits-learn.md"

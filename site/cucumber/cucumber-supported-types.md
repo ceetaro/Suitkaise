@@ -14,18 +14,18 @@ title = "cucumber supported types"
 # 1.2
 
 text = "
-Note: Iterator-style objects (including `enumerate` and `zip`) are exhausted during serialization. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.
+**Note:** Iterator-style objects (including `enumerate` and `zip`) are exhausted during `serialization`. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.
 
-Note: Objects that turn into `Reconnector` objects may need to be reconnected after deserialization to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `<suitkaise-api>reconnect_all</suitkaise-api>(...)` with credentials).
+**Note:** Objects that turn into `Reconnector` objects may need to be reconnected after `deserialization` to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit `reconnect(...)` call (or `<suitkaise-api>reconnect_all</suitkaise-api>(...)` with credentials).
 
-Note: Due to Python limitations, some types are not supported by `<suitkaise-api>Share</suitkaise-api>`.
+**Note:** Due to Python limitations, some types are not supported by `<suitkaise-api>Share</suitkaise-api>`.
 - `multiprocessing.*` objects (queues, managers, events, shared_memory, connections)
 - `os.pipe()` file handles / pipe-backed `io.FileIO`
 - `weakref.ref` objects (recreated as weak references; dead refs become placeholders)
-- tokens with authentication (cannot serialize authentication strings)
+- Tokens with authentication (cannot serialize authentication strings)
 
 
-- user-defined class instances --> new instance of same type with same state
+- User-defined class instances --> new instance of same type with same state
 - `None` --> `None`
 - `bool` --> `bool`
 - `int` --> `int`

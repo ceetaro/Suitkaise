@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How to use `<suitkaise-api>cucumber</suitkaise-api>`"
+title = "How to use `cucumber`"
 
 # 1.2
 
@@ -18,11 +18,11 @@ text = "
 
 Basically any object in Python will work, and it covers more types than `pickle`, `cloudpickle`, and `dill` combined.
 
-- extensive type coverage
-- superior speed for simple types compared to `cloudpickle` and `dill`
-- handles all circular references
-- works on class objects defined in `__main__`
-- and more
+- Extensive type coverage
+- Superior speed for simple types compared to `cloudpickle` and `dill`
+- Handles all circular references
+- Works on class objects defined in `__main__`
+- And more
 
 To see a list of supported types, see the supported types page.
 
@@ -94,7 +94,7 @@ Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
 
 ### `debug` and `verbose`
 
-`debug` and `verbose` are keyword only arguments.
+Note: `debug` and `verbose` are keyword-only arguments.
 
 When `debug=True`, `<suitkaise-api>cucumber</suitkaise-api>` shows you where it failed to serialize an object.
 ```text
@@ -151,7 +151,7 @@ Reconstructs a Python object from bytes created by `<suitkaise-api>cucumber</sui
 
 Will not work if the object was serialized with `pickle`, `cloudpickle`, or `dill`, as these libraries do not use `<suitkaise-api>cucumber</suitkaise-api>`'s IR.
 
-- restores all circular references before reconstructing objects
+- Restores all circular references before reconstructing objects
 - `Reconnector` objects are returned for certain types
 
 ```python
@@ -322,9 +322,9 @@ This is fine in most cases unless you are using database connections that requir
 Returns the IR without converting to bytes.
 
 Use this to inspect the IR of an object.
-- debugging
-- inspection
-- custom tooling
+- Debugging
+- Inspection
+- Custom tooling
 
 ```python
 ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
@@ -376,7 +376,7 @@ Raises
 
 A JSON-serializable structure is a Python `dict`/`list` tree that only uses JSON-safe types (`dict`, `list`, `str`, `int`, `float`, `bool`, `None`). 
 
-A JSON string is the final serialized text output (the result of `json.dumps`). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.
+A JSON string is the final serialized text output (the result of `json.dumps()`). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.
 
 ### `<suitkaise-api>to_jsonable</suitkaise-api>()`
 

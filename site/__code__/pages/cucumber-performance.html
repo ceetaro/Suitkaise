@@ -8,18 +8,17 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link active" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
     <h1><code><suitkaise-api>cucumber</suitkaise-api></code> performance</h1>
-    <p>Note from future me: I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).</p>
+    <p><strong>Note from future me:</strong> I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).</p>
     <p>Here are the performance benchmarks for <code><suitkaise-api>cucumber</suitkaise-api></code> compared to other serialization libraries.</p>
     <p>These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.</p>
-    <p>Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.</p>
-    <p>Note: <code><suitkaise-api>cucumber</suitkaise-api></code> is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.</p>
+    <p><strong>Windows users:</strong> Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.</p>
+    <p><strong>Note:</strong> <code><suitkaise-api>cucumber</suitkaise-api></code> is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.</p>
     <p>To run the benchmarks yourself, run the following command:</p>
     <pre><code class="language-bash">python -m tests.<suitkaise-api>cucumber</suitkaise-api>.run_all_benchmarks</code></pre>
     <details>
@@ -169,7 +168,7 @@
             </thead>
             <tbody>
                 <tr><td><code>Skclass</code></td><td>9.8µs</td><td>5.24x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
-                <tr><td><code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code></td><td>6.6µs</td><td>4.77x (<code>dill</code>)</td></tr>
+                <tr><td><code>multiprocessing.Pipe</code></td><td>6.6µs</td><td>4.77x (<code>dill</code>)</td></tr>
                 <tr><td><code>SQLiteReconnector</code></td><td>5.1µs</td><td>4.06x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
                 <tr><td><code>CodeType</code></td><td>9.4µs</td><td>3.82x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
                 <tr><td><code>PurePath</code></td><td>3.8µs</td><td>3.82x (<code>dill</code>)</td></tr>
@@ -308,7 +307,7 @@
   threading.local                17.0µs             fail               fail               fail              
   multiprocessing.Queue          14.0µs             fail               fail               fail              
   multiprocessing.Event          35.1µs             fail               fail               fail              
-  multiprocessing.<suitkaise-api>Pipe</suitkaise-api>           44.6µs             3.4µs              31.5µs             6.6µs             
+  multiprocessing.Pipe           44.6µs             3.4µs              31.5µs             6.6µs             
   multiprocessing.Manager        190.5µs            fail               fail               fail              
   SharedMemory                   52.8µs             5.9µs              43.3µs             12.0µs            
   queue.Queue                    23.2µs             fail               133.7µs            fail              

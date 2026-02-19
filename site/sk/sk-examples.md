@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "`<suitkaise-api>sk</suitkaise-api>` examples"
+title = "`sk` examples"
 
 # 1.2
 
@@ -21,22 +21,32 @@ text = "
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
-from pathlib import Path
 import json
 
-@<suitkaise-api>sk</suitkaise-api>
-def load_users(path: Path) -> list[dict]:
-    data = json.loads(Path(path).read_text())
-    return data["users"]
+<suitkaise-api>@sk</suitkaise-api>
+def fetch_user(user_id: int) -> dict:
+    """Fetch user data (simulated)."""
+    import time
+    time.sleep(0.05)
+    return {"id": user_id, "name": f"User {user_id}", "active": True}
 
-# real file I/O
-data_path = Path("data/users.json")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
-data_path.write_text(json.dumps({"users": [{"id": 1, "name": "Ana"}]}))
+# normal call — works exactly like a regular function
+user = fetch_user(42)
+print(user)  # {"id": 42, "name": "User 42", "active": True}
 
-# call normally (no changes to calling style)
-users = load_users(data_path)
-print(users)  # [{'id': 1, 'name': 'Ana'}]
+# retry on failure
+user = fetch_user.<suitkaise-api>retry</suitkaise-api>(times=3, delay=0.5)(42)
+
+# timeout
+user = fetch_user.<suitkaise-api>timeout</suitkaise-api>(2.0)(42)
+
+# run in background, get a Future
+future = fetch_user.<suitkaise-api>background</suitkaise-api>()(42)
+other_work = sum(range(1_000_000))
+user = future.<suitkaise-api>result</suitkaise-api>()
+
+# chain modifiers
+user = fetch_user.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(42)
 ```
 
 ### Use `<suitkaise-api>sk</suitkaise-api>()` as a function
@@ -59,13 +69,13 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import hashlib
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def read_and_hash(path: Path) -> str:
     content = Path(path).read_bytes()
     return hashlib.sha256(content).hexdigest()
 
 data_path = Path("data/blob.bin")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_bytes(b"real data" * 100_000)
 
 # same behavior, different order
@@ -79,7 +89,7 @@ digest = read_and_hash.<suitkaise-api>timeout</suitkaise-api>(1.0).<suitkaise-ap
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>FunctionTimeoutError</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def count_primes(limit: int) -> int:
     primes = []
     for n in range(2, limit):
@@ -95,7 +105,7 @@ def count_primes(limit: int) -> int:
     return len(primes)
 
 try:
-    <suitkaise-api>result</suitkaise-api> = count_primes.<suitkaise-api>timeout</suitkaise-api>(0.05)(200_000)
+    result = count_primes.<suitkaise-api>timeout</suitkaise-api>(0.05)(200_000)
 except <suitkaise-api>FunctionTimeoutError</suitkaise-api> as exc:
     print(f"Timed out: {exc}")
 ```
@@ -107,13 +117,13 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import hashlib
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def hash_file(path: Path) -> str:
     data = Path(path).read_bytes()
     return hashlib.sha256(data).hexdigest()
 
 data_path = Path("data/large.bin")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_bytes(b"x" * 5_000_000)
 
 future = hash_file.<suitkaise-api>background</suitkaise-api>()(data_path)
@@ -121,9 +131,9 @@ future = hash_file.<suitkaise-api>background</suitkaise-api>()(data_path)
 # do other work
 summary = (data_path.stat().st_size, data_path.name)
 
-# get the <suitkaise-api>result</suitkaise-api> (this will block)
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
-print(summary, <suitkaise-api>result</suitkaise-api>[:12])
+# get the result (this will block)
+result = future.<suitkaise-api>result</suitkaise-api>()
+print(summary, result[:12])
 ```
 
 ### Rate limiting
@@ -132,12 +142,12 @@ print(summary, <suitkaise-api>result</suitkaise-api>[:12])
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from pathlib import Path
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def file_size(path: Path) -> int:
     return Path(path).stat().st_size
 
 data_path = Path("data/sample.txt")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_text("real content\n" * 1000)
 
 limited = file_size.rate_limit(2.0)  # max 2 calls per second
@@ -155,7 +165,7 @@ import json
 class ApiError(RuntimeError):
     pass
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def load_config(path: Path) -> dict:
     text = Path(path).read_text()
     try:
@@ -167,7 +177,7 @@ def load_config(path: Path) -> dict:
 
 # create a truncated JSON file
 config_path = Path("data/config.json")
-config_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+config_path.parent.mkdir(parents=True, exist_ok=True)
 config_path.write_text('{"name": "demo"')
 
 # only retry on ApiError
@@ -189,7 +199,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import csv
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def sum_csv(path: Path) -> int:
     total = 0
     with open(path, "r", newline="") as f:
@@ -201,21 +211,21 @@ def sum_csv(path: Path) -> int:
 # real CSV work
 data_dir = Path("data")
 data_dir.mkdir(parents=True, exist_ok=True)
-<suitkaise-api>paths</suitkaise-api> = []
+paths = []
 for i in range(3):
     p = data_dir / f"numbers_{i}.csv"
     p.write_text("\n".join(str(n) for n in range(1, 1000)))
-    <suitkaise-api>paths</suitkaise-api>.append(p)
+    paths.append(p)
 
 async def main():
     results = await asyncio.gather(
-        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(<suitkaise-api>paths</suitkaise-api>[0]),
-        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(<suitkaise-api>paths</suitkaise-api>[1]),
-        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(<suitkaise-api>paths</suitkaise-api>[2]),
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[0]),
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[1]),
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[2]),
     )
     print(results)
 
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+asyncio.run(main())
 ```
 
 ### Async chaining with timeout + retry
@@ -226,7 +236,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import json
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def load_report(path: Path) -> dict:
     text = Path(path).read_text()
     try:
@@ -237,18 +247,18 @@ def load_report(path: Path) -> dict:
         raise ValueError("Report was incomplete, repaired and retrying")
 
 report_path = Path("data/report.json")
-report_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+report_path.parent.mkdir(parents=True, exist_ok=True)
 report_path.write_text('{"ok": true')
 
 async def main():
     report = await (
-        load_report.<suitkaise-api>asynced</suitkaise-api>()
+        load_report.asynced()
         .<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1, exceptions=(ValueError,))
         .<suitkaise-api>timeout</suitkaise-api>(0.5)
     )(report_path)
     print(report)
 
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+asyncio.run(main())
 ```
 
 ### Async rate limiting
@@ -259,21 +269,21 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import hashlib
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def hash_text(path: Path) -> str:
     data = Path(path).read_text().encode()
     return hashlib.sha256(data).hexdigest()
 
 data_path = Path("data/log.txt")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_text("log line\n" * 1000)
 
 async def main():
-    limited = hash_text.<suitkaise-api>asynced</suitkaise-api>().rate_limit(5.0)
+    limited = hash_text.asynced().rate_limit(5.0)
     results = await asyncio.gather(*[limited(data_path) for _ in range(10)])
     print(results[:2])
 
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+asyncio.run(main())
 ```
 
 (end of dropdown "Async examples")
@@ -287,32 +297,32 @@ asyncio.<suitkaise-api>run</suitkaise-api>(main())
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from pathlib import Path
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def load_text(path: Path) -> str:
     with open(path, "r") as f:
         return f.read()
 
 data_path = Path("data/readme.txt")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_text("real text")
 
 print(load_text.<suitkaise-api>has_blocking_calls</suitkaise-api>)  # True
 print(load_text.<suitkaise-api>blocking_calls</suitkaise-api>)      # includes file I/O
 ```
 
-### Mark CPU-heavy code with `@<suitkaise-api>blocking</suitkaise-api>`
+### Mark CPU-heavy code with `<suitkaise-api>@blocking</suitkaise-api>`
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def heavy_math(n: int) -> int:
     return sum(range(n))
 
 # background/asynced are now available
 future = heavy_math.<suitkaise-api>background</suitkaise-api>()(1_000_000)
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+result = future.<suitkaise-api>result</suitkaise-api>()
 ```
 
 (end of dropdown "Blocking detection")
@@ -326,7 +336,7 @@ future = heavy_math.<suitkaise-api>background</suitkaise-api>()(1_000_000)
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 import json
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class DataStore:
     def __init__(self):
         self.data = {}
@@ -353,15 +363,15 @@ import asyncio
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 from pathlib import Path
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class FileReader:
-    @<suitkaise-api>blocking</suitkaise-api>
+    <suitkaise-api>@blocking</suitkaise-api>
     def read(self, path: Path) -> str:
         with open(path, "r") as f:
             return f.read()
 
 data_path = Path("data/message.txt")
-data_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+data_path.parent.mkdir(parents=True, exist_ok=True)
 data_path.write_text("hello from disk")
 
 async def main():
@@ -369,7 +379,7 @@ async def main():
     data = await reader.read.<suitkaise-api>asynced</suitkaise-api>()(data_path)
     print(data)
 
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+asyncio.run(main())
 ```
 
 ### Handling `<suitkaise-api>SkModifierError</suitkaise-api>` for classes without blocking calls
@@ -378,7 +388,7 @@ asyncio.<suitkaise-api>run</suitkaise-api>(main())
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>SkModifierError</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -398,7 +408,7 @@ except <suitkaise-api>SkModifierError</suitkaise-api> as exc:
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -406,11 +416,45 @@ class Counter:
     def inc(self):
         self.value += 1
 
-with <suitkaise-api>Share</suitkaise-api>() as share:
+with <suitkaise-api>Share(</suitkaise-api>) as share:
     share.counter = Counter()
     share.counter.inc()
     share.counter.inc()
     print(share.counter.value)  # 2
+```
+
+### <suitkaise-api>_shared_meta</suitkaise-api> Generation
+
+```python
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+class Ledger:
+    def __init__(self):
+        self.balance = 0.0
+        self.transactions = []
+        self.name = "main"
+
+    def deposit(self, amount: float):
+        self.balance += amount
+        self.transactions.append(("deposit", amount))
+
+    def withdraw(self, amount: float):
+        self.balance -= amount
+        self.transactions.append(("withdraw", amount))
+
+# sk analyzed every method via AST and generated this:
+print(Ledger.<suitkaise-api>_shared_meta</suitkaise-api>)
+# {
+#     'methods': {
+#         'deposit': {'reads': ['balance', 'transactions'], 'writes': ['balance', 'transactions']},
+#         'withdraw': {'reads': ['balance', 'transactions'], 'writes': ['balance', 'transactions']},
+#     },
+#     'properties': {}
+# }
+
+# Why this matters: when used with Share, only 'balance' and 'transactions'
+# are synced after deposit() — not 'name' or anything else.
 ```
 
 (end of dropdown "Classes")
@@ -425,7 +469,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 from pathlib import Path
 import json
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def load_payload(path: Path) -> dict:
     text = Path(path).read_text()
     try:
@@ -436,7 +480,7 @@ def load_payload(path: Path) -> dict:
         raise RuntimeError("Payload incomplete, repaired and retrying")
 
 payload_path = Path("data/payload.json")
-payload_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+payload_path.parent.mkdir(parents=True, exist_ok=True)
 payload_path.write_text('{"id": 1, "value": 42')
 
 future = load_payload.<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1).<suitkaise-api>timeout</suitkaise-api>(1.0).<suitkaise-api>background</suitkaise-api>()(payload_path)
@@ -449,15 +493,15 @@ print(future.<suitkaise-api>result</suitkaise-api>())
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 from pathlib import Path
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def read_lines(path: Path) -> int:
     return len(Path(path).read_text().splitlines())
 
 log_path = Path("data/log.txt")
-log_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
+log_path.parent.mkdir(parents=True, exist_ok=True)
 log_path.write_text("line\n" * 500)
 
-# limiter <suitkaise-api>lives</suitkaise-api> inside the wrapper
+# limiter lives inside the wrapper
 limited = read_lines.rate_limit(3.0)
 
 batch_a = [limited(log_path) for _ in range(3)]
@@ -475,7 +519,7 @@ An end-to-end example that uses multiple modifiers together:
 - `<suitkaise-api>timeout</suitkaise-api>()` to cap long calls
 - `rate_limit()` to protect external services
 - `<suitkaise-api>background</suitkaise-api>()` for CPU-heavy scoring
-- `@<suitkaise-api>blocking</suitkaise-api>` to mark CPU-bound work
+- `<suitkaise-api>@blocking</suitkaise-api>` to mark CPU-bound work
 
 ```python
 """
@@ -509,8 +553,8 @@ def seed_records() -> list[str]:
     return payloads
 
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def load_record(index: int, payloads: list[str]) -> dict:
     text = payloads[index]
     try:
@@ -526,8 +570,8 @@ def load_record(index: int, payloads: list[str]) -> dict:
     return record
 
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def score_record(record: dict) -> dict:
     payload = f"{record['id']}:{record['value']}".encode()
     digest = hashlib.sha256(payload).hexdigest()
@@ -551,14 +595,14 @@ async def main():
     )
     
     records = []
-    for idx, <suitkaise-api>result</suitkaise-api> in enumerate(results):
-        if isinstance(<suitkaise-api>result</suitkaise-api>, <suitkaise-api>FunctionTimeoutError</suitkaise-api>):
+    for idx, result in enumerate(results):
+        if isinstance(result, <suitkaise-api>FunctionTimeoutError</suitkaise-api>):
             print(f"Timeout: record {idx + 1}")
             continue
-        if isinstance(<suitkaise-api>result</suitkaise-api>, Exception):
-            print(f"Failed: record {idx + 1}: {<suitkaise-api>result</suitkaise-api>}")
+        if isinstance(result, Exception):
+            print(f"Failed: record {idx + 1}: {result}")
             continue
-        records.append(<suitkaise-api>result</suitkaise-api>)
+        records.append(result)
     
     futures = [score_record.<suitkaise-api>background</suitkaise-api>()(record) for record in records]
     scored = [future.<suitkaise-api>result</suitkaise-api>() for future in futures]
@@ -568,6 +612,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.<suitkaise-api>run</suitkaise-api>(main())
+    asyncio.run(main())
 ```
 "

@@ -6,7 +6,6 @@
         <a href="#circuits" class="module-bar-link" data-page="circuits">how to use</a>
         <a href="#circuits-how-it-works" class="module-bar-link active" data-page="circuits-how-it-works">how it works</a>
         <a href="#circuits-examples" class="module-bar-link" data-page="circuits-examples">examples</a>
-        <a href="#circuits-tests" class="module-bar-link" data-page="circuits-tests">tests</a>
         <a href="#circuits-videos" class="module-bar-link" data-page="circuits-videos">videos</a>
         <a href="#circuits-learn" class="module-bar-link" data-page="circuits-learn">learn</a>
     </nav>
@@ -20,10 +19,10 @@
     </ul>
     <p>Both classes have:</p>
     <ul>
-        <li>thread safety</li>
-        <li>native async support</li>
-        <li>exponential backoff (with jitter and max sleep time)</li>
-        <li>super simple API</li>
+        <li>Thread safety</li>
+        <li>Native async support</li>
+        <li>Exponential backoff (with jitter and max sleep time)</li>
+        <li>Super simple API</li>
     </ul>
     <h2><code><suitkaise-api>Circuit</suitkaise-api></code></h2>
     <p><code><suitkaise-api>Circuit</suitkaise-api></code> is an auto-resetting circuit that sleeps, and then automatically resets to continue.</p>
@@ -110,13 +109,13 @@
     </ol>
     <h3>Exponential Backoff</h3>
     <p><code><suitkaise-api>Circuit</suitkaise-api></code> supports exponential backoff to progressively increase sleep time after repeated trips.</p>
-    <pre><code class="language-python">circ = <suitkaise-api>Circuit</suitkaise-api>(
+    <pre><code class="language-python"><suitkaise-api>circ</suitkaise-api> = <suitkaise-api>Circuit(</suitkaise-api>
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,  # initial sleep time == 1.0s
     backoff_factor=2.0,         # double it each time it is tripped
     max_sleep_time=30.0         # sleep time is capped at 30s
 )</code></pre>
-    <p>With the above parameters:</p>
+    <p><strong>With the above parameters:</strong></p>
     <ul>
         <li>Trip 1: sleep 1.0s</li>
         <li>Trip 2: sleep 2.0s</li>
@@ -127,7 +126,7 @@
         <li>Trip 7: sleep 30.0s (capped)</li>
         <li>...</li>
     </ul>
-    <p>Formula for calculating the next sleep time:</p>
+    <p><strong>Formula for calculating the next sleep time:</strong></p>
     <pre><code class="language-python">_current_sleep_time = min(
     _current_sleep_time * backoff_factor,
     max_sleep_time
@@ -152,12 +151,12 @@ def <suitkaise-api>times_shorted</suitkaise-api>(self) -&gt; int:
     <p><code><suitkaise-api>Circuit</suitkaise-api></code> supports async usage via the <code>_AsyncableMethod</code> pattern from <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api></code>.</p>
     <p><code>_AsyncableMethod</code> wraps a sync method and an async method into a single attribute that can be called either way.</p>
     <pre><code class="language-python">short = _AsyncableMethod(_sync_short, _async_short)</code></pre>
-    <p>Usage:</p>
+    <p><strong>Usage:</strong></p>
     <pre><code class="language-python"># sync usage
-circ.<suitkaise-api>short</suitkaise-api>()
+<suitkaise-api>circ.short()</suitkaise-api>
 
 # async usage
-await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+await <suitkaise-api>circ.short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
     <p>The async versions use <code>asyncio.sleep()</code> instead of blocking <code>time.sleep()</code>:</p>
     <pre><code class="language-python">async def _async_trip_circuit(self, custom_sleep: float | None = None) -&gt; bool:
     with self._lock:
@@ -177,7 +176,7 @@ await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkais
     
     return True</code></pre>
     <p>The lock usage is the same - only the sleep call differs.</p>
-    <p>Methods with async support:</p>
+    <p><strong>Methods with async support:</strong></p>
     <ul>
         <li><code><suitkaise-api>short</suitkaise-api>()</code> - via <code><suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></li>
         <li><code><suitkaise-api>trip</suitkaise-api>()</code> - via <code><suitkaise-api>trip</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></li>
@@ -318,13 +317,13 @@ await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkais
     <p>Note: Does NOT reset the broken state - use <code><suitkaise-api>reset</suitkaise-api>()</code> for that.</p>
     <h3>Exponential Backoff</h3>
     <p><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> supports exponential backoff to progressively increase sleep time after repeated resets.</p>
-    <pre><code class="language-python">circ = <suitkaise-api>BreakingCircuit</suitkaise-api>(
+    <pre><code class="language-python"><suitkaise-api>circ</suitkaise-api> = <suitkaise-api>BreakingCircuit(</suitkaise-api>
     num_shorts_to_trip=5,
     sleep_time_after_trip=1.0,  # initial sleep time == 1.0s
-    backoff_factor=2.0,         # double it each time <suitkaise-api>reset</suitkaise-api>() is called
+    backoff_factor=2.0,         # double it each time reset() is called
     max_sleep_time=30.0         # sleep time is capped at 30s
 )</code></pre>
-    <p>With the above parameters:</p>
+    <p><strong>With the above parameters:</strong></p>
     <ul>
         <li>Trip 1: sleep 1.0s</li>
         <li>Reset 1: backoff applied, next sleep will be 2.0s</li>
@@ -333,7 +332,7 @@ await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkais
         <li>Trip 3: sleep 4.0s</li>
         <li>...</li>
     </ul>
-    <p>Formula for calculating the next sleep time (applied on <code><suitkaise-api>reset</suitkaise-api>()</code>):</p>
+    <p><strong>Formula for calculating the next sleep time (applied on <code><suitkaise-api>reset</suitkaise-api>()</code>):</strong></p>
     <pre><code class="language-python">_current_sleep_time = min(
     _current_sleep_time * backoff_factor,
     max_sleep_time
@@ -358,12 +357,12 @@ def <suitkaise-api>broken</suitkaise-api>(self) -&gt; bool:
     <p><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> supports async usage via the <code>_AsyncableMethod</code> pattern from <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api></code>.</p>
     <p><code>_AsyncableMethod</code> wraps a sync method and an async method into a single attribute that can be called either way.</p>
     <pre><code class="language-python">short = _AsyncableMethod(_sync_short, _async_short)</code></pre>
-    <p>Usage:</p>
+    <p><strong>Usage:</strong></p>
     <pre><code class="language-python"># sync usage
-circ.<suitkaise-api>short</suitkaise-api>()
+<suitkaise-api>circ.short()</suitkaise-api>
 
 # async usage
-await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+await <suitkaise-api>circ.short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
     <p>The async versions use <code>asyncio.sleep()</code> instead of blocking <code>time.sleep()</code>:</p>
     <pre><code class="language-python">async def _async_break_circuit(self, sleep_duration: float) -&gt; None:
     with self._lock:
@@ -374,7 +373,7 @@ await circ.<suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkais
     if sleep_duration &gt; 0:
         await asyncio.sleep(sleep_duration)</code></pre>
     <p>The lock usage is the same - only the sleep call differs.</p>
-    <p>Methods with async support:</p>
+    <p><strong>Methods with async support:</strong></p>
     <ul>
         <li><code><suitkaise-api>short</suitkaise-api>()</code> - via <code><suitkaise-api>short</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></li>
         <li><code><suitkaise-api>trip</suitkaise-api>()</code> - via <code><suitkaise-api>trip</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></li>

@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "Quick Start: `<suitkaise-api>timing</suitkaise-api>`"
+title = "`<suitkaise-api>timing</suitkaise-api>` quick start guide"
 
 # 1.2
 
@@ -23,7 +23,7 @@ pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api>
 
-@<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timethis</suitkaise-api>()
 def process_data():
     do_work()
 
@@ -38,11 +38,11 @@ for _ in range(100):
     process_data()
 
 print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.median)
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>median</suitkaise-api>)
 print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>)
 print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
-print(process_data.<suitkaise-api>timer</suitkaise-api>.min)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.max)
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>min</suitkaise-api>)
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>max</suitkaise-api>)
 ```
 
 ## Time a code block
@@ -50,7 +50,7 @@ print(process_data.<suitkaise-api>timer</suitkaise-api>.max)
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>TimeThis</suitkaise-api>
 
-with <suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with <suitkaise-api>TimeThis(</suitkaise-api>) as timer:
     do_work()
 
 print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>)
@@ -61,20 +61,20 @@ print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
 
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 do_work()
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-print(<suitkaise-api>elapsed</suitkaise-api>)
+print(elapsed)
 print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
 ```
 
 ## Pause timing (exclude user input, delays, etc.)
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 
 results = database.query("SELECT * FROM users")
@@ -92,12 +92,12 @@ if answer == 'y':
 ## Discard failed measurements
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 
 for _ in range(100):
     <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
     try:
-        <suitkaise-api>result</suitkaise-api> = unreliable_operation()
+        result = unreliable_operation()
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
     except Exception:
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don't pollute stats with failures
@@ -106,13 +106,13 @@ for _ in range(100):
 ## Rolling window for long-running processes
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>(max_times=1000)  # keep only last 1000 measurements
+<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>max_times=1000)  # keep only last 1000 measurements
 ```
 
 ## Only record slow operations
 
 ```python
-@<suitkaise-api>timethis</suitkaise-api>(threshold=0.1)
+<suitkaise-api>@timethis</suitkaise-api>(threshold=0.1)
 def handle_request():
     # only records times >= 0.1 seconds
     process_request()

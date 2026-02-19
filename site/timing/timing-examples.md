@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "`<suitkaise-api>timing</suitkaise-api>` Examples"
+title = "`timing` Examples"
 
 # 1.2
 
@@ -22,41 +22,14 @@ text = "
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Basic start/stop <suitkaise-api>timing</suitkaise-api>
-# 
-# The simplest way to time something: start, do work, <suitkaise-api>stop</suitkaise-api>.
-# The <suitkaise-api>elapsed</suitkaise-api> time is returned by <suitkaise-api>stop</suitkaise-api>() and also stored in the <suitkaise-api>timer</suitkaise-api>.
-# ──────────────────────────────────────────────────────────────────────────────
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-# create a new timer instance
-# - no arguments needed for basic usage
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-# start the timer
-# - records current high-resolution timestamp
-# - uses perf_counter() internally for accurate measurements
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+total = sum(i * i for i in range(1_000_000))
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-# do some work
-# - this is what we're measuring
-# - could be any code: function calls, loops, I/O operations
-for i in range(1000000):
-    _ = i * i
-
-# stop the timer and get <suitkaise-api>elapsed</suitkaise-api> time
-# - returns <suitkaise-api>elapsed</suitkaise-api> time in seconds as a float
-# - also stores the measurement in <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>times</suitkaise-api> for statistics
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
-
-# print the <suitkaise-api>result</suitkaise-api>
-# - :.3f formats to 3 decimal places (millisecond precision)
-print(f"Elapsed: {<suitkaise-api>elapsed</suitkaise-api>:.3f}s")
-
-# you can also access the last measurement via property
-# - most_recent is an alias for the last recorded time
-# - <suitkaise-api>result</suitkaise-api> is also an alias for most_recent
-print(f"Same value: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+print(f"Elapsed: {elapsed:.3f}s")
+print(f"Same value: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")  # also accessible as a property
 ```
 
 ### Using elapsed()
@@ -64,191 +37,96 @@ print(f"Same value: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_re
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Using <suitkaise-api>elapsed</suitkaise-api>() for simple time differences
-#
-# <suitkaise-api>elapsed</suitkaise-api>() calculates the difference between two timestamps.
-# If you only provide one timestamp, it uses current time as the second.
-# Order doesn't matter - always returns positive value.
-# ──────────────────────────────────────────────────────────────────────────────
+start = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>time</suitkaise-api>()
+<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>sleep</suitkaise-api>(0.5)
+end = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>time</suitkaise-api>()
 
-# get the current Unix timestamp
-# - equivalent to time.time()
-# - returns seconds since epoch as a float
-start = <suitkaise-api>timing</suitkaise-api>.time()
+# one argument: uses current time as second timestamp
+print(f"Elapsed: {<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start):.3f}s")
 
-# do real work
-import hashlib
-payload = b"elapsed_example"
-for _ in range(20000):
-    payload = hashlib.sha256(payload).digest()
+# two arguments: explicit timestamps
+print(f"Elapsed: {<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start, end):.3f}s")
 
-# calculate <suitkaise-api>elapsed</suitkaise-api> time with one argument
-# - uses current time as the second timestamp
-# - same as: <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start, <suitkaise-api>timing</suitkaise-api>.time())
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start)
-print(f"Elapsed: {<suitkaise-api>elapsed</suitkaise-api>:.3f}s")  # ~0.500s
-
-# calculate <suitkaise-api>elapsed</suitkaise-api> time with two arguments
-# - explicitly provide both timestamps
-end = <suitkaise-api>timing</suitkaise-api>.time()
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start, end)
-print(f"Elapsed: {<suitkaise-api>elapsed</suitkaise-api>:.3f}s")
-
-# order doesn't matter - always returns positive value
-# - internally uses abs() so you can't get negative results
-# - useful when you're not sure which timestamp is earlier
-elapsed_reversed = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(end, start)
-print(f"Reversed: {elapsed_reversed:.3f}s")  # same value
+# order doesn't matter — always positive
+print(f"Reversed: {<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(end, start):.3f}s")  # same value
 ```
 
 ### Multiple Measurements
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-import hashlib
+import json
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Collecting multiple measurements for statistics
-#
-# Run the same operation multiple times and collect <suitkaise-api>timing</suitkaise-api> data.
-# <suitkaise-api>Sktimer</suitkaise-api> accumulates all measurements and provides statistical analysis.
-# ──────────────────────────────────────────────────────────────────────────────
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-# <suitkaise-api>run</suitkaise-api> 100 iterations of the same operation
-# - each iteration is timed independently
-# - all times are stored in <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>times</suitkaise-api> list
+# run 100 iterations, each timed independently
 for i in range(100):
     <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
-    
-    # variable work based on input size
-    payload = b"x" * (2000 + (i % 5) * 500)
-    hashlib.sha256(payload).hexdigest()
-    
+    data = {"id": i, "values": list(range(500))}
+    json.dumps(data)
     <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-# access statistics
-# - num_times: how many measurements we collected
-# - mean: average of all measurements
-# - median: middle value when sorted (less affected by outliers)
-# - stdev: standard deviation (measure of variance)
-# - min/max: fastest and slowest measurements
 print(f"Measurements: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"Median: {<suitkaise-api>timer</suitkaise-api>.median:.3f}s")
-print(f"Std Dev: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>:.3f}s")
-print(f"Min: {<suitkaise-api>timer</suitkaise-api>.min:.3f}s")
-print(f"Max: {<suitkaise-api>timer</suitkaise-api>.max:.3f}s")
-
-# calculate percentiles
-# - <suitkaise-api>percentile</suitkaise-api>(95) means 95% of measurements are at or below this value
-# - useful for understanding "worst case" performance
-p95 = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95)
-p99 = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(99)
-print(f"95th percentile: {p95:.3f}s")
-print(f"99th percentile: {p99:.3f}s")
+print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s")
+print(f"Median: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>median</suitkaise-api>:.6f}s")
+print(f"Std Dev: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>:.6f}s")
+print(f"Min: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>min</suitkaise-api>:.6f}s")
+print(f"Max: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>max</suitkaise-api>:.6f}s")
+print(f"95th percentile: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.6f}s")
+print(f"99th percentile: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(99):.6f}s")
 ```
 
 ### Using lap()
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Using <suitkaise-api>lap</suitkaise-api>() for continuous measurements
-#
-# <suitkaise-api>lap</suitkaise-api>() records the current measurement and immediately starts the next one.
-# It's like calling <suitkaise-api>stop</suitkaise-api>() + <suitkaise-api>start</suitkaise-api>() in one operation.
-# Useful for <suitkaise-api>timing</suitkaise-api> iterations without the overhead of separate stop/<suitkaise-api>start</suitkaise-api>.
-# ──────────────────────────────────────────────────────────────────────────────
-
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-# start <suitkaise-api>timing</suitkaise-api>
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 
-# process multiple items, recording time for each
-items = ["item1", "item2", "item3", "item4", "item5"]
+pipeline = [
+    ("parse",     lambda: json.loads('{"users": ' + json.dumps(list(range(5000))) + '}')),
+    ("validate",  lambda: [x for x in range(5000) if isinstance(x, int)]),
+    ("transform", lambda: {str(k): k * 2 for k in range(5000)}),
+    ("serialize", lambda: json.dumps(list(range(5000)))),
+]
 
-for item in items:
-    # real work per item
-    import hashlib
-    payload = (item * 1000).encode()
-    hashlib.sha256(payload).hexdigest()
-    
-    # record lap time and continue
-    # - records time since last <suitkaise-api>lap</suitkaise-api>() or <suitkaise-api>start</suitkaise-api>()
-    # - immediately begins new measurement
-    # - returns the <suitkaise-api>elapsed</suitkaise-api> time for this lap
+for stage_name, stage_fn in pipeline:
+    stage_fn()
     lap_time = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()
-    print(f"Processed {item}: {lap_time:.3f}s")
+    print(f"{stage_name}: {lap_time:.4f}s")
 
-# after the loop, there's still an active measurement running
-# - we need to either <suitkaise-api>stop</suitkaise-api>() or <suitkaise-api>discard</suitkaise-api>() it
-# - <suitkaise-api>discard</suitkaise-api>() stops <suitkaise-api>timing</suitkaise-api> without recording (since we already recorded with <suitkaise-api>lap</suitkaise-api>())
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # clean up the last pending measurement
 
-# we have 5 measurements (one per lap)
-print(f"\nTotal measurements: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Total time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>:.3f}s")
-print(f"Average per item: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"\nTotal pipeline time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>:.4f}s")
+print(f"Slowest stage: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>max</suitkaise-api>:.4f}s")
 ```
 
 ### Pause and Resume
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import time
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Pausing <suitkaise-api>timing</suitkaise-api> during user interaction
-#
-# Sometimes you want to exclude certain time from measurements.
-# <suitkaise-api>pause</suitkaise-api>()/<suitkaise-api>resume</suitkaise-api>() let you temporarily stop the clock without ending the session.
-# Useful for excluding user input, network waits, or other external delays.
-# ──────────────────────────────────────────────────────────────────────────────
-
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 
-# phase 1: initial <suitkaise-api>processing</suitkaise-api> (timed)
-print("Phase 1: Processing data...")
-import hashlib
-data = b"phase1"
-for _ in range(20000):
-    data = hashlib.sha256(data).digest()
+# phase 1: actual work (timed)
+total = sum(range(2_000_000))
 
-# pause <suitkaise-api>timing</suitkaise-api> during user interaction
-# - time spent paused is tracked separately
-# - will be excluded from the final <suitkaise-api>elapsed</suitkaise-api> time
+# pause during a simulated user prompt
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>pause</suitkaise-api>()
-
-# do work while paused (not timed)
-# - in real code: user_input = input("Continue? ")
-print("Waiting for user input (not timed)...")
-data = b"paused_work"
-for _ in range(30000):
-    data = hashlib.sha256(data).digest()
-
-# resume <suitkaise-api>timing</suitkaise-api>
-# - clock starts again from where it paused
+time.sleep(1.0)  # pretend: input("Export results? (y/n): ")
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
 
-# phase 2: more <suitkaise-api>processing</suitkaise-api> (timed)
-print("Phase 2: More <suitkaise-api>processing</suitkaise-api>...")
-data = b"phase2"
-for _ in range(20000):
-    data = hashlib.sha256(data).digest()
+# phase 2: more work (timed)
+squared = [x * x for x in range(500_000)]
 
-# stop and get <suitkaise-api>elapsed</suitkaise-api> time
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-# <suitkaise-api>elapsed</suitkaise-api> should be ~0.4s, not ~1.4s
-# - the 1.0s pause is excluded
-print(f"\nActive work time: {<suitkaise-api>elapsed</suitkaise-api>:.3f}s")
-print(f"Time spent paused: {<suitkaise-api>timer</suitkaise-api>.total_time_paused:.3f}s")
+print(f"Active work time: {elapsed:.3f}s")              # ~0.1s (only work)
+print(f"Time spent paused: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time_paused</suitkaise-api>:.3f}s")  # ~1.0s (the prompt)
 ```
 
 (end of dropdown "Basic Examples")
@@ -261,38 +139,18 @@ print(f"Time spent paused: {<suitkaise-api>timer</suitkaise-api>.total_time_paus
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
-# ──────────────────────────────────────────────────────────────────────────────
-# <suitkaise-api>TimeThis</suitkaise-api> context manager for clean <suitkaise-api>timing</suitkaise-api> syntax
-#
-# <suitkaise-api>TimeThis</suitkaise-api> wraps a code block with automatic start/<suitkaise-api>stop</suitkaise-api>.
-# The 'as timer' gives you access to the timer inside and after the block.
-# Perfect for one-off measurements without explicit start/stop calls.
-# ──────────────────────────────────────────────────────────────────────────────
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as <suitkaise-api>timer</suitkaise-api>:
+    total = sum(range(1_000_000))
 
-# time a code block using context manager
-# - automatically calls <suitkaise-api>start</suitkaise-api>() on entry
-# - automatically calls <suitkaise-api>stop</suitkaise-api>() on exit
-# - creates a new <suitkaise-api>Sktimer</suitkaise-api> if none provided
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
-    # all code in this block is timed
-    total = 0
-    for i in range(1000000):
-        total += i
-
-# after the block, timer has the measurement
 print(f"Loop took: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
 
-# compare two operations
-# ─────────────────────────────────────────────────────────────────────────────
+# quick A/B comparison
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as timer_a:
+    result_a = sum(range(1_000_000))
 
-# time operation A
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer_a:
-    result_a = sum(range(1000000))
-
-# time operation B
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer_b:
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as timer_b:
     result_b = 0
-    for i in range(1000000):
+    for i in range(1_000_000):
         result_b += i
 
 print(f"\nBuilt-in sum(): {timer_a.<suitkaise-api>most_recent</suitkaise-api>:.6f}s")
@@ -304,102 +162,50 @@ print(f"Ratio: {timer_b.<suitkaise-api>most_recent</suitkaise-api> / timer_a.<su
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-from pathlib import Path
 import json
-import hashlib
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Accumulating statistics across multiple <suitkaise-api>TimeThis</suitkaise-api> blocks
-#
-# Pass a pre-created <suitkaise-api>Sktimer</suitkaise-api> to <suitkaise-api>TimeThis</suitkaise-api> to collect multiple measurements.
-# Each context manager block adds one measurement to the shared <suitkaise-api>timer</suitkaise-api>.
-# Great for <suitkaise-api>timing</suitkaise-api> the same operation in different parts of your code.
-# ──────────────────────────────────────────────────────────────────────────────
+api_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-# create a shared timer for all API-like file reads
-api_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+def serialize(obj):
+    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>api_timer):
+        return json.dumps(obj)
 
-# seed local data files
-data_dir = Path("data/api")
-data_dir.mkdir(parents=True, exist_ok=True)
-for user_id in range(5):
-    (data_dir / f"user_{user_id}.json").write_text(
-        json.dumps({"id": user_id, "name": f"User {user_id}"})
-    )
-    (data_dir / f"posts_{user_id}.json").write_text(
-        json.dumps([{"id": i, "title": f"Post {i}"} for i in range(3)])
-    )
+def deserialize(data):
+    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>api_timer):
+        return json.loads(data)
 
-def fetch_user(user_id):
-    """Fetch a user from disk."""
-    # pass the shared timer to <suitkaise-api>TimeThis</suitkaise-api>
-    # - each call adds one measurement to api_timer
-    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>(api_timer):
-        text = (data_dir / f"user_{user_id}.json").read_text()
-        digest = hashlib.sha256(text.encode()).hexdigest()
-        return {**json.loads(text), "digest": digest[:8]}
+objects = [{"id": i, "values": list(range(500))} for i in range(100)]
 
-def fetch_posts(user_id):
-    """Fetch posts for a user from disk."""
-    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>(api_timer):
-        text = (data_dir / f"posts_{user_id}.json").read_text()
-        posts = json.loads(text)
-        for post in posts:
-            post["hash"] = hashlib.sha256(post["title"].encode()).hexdigest()[:8]
-        return posts
+for obj in objects:
+    data = serialize(obj)
+    deserialize(data)
 
-# make several API calls
-# - each call is timed and added to api_timer
-for user_id in range(5):
-    user = fetch_user(user_id)
-    posts = fetch_posts(user_id)
-
-# analyze combined API performance
-# - 5 users × 2 calls each = 10 measurements
-print(f"Total API calls: {api_timer.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Total API time: {api_timer.<suitkaise-api>total_time</suitkaise-api>:.3f}s")
-print(f"Average call: {api_timer.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"Slowest call: {api_timer.max:.3f}s")
-print(f"95th percentile: {api_timer.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
+# 100 objects × 2 operations = 200 measurements
+print(f"Total calls: {api_timer.num_times}")
+print(f"Total time: {api_timer.total_time:.3f}s")
+print(f"Average: {api_timer.mean:.6f}s")
+print(f"Slowest: {api_timer.<suitkaise-api>max</suitkaise-api>:.6f}s")
+print(f"p95: {api_timer.percentile(95):.6f}s")
 ```
 
 ### TimeThis with Threshold
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-import hashlib
+import time
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Filtering out fast operations with threshold
-#
-# The threshold parameter only records times above a minimum value.
-# Useful when you only care about "slow" operations for analysis.
-# Fast operations are silently discarded.
-# ──────────────────────────────────────────────────────────────────────────────
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(<suitkaise-api>threshold</suitkaise-api>=0.1)
+def handle_request(request_id):
+    """Simulate request handling — every 10th request is slow."""
+    delay = 0.01 if request_id % 10 != 0 else 0.2
+    time.sleep(delay)
 
-slow_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-def process_item(item):
-    """Process an item, sometimes slow."""
-    # only record times >= 0.1 seconds
-    # - fast operations won't be recorded
-    # - helps focus analysis on problematic cases
-    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>(slow_timer, threshold=0.1):
-        # variable <suitkaise-api>processing</suitkaise-api> time based on item size
-        data = f"item_{item}".encode()
-        iterations = 40000 if item % 5 == 0 else 4000
-        for _ in range(iterations):
-            data = hashlib.sha256(data).digest()
-
-# process 50 items
 for i in range(50):
-    process_item(i)
+    handle_request(i)
 
-# only slow operations were recorded
-# - expected: ~10 measurements (20% of 50)
-print(f"Slow operations detected: {slow_timer.<suitkaise-api>num_times</suitkaise-api>}")
-if slow_timer.<suitkaise-api>num_times</suitkaise-api> > 0:
-    print(f"Average slow time: {slow_timer.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+# only the slow requests (>= 0.1s) are recorded
+print(f"Slow requests: {handle_request.<suitkaise-api>timer.num_times</suitkaise-api>}")  # ~5
+print(f"Mean slow time: {handle_request.<suitkaise-api>timer.mean</suitkaise-api>:.3f}s")
 ```
 
 (end of dropdown "Context Manager Examples")
@@ -413,183 +219,111 @@ if slow_timer.<suitkaise-api>num_times</suitkaise-api> > 0:
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Timing functions with @<suitkaise-api>timethis</suitkaise-api> decorator
+# Timing functions with @timethis decorator
 #
-# @<suitkaise-api>timethis</suitkaise-api>() automatically times every call to the decorated function.
-# The timer is attached to the function as .<suitkaise-api>timer</suitkaise-api> attribute.
+# @timethis() automatically times every call to the decorated function.
+# The timer is attached to the function as .timer attribute.
 # Call the function multiple times to build statistics.
 # ──────────────────────────────────────────────────────────────────────────────
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
-def fibonacci(n):
-    """Calculate nth Fibonacci number (inefficient recursive version)."""
-    if n <= 1:
-        return n
-    return fibonacci(n - 1) + fibonacci(n - 2)
+import random
 
-# first call
-<suitkaise-api>result</suitkaise-api> = fibonacci(20)
-print(f"fib(20) = {<suitkaise-api>result</suitkaise-api>}")
-print(f"Time: {fibonacci.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+def sort_data(data):
+    """Sort a list using Python's built-in sort."""
+    return sorted(data)
 
-# call multiple times to build statistics
-# - each call adds a measurement to fibonacci.<suitkaise-api>timer</suitkaise-api>
-for n in [15, 18, 20, 22, 25]:
-    <suitkaise-api>result</suitkaise-api> = fibonacci(n)
-    print(f"fib({n}) = {<suitkaise-api>result</suitkaise-api>}, time: {fibonacci.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+# generate random datasets
+datasets = [random.sample(range(100_000), 10_000) for _ in range(20)]
 
-# view statistics
-print(f"\nTotal calls: {fibonacci.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Mean time: {fibonacci.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"Min time: {fibonacci.<suitkaise-api>timer</suitkaise-api>.min:.3f}s")
-print(f"Max time: {fibonacci.<suitkaise-api>timer</suitkaise-api>.max:.3f}s")
+for data in datasets:
+    sort_data(data)
+
+# each call = one measurement
+print(f"Calls: {sort_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")         # 20
+print(f"Mean: {sort_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
+print(f"Fastest: {sort_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>min</suitkaise-api>:.4f}s")
+print(f"Slowest: {sort_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>max</suitkaise-api>:.4f}s")
+print(f"p95: {sort_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.4f}s")
 ```
 
 ### Shared Timer Across Functions
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-import hashlib
+import json
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Single timer tracking multiple functions
-#
-# Pass an explicit <suitkaise-api>Sktimer</suitkaise-api> to @<suitkaise-api>timethis</suitkaise-api>() to share across functions.
-# All decorated functions contribute to the same statistics.
-# Useful for measuring total time spent on a category of operations.
-# ──────────────────────────────────────────────────────────────────────────────
+io_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-# create a shared timer for all math operations
-math_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(io_timer)
+def serialize(obj):
+    return json.dumps(obj)
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(math_timer)
-def add(a, b):
-    hashlib.sha256(f"{a}+{b}".encode()).digest()
-    return a + b
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(io_timer)
+def deserialize(data):
+    return json.loads(data)
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(math_timer)
-def multiply(a, b):
-    hashlib.sha256(f"{a}*{b}".encode()).digest()
-    return a * b
+objects = [{"id": i, "values": list(range(500))} for i in range(100)]
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(math_timer)
-def divide(a, b):
-    hashlib.sha256(f"{a}/{b}".encode()).digest()
-    return a / b if b != 0 else 0
+for obj in objects:
+    data = serialize(obj)
+    deserialize(data)
 
-# perform many operations
-# - all times go into math_timer
-for i in range(1, 101):
-    a, b = i, i + 1
-    add(a, b)
-    multiply(a, b)
-    divide(a, b)
-
-# combined statistics across all math functions
-# - 100 iterations × 3 functions = 300 measurements
-print(f"Total math operations: {math_timer.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Total math time: {math_timer.<suitkaise-api>total_time</suitkaise-api>:.3f}s")
-print(f"Average operation: {math_timer.<suitkaise-api>mean</suitkaise-api>:.6f}s")
+print(f"Total I/O operations: {io_timer.num_times}")    # 200
+print(f"Total I/O time: {io_timer.total_time:.3f}s")
+print(f"Average operation: {io_timer.mean:.6f}s")
 ```
 
 ### Stacked Decorators
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-from pathlib import Path
 import json
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Both shared and per-function <suitkaise-api>timing</suitkaise-api>
-#
-# Stack multiple @<suitkaise-api>timethis</suitkaise-api>() decorators to track at different granularities.
-# One timer for combined stats, another for per-function stats.
-# Useful for detailed performance analysis.
-# ──────────────────────────────────────────────────────────────────────────────
+db_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-# shared timer for all database operations
-db_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function <suitkaise-api>timer</suitkaise-api> (auto-attached)
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
 def db_read(key):
-    """Read from a JSON file as a tiny local store."""
-    data = json.loads(db_path.read_text())
-    return data.get(key)
+    return json.loads('{"users": 100}').get(key)
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function <suitkaise-api>timer</suitkaise-api> (auto-attached)
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
 def db_write(key, value):
-    """Write to a JSON file as a tiny local store."""
-    data = json.loads(db_path.read_text())
-    data[key] = value
-    db_path.write_text(json.dumps(data))
-    return True
+    json.dumps({key: value})
 
-db_path = Path("data/db.json")
-db_path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
-db_path.write_text(json.dumps({}))
-
-# perform operations
-for i in range(20):
+for i in range(100):
     db_read(f"key_{i}")
     db_write(f"key_{i}", f"value_{i}")
 
-# combined database statistics
-print("=== Combined DB Stats ===")
-print(f"Total operations: {db_timer.<suitkaise-api>num_times</suitkaise-api>}")  # 40
-print(f"Total time: {db_timer.<suitkaise-api>total_time</suitkaise-api>:.3f}s")
-print(f"Mean: {db_timer.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+# combined stats
+print(f"Total DB ops: {db_timer.num_times}")     # 200
+print(f"Overall mean: {db_timer.mean:.6f}s")
 
-# per-function statistics
-print("\n=== Read Stats ===")
-print(f"Read operations: {db_read.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")  # 20
-print(f"Read mean: {db_read.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-
-print("\n=== Write Stats ===")
-print(f"Write operations: {db_write.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")  # 20
-print(f"Write mean: {db_write.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+# per-function breakdown
+print(f"Read mean:  {db_read.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s")  # 100 reads
+print(f"Write mean: {db_write.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s") # 100 writes
 ```
 
 ### Rolling Window
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-import hashlib
+import json
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Rolling window for recent measurements only
-#
-# max_times limits how many measurements are kept.
-# Older measurements are automatically discarded.
-# Useful for long-running processes where you only care about recent performance.
-# ──────────────────────────────────────────────────────────────────────────────
-
-# only keep last 10 measurements
-# - older measurements are discarded as new ones arrive
-# - memory stays bounded regardless of how many calls
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(max_times=10)
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(<suitkaise-api>max_times</suitkaise-api>=10)
 def process_request():
-    """Process a request by hashing its payload."""
-    payload = b"request_payload" * 500
-    hashlib.sha256(payload).hexdigest()
+    json.dumps({"data": list(range(1000))})
 
-# process 100 requests
 for i in range(100):
     process_request()
-    
-    # check stats periodically
-    if (i + 1) % 25 == 0:
-        # num_times is capped at 10 (our max_times)
-        print(f"After {i + 1} requests: "
-              f"{process_request.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>} measurements, "
-              f"mean: {process_request.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
 
-# final stats are based on only the last 10 requests
-print(f"\nFinal stats (last 10 only):")
-print(f"Mean: {process_request.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"Min: {process_request.<suitkaise-api>timer</suitkaise-api>.min:.3f}s")
-print(f"Max: {process_request.<suitkaise-api>timer</suitkaise-api>.max:.3f}s")
+    if (i + 1) % 25 == 0:
+        t = process_request.timer
+        print(f"After {i+1} requests: {<suitkaise-api>t.num_times</suitkaise-api>} kept, mean: {<suitkaise-api>t.mean</suitkaise-api>:.6f}s")
+
+# stats always reflect only the last 10 measurements — memory stays bounded
+print(f"\nFinal (last 10): mean={process_request.<suitkaise-api>timer.mean</suitkaise-api>:.6f}s")
 ```
 
 (end of dropdown "Decorator Examples")
@@ -604,51 +338,28 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suit
 import threading
 import hashlib
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Thread-safe <suitkaise-api>timing</suitkaise-api> across multiple threads
-#
-# <suitkaise-api>Sktimer</suitkaise-api> is fully thread-safe using per-thread sessions.
-# Multiple threads can time operations concurrently.
-# All measurements aggregate into a single statistics pool.
-# ──────────────────────────────────────────────────────────────────────────────
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-
-def worker(worker_id, iterations):
+def worker(worker_id, num_iterations):
     """Worker function that times its operations."""
-    for i in range(iterations):
+    for i in range(num_iterations):
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
-        
-        # real work with deterministic variation
-        payload = f"worker_{worker_id}_{i}".encode()
-        iterations = 2000 + (i % 5) * 500
-        for _ in range(iterations):
-            payload = hashlib.sha256(payload).digest()
-        
+        data = f"worker_{worker_id}_item_{i}".encode()
+        for _ in range(5000):
+            data = hashlib.sha256(data).digest()
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
-    
-    print(f"Worker {worker_id} completed {iterations} iterations")
 
-# create and start multiple threads
-# - each thread times its own work independently
-# - all times go into the same timer
-threads = []
-for i in range(4):
-    t = threading.Thread(target=worker, args=(i, 25))
-    threads.append(t)
-    t.<suitkaise-api>start</suitkaise-api>()
-
-# wait for all threads to complete
+threads = [threading.Thread(target=worker, args=(i, 25)) for i in range(4)]
+for t in threads:
+    t.start()
 for t in threads:
     t.join()
 
-# combined statistics from all threads
-# - 4 workers × 25 iterations = 100 measurements
-print(f"\n=== Combined Stats (all threads) ===")
+# 4 workers × 25 iterations = 100 measurements, aggregated automatically
 print(f"Total measurements: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Total time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>:.3f}s")
 print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
 print(f"Std Dev: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>:.3f}s")
+print(f"p95: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
 ```
 
 ### Benchmarking Multiple Implementations
@@ -666,7 +377,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suit
 
 def benchmark(name, func, iterations=100):
     """Run a function multiple times and return <suitkaise-api>timing</suitkaise-api> statistics."""
-    timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+    timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
     
     for _ in range(iterations):
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
@@ -684,10 +395,10 @@ def benchmark(name, func, iterations=100):
 
 # implementations to compare
 def list_append():
-    <suitkaise-api>result</suitkaise-api> = []
+    result = []
     for i in range(10000):
-        <suitkaise-api>result</suitkaise-api>.append(i)
-    return <suitkaise-api>result</suitkaise-api>
+        result.append(i)
+    return result
 
 def list_comprehension():
     return [i for i in range(10000)]
@@ -695,7 +406,7 @@ def list_comprehension():
 def list_constructor():
     return list(range(10000))
 
-# <suitkaise-api>run</suitkaise-api> benchmarks
+# run benchmarks
 results = [
     benchmark("list.append()", list_append),
     benchmark("list comprehension", list_comprehension),
@@ -718,52 +429,27 @@ for r in sorted(results, key=lambda x: x['mean']):
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-import hashlib
+import random
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Only recording successful operations
-#
-# Use <suitkaise-api>discard</suitkaise-api>() to stop <suitkaise-api>timing</suitkaise-api> without recording when an operation fails.
-# Keeps statistics clean and meaningful (only successful times).
-# The discarded time is still returned for logging if needed.
-# ──────────────────────────────────────────────────────────────────────────────
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+successes = 0
+failures = 0
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-success_count = 0
-failure_count = 0
-
-def unreliable_operation(item_id: int):
-    """Operation that sometimes fails based on content."""
-    payload = f"item_{item_id}".encode()
-    digest = hashlib.sha256(payload).digest()
-    
-    # deterministic failure for some inputs
-    if digest[0] % 3 == 0:
-        raise RuntimeError("Operation failed")
-    
-    return digest[:8].hex()
-
-# <suitkaise-api>run</suitkaise-api> many operations
 for i in range(100):
     <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
-    
     try:
-        <suitkaise-api>result</suitkaise-api> = unreliable_operation(i)
-        # success - record the <suitkaise-api>timing</suitkaise-api>
+        if random.random() < 0.3:
+            raise RuntimeError("transient failure")
+        sorted(range(10_000))  # actual work
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
-        success_count += 1
-        
+        successes += 1
     except RuntimeError:
-        # failure - discard <suitkaise-api>timing</suitkaise-api> (don't pollute statistics)
-        # - returns <suitkaise-api>elapsed</suitkaise-api> time in case we want to log it
-        discarded_time = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
-        failure_count += 1
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don't pollute stats with failed runs
+        failures += 1
 
-# statistics only reflect successful operations
-print(f"Successful operations: {success_count}")
-print(f"Failed operations: {failure_count}")
-print(f"Recorded measurements: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")  # equals success_count
-print(f"Mean success time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Successes: {successes}, Failures: {failures}")
+print(f"Recorded: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")  # equals successes
+print(f"Mean success time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s")
 ```
 
 ### Async Timing
@@ -772,34 +458,76 @@ print(f"Mean success time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>
 import asyncio
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Timing async operations
-#
-# The <suitkaise-api>timing</suitkaise-api> API works the same in async context.
-# ──────────────────────────────────────────────────────────────────────────────
+# @timethis works on async functions transparently
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+async def fetch_user(user_id):
+    await asyncio.sleep(0.05)  # simulate network I/O
+    return {"id": user_id, "name": f"User {user_id}"}
 
-async def fetch_data(item_id):
-    """Async file read with real I/O."""
-    from pathlib import Path
-    path = Path(f"data/async_{item_id}.txt")
-    path.<suitkaise-api>parent</suitkaise-api>.mkdir(parents=True, exist_ok=True)
-    path.write_text("async data\n" * 1000)
-    return await asyncio.to_thread(path.read_text)
+# TimeThis works as an async context manager
+async def process_batch(user_ids):
+    async with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as batch_timer:
+        results = []
+        for uid in user_ids:
+            results.append(await fetch_user(uid))
+    print(f"Batch took: {batch_timer.most_recent:.3f}s")
+    return results
 
 async def main():
-    timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-    
-    # time multiple async operations
-    for i in range(5):
-        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
-        data = await fetch_data(i)
-        <suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
-        print(f"Fetched {data}: {<suitkaise-api>elapsed</suitkaise-api>:.3f}s")
-    
-    print(f"\nMean fetch time: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+    users = await process_batch(range(10))
 
-# <suitkaise-api>run</suitkaise-api> the async code
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+    # per-fetch stats from @timethis
+    print(f"Per-fetch mean: {fetch_user.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
+    print(f"Per-fetch p95:  {fetch_user.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.4f}s")
+
+asyncio.run(main())
+```
+
+### Frozen Snapshots
+
+```python
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+for _ in range(50):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    sorted(range(10_000))
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+# capture a frozen snapshot
+snapshot = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>get_statistics</suitkaise-api>()
+
+# timer continues recording new data...
+for _ in range(50):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    sorted(range(10_000))
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+# snapshot is immutable — still reflects the first 50 measurements
+print(f"Snapshot mean (50 runs): {snapshot.mean:.4f}s")
+print(f"Snapshot count: {snapshot.num_times}")         # 50
+
+print(f"Live mean (100 runs): {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
+print(f"Live count: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")                # 100
+```
+
+### Importing External Measurements
+
+```python
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+# import timings from an external source (logs, another system, etc.)
+external_measurements = [0.45, 0.52, 0.48, 0.71, 0.39, 0.55]
+for t in external_measurements:
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(t)
+
+# Sktimer isn't just a stopwatch — it's a statistical analysis tool
+print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"p95:  {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
+print(f"Stdev: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>:.3f}s")
 ```
 
 (end of dropdown "Advanced Examples")
@@ -809,181 +537,45 @@ asyncio.<suitkaise-api>run</suitkaise-api>(main())
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 import threading
-import hashlib
-from dataclasses import dataclass
-from typing import Dict, Optional
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Full API Performance Monitor
-#
-# A complete system for monitoring API endpoint performance.
-# Features:
-# - Per-endpoint <suitkaise-api>timing</suitkaise-api> with separate statistics
-# - Combined overall statistics
-# - Thread-safe for concurrent requests
-# - Rolling window to bound memory usage
-# - Periodic reporting
-# ──────────────────────────────────────────────────────────────────────────────
+overall = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api><suitkaise-api>max_times</suitkaise-api>=1000)
 
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_users():
+    sorted(range(50_000))
 
-@dataclass
-class EndpointStats:
-    """Statistics for a single endpoint."""
-    name: str
-    timer: <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>
-    
-    def report(self) -> str:
-        """Generate a report string for this endpoint."""
-        if self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api> == 0:
-            return f"{self.name}: no data"
-        
-        return (f"{self.name}: "
-                f"n={self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}, "
-                f"mean={self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>*1000:.1f}ms, "
-                f"p95={self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95)*1000:.1f}ms, "
-                f"max={self.<suitkaise-api>timer</suitkaise-api>.max*1000:.1f}ms")
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_search():
+    {str(i): i for i in range(100_000)}
 
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_health():
+    pass
 
-class APIMonitor:
-    """Monitor API endpoint performance."""
-    
-    def __init__(self, max_measurements: int = 1000):
-        # overall timer for all endpoints
-        # - tracks total API performance
-        self.overall_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>(max_times=max_measurements)
-        
-        # per-endpoint timers
-        # - allows drilling down into specific endpoint performance
-        self._endpoints: Dict[str, EndpointStats] = {}
-        self._lock = threading.RLock()
-    
-    def _get_endpoint(self, name: str) -> EndpointStats:
-        """Get or create stats for an endpoint."""
-        with self._lock:
-            if name not in self._endpoints:
-                # create new timer for this endpoint
-                # - same max_times as overall to keep memory bounded
-                self._endpoints[name] = EndpointStats(
-                    name=name,
-                    timer=<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>(max_times=1000)
-                )
-            return self._endpoints[name]
-    
-    def time_request(self, endpoint: str):
-        """Context manager for <suitkaise-api>timing</suitkaise-api> a request to an endpoint."""
-        # get the endpoint's timer
-        endpoint_stats = self._get_endpoint(endpoint)
-        
-        # create a <suitkaise-api>TimeThis</suitkaise-api> that records to both timers
-        class DualTimer:
-            def __init__(self, overall, endpoint):
-                self.overall = overall
-                self.endpoint = endpoint
-                
-            def __enter__(self):
-                self.overall.<suitkaise-api>start</suitkaise-api>()
-                self.endpoint.<suitkaise-api>start</suitkaise-api>()
-                return self
-            
-            def __exit__(self, *args):
-                self.overall.<suitkaise-api>stop</suitkaise-api>()
-                self.endpoint.<suitkaise-api>stop</suitkaise-api>()
-        
-        return DualTimer(self.overall_timer, endpoint_stats.<suitkaise-api>timer</suitkaise-api>)
-    
-    def report(self) -> str:
-        """Generate a full performance report."""
-        lines = ["=== API Performance Report ===", ""]
-        
-        # overall statistics
-        overall = self.overall_timer
-        if overall.<suitkaise-api>num_times</suitkaise-api> > 0:
-            lines.append(f"Overall: {overall.<suitkaise-api>num_times</suitkaise-api>} requests, "
-                        f"mean={overall.<suitkaise-api>mean</suitkaise-api>*1000:.1f}ms, "
-                        f"p95={overall.<suitkaise-api>percentile</suitkaise-api>(95)*1000:.1f}ms")
-            lines.append("")
-        
-        # per-endpoint statistics
-        lines.append("Per-endpoint:")
-        with self._lock:
-            for stats in sorted(self._endpoints.values(), 
-                              key=lambda s: s.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api> or 0, 
-                              reverse=True):
-                lines.append(f"  {stats.report()}")
-        
-        return "\n".join(lines)
+def worker(num_requests):
+    endpoints = [handle_users, handle_search, handle_health]
+    for i in range(num_requests):
+        endpoints[i % len(endpoints)]()
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# API-like Workload
-# ──────────────────────────────────────────────────────────────────────────────
-
-def run_api_calls(monitor: APIMonitor, num_calls: int):
-    """Run deterministic, real work for API-like calls."""
-    endpoints = ["/users", "/posts", "/comments", "/search", "/health"]
-    payloads = {
-        "/users": b"user\n" * 2000,
-        "/posts": b"post\n" * 4000,
-        "/comments": b"comment\n" * 8000,
-        "/search": b"search\n" * 20000,
-        "/health": b"ok\n" * 200,
-    }
-    
-    for i in range(num_calls):
-        endpoint = endpoints[i % len(endpoints)]
-        with monitor.time_request(endpoint):
-            hashlib.sha256(payloads[endpoint]).digest()
-
-
-def worker(monitor: APIMonitor, worker_id: int, num_calls: int):
-    """Worker thread that makes API calls."""
-    print(f"Worker {worker_id} starting {num_calls} calls...")
-    run_api_calls(monitor, num_calls)
-    print(f"Worker {worker_id} completed")
-
-
-# create the monitor
-# - max_measurements=1000 keeps memory bounded
-monitor = APIMonitor(max_measurements=1000)
-
-# spawn multiple worker threads
-# - <suitkaise-api>runs</suitkaise-api> concurrent API-like work
-threads = []
-for i in range(4):
-    t = threading.Thread(target=worker, args=(monitor, i, 50))
-    threads.append(t)
-    t.<suitkaise-api>start</suitkaise-api>()
-
-# wait for all workers
+# 4 threads, 100 requests each — thread-safe, automatic aggregation
+threads = [threading.Thread(target=worker, args=(100,)) for _ in range(4)]
+for t in threads:
+    t.start()
 for t in threads:
     t.join()
 
-# print the final report
-print("\n" + monitor.report())
+# overall stats
+print(f"Total requests: {overall.<suitkaise-api>num_times</suitkaise-api>}")
+print(f"Overall mean: {overall.<suitkaise-api>mean</suitkaise-api>*1000:.1f}ms")
+print(f"Overall p95:  {overall.<suitkaise-api>percentile</suitkaise-api>(95)*1000:.1f}ms")
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Expected output (times will vary):
-# 
-# Worker 0 starting 50 calls...
-# Worker 1 starting 50 calls...
-# Worker 2 starting 50 calls...
-# Worker 3 starting 50 calls...
-# Worker 0 completed
-# Worker 1 completed
-# Worker 2 completed
-# Worker 3 completed
-#
-# === API Performance Report ===
-# 
-# Overall: 200 requests, mean=35.2ms, p95=120.5ms
-# 
-# Per-endpoint:
-#   /search: n=45, mean=98.5ms, p95=142.3ms, max=149.8ms
-#   /users: n=38, mean=34.2ms, p95=48.7ms, max=49.9ms
-#   /posts: n=42, mean=19.8ms, p95=28.9ms, max=29.8ms
-#   /comments: n=35, mean=14.5ms, p95=19.2ms, max=19.9ms
-#   /health: n=40, mean=2.8ms, p95=4.8ms, max=4.9ms
-# ──────────────────────────────────────────────────────────────────────────────
+# per-endpoint breakdown — stacked decorators give you both levels for free
+for fn in [handle_users, handle_search, handle_health]:
+    t = fn.<suitkaise-api>timer</suitkaise-api>
+    print(f"  {fn.__name__}: n={<suitkaise-api>t.num_times</suitkaise-api>}, "
+          f"mean={<suitkaise-api>t.mean</suitkaise-api>*1000:.1f}ms, p95={<suitkaise-api>t.percentile(</suitkaise-api>95)*1000:.1f}ms")
 ```
 "

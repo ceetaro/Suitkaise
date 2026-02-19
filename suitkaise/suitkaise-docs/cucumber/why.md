@@ -41,21 +41,21 @@ class Worker:
 worker = Worker()
 ```
 
-With `pickle`:
+**With `pickle`:**
 ```python
 import pickle
 pickle.dumps(worker)
 # TypeError: cannot pickle '_thread.lock' objects
 ```
 
-With `cloudpickle`:
+**With `cloudpickle`:**
 ```python
 import cloudpickle
 cloudpickle.dumps(worker)
 # TypeError: cannot pickle '_thread.lock' objects
 ```
 
-With `<suitkaise-api>cucumber</suitkaise-api>`:
+**With `<suitkaise-api>cucumber</suitkaise-api>`:**
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(worker)
@@ -75,10 +75,10 @@ It also handles many more types that are frequently used in higher level program
 
 And, it can handle user created classes, with all of these objects!
 
-- handles user created classes
-- can handle generators with state
-- handles asyncio
-- handles multiprocessing and threading
+- Handles user created classes
+- Can handle generators with state
+- Handles asyncio
+- Handles multiprocessing and threading
 
 #### Types only `<suitkaise-api>cucumber</suitkaise-api>` can handle
 
@@ -112,8 +112,8 @@ And, it can handle user created classes, with all of these objects!
 
 `<suitkaise-api>cucumber</suitkaise-api>` can handle classes defined in `__main__`.
 
-- enables multiprocessing when quickly prototyping in one file
-- allows for easy testing using CodeRunners
+- Enables multiprocessing when quickly prototyping in one file
+- Allows for easy testing using CodeRunners
 
 #### Circular references
 
@@ -138,7 +138,7 @@ For a full performance breakdown, head to the performance page.
 
 `<suitkaise-api>cucumber</suitkaise-api>` intelligently reconstructs complex objects using custom handlers.
 
-- easy reconnection to live resources like database connections, sockets, threads, and more while maintaining security
+- Easy reconnection to live resources like database connections, sockets, threads, and more while maintaining security
 
 All you have to do after deserializing is call `<suitkaise-api>reconnect_all</suitkaise-api>()` and provide any authentication needed, and all of your live resources will be recreated automatically.
 
@@ -222,12 +222,12 @@ Each `WorstPossibleObject` is different from the last, and they all have ways to
 
 Not only does `<suitkaise-api>cucumber</suitkaise-api>` handle this object, but it can handle more than 100 different `WorstPossibleObjects` per second.
 
-By handle, I mean:
+**By handle, I mean:**
 
 1. Serialize it to bytes
 2. I pass it to a different process
 3. Deserialize it
-3. Reconnect everything
+4. Reconnect everything
 
 It can then verify that it is the same object as it was when it got created, and that all of its complex objects within still work as expected.
 

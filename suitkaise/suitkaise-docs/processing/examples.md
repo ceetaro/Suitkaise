@@ -1,37 +1,37 @@
-# `<suitkaise-api>processing</suitkaise-api>` Examples
+# `processing` Examples
 
-## Basic `<suitkaise-api>Skprocess</suitkaise-api>`
+## Basic `Skprocess`
 
 ### Simple Counter Process
 
 A minimal process that counts iterations.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class CounterProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class CounterProcess(Skprocess):
     """
     A simple process that counts up to a specified number.
     
-    - Basic __init__ with <suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api>
-    - <suitkaise-api>__run__</suitkaise-api> for main work
-    - <suitkaise-api>__result__</suitkaise-api> to return data
+    - Basic __init__ with process_config.runs
+    - __run__ for main work
+    - __result__ to return data
     """
     
     def __init__(self, target: int = 10):
         # store target count
-        # (<suitkaise-api>process_config</suitkaise-api> is already initialized by <suitkaise-api>Skprocess</suitkaise-api>._setup)
+        # (process_config is already initialized by Skprocess._setup)
         self.target = target
         self.counter = 0
         
-        # configure: <suitkaise-api>run</suitkaise-api> exactly 'target' iterations
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = target
+        # configure: run exactly 'target' iterations
+        self.process_config.runs = target
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # increment counter each iteration
         self.counter += 1
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         # return final count when process completes
         return self.counter
 
@@ -40,111 +40,111 @@ class CounterProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 process = CounterProcess(target=100)
 
 # start the subprocess
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 
 # wait for completion (blocks until done)
-process.<suitkaise-api>wait</suitkaise-api>()
+process.wait()
 
-# get the <suitkaise-api>result</suitkaise-api>
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
-print(f"Final count: {<suitkaise-api>result</suitkaise-api>}")  # Final count: 100
+# get the result
+result = process.result()
+print(f"Final count: {result}")  # Final count: 100
 ```
 
-### Using `<suitkaise-api>run</suitkaise-api>()`
+### Using `run()`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class QuickProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class QuickProcess(Skprocess):
     """
     A process that does quick work.
     
-    Using <suitkaise-api>run</suitkaise-api>() to start, wait, and get <suitkaise-api>result</suitkaise-api> in one call
+    Using run() to start, wait, and get result in one call
     """
     
     def __init__(self, data: list):
         self.data = data
         self.results = []
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = len(data)
+        self.process_config.runs = len(data)
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
-        # process one item per <suitkaise-api>run</suitkaise-api>
+    def __run__(self):
+        # process one item per run
         item = self.data[self._current_run]
         self.results.append(item * 2)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
-# <suitkaise-api>run</suitkaise-api>() combines <suitkaise-api>start</suitkaise-api>(), <suitkaise-api>wait</suitkaise-api>(), and <suitkaise-api>result</suitkaise-api>()
+# run() combines start(), wait(), and result()
 process = QuickProcess([1, 2, 3, 4, 5])
-results = process.<suitkaise-api>run</suitkaise-api>()
+results = process.run()
 print(results)  # [2, 4, 6, 8, 10]
 ```
 
 ### Full Lifecycle Process
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class DataProcessor(<suitkaise-api>Skprocess</suitkaise-api>):
+class DataProcessor(Skprocess):
     """
     A process demonstrating all lifecycle methods.
     
-    - <suitkaise-api>__prerun__</suitkaise-api>: Setup before each <suitkaise-api>run</suitkaise-api>
-    - <suitkaise-api>__run__</suitkaise-api>: Main work
-    - <suitkaise-api>__postrun__</suitkaise-api>: Cleanup after each <suitkaise-api>run</suitkaise-api>
-    - <suitkaise-api>__onfinish__</suitkaise-api>: Final cleanup
-    - <suitkaise-api>__result__</suitkaise-api>: Return data
+    - __prerun__: Setup before each run
+    - __run__: Main work
+    - __postrun__: Cleanup after each run
+    - __onfinish__: Final cleanup
+    - __result__: Return data
     """
     
     def __init__(self, batch_size: int = 5):
         # configure process
         self.batch_size = batch_size
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 3  # process 3 batches
+        self.process_config.runs = 3  # process 3 batches
         
         # state tracking
         self.current_batch = None
         self.processed_batches = []
         self.total_items = 0
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
-        # called before each <suitkaise-api>__run__</suitkaise-api>
+    def __prerun__(self):
+        # called before each __run__
         # fetch the next batch of data
         batch_number = self._current_run
         self.current_batch = [
             f"item_{batch_number}_{i}" 
             for i in range(self.batch_size)
         ]
-        print(f"[<suitkaise-api>prerun</suitkaise-api>] Fetched batch {batch_number}: {len(self.current_batch)} items")
+        print(f"[prerun] Fetched batch {batch_number}: {len(self.current_batch)} items")
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # called each iteration - do the main work
         # process each item in the current batch
         processed = []
         for item in self.current_batch:
-            <suitkaise-api>result</suitkaise-api> = item.upper()
-            processed.append(<suitkaise-api>result</suitkaise-api>)
+            result = item.upper()
+            processed.append(result)
             self.total_items += 1
         
-        # store for <suitkaise-api>postrun</suitkaise-api>
+        # store for postrun
         self._processed = processed
-        print(f"[<suitkaise-api>run</suitkaise-api>] Processed {len(processed)} items")
+        print(f"[run] Processed {len(processed)} items")
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
-        # called after each <suitkaise-api>__run__</suitkaise-api>
+    def __postrun__(self):
+        # called after each __run__
         # save results and cleanup
         self.processed_batches.append(self._processed)
         self.current_batch = None  # clear for next iteration
         self._processed = None
-        print(f"[<suitkaise-api>postrun</suitkaise-api>] Saved batch, total batches: {len(self.processed_batches)}")
+        print(f"[postrun] Saved batch, total batches: {len(self.processed_batches)}")
     
-    def <suitkaise-api>__onfinish__</suitkaise-api>(self):
-        # called once when process ends (stop signal or <suitkaise-api>run</suitkaise-api> limit)
+    def __onfinish__(self):
+        # called once when process ends (stop signal or run limit)
         # final cleanup and summary
-        print(f"[<suitkaise-api>onfinish</suitkaise-api>] Finished <suitkaise-api>processing</suitkaise-api> {self.total_items} total items")
+        print(f"[onfinish] Finished processing {self.total_items} total items")
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         # return the final data
         return {
             'batches': self.processed_batches,
@@ -152,57 +152,57 @@ class DataProcessor(<suitkaise-api>Skprocess</suitkaise-api>):
             'num_batches': len(self.processed_batches)
         }
 
-    # NOTE: not implementing <suitkaise-api>__error__</suitkaise-api> to let <suitkaise-api>Skprocess</suitkaise-api> decide what <suitkaise-api>error</suitkaise-api> to raise
+    # NOTE: not implementing __error__ to let Skprocess decide what error to raise
 
 
 process = DataProcessor(batch_size=3)
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>()
+result = process.run()
 
-print(f"\nResult: {<suitkaise-api>result</suitkaise-api>['num_batches']} batches, {<suitkaise-api>result</suitkaise-api>['total_items']} items")
+print(f"\nResult: {result['num_batches']} batches, {result['total_items']} items")
 # Output:
-# [<suitkaise-api>prerun</suitkaise-api>] Fetched batch 0: 3 items
-# [<suitkaise-api>run</suitkaise-api>] Processed 3 items
-# [<suitkaise-api>postrun</suitkaise-api>] Saved batch, total batches: 1
-# [<suitkaise-api>prerun</suitkaise-api>] Fetched batch 1: 3 items
-# [<suitkaise-api>run</suitkaise-api>] Processed 3 items
-# [<suitkaise-api>postrun</suitkaise-api>] Saved batch, total batches: 2
-# [<suitkaise-api>prerun</suitkaise-api>] Fetched batch 2: 3 items
-# [<suitkaise-api>run</suitkaise-api>] Processed 3 items
-# [<suitkaise-api>postrun</suitkaise-api>] Saved batch, total batches: 3
-# [<suitkaise-api>onfinish</suitkaise-api>] Finished <suitkaise-api>processing</suitkaise-api> 9 total items
+# [prerun] Fetched batch 0: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 1
+# [prerun] Fetched batch 1: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 2
+# [prerun] Fetched batch 2: 3 items
+# [run] Processed 3 items
+# [postrun] Saved batch, total batches: 3
+# [onfinish] Finished processing 9 total items
 
 # Result: 3 batches, 9 items
 ```
 
-### Indefinite Process with `<suitkaise-api>stop</suitkaise-api>()`
+### Indefinite Process with `stop()`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Skprocess
+from suitkaise import timing
 
-class MonitorProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class MonitorProcess(Skprocess):
     """
-    A process that <suitkaise-api>runs</suitkaise-api> indefinitely until stopped.
+    A process that runs indefinitely until stopped.
     
-    - `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api>=None` for indefinite execution
-    - Using <suitkaise-api>stop</suitkaise-api>() from the parent process
-    - Graceful shutdown with <suitkaise-api>__onfinish__</suitkaise-api>
+    - `process_config.runs=None` for indefinite execution
+    - Using stop() from the parent process
+    - Graceful shutdown with __onfinish__
     """
     
     def __init__(self):
-        # no <suitkaise-api>run</suitkaise-api> limit - <suitkaise-api>runs</suitkaise-api> until <suitkaise-api>stop</suitkaise-api>() is called
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None
+        # no run limit - runs until stop() is called
+        self.process_config.runs = None
         self.events = []
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # record timestamp and system info each iteration
         import os
         import hashlib
         payload = f"{self._current_run}:{os.getpid()}".encode()
         digest = hashlib.sha256(payload).hexdigest()
         self.events.append({
-            '<suitkaise-api>run</suitkaise-api>': self._current_run,
-            'time': <suitkaise-api>timing</suitkaise-api>.time(),
+            'run': self._current_run,
+            'time': timing.time(),
             'pid': os.getpid(),
             'memory': self._get_memory_usage(),
             'hash': digest[:12],
@@ -210,20 +210,24 @@ class MonitorProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     
     def _get_memory_usage(self):
         """Get current process memory usage in MB."""
-        import resource
-        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024
+        import os
+        try:
+            import resource
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 / 1024
+        except ImportError:
+            return 0  # not available on this platform
     
-    def <suitkaise-api>__onfinish__</suitkaise-api>(self):
-        # called when <suitkaise-api>stop</suitkaise-api>() signal is received
+    def __onfinish__(self):
+        # called when stop() signal is received
         print(f"Monitor shutting down after {len(self.events)} events")
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.events
 
 
 # start the monitor
 process = MonitorProcess()
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 
 # do some work while it collects data
 import hashlib
@@ -232,50 +236,50 @@ for _ in range(2000):
     data = hashlib.sha256(data).digest()
 
 # signal graceful stop
-<suitkaise-api>timing</suitkaise-api>.sleep(0.05)
-process.<suitkaise-api>stop</suitkaise-api>()
+timing.sleep(0.05)
+process.stop()
 
 # wait for it to finish
-process.<suitkaise-api>wait</suitkaise-api>()
+process.wait()
 
 # get results
-events = process.<suitkaise-api>result</suitkaise-api>()
+events = process.result()
 print(f"Captured {len(events)} events")
 ```
 
-### Time-Limited Process with `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api>`
+### Time-Limited Process with `process_config.join_in`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class TimeBoundProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class TimeBoundProcess(Skprocess):
     """
-    A process that <suitkaise-api>runs</suitkaise-api> for a maximum amount of time.
+    A process that runs for a maximum amount of time.
     
-    - `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api>` to set maximum runtime
-    - `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api>=None` combined with `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api>` for time-based limits
+    - `process_config.join_in` to set maximum runtime
+    - `process_config.runs=None` combined with `process_config.join_in` for time-based limits
     """
     
     def __init__(self, max_seconds: float = 10.0):
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None # this is the default
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api> = max_seconds
+        self.process_config.runs = None # this is the default
+        self.process_config.join_in = max_seconds
         
         self.iterations = 0
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         import hashlib
         payload = f"iter_{self._current_run}".encode()
         digest = hashlib.sha256(payload).digest()
         self.iterations += digest[0]
 
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.iterations
 
 
 process = TimeBoundProcess(max_seconds=1.0)
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>()
-print(f"Completed {<suitkaise-api>result</suitkaise-api>} iterations in ~1 second")
+result = process.run()
+print(f"Completed {result} iterations in ~1 second")
 # Completed ~10 iterations in ~1 second
 ```
 
@@ -283,53 +287,53 @@ print(f"Completed {<suitkaise-api>result</suitkaise-api>} iterations in ~1 secon
 
 ```python
 import hashlib
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>RunError</suitkaise-api>, <suitkaise-api>ProcessError</suitkaise-api>
+from suitkaise.processing import Skprocess, RunError, ProcessError
 
-class UnreliableProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class UnreliableProcess(Skprocess):
     """
     A process that may fail but retries automatically.
     
-    - `<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api>` for automatic retry on failure
+    - `process_config.lives` for automatic retry on failure
     - State preservation across retries
-    - <suitkaise-api>__error__</suitkaise-api> for handling final failure
+    - __error__ for handling final failure
     """
     
     def __init__(self):
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
+        self.process_config.runs = 10
         # allow 3 total attempts (2 retries)
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3
+        self.process_config.lives = 3
         
         self.successful_runs = 0
         self.attempt_count = 0
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
+    def __prerun__(self):
         # track attempts
         self.attempt_count += 1
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # deterministic failure based on real work
-        payload = f"<suitkaise-api>run</suitkaise-api>:{self._current_run}".encode()
+        payload = f"run:{self._current_run}".encode()
         digest = hashlib.sha256(payload).digest()
         if digest[0] % 5 == 0:
-            raise RuntimeError(f"Content failure on <suitkaise-api>run</suitkaise-api> {self._current_run}")
+            raise RuntimeError(f"Content failure on run {self._current_run}")
         
         # success!
         self.successful_runs += 1
     
-    def <suitkaise-api>__error__</suitkaise-api>(self):
-        # called when all <suitkaise-api>lives</suitkaise-api> exhausted
-        # self.<suitkaise-api>error</suitkaise-api> contains the exception
+    def __error__(self):
+        # called when all lives exhausted
+        # self.error contains the exception
         print(f"Process failed after {self.attempt_count} attempts")
-        print(f"Error: {self.<suitkaise-api>error</suitkaise-api>}")
+        print(f"Error: {self.error}")
         
         # return partial results
         return {
             'status': 'failed',
             'successful_runs': self.successful_runs,
-            '<suitkaise-api>error</suitkaise-api>': str(self.<suitkaise-api>error</suitkaise-api>)
+            'error': str(self.error)
         }
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return {
             'status': 'success',
             'successful_runs': self.successful_runs,
@@ -340,43 +344,43 @@ class UnreliableProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 # set seed for reproducibility
 process = UnreliableProcess()
 try:
-    <suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>()
-    print(f"Result: {<suitkaise-api>result</suitkaise-api>}")
-except <suitkaise-api>ProcessError</suitkaise-api> as e:
+    result = process.run()
+    print(f"Result: {result}")
+except ProcessError as e:
     print(f"Process ultimately failed: {e}")
 ```
 
 ### Timeouts on Lifecycle Methods
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>ProcessTimeoutError</suitkaise-api>
+from suitkaise.processing import Skprocess, ProcessTimeoutError
 
-class SlowProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class SlowProcess(Skprocess):
     """
     A process with timeout protection on lifecycle methods.
     
-    - Setting <suitkaise-api>timeouts</suitkaise-api> for individual lifecycle sections
-    - <suitkaise-api>ProcessTimeoutError</suitkaise-api> when <suitkaise-api>timeouts</suitkaise-api> are exceeded
+    - Setting timeouts for individual lifecycle sections
+    - ProcessTimeoutError when timeouts are exceeded
     """
     
     def __init__(self):
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 5
+        self.process_config.runs = 5
         
-        # set <suitkaise-api>timeouts</suitkaise-api> for each section
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>prerun</suitkaise-api> = 1.0   # 1 second max
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 2.0      # 2 seconds max
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>postrun</suitkaise-api> = 1.0  # 1 second max
+        # set timeouts for each section
+        self.process_config.timeouts.prerun = 1.0   # 1 second max
+        self.process_config.timeouts.run = 2.0      # 2 seconds max
+        self.process_config.timeouts.postrun = 1.0  # 1 second max
         
         self.completed_runs = 0
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
-        # quick <suitkaise-api>prerun</suitkaise-api> - well within timeout
+    def __prerun__(self):
+        # quick prerun - well within timeout
         pass
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # CPU-intensive work that varies in duration
         if self._current_run == 3:
-            # this <suitkaise-api>run</suitkaise-api> will exceed timeout - compute intensive fibonacci
+            # this run will exceed timeout - compute intensive fibonacci
             self._fibonacci(40)  # takes several seconds
         else:
             # normal quick computation
@@ -390,16 +394,16 @@ class SlowProcess(<suitkaise-api>Skprocess</suitkaise-api>):
             return n
         return self._fibonacci(n - 1) + self._fibonacci(n - 2)
     
-    def <suitkaise-api>__error__</suitkaise-api>(self):
-        # handle timeout <suitkaise-api>error</suitkaise-api>
-        if isinstance(self.<suitkaise-api>error</suitkaise-api>, <suitkaise-api>ProcessTimeoutError</suitkaise-api>):
-            print(f"Timeout in {self.<suitkaise-api>error</suitkaise-api>.section} after {self.<suitkaise-api>error</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>}s")
+    def __error__(self):
+        # handle timeout error
+        if isinstance(self.error, ProcessTimeoutError):
+            print(f"Timeout in {self.error.section} after {self.error.timeout}s")
         return {
             'status': 'timeout',
             'completed_runs': self.completed_runs
         }
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return {
             'status': 'success',
             'completed_runs': self.completed_runs
@@ -407,72 +411,72 @@ class SlowProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
 
 process = SlowProcess()
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>()
-print(f"Result: {<suitkaise-api>result</suitkaise-api>}")
-# Timeout in <suitkaise-api>__run__</suitkaise-api> after 2.0s
+result = process.run()
+print(f"Result: {result}")
+# Timeout in __run__ after 2.0s
 # Result: {'status': 'timeout', 'completed_runs': 3}
 ```
 
 ### Accessing Timing Data
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 import hashlib
 
-class TimedProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class TimedProcess(Skprocess):
     """
-    A process demonstrating <suitkaise-api>timing</suitkaise-api> access.
+    A process demonstrating timing access.
     
     - Accessing per-method timers
     - Using process_timer for aggregate stats
     - Timer statistics (mean, min, max, percentile)
     """
     
-    def __init__(self, <suitkaise-api>runs</suitkaise-api>: int = 20):
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = <suitkaise-api>runs</suitkaise-api>
+    def __init__(self, runs: int = 20):
+        self.process_config.runs = runs
         self.data = [f"data_block_{i}" for i in range(1000)]
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
-        # variable <suitkaise-api>prerun</suitkaise-api> work - rotate data
+    def __prerun__(self):
+        # variable prerun work - rotate data
         self.data = self.data[-1:] + self.data[:-1]
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
-        # variable <suitkaise-api>run</suitkaise-api> work - hash computations
+    def __run__(self):
+        # variable run work - hash computations
         iterations = 50 + (self._current_run * 7 % 100)
         for _ in range(iterations):
             for item in self.data[:100]:
                 hashlib.sha256(item.encode()).hexdigest()
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
-        # quick <suitkaise-api>postrun</suitkaise-api> - sort a slice
+    def __postrun__(self):
+        # quick postrun - sort a slice
         sorted(self.data[:50])
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 
 
-process = TimedProcess(<suitkaise-api>runs</suitkaise-api>=20)
-process.<suitkaise-api>run</suitkaise-api>()
+process = TimedProcess(runs=20)
+process.run()
 
 # access individual timers
-print(f"<suitkaise-api>__prerun__</suitkaise-api> <suitkaise-api>timing</suitkaise-api>:")
-print(f"  mean:   {process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
-print(f"  min:    {process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.min:.4f}s")
-print(f"  max:    {process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.max:.4f}s")
+print(f"__prerun__ timing:")
+print(f"  mean:   {process.__prerun__.timer.mean:.4f}s")
+print(f"  min:    {process.__prerun__.timer.min:.4f}s")
+print(f"  max:    {process.__prerun__.timer.max:.4f}s")
 
-print(f"\n__run__ <suitkaise-api>timing</suitkaise-api>:")
-print(f"  mean:   {process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
-print(f"  p50:    {process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(50):.4f}s")
-print(f"  p95:    {process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.4f}s")
+print(f"\n__run__ timing:")
+print(f"  mean:   {process.__run__.timer.mean:.4f}s")
+print(f"  p50:    {process.__run__.timer.percentile(50):.4f}s")
+print(f"  p95:    {process.__run__.timer.percentile(95):.4f}s")
 
-print(f"\n__postrun__ <suitkaise-api>timing</suitkaise-api>:")
-print(f"  total:  {process.<suitkaise-api>__postrun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>:.4f}s")
+print(f"\n__postrun__ timing:")
+print(f"  total:  {process.__postrun__.timer.total_time:.4f}s")
 
 # aggregate timer for full iterations
-print(f"\nFull iteration <suitkaise-api>timing</suitkaise-api> (<suitkaise-api>prerun</suitkaise-api> + <suitkaise-api>run</suitkaise-api> + <suitkaise-api>postrun</suitkaise-api>):")
-print(f"  mean:   {process.process_timer.<suitkaise-api>mean</suitkaise-api>:.4f}s")
-print(f"  total:  {process.process_timer.<suitkaise-api>total_time</suitkaise-api>:.4f}s")
-print(f"  count:  {process.process_timer.<suitkaise-api>num_times</suitkaise-api>}")
+print(f"\nFull iteration timing (prerun + run + postrun):")
+print(f"  mean:   {process.process_timer.mean:.4f}s")
+print(f"  total:  {process.process_timer.total_time:.4f}s")
+print(f"  count:  {process.process_timer.num_times}")
 ```
 
 ### Async Process Execution
@@ -480,33 +484,33 @@ print(f"  count:  {process.process_timer.<suitkaise-api>num_times</suitkaise-api
 ```python
 import asyncio
 import hashlib
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class AsyncFriendlyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class AsyncFriendlyProcess(Skprocess):
     """
     Running processes in async code.
     
-    - Using .<suitkaise-api>asynced</suitkaise-api>() modifier on <suitkaise-api>wait</suitkaise-api>() and <suitkaise-api>result</suitkaise-api>()
+    - Using .asynced() modifier on wait() and result()
     - Running multiple processes concurrently
     """
     
     def __init__(self, process_id: int, data_chunks: list):
         self.process_id = process_id
         self.data_chunks = data_chunks
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = len(data_chunks)
+        self.process_config.runs = len(data_chunks)
         self.results = []
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # process a data chunk - compute hash
         chunk = self.data_chunks[self._current_run]
         hash_result = hashlib.sha256(chunk.encode()).hexdigest()
         self.results.append({
             'process': self.process_id,
-            '<suitkaise-api>run</suitkaise-api>': self._current_run,
+            'run': self._current_run,
             'hash': hash_result[:16]
         })
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
@@ -524,21 +528,21 @@ async def run_processes_concurrently():
     processes = []
     for i, data in enumerate(all_data):
         p = AsyncFriendlyProcess(process_id=i, data_chunks=data)
-        p.<suitkaise-api>start</suitkaise-api>()
+        p.start()
         processes.append(p)
     
-    # wait for all concurrently using <suitkaise-api>asynced</suitkaise-api>()
-    wait_tasks = [p.<suitkaise-api>wait</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()() for p in processes]
+    # wait for all concurrently using asynced()
+    wait_tasks = [p.wait.asynced()() for p in processes]
     await asyncio.gather(*wait_tasks)
     
     # get all results
-    results = [p.<suitkaise-api>result</suitkaise-api>() for p in processes]
+    results = [p.result() for p in processes]
     
     return results
 
 
-# <suitkaise-api>run</suitkaise-api> the async code
-results = asyncio.<suitkaise-api>run</suitkaise-api>(run_processes_concurrently())
+# run the async code
+results = asyncio.run(run_processes_concurrently())
 for i, r in enumerate(results):
     print(f"Process {i}: {len(r)} results")
 ```
@@ -546,25 +550,25 @@ for i, r in enumerate(results):
 ### Background Execution with Future
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Skprocess
+from suitkaise import timing
 import math
 
-class BackgroundProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class BackgroundProcess(Skprocess):
     """
-    Running a process in the <suitkaise-api>background</suitkaise-api>.
+    Running a process in the background.
     
-    - Using .<suitkaise-api>background</suitkaise-api>() modifier
-    - Doing other work while process <suitkaise-api>runs</suitkaise-api>
-    - Getting <suitkaise-api>result</suitkaise-api> from Future
+    - Using .background() modifier
+    - Doing other work while process runs
+    - Getting result from Future
     """
     
     def __init__(self, numbers: list):
         self.numbers = numbers
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = len(numbers)
+        self.process_config.runs = len(numbers)
         self.results = []
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # compute prime factorization for each number
         n = self.numbers[self._current_run]
         factors = self._prime_factors(n)
@@ -583,38 +587,38 @@ class BackgroundProcess(<suitkaise-api>Skprocess</suitkaise-api>):
             factors.append(n)
         return factors
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
 # start process and get Future immediately
 numbers = [123456789, 987654321, 1000000007, 999999937, 2147483647]
 process = BackgroundProcess(numbers)
-future = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()()
+future = process.run.background()()
 
-# do other work while process <suitkaise-api>runs</suitkaise-api>
-print("Process running in <suitkaise-api>background</suitkaise-api>...")
+# do other work while process runs
+print("Process running in background...")
 main_thread_work = []
 for i in range(5):
     # compute something in main thread
     main_thread_work.append(math.factorial(100 + i))
     print(f"  Main thread computed factorial({100 + i})")
 
-# now get the <suitkaise-api>result</suitkaise-api> (may block if not done)
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
-print(f"\nProcess computed {len(<suitkaise-api>result</suitkaise-api>)} factorizations")
-for r in <suitkaise-api>result</suitkaise-api>[:3]:
+# now get the result (may block if not done)
+result = future.result()
+print(f"\nProcess computed {len(result)} factorizations")
+for r in result[:3]:
     print(f"  {r['number']} = {r['factors']}")
 ```
 
 ---
 
-## `<suitkaise-api>Pool</suitkaise-api>`
+## `Pool`
 
 ### Basic `map`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 
 def square(x):
     """Simple function to square a number."""
@@ -622,12 +626,12 @@ def square(x):
 
 
 # create a pool with 4 workers
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
+pool = Pool(workers=4)
 
 # map applies the function to each item
 # results are returned in the same order as inputs
 items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-results = pool.<suitkaise-api>map</suitkaise-api>(square, items)
+results = pool.map(square, items)
 
 print(results)  # [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
 
@@ -635,10 +639,10 @@ print(results)  # [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
 pool.close()
 ```
 
-### `<suitkaise-api>Pool</suitkaise-api>` as Context Manager
+### `Pool` as Context Manager
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import hashlib
 import json
 
@@ -650,7 +654,7 @@ def process_data(data):
     # compute a hash
     data_hash = hashlib.md5(normalized.encode()).hexdigest()
     
-    # return processed <suitkaise-api>result</suitkaise-api>
+    # return processed result
     return {
         'original': data,
         'normalized': normalized,
@@ -659,10 +663,10 @@ def process_data(data):
 
 
 # use context manager for automatic cleanup
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = ["  Apple  ", "BANANA", "Cherry", "  DATE", "elderberry"]
 
-    results = pool.<suitkaise-api>map</suitkaise-api>(process_data, items)
+    results = pool.map(process_data, items)
 
     for r in results:
         print(f"{r['original']:>12} -> {r['normalized']:<12} ({r['hash']})")
@@ -671,10 +675,10 @@ with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
 # pool is automatically closed when exiting the 'with' block
 ```
 
-### Using `<suitkaise-api>star</suitkaise-api>()` for Tuple Unpacking
+### Using `star()` for Tuple Unpacking
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 
 def add(a, b):
     """Add two numbers."""
@@ -685,26 +689,26 @@ def multiply(x, y, z):
     return x * y * z
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
-    # without <suitkaise-api>star</suitkaise-api>(): each item is passed as a single argument
+with Pool(workers=4) as pool:
+    # without star(): each item is passed as a single argument
     # the function receives a tuple
-    # pool.<suitkaise-api>map</suitkaise-api>(add, [(1, 2), (3, 4)])  # ERROR: add() expects 2 args, got 1 tuple
+    # pool.map(add, [(1, 2), (3, 4)])  # ERROR: add() expects 2 args, got 1 tuple
     
-    # with <suitkaise-api>star</suitkaise-api>(): tuples are unpacked into positional arguments
+    # with star(): tuples are unpacked into positional arguments
     pairs = [(1, 2), (3, 4), (5, 6), (7, 8)]
-    sums = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(add, pairs)
+    sums = pool.star().map(add, pairs)
     print(f"Sums: {sums}")  # Sums: [3, 7, 11, 15]
     
     # works with any number of arguments
     triples = [(1, 2, 3), (4, 5, 6), (7, 8, 9)]
-    products = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(multiply, triples)
+    products = pool.star().map(multiply, triples)
     print(f"Products: {products}")  # Products: [6, 120, 504]
 ```
 
 ### `unordered_map` for Fastest List
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import hashlib
 
 def variable_work(item):
@@ -723,35 +727,35 @@ def variable_work(item):
     }
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = list(range(20))
     
     # unordered_map returns a list (like map)
     # but results are in completion order (like unordered_imap)
-    results = pool.<suitkaise-api>unordered_map</suitkaise-api>(variable_work, items)
+    results = pool.unordered_map(variable_work, items)
     
     print(f"Got {len(results)} results")
     print(f"Order received: {[r['item'] for r in results]}")
     # Order is NOT sequential - items with fewer iterations complete first
     
     # useful when you need all results but don't care about order
-    # faster than <suitkaise-api>map</suitkaise-api>() because you don't wait for slow items to unblock fast ones
+    # faster than map() because you don't wait for slow items to unblock fast ones
 ```
 
 ### `imap` for Memory Efficiency
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import hashlib
 
 def heavy_computation(item):
-    """Compute SHA-256 hash multiple times, return large <suitkaise-api>result</suitkaise-api>."""
+    """Compute SHA-256 hash multiple times, return large result."""
     # do real computation - iterative hashing
     data = str(item).encode()
     for _ in range(1000):
         data = hashlib.sha256(data).digest()
     
-    # return <suitkaise-api>result</suitkaise-api> with computed hash and derived data
+    # return result with computed hash and derived data
     final_hash = hashlib.sha256(data).hexdigest()
     return {
         'input': item,
@@ -760,17 +764,17 @@ def heavy_computation(item):
     }
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     # imap returns an iterator - results are yielded one at a time
     # this is memory efficient for large datasets
     items = range(100)
     
     processed = 0
-    for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>imap</suitkaise-api>(heavy_computation, items):
-        # process each <suitkaise-api>result</suitkaise-api> as it arrives (in order)
+    for result in pool.imap(heavy_computation, items):
+        # process each result as it arrives (in order)
         processed += 1
         if processed % 20 == 0:
-            print(f"Processed {processed} items, latest hash: {<suitkaise-api>result</suitkaise-api>['hash'][:16]}...")
+            print(f"Processed {processed} items, latest hash: {result['hash'][:16]}...")
     
     print(f"Done! Processed {processed} total items")
 ```
@@ -778,7 +782,7 @@ with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
 ### `unordered_imap` for Fastest Results
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import hashlib
 
 def variable_work(item):
@@ -798,24 +802,24 @@ def variable_work(item):
     }
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = list(range(20))
     
     print("Using unordered_imap - fastest results first:")
     results = []
-    for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>unordered_imap</suitkaise-api>(variable_work, items):
+    for result in pool.unordered_imap(variable_work, items):
         # results arrive as they complete (NOT in order)
-        results.append(<suitkaise-api>result</suitkaise-api>)
-        print(f"  Got item {<suitkaise-api>result</suitkaise-api>['item']:2d} ({<suitkaise-api>result</suitkaise-api>['iterations']:4d} iters)")
+        results.append(result)
+        print(f"  Got item {result['item']:2d} ({result['iterations']:4d} iters)")
     
     print(f"\nOrder received: {[r['item'] for r in results]}")
     # Order is NOT sequential - items with fewer iterations complete first
 ```
 
-### `<suitkaise-api>Pool</suitkaise-api>` with Timeout
+### `Pool` with Timeout
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 
 def slow_function(x):
     """Function that might be slow - recursive fibonacci."""
@@ -832,28 +836,28 @@ def slow_function(x):
         return fib(20 + x)
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = [1, 2, 3, 4, 5, 6, 7, 8]
     
     try:
         # timeout applies to the entire operation
-        results = pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(2.0)(slow_function, items)
+        results = pool.map.timeout(2.0)(slow_function, items)
         print(results)
     except TimeoutError as e:
         print(f"Operation timed out: {e}")
     
     # timeout also works with imap - use items that complete quickly
     try:
-        for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(5.0)(slow_function, [1, 2, 3]):
-            print(f"Got: {<suitkaise-api>result</suitkaise-api>}")
+        for result in pool.imap.timeout(5.0)(slow_function, [1, 2, 3]):
+            print(f"Got: {result}")
     except TimeoutError:
         print("imap timed out")
 ```
 
-### Background Execution with `<suitkaise-api>Pool</suitkaise-api>`
+### Background Execution with `Pool`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import math
 
 def compute(x):
@@ -875,33 +879,33 @@ def compute(x):
     return {'input': x, 'number': large_num, 'factors': prime_factors(large_num)}
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = list(range(20))
     
     # start map in background - returns Future immediately
-    future = pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(compute, items)
+    future = pool.map.background()(compute, items)
     
     # do other work while pool processes
-    print("<suitkaise-api>Pool</suitkaise-api> working in <suitkaise-api>background</suitkaise-api>...")
+    print("Pool working in background...")
     main_work = []
     for i in range(3):
         # compute something in main thread
-        <suitkaise-api>result</suitkaise-api> = math.factorial(500 + i * 100)
-        main_work.append(len(str(<suitkaise-api>result</suitkaise-api>)))
+        result = math.factorial(500 + i * 100)
+        main_work.append(len(str(result)))
         print(f"  Main thread computed factorial, {main_work[-1]} digits")
     
     # get results (blocks if not done)
-    results = future.<suitkaise-api>result</suitkaise-api>()
+    results = future.result()
     print(f"Got {len(results)} factorizations")
-    print(f"First <suitkaise-api>result</suitkaise-api>: {results[0]}")
+    print(f"First result: {results[0]}")
 ```
 
-### Async `<suitkaise-api>Pool</suitkaise-api>` Operations
+### Async `Pool` Operations
 
 ```python
 import asyncio
 import hashlib
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 
 def cpu_work(x):
     """CPU-bound work - compute hash chain."""
@@ -914,50 +918,50 @@ def cpu_work(x):
 async def process_batches():
     """Process multiple batches concurrently."""
     
-    with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+    with Pool(workers=4) as pool:
         # create multiple async map operations
         batch1 = list(range(10))
         batch2 = list(range(10, 20))
         batch3 = list(range(20, 30))
         
-        # <suitkaise-api>run</suitkaise-api> all batches concurrently using <suitkaise-api>asynced</suitkaise-api>()
+        # run all batches concurrently using asynced()
         results = await asyncio.gather(
-            pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(cpu_work, batch1),
-            pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(cpu_work, batch2),
-            pool.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(cpu_work, batch3),
+            pool.map.asynced()(cpu_work, batch1),
+            pool.map.asynced()(cpu_work, batch2),
+            pool.map.asynced()(cpu_work, batch3),
         )
         
         return results
 
 
-results = asyncio.<suitkaise-api>run</suitkaise-api>(process_batches())
+results = asyncio.run(process_batches())
 print(f"Batch 1: {len(results[0])} items, first: {results[0][0]}")
 print(f"Batch 2: {len(results[1])} items, first: {results[1][0]}")
 print(f"Batch 3: {len(results[2])} items, first: {results[2][0]}")
 ```
 
-### Using `<suitkaise-api>Skprocess</suitkaise-api>` with `<suitkaise-api>Pool</suitkaise-api>`
+### Using `Skprocess` with `Pool`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Pool, Skprocess
 import hashlib
 import json
 
-class DataTransformer(<suitkaise-api>Skprocess</suitkaise-api>):
+class DataTransformer(Skprocess):
     """
-    A <suitkaise-api>Skprocess</suitkaise-api> that can be used with <suitkaise-api>Pool</suitkaise-api>.
+    A Skprocess that can be used with Pool.
     
-    <suitkaise-api>Pool</suitkaise-api> creates an instance for each item and <suitkaise-api>runs</suitkaise-api> it.
+    Pool creates an instance for each item and runs it.
     """
     
     def __init__(self, input_data: dict):
         # receive input through __init__
         self.input_data = input_data
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1  # single <suitkaise-api>run</suitkaise-api> per item
+        self.process_config.runs = 1  # single run per item
         
         self.transformed = None
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # transform the data - real computation
         data = self.input_data
         
@@ -975,7 +979,7 @@ class DataTransformer(<suitkaise-api>Skprocess</suitkaise-api>):
             'processed': True
         }
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.transformed
 
 
@@ -987,10 +991,10 @@ items = [
     {'id': 4, 'value': 40},
 ]
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
-    # <suitkaise-api>Pool</suitkaise-api> creates DataTransformer(item) for each item
-    # and <suitkaise-api>runs</suitkaise-api> it, collecting results
-    results = pool.<suitkaise-api>map</suitkaise-api>(DataTransformer, items)
+with Pool(workers=2) as pool:
+    # Pool creates DataTransformer(item) for each item
+    # and runs it, collecting results
+    results = pool.map(DataTransformer, items)
     
     for r in results:
         print(f"ID {r['original_id']}: {r['original_value']} -> doubled={r['doubled']}, squared={r['squared']}")
@@ -1000,10 +1004,10 @@ with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
 # ID 4: 40 -> doubled=80, squared=1600
 ```
 
-### Combining `<suitkaise-api>star</suitkaise-api>()` with Modifiers
+### Combining `star()` with Modifiers
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 import asyncio
 import math
 
@@ -1011,83 +1015,83 @@ def process_pair(x, y):
     """Process a pair of values - compute combination and factorial ratio."""
     # compute nCr (n choose r) where x >= y
     n, r = max(x, y), min(x, y)
-    <suitkaise-api>result</suitkaise-api> = math.comb(n * 10, r * 2)
-    return {'inputs': (x, y), 'comb': <suitkaise-api>result</suitkaise-api>, 'digits': len(str(<suitkaise-api>result</suitkaise-api>))}
+    result = math.comb(n * 10, r * 2)
+    return {'inputs': (x, y), 'comb': result, 'digits': len(str(result))}
 
 
 async def main():
-    with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+    with Pool(workers=4) as pool:
         pairs = [(1, 2), (3, 4), (5, 6), (7, 8)]
         
-        # <suitkaise-api>star</suitkaise-api>() composes with all modifiers
+        # star() composes with all modifiers
         
         # star + timeout
-        results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(5.0)(process_pair, pairs)
+        results = pool.star().map.timeout(5.0)(process_pair, pairs)
         print(f"star + timeout: {[r['digits'] for r in results]} digits")
         
         # star + background
-        future = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(process_pair, pairs)
-        results = future.<suitkaise-api>result</suitkaise-api>()
+        future = pool.star().map.background()(process_pair, pairs)
+        results = future.result()
         print(f"star + background: {[r['digits'] for r in results]} digits")
         
         # star + async
-        results = await pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(process_pair, pairs)
+        results = await pool.star().map.asynced()(process_pair, pairs)
         print(f"star + async: {[r['digits'] for r in results]} digits")
         
         # star + imap
         print("star + imap:", end=" ")
-        for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>imap</suitkaise-api>(process_pair, pairs):
-            print(f"{<suitkaise-api>result</suitkaise-api>['inputs']}", end=" ")
+        for result in pool.star().imap(process_pair, pairs):
+            print(f"{result['inputs']}", end=" ")
         print()
         
         # star + unordered_imap
         print("star + unordered_imap:", end=" ")
-        for <suitkaise-api>result</suitkaise-api> in pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>unordered_imap</suitkaise-api>(process_pair, pairs):
-            print(f"{<suitkaise-api>result</suitkaise-api>['inputs']}", end=" ")
+        for result in pool.star().unordered_imap(process_pair, pairs):
+            print(f"{result['inputs']}", end=" ")
         print()
 
 
-asyncio.<suitkaise-api>run</suitkaise-api>(main())
+asyncio.run(main())
 ```
 
-### Error Handling in `<suitkaise-api>Pool</suitkaise-api>`
+### Error Handling in `Pool`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Pool
 
 def risky_function(x):
-    """Function that might raise an <suitkaise-api>error</suitkaise-api>."""
+    """Function that might raise an error."""
     if x == 3:
         raise ValueError(f"Cannot process {x}")
     return x * 2
 
 
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+with Pool(workers=4) as pool:
     items = [1, 2, 3, 4, 5]
     
     try:
-        # <suitkaise-api>error</suitkaise-api> in any worker propagates to main process
-        results = pool.<suitkaise-api>map</suitkaise-api>(risky_function, items)
+        # error in any worker propagates to main process
+        results = pool.map(risky_function, items)
     except RuntimeError as e:
-        print(f"Caught <suitkaise-api>error</suitkaise-api>: {e}")
+        print(f"Caught error: {e}")
     
     # process the items that don't cause errors
     safe_items = [1, 2, 4, 5]
-    results = pool.<suitkaise-api>map</suitkaise-api>(risky_function, safe_items)
+    results = pool.map(risky_function, safe_items)
     print(f"Safe results: {results}")  # [2, 4, 8, 10]
 ```
 
 ---
 
-## `<suitkaise-api>Share</suitkaise-api>`
+## `Share`
 
-### Basic Shared Counter using `<suitkaise-api>Share</suitkaise-api>`
+### Basic Shared Counter using `Share`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Share, Pool, Skprocess
 
-# create a <suitkaise-api>Share</suitkaise-api> and assign a counter object
-share = <suitkaise-api>Share</suitkaise-api>()
+# create a Share and assign a counter object
+share = Share()
 
 class Counter:
     def __init__(self):
@@ -1099,104 +1103,104 @@ class Counter:
 share.counter = Counter()
 
 
-class CounterProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class CounterProcess(Skprocess):
     """
     A process that increments a shared counter.
     
-    Demonstrates basic <suitkaise-api>Share</suitkaise-api> usage across processes.
+    Demonstrates basic Share usage across processes.
     """
-    # pass the <suitkaise-api>Share</suitkaise-api> instance to the process
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>, amount: int = 1):
+    # pass the Share instance to the process
+    def __init__(self, shared: Share, amount: int = 1):
         self.shared = shared
         self.amount = amount
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10  # increment 10 times
+        self.process_config.runs = 10  # increment 10 times
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    def __postrun__(self):
         # increment the shared counter
         # use a method to avoid read/modify/write races
         self.shared.counter.increment(self.amount)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 
 
-# <suitkaise-api>run</suitkaise-api> 5 processes, each incrementing 10 times
-with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
+# run 5 processes, each incrementing 10 times
+with Pool(workers=4) as pool:
     # pass the same share instance to all processes
-    pool.<suitkaise-api>map</suitkaise-api>(CounterProcess, [share] * 5)
+    pool.map(CounterProcess, [share] * 5)
 
-# counter was incremented 50 <suitkaise-api>times</suitkaise-api> (5 processes × 10 <suitkaise-api>runs</suitkaise-api> each)
+# counter was incremented 50 times (5 processes × 10 runs each)
 print(f"Final counter: {share.counter.value}") # will be 50
 
 # always stop share when done to save resources
-share.<suitkaise-api>stop</suitkaise-api>()
+share.stop()
 ```
 
-### Sharing Complex Objects (like `<suitkaise-api>Sktimer</suitkaise-api>`)
+### Sharing Complex Objects (like `Sktimer`)
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Share, Pool, Skprocess
+from suitkaise.timing import Sktimer
+from suitkaise import timing
 import hashlib
 
-# create <suitkaise-api>Share</suitkaise-api> and assign a timer
-share = <suitkaise-api>Share</suitkaise-api>()
-share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+# create Share and assign a timer
+share = Share()
+share.timer = Sktimer()
 
 
-class TimedWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class TimedWorker(Skprocess):
     """
-    A process that records <suitkaise-api>timing</suitkaise-api> to a shared <suitkaise-api>timer</suitkaise-api>.
+    A process that records timing to a shared timer.
     
-    Demonstrates sharing <suitkaise-api>suitkaise</suitkaise-api> objects with _shared_meta.
+    Demonstrates sharing suitkaise objects with _shared_meta.
     """
     
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>, work_count: int = 5):
+    def __init__(self, shared: Share, work_count: int = 5):
         self.shared = shared
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = work_count
+        self.process_config.runs = work_count
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # variable hash iterations (deterministic)
-        with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as run_timer:
+        with timing.TimeThis() as run_timer:
             data = b"benchmark_data"
             iterations = 500 + (self._current_run * 97 % 1500)
             for _ in range(iterations):
                 data = hashlib.sha256(data).digest()
         
-        # add <suitkaise-api>timing</suitkaise-api> to shared timer
-        self.shared.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(run_timer.<suitkaise-api>most_recent</suitkaise-api>)
+        # add timing to shared timer
+        self.shared.timer.add_time(run_timer.most_recent)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 
 
-# <suitkaise-api>run</suitkaise-api> multiple workers
+# run multiple workers
 workers = 4
-with <suitkaise-api>Pool</suitkaise-api>(workers=workers) as pool:
-    pool.<suitkaise-api>map</suitkaise-api>(TimedWorker, [share] * workers)
+with Pool(workers=workers) as pool:
+    pool.map(TimedWorker, [share] * workers)
 
-stats = share.<suitkaise-api>timer</suitkaise-api>.get_stats()
+stats = share.timer.get_stats()
 
-# will be 20 (4 workers × 5 <suitkaise-api>runs</suitkaise-api> each)
-num_times = stats.<suitkaise-api>num_times</suitkaise-api>
+# will be 20 (4 workers × 5 runs each)
+num_times = stats.num_times
 
-mean = stats.<suitkaise-api>mean</suitkaise-api>
+mean = stats.mean
 min = stats.min
 max = stats.max
-stdev = stats.<suitkaise-api>stdev</suitkaise-api>
-variance = stats.<suitkaise-api>variance</suitkaise-api>
+stdev = stats.stdev
+variance = stats.variance
 
-share.<suitkaise-api>stop</suitkaise-api>()
+share.stop()
 ```
 
-### `<suitkaise-api>Share</suitkaise-api>` as Context Manager
+### `Share` as Context Manager
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Share, Pool, Skprocess
 
 class Counter:
-    """A simple counter class (will be auto-wrapped by <suitkaise-api>Share</suitkaise-api>)."""
+    """A simple counter class (will be auto-wrapped by Share)."""
     def __init__(self):
         self.value = 0
     
@@ -1204,37 +1208,37 @@ class Counter:
         self.value += amount
 
 
-class WorkerProcess(<suitkaise-api>Skprocess</suitkaise-api>):
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>):
+class WorkerProcess(Skprocess):
+    def __init__(self, shared: Share):
         self.shared = shared
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
+        self.process_config.runs = 10
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    def __postrun__(self):
         self.shared.counter.increment(1)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 
 
-# use <suitkaise-api>Share</suitkaise-api> as context manager for automatic cleanup
-with <suitkaise-api>Share</suitkaise-api>() as share:
+# use Share as context manager for automatic cleanup
+with Share() as share:
 
     # assign custom object - auto-wrapped with Skclass
     share.counter = Counter()
     
-    with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
-        pool.<suitkaise-api>map</suitkaise-api>(WorkerProcess, [share] * 3)
+    with Pool(workers=2) as pool:
+        pool.map(WorkerProcess, [share] * 3)
     
     print(f"Final value: {share.counter.value}") # 30
 
-# <suitkaise-api>Share</suitkaise-api> automatically stopped after 'with' block
+# Share automatically stopped after 'with' block
 ```
 
 ### Multiple Shared Objects
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Share, Pool, Skprocess
+from suitkaise import timing
 import hashlib
 
 class Stats:
@@ -1253,19 +1257,19 @@ class Stats:
         self.errors += 1
 
 
-class DataProcessor(<suitkaise-api>Skprocess</suitkaise-api>):
+class DataProcessor(Skprocess):
     """
     Process that uses multiple shared objects.
     """
     
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>, item: dict):
+    def __init__(self, shared: Share, item: dict):
         self.shared = shared
         self.item = item
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+        self.process_config.runs = 1
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
-        # time the <suitkaise-api>processing</suitkaise-api>
-        with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as run_timer:
+    def __run__(self):
+        # time the processing
+        with timing.TimeThis() as run_timer:
             try:
                 # process the data - hash computation
                 data = self.item['data'].encode()
@@ -1273,7 +1277,7 @@ class DataProcessor(<suitkaise-api>Skprocess</suitkaise-api>):
                 # deterministically fail based on content hash
                 checksum = hashlib.sha256(data).digest()
                 if checksum[0] % 5 == 0:
-                    raise RuntimeError(f"Failed <suitkaise-api>processing</suitkaise-api> {self.item['id']}")
+                    raise RuntimeError(f"Failed processing {self.item['id']}")
                 
                 # compute hash chain
                 for _ in range(1000):
@@ -1284,51 +1288,51 @@ class DataProcessor(<suitkaise-api>Skprocess</suitkaise-api>):
             except Exception:
                 self.shared.stats.record_error()
         
-        self.shared.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(run_timer.<suitkaise-api>most_recent</suitkaise-api>)
+        self.shared.timer.add_time(run_timer.most_recent)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.item['id']
 
 
-with <suitkaise-api>Share</suitkaise-api>() as share:
+with Share() as share:
     # multiple shared objects
     share.stats = Stats()
-    share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+    share.timer = timing.Sktimer()
     
     # create work items
     items = [{'id': i, 'data': f'item_{i}'} for i in range(20)]
     
-    with <suitkaise-api>Pool</suitkaise-api>(workers=4) as pool:
-        # use <suitkaise-api>star</suitkaise-api>() to pass both share and item
+    with Pool(workers=4) as pool:
+        # use star() to pass both share and item
         args = [(share, item) for item in items]
-        pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(DataProcessor, args)
+        pool.star().map(DataProcessor, args)
     
     # access aggregated results
     print(f"Processed: {share.stats.processed}")
     print(f"Successes: {share.stats.successes}")
     print(f"Errors: {share.stats.errors}")
-    print(f"Avg time: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
+    print(f"Avg time: {share.timer.mean:.4f}s")
 ```
 
-### Sharing with single `<suitkaise-api>Skprocess</suitkaise-api>`
+### Sharing with single `Skprocess`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>, <suitkaise-api>TimeThis</suitkaise-api>
+from suitkaise.processing import Share, Skprocess
+from suitkaise.timing import Sktimer, TimeThis
 import hashlib
 
-class IterativeWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class IterativeWorker(Skprocess):
     """
     A long-running process that updates shared state.
     """
     
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>):
+    def __init__(self, shared: Share):
         self.shared = shared
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 100
+        self.process_config.runs = 100
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # variable work - hash computation with deterministic iterations
-        with <suitkaise-api>TimeThis</suitkaise-api>() as run_timer:
+        with TimeThis() as run_timer:
             data = f"iteration_{self._current_run}".encode()
             iterations = 200 + (hashlib.sha256(data).digest()[0] % 600)
             for _ in range(iterations):
@@ -1336,19 +1340,19 @@ class IterativeWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         
         # update shared state
         self.shared.progress += 1
-        self.shared.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(run_timer.<suitkaise-api>most_recent</suitkaise-api>)
+        self.shared.timer.add_time(run_timer.most_recent)
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "complete"
 
 
-with <suitkaise-api>Share</suitkaise-api>() as share:
+with Share() as share:
     share.progress = 0
-    share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+    share.timer = Sktimer()
     
-    # <suitkaise-api>run</suitkaise-api> single process
+    # run single process
     process = IterativeWorker(share)
-    process.<suitkaise-api>start</suitkaise-api>()
+    process.start()
     
     # monitor progress from parent
     while process.is_alive:
@@ -1358,64 +1362,64 @@ with <suitkaise-api>Share</suitkaise-api>() as share:
         for _ in range(500):
             payload = hashlib.sha256(payload).digest()
     
-    process.<suitkaise-api>wait</suitkaise-api>()
+    process.wait()
     
     print(f"\nFinal progress: {share.progress}")
-    print(f"Total time: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>:.2f}s")
-    print(f"Avg iteration: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.4f}s")
+    print(f"Total time: {share.timer.total_time:.2f}s")
+    print(f"Avg iteration: {share.timer.mean:.4f}s")
 ```
 
-### `<suitkaise-api>Share</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()` and `<suitkaise-api>Share</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()` control
+### `Share.start()` and `Share.stop()` control
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
+from suitkaise.processing import Share
 
-# create <suitkaise-api>Share</suitkaise-api> without auto-start
-share = <suitkaise-api>Share</suitkaise-api>(auto_start=False)
+# create Share without auto-start
+share = Share(auto_start=False)
 
-# <suitkaise-api>Share</suitkaise-api> is not running - operations will warn
-share.counter = 0  # warning: <suitkaise-api>Share</suitkaise-api> is stopped
+# Share is not running - operations will warn
+share.counter = 0  # warning: Share is stopped
 
 # explicitly start
-share.<suitkaise-api>start</suitkaise-api>()
+share.start()
 print(f"Running: {share.is_running}")  # Running: True
 
 # normal operations
 share.counter = 100
 
 # stop to free resources
-share.<suitkaise-api>stop</suitkaise-api>()
+share.stop()
 print(f"Running: {share.is_running}")  # Running: False
 
 # can restart
-share.<suitkaise-api>start</suitkaise-api>()
+share.start()
 print(f"Counter: {share.counter}")  # Counter: 100
-share.<suitkaise-api>stop</suitkaise-api>()
+share.stop()
 ```
 
-### Clearing `<suitkaise-api>Share</suitkaise-api>` State
+### Clearing `Share` State
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Share, Pool, Skprocess
 
-class Incrementer(<suitkaise-api>Skprocess</suitkaise-api>):
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>):
+class Incrementer(Skprocess):
+    def __init__(self, shared: Share):
         self.shared = shared
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
+        self.process_config.runs = 10
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    def __postrun__(self):
         self.shared.count += 1
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 
 
-with <suitkaise-api>Share</suitkaise-api>() as share:
+with Share() as share:
     share.count = 0
     
     # first batch
-    with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
-        pool.<suitkaise-api>map</suitkaise-api>(Incrementer, [share] * 2)
+    with Pool(workers=2) as pool:
+        pool.map(Incrementer, [share] * 2)
     
     print(f"After batch 1: {share.count}")  # 20
     
@@ -1426,56 +1430,56 @@ with <suitkaise-api>Share</suitkaise-api>() as share:
     share.count = 0
     
     # second batch
-    with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
-        pool.<suitkaise-api>map</suitkaise-api>(Incrementer, [share] * 3)
+    with Pool(workers=2) as pool:
+        pool.map(Incrementer, [share] * 3)
     
     print(f"After batch 2: {share.count}")  # 30
 ```
 
 ---
 
-## `<suitkaise-api>Pipe</suitkaise-api>`
+## `Pipe`
 
-### Basic `<suitkaise-api>Pipe</suitkaise-api>` Communication
+### Basic `Pipe` Communication
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Pipe, Skprocess
 
-class PipeWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class PipeWorker(Skprocess):
     """
-    A process that communicates via <suitkaise-api>Pipe</suitkaise-api>.
+    A process that communicates via Pipe.
     
     - Receiving the point end of a pipe
     - Bidirectional communication with parent
     """
     
-    def __init__(self, pipe_point: <suitkaise-api>Pipe</suitkaise-api>.Point):
+    def __init__(self, pipe_point: Pipe.Point):
         self.pipe = pipe_point
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+        self.process_config.runs = 1
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # receive command from parent
         command = self.pipe.recv()
         print(f"[Child] Received: {command}")
         
         # process the command
-        <suitkaise-api>result</suitkaise-api> = command['value'] * 2
+        result = command['value'] * 2
         
-        # send <suitkaise-api>result</suitkaise-api> back
-        self.pipe.send({'<suitkaise-api>result</suitkaise-api>': <suitkaise-api>result</suitkaise-api>, 'status': 'ok'})
-        print(f"[Child] Sent <suitkaise-api>result</suitkaise-api>: {<suitkaise-api>result</suitkaise-api>}")
+        # send result back
+        self.pipe.send({'result': result, 'status': 'ok'})
+        print(f"[Child] Sent result: {result}")
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "pipe_complete"
 
 
 # create a pipe pair
 # anchor stays in parent, point goes to child
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+anchor, point = Pipe.pair()
 
 # start process with pipe point
 process = PipeWorker(point)
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 point.close()
 
 # send command through anchor
@@ -1487,28 +1491,28 @@ response = anchor.recv()
 print(f"[Parent] Received response: {response}")
 
 # wait for process to finish
-process.<suitkaise-api>wait</suitkaise-api>()
+process.wait()
 
 # close the pipe
 anchor.close()
 ```
 
-### One-Way `<suitkaise-api>Pipe</suitkaise-api>`
+### One-Way `Pipe`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Pipe, Skprocess
 
-class DataReceiver(<suitkaise-api>Skprocess</suitkaise-api>):
+class DataReceiver(Skprocess):
     """
     A process that only receives data (one-way pipe).
     """
     
-    def __init__(self, pipe_point: <suitkaise-api>Pipe</suitkaise-api>.Point):
+    def __init__(self, pipe_point: Pipe.Point):
         self.pipe = pipe_point
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+        self.process_config.runs = 1
         self.received_data = []
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # receive all data until None sentinel
         while True:
             data = self.pipe.recv()
@@ -1517,15 +1521,15 @@ class DataReceiver(<suitkaise-api>Skprocess</suitkaise-api>):
             self.received_data.append(data)
             print(f"[Child] Received: {data}")
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.received_data
 
 
 # create one-way pipe (parent sends, child receives)
-anchor, point = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
+anchor, point = Pipe.pair(one_way=True)
 
 process = DataReceiver(point)
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 point.close()
 
 # send multiple items
@@ -1536,55 +1540,55 @@ for i in range(5):
 anchor.send(None)
 
 # get results
-process.<suitkaise-api>wait</suitkaise-api>()
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
-print(f"Received {len(<suitkaise-api>result</suitkaise-api>)} items")
+process.wait()
+result = process.result()
+print(f"Received {len(result)} items")
 
 anchor.close()
 ```
 
-### Multiple `<suitkaise-api>Pipe</suitkaise-api>`s
+### Multiple `Pipe`s
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Pipe, Skprocess
 
-class DualPipeWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class DualPipeWorker(Skprocess):
     """
     A process with separate command and data pipes.
     """
     
-    def __init__(self, cmd_pipe: <suitkaise-api>Pipe</suitkaise-api>.Point, data_pipe: <suitkaise-api>Pipe</suitkaise-api>.Point):
+    def __init__(self, cmd_pipe: Pipe.Point, data_pipe: Pipe.Point):
         self.cmd_pipe = cmd_pipe
         self.data_pipe = data_pipe
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None  # <suitkaise-api>run</suitkaise-api> until stop
+        self.process_config.runs = None  # run until stop
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
-        # check for commands (non-<suitkaise-api>blocking</suitkaise-api> would need timeout)
+    def __run__(self):
+        # check for commands (non-blocking would need timeout)
         try:
             cmd = self.cmd_pipe.recv()
             
             if cmd['action'] == 'process':
                 # get data from data pipe
                 data = self.data_pipe.recv()
-                <suitkaise-api>result</suitkaise-api> = sum(data)
-                self.cmd_pipe.send({'status': 'done', '<suitkaise-api>result</suitkaise-api>': <suitkaise-api>result</suitkaise-api>})
+                result = sum(data)
+                self.cmd_pipe.send({'status': 'done', 'result': result})
             
             elif cmd['action'] == 'stop':
-                self.<suitkaise-api>stop</suitkaise-api>()
+                self.stop()
                 
         except Exception as e:
-            self.cmd_pipe.send({'status': '<suitkaise-api>error</suitkaise-api>', '<suitkaise-api>error</suitkaise-api>': str(e)})
+            self.cmd_pipe.send({'status': 'error', 'error': str(e)})
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "worker_stopped"
 
 
 # create two pipe pairs
-cmd_anchor, cmd_point = <suitkaise-api>Pipe</suitkaise-api>.pair()
-data_anchor, data_point = <suitkaise-api>Pipe</suitkaise-api>.pair()
+cmd_anchor, cmd_point = Pipe.pair()
+data_anchor, data_point = Pipe.pair()
 
 process = DualPipeWorker(cmd_point, data_point)
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 cmd_point.close()
 data_point.close()
 
@@ -1594,13 +1598,13 @@ cmd_anchor.send({'action': 'process'})
 # send data on data pipe
 data_anchor.send([1, 2, 3, 4, 5])
 
-# get <suitkaise-api>result</suitkaise-api> on command pipe
-<suitkaise-api>result</suitkaise-api> = cmd_anchor.recv()
-print(f"Result: {<suitkaise-api>result</suitkaise-api>}")  # Result: {'status': 'done', '<suitkaise-api>result</suitkaise-api>': 15}
+# get result on command pipe
+result = cmd_anchor.recv()
+print(f"Result: {result}")  # Result: {'status': 'done', 'result': 15}
 
 # stop the worker
 cmd_anchor.send({'action': 'stop'})
-process.<suitkaise-api>wait</suitkaise-api>()
+process.wait()
 
 cmd_anchor.close()
 data_anchor.close()
@@ -1608,32 +1612,32 @@ data_anchor.close()
 
 ---
 
-## `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` and `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()`
+## `Skprocess.tell()` and `Skprocess.listen()`
 
 ### Basic usage
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Skprocess
+from suitkaise import timing
 import hashlib
 
-class CommandableProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class CommandableProcess(Skprocess):
     """
-    A process that receives commands via <suitkaise-api>listen</suitkaise-api>().
+    A process that receives commands via listen().
     
-    - <suitkaise-api>listen</suitkaise-api>() from subprocess
-    - <suitkaise-api>tell</suitkaise-api>() from parent
-    - Bidirectional communication without <suitkaise-api>Pipe</suitkaise-api>
+    - listen() from subprocess
+    - tell() from parent
+    - Bidirectional communication without Pipe
     """
     
     def __init__(self):
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None  # <suitkaise-api>run</suitkaise-api> indefinitely
+        self.process_config.runs = None  # run indefinitely
         self.multiplier = 1
         self.results = []
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
-        # check for commands (non-<suitkaise-api>blocking</suitkaise-api> with timeout)
-        command = self.<suitkaise-api>listen</suitkaise-api>(timeout=0.1)
+    def __prerun__(self):
+        # check for commands (non-blocking with timeout)
+        command = self.listen(timeout=0.1)
         
         if command is not None:
             if command.get('action') == 'set_multiplier':
@@ -1641,56 +1645,56 @@ class CommandableProcess(<suitkaise-api>Skprocess</suitkaise-api>):
                 print(f"[Child] Multiplier set to {self.multiplier}")
             
             elif command.get('action') == 'stop':
-                self.<suitkaise-api>stop</suitkaise-api>()
+                self.stop()
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # do some real work - compute hash
         data = f"run_{self._current_run}_mult_{self.multiplier}".encode()
         for _ in range(100 * self.multiplier):
             data = hashlib.sha256(data).digest()
         
         value = int.from_bytes(data[:4], 'big') % 1000
-        self.results.append({'<suitkaise-api>run</suitkaise-api>': self._current_run, 'value': value})
+        self.results.append({'run': self._current_run, 'value': value})
         
         # notify parent of progress
         if self._current_run % 5 == 0:
-            self.<suitkaise-api>tell</suitkaise-api>({'progress': self._current_run, 'latest': value})
+            self.tell({'progress': self._current_run, 'latest': value})
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
 process = CommandableProcess()
-process.<suitkaise-api>start</suitkaise-api>()
+process.start()
 
-# let it <suitkaise-api>run</suitkaise-api> while doing work in parent
+# let it run while doing work in parent
 import hashlib
 data = b"parent_work"
 for _ in range(1500):
     data = hashlib.sha256(data).digest()
 
 # send command to change multiplier
-process.<suitkaise-api>tell</suitkaise-api>({'action': 'set_multiplier', 'value': 10})
+process.tell({'action': 'set_multiplier', 'value': 10})
 
 # listen for progress updates for a short window
 data = b"parent_work_2"
 for _ in range(1500):
     data = hashlib.sha256(data).digest()
 for _ in range(20):
-    msg = process.<suitkaise-api>listen</suitkaise-api>(timeout=0.1)
+    msg = process.listen(timeout=0.1)
     if msg is not None:
         print(f"[Parent] Progress: {msg}")
 
 # stop the process, then drain any remaining messages
-process.<suitkaise-api>tell</suitkaise-api>({'action': 'stop'})
-process.<suitkaise-api>wait</suitkaise-api>()
+process.tell({'action': 'stop'})
+process.wait()
 while True:
-    msg = process.<suitkaise-api>listen</suitkaise-api>(timeout=0.1)
+    msg = process.listen(timeout=0.1)
     if msg is None:
         break
     print(f"[Parent] Progress (late): {msg}")
 
-results = process.<suitkaise-api>result</suitkaise-api>()
+results = process.result()
 print(f"Got {len(results)} results")
 ```
 
@@ -1699,90 +1703,90 @@ print(f"Got {len(results)} results")
 ```python
 import asyncio
 import hashlib
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+from suitkaise.processing import Skprocess
 
-class AsyncWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class AsyncWorker(Skprocess):
     """
     A worker that uses tell/listen in async code.
     """
     
     def __init__(self, data_items: list):
         self.data_items = data_items
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = len(data_items)
+        self.process_config.runs = len(data_items)
         self.results = []
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # process data item - compute hash
         item = self.data_items[self._current_run]
         hash_result = hashlib.sha256(item.encode()).hexdigest()
         self.results.append(hash_result[:16])
         
-        # send status every 5 <suitkaise-api>runs</suitkaise-api>
+        # send status every 5 runs
         if self._current_run % 5 == 0:
-            self.<suitkaise-api>tell</suitkaise-api>({
-                '<suitkaise-api>run</suitkaise-api>': self._current_run,
+            self.tell({
+                'run': self._current_run,
                 'status': 'working',
                 'last_hash': hash_result[:8]
             })
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
 async def monitor_process():
-    """Monitor a process using async <suitkaise-api>listen</suitkaise-api>."""
+    """Monitor a process using async listen."""
     
     data = [f"async_data_item_{i}" for i in range(20)]
     process = AsyncWorker(data)
-    process.<suitkaise-api>start</suitkaise-api>()
+    process.start()
     
     # monitor with async listen
     while process.is_alive:
-        # use <suitkaise-api>asynced</suitkaise-api>() for non-<suitkaise-api>blocking</suitkaise-api> listen in async code
-        msg = await process.<suitkaise-api>listen</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(timeout=0.2)
+        # use asynced() for non-blocking listen in async code
+        msg = await process.listen.asynced()(timeout=0.2)
         if msg:
             print(f"Status: {msg}")
     
-    await process.<suitkaise-api>wait</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()
-    <suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>result</suitkaise-api>()
-    print(f"Final: {len(<suitkaise-api>result</suitkaise-api>)} hashes computed")
+    await process.wait.asynced()()
+    result = process.result()
+    print(f"Final: {len(result)} hashes computed")
 
 
-asyncio.<suitkaise-api>run</suitkaise-api>(monitor_process())
+asyncio.run(monitor_process())
 ```
 
 ---
 
-## `<suitkaise-api>autoreconnect</suitkaise-api>`
+## `autoreconnect`
 
-### Basic `<suitkaise-api>autoreconnect</suitkaise-api>`
+### Basic `autoreconnect`
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>
+from suitkaise.processing import Skprocess, autoreconnect, Pool
 
 # NOTE: This example shows the pattern - actual database would need real connection
 
-@<suitkaise-api>autoreconnect</suitkaise-api>(
+@autoreconnect(
     start_threads=False,
     **{
         "psycopg2.Connection": {"*": "secret"},  # auth value is the password string
     }
 )
-class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class DatabaseWorker(Skprocess):
     """
     A process that uses a database connection.
     
-    @<suitkaise-api>autoreconnect</suitkaise-api> ensures the connection is re-established
+    @autoreconnect ensures the connection is re-established
     in the subprocess after serialization.
     """
     
     def __init__(self, db_connection, query: str):
         self.db = db_connection
         self.query = query
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+        self.process_config.runs = 1
         self.results = None
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # db connection was auto-reconnected in subprocess
         # self.db is now a live connection, not a Reconnector
         cursor = self.db.cursor()
@@ -1790,27 +1794,27 @@ class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.results = cursor.fetchall()
         cursor.close()
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.results
 
 
 # Usage (conceptual):
 # db = psycopg2.connect(host="localhost", database="mydb", password="secret")
 # 
-# with <suitkaise-api>Pool</suitkaise-api>(workers=2) as pool:
+# with Pool(workers=2) as pool:
 #     queries = [
 #         (db, "SELECT * FROM users LIMIT 10"),
 #         (db, "SELECT * FROM orders LIMIT 10"),
 #     ]
-#     results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(DatabaseWorker, queries)
+#     results = pool.star().map(DatabaseWorker, queries)
 ```
 
-### `<suitkaise-api>autoreconnect</suitkaise-api>` with Multiple Connection Types
+### `autoreconnect` with Multiple Connection Types
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
+from suitkaise.processing import Skprocess, autoreconnect
 
-@<suitkaise-api>autoreconnect</suitkaise-api>(
+@autoreconnect(
     start_threads=False,
     **{
         # PostgreSQL connections - auth value is the password string
@@ -1828,7 +1832,7 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkai
         }
     }
 )
-class MultiDbWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class MultiDbWorker(Skprocess):
     """
     A process that uses multiple database connections.
     
@@ -1841,14 +1845,14 @@ class MultiDbWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.analytics_db = analytics_db  # uses "analytics_db" auth
         self.cache = cache                # Redis with its auth
         self.mongo = mongo                # MongoDB with its auth
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+        self.process_config.runs = 1
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         # all connections are auto-reconnected in subprocess
         # ... use connections ...
         pass
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return "done"
 ```
 
@@ -1875,19 +1879,19 @@ What this script does
 
 ```python
 """
-A complete example of a distributed task queue using <suitkaise-api>processing</suitkaise-api>.
+A complete example of a distributed task queue using processing.
 
 Features used:
-- <suitkaise-api>Pool</suitkaise-api> for parallel worker management
-- <suitkaise-api>Share</suitkaise-api> for tracking global state across processes
-- <suitkaise-api>Skprocess</suitkaise-api> for structured task execution with lifecycle hooks
+- Pool for parallel worker management
+- Share for tracking global state across processes
+- Skprocess for structured task execution with lifecycle hooks
 - Timing for performance metrics collection
-- <suitkaise-api>lives</suitkaise-api> for automatic retry on failure
+- lives for automatic retry on failure
 """
 
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Pool, Share, Skprocess
+from suitkaise.timing import Sktimer
+from suitkaise import timing
 import hashlib
 
 
@@ -1895,7 +1899,7 @@ class TaskStats:
     """
     Tracks statistics across all workers.
     
-    This class will be auto-wrapped by <suitkaise-api>Share</suitkaise-api> with Skclass.
+    This class will be auto-wrapped by Share with Skclass.
     """
     
     def __init__(self):
@@ -1916,41 +1920,41 @@ class TaskStats:
         self.retried += 1
 
 
-class TaskWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class TaskWorker(Skprocess):
     """
     A worker that processes a single task.
     
     Features:
     - Deterministic failure based on task content
-    - Retry support via <suitkaise-api>lives</suitkaise-api>
+    - Retry support via lives
     - Timing recorded to shared timer
     - Stats recorded to shared stats object
     """
     
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>, task: dict):
+    def __init__(self, shared: Share, task: dict):
         # store references
         self.shared = shared
         self.task = task
         
         # configure process
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1      # one <suitkaise-api>run</suitkaise-api> per task
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3     # retry up to 2 times
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 5.0  # 5 second timeout
+        self.process_config.runs = 1      # one run per task
+        self.process_config.lives = 3     # retry up to 2 times
+        self.process_config.timeouts.run = 5.0  # 5 second timeout
         
-        # <suitkaise-api>result</suitkaise-api> storage
+        # result storage
         self.result_data = None
         self.attempts = 0
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
+    def __prerun__(self):
         # track retry attempts
         self.attempts += 1
         if self.attempts > 1:
             # this is a retry
             self.shared.stats.record_retry()
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
-        # record <suitkaise-api>timing</suitkaise-api>
-        start = <suitkaise-api>timing</suitkaise-api>.time()
+    def __run__(self):
+        # record timing
+        start = timing.time()
         
         try:
             # real work - compute hash chain with deterministic iterations
@@ -1978,11 +1982,11 @@ class TaskWorker(<suitkaise-api>Skprocess</suitkaise-api>):
             self.shared.stats.record_complete()
             
         finally:
-            # always record <suitkaise-api>timing</suitkaise-api>
-            <suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start)
-            self.shared.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(<suitkaise-api>elapsed</suitkaise-api>)
+            # always record timing
+            elapsed = timing.elapsed(start)
+            self.shared.timer.add_time(elapsed)
     
-    def <suitkaise-api>__error__</suitkaise-api>(self):
+    def __error__(self):
         # all retries exhausted
         self.shared.stats.record_fail()
         
@@ -1992,10 +1996,10 @@ class TaskWorker(<suitkaise-api>Skprocess</suitkaise-api>):
             'output': None,
             'attempts': self.attempts,
             'status': 'failed',
-            '<suitkaise-api>error</suitkaise-api>': str(self.<suitkaise-api>error</suitkaise-api>)
+            'error': str(self.error)
         }
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return self.result_data
 
 
@@ -2011,16 +2015,16 @@ def run_task_queue(tasks: list[dict], workers: int = 4):
     """
     
     # set up shared state
-    with <suitkaise-api>Share</suitkaise-api>() as share:
+    with Share() as share:
         share.stats = TaskStats()
-        share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+        share.timer = Sktimer()
         
-        # create argument tuples for <suitkaise-api>star</suitkaise-api>()
+        # create argument tuples for star()
         args = [(share, task) for task in tasks]
         
         # process all tasks in parallel
-        with <suitkaise-api>Pool</suitkaise-api>(workers=workers) as pool:
-            results = pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(TaskWorker, args)
+        with Pool(workers=workers) as pool:
+            results = pool.star().map(TaskWorker, args)
         
         # collect statistics
         stats = {
@@ -2028,12 +2032,12 @@ def run_task_queue(tasks: list[dict], workers: int = 4):
             'completed': share.stats.completed,
             'failed': share.stats.failed,
             'retried': share.stats.retried,
-            '<suitkaise-api>timing</suitkaise-api>': {
-                'total': share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>,
-                'mean': share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>,
-                'min': share.<suitkaise-api>timer</suitkaise-api>.min,
-                'max': share.<suitkaise-api>timer</suitkaise-api>.max,
-                'p95': share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95),
+            'timing': {
+                'total': share.timer.total_time,
+                'mean': share.timer.mean,
+                'min': share.timer.min,
+                'max': share.timer.max,
+                'p95': share.timer.percentile(95),
             }
         }
     
@@ -2052,29 +2056,29 @@ if __name__ == "__main__":
     ]
     print(f"Processing {len(tasks)} tasks...")
 
-    start = <suitkaise-api>timing</suitkaise-api>.time()
+    start = timing.time()
     
-    # <suitkaise-api>run</suitkaise-api> the queue
+    # run the queue
     output = run_task_queue(tasks, workers=4)
     
-    <suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start)
+    elapsed = timing.elapsed(start)
     
     # print results
     print(f"\n{'='*50}")
     print(f"TASK QUEUE RESULTS")
     print(f"{'='*50}")
-    print(f"Total time: {<suitkaise-api>elapsed</suitkaise-api>:.2f}s")
+    print(f"Total time: {elapsed:.2f}s")
     print(f"\nTask Statistics:")
     print(f"  Total processed: {output['stats']['total_tasks']}")
     print(f"  Completed:       {output['stats']['completed']}")
     print(f"  Failed:          {output['stats']['failed']}")
     print(f"  Retried:         {output['stats']['retried']}")
     print(f"\nTiming Statistics:")
-    print(f"  Total work time: {output['stats']['<suitkaise-api>timing</suitkaise-api>']['total']:.2f}s")
-    print(f"  Mean per task:   {output['stats']['<suitkaise-api>timing</suitkaise-api>']['mean']:.4f}s")
-    print(f"  Min:             {output['stats']['<suitkaise-api>timing</suitkaise-api>']['min']:.4f}s")
-    print(f"  Max:             {output['stats']['<suitkaise-api>timing</suitkaise-api>']['max']:.4f}s")
-    print(f"  P95:             {output['stats']['<suitkaise-api>timing</suitkaise-api>']['p95']:.4f}s")
+    print(f"  Total work time: {output['stats']['timing']['total']:.2f}s")
+    print(f"  Mean per task:   {output['stats']['timing']['mean']:.4f}s")
+    print(f"  Min:             {output['stats']['timing']['min']:.4f}s")
+    print(f"  Max:             {output['stats']['timing']['max']:.4f}s")
+    print(f"  P95:             {output['stats']['timing']['p95']:.4f}s")
     
     # show sample results
     print(f"\nSample Results:")
@@ -2100,27 +2104,27 @@ Say you're building a system that processes a stream of events (log entries, sen
 What this script does
 1. Starts 3 worker processes that run indefinitely
 2. Generates a stream of 100 data items ("item_0", "item_1", etc.)
-3. Distributes items to workers in round-robin fashion via `<suitkaise-api>tell</suitkaise-api>()`
+3. Distributes items to workers in round-robin fashion via `tell()`
 4. Each worker computes a hash transformation on received items
-5. Workers report their status periodically via `<suitkaise-api>tell</suitkaise-api>()` back to parent
+5. Workers report their status periodically via `tell()` back to parent
 6. Results accumulate in shared state accessible from all processes
 7. After stream ends, sends stop signal to all workers
 8. Collects final statistics and prints summary
 
 ```python
 """
-A real-time data pipeline using <suitkaise-api>processing</suitkaise-api>.
+A real-time data pipeline using processing.
 
 Features used:
-- Indefinite process with stop signal (<suitkaise-api>runs</suitkaise-api>=None)
+- Indefinite process with stop signal (runs=None)
 - tell/listen for real-time bidirectional communication
-- <suitkaise-api>Share</suitkaise-api> for accumulating results across processes
-- Graceful shutdown with <suitkaise-api>__onfinish__</suitkaise-api>
+- Share for accumulating results across processes
+- Graceful shutdown with __onfinish__
 """
 
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>Share</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>, <suitkaise-api>TimeThis</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise.processing import Skprocess, Share
+from suitkaise.timing import Sktimer, TimeThis
+from suitkaise import timing
 import hashlib
 
 
@@ -2135,48 +2139,48 @@ class Results:
         self.count += 1
 
 
-class DataPipelineWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class DataPipelineWorker(Skprocess):
     """
     A worker that processes streaming data.
     
     - Runs indefinitely until parent sends stop
-    - Receives data items via <suitkaise-api>listen</suitkaise-api>()
-    - Processes and stores results in <suitkaise-api>Share</suitkaise-api>
-    - Sends status updates via <suitkaise-api>tell</suitkaise-api>()
+    - Receives data items via listen()
+    - Processes and stores results in Share
+    - Sends status updates via tell()
     """
     
-    def __init__(self, shared: <suitkaise-api>Share</suitkaise-api>, worker_id: int):
+    def __init__(self, shared: Share, worker_id: int):
         self.shared = shared
         self.worker_id = worker_id
         
-        # <suitkaise-api>run</suitkaise-api> indefinitely
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = None
+        # run indefinitely
+        self.process_config.runs = None
         
         self.processed = 0
     
-    def <suitkaise-api>__prerun__</suitkaise-api>(self):
+    def __prerun__(self):
         # check for stop signal or data
-        msg = self.<suitkaise-api>listen</suitkaise-api>(timeout=0.1)
+        msg = self.listen(timeout=0.1)
         
         if msg is not None:
             if msg.get('action') == 'stop':
                 # graceful shutdown
-                self.<suitkaise-api>stop</suitkaise-api>()
+                self.stop()
             elif msg.get('action') == 'data':
-                # store data for <suitkaise-api>processing</suitkaise-api>
+                # store data for processing
                 self._pending_data = msg['payload']
             else:
                 self._pending_data = None
         else:
             self._pending_data = None
     
-    def <suitkaise-api>__run__</suitkaise-api>(self):
+    def __run__(self):
         if self._pending_data is None:
             # no data to process
             return
         
         # process the data - real work
-        with <suitkaise-api>TimeThis</suitkaise-api>() as run_timer:
+        with TimeThis() as run_timer:
             data = self._pending_data
             
             # transform the data - compute hash and transform
@@ -2189,39 +2193,39 @@ class DataPipelineWorker(<suitkaise-api>Skprocess</suitkaise-api>):
             else:
                 output = data * 2
             
-            <suitkaise-api>result</suitkaise-api> = {
+            result = {
                 'worker': self.worker_id,
                 'input': data,
                 'output': output,
-                'timestamp': <suitkaise-api>timing</suitkaise-api>.time()
+                'timestamp': timing.time()
             }
         
         
-        # store <suitkaise-api>result</suitkaise-api> in shared state
-        self.shared.results.add(<suitkaise-api>result</suitkaise-api>)
-        self.shared.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(run_timer.<suitkaise-api>most_recent</suitkaise-api>)
+        # store result in shared state
+        self.shared.results.add(result)
+        self.shared.timer.add_time(run_timer.most_recent)
         
         self.processed += 1
         self._pending_data = None
     
-    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    def __postrun__(self):
         # send periodic status updates
         if self.processed > 0 and self.processed % 10 == 0:
-            self.<suitkaise-api>tell</suitkaise-api>({
+            self.tell({
                 'worker': self.worker_id,
                 'processed': self.processed,
                 'status': 'running'
             })
     
-    def <suitkaise-api>__onfinish__</suitkaise-api>(self):
+    def __onfinish__(self):
         # send final status
-        self.<suitkaise-api>tell</suitkaise-api>({
+        self.tell({
             'worker': self.worker_id,
             'processed': self.processed,
             'status': 'finished'
         })
     
-    def <suitkaise-api>__result__</suitkaise-api>(self):
+    def __result__(self):
         return {
             'worker_id': self.worker_id,
             'total_processed': self.processed
@@ -2234,36 +2238,36 @@ def run_pipeline(data_stream, num_workers: int = 2, timeout: float = 5.0):
     Args:
         data_stream: Iterator of data items to process
         num_workers: Number of parallel workers
-        timeout: Maximum time to <suitkaise-api>run</suitkaise-api>
+        timeout: Maximum time to run
     
     Returns:
         Dict with results and worker stats
     """
     
-    with <suitkaise-api>Share</suitkaise-api>() as share:
+    with Share() as share:
         share.results = Results()
-        share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+        share.timer = Sktimer()
         
         # start workers
         workers = []
         for i in range(num_workers):
             worker = DataPipelineWorker(share, worker_id=i)
-            worker.<suitkaise-api>start</suitkaise-api>()
+            worker.start()
             workers.append(worker)
         
         # distribute data to workers
-        start_time = <suitkaise-api>timing</suitkaise-api>.time()
+        start_time = timing.time()
         worker_idx = 0
         
         for item in data_stream:
             # check timeout
-            if <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start_time) > timeout:
+            if timing.elapsed(start_time) > timeout:
                 break
             
             # round-robin to workers (compute checksum in parent)
             import hashlib
             checksum = hashlib.sha256(str(item).encode()).hexdigest()[:8]
-            workers[worker_idx].<suitkaise-api>tell</suitkaise-api>({
+            workers[worker_idx].tell({
                 'action': 'data',
                 'payload': item,
                 'checksum': checksum,
@@ -2272,31 +2276,31 @@ def run_pipeline(data_stream, num_workers: int = 2, timeout: float = 5.0):
         
         # signal workers to stop
         for worker in workers:
-            worker.<suitkaise-api>tell</suitkaise-api>({'action': 'stop'})
+            worker.tell({'action': 'stop'})
         
         # collect status messages
         statuses = []
         for worker in workers:
             while True:
-                msg = worker.<suitkaise-api>listen</suitkaise-api>(timeout=0.5)
+                msg = worker.listen(timeout=0.5)
                 if msg is None:
                     break
                 statuses.append(msg)
         
         # wait for all workers
         for worker in workers:
-            worker.<suitkaise-api>wait</suitkaise-api>()
+            worker.wait()
         
         # collect results
-        worker_results = [worker.<suitkaise-api>result</suitkaise-api>() for worker in workers]
+        worker_results = [worker.result() for worker in workers]
         
         return {
             'results': share.results.items,
             'count': share.results.count,
             'worker_stats': worker_results,
-            '<suitkaise-api>timing</suitkaise-api>': {
-                'total': share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>,
-                'mean': share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api> if share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api> > 0 else 0,
+            'timing': {
+                'total': share.timer.total_time,
+                'mean': share.timer.mean if share.timer.num_times > 0 else 0,
             },
             'statuses': statuses
         }
@@ -2314,8 +2318,8 @@ if __name__ == "__main__":
     
     print(f"\nPipeline Results:")
     print(f"  Total processed: {output['count']}")
-    print(f"  Total time: {output['<suitkaise-api>timing</suitkaise-api>']['total']:.2f}s")
-    print(f"  Mean per item: {output['<suitkaise-api>timing</suitkaise-api>']['mean']:.4f}s")
+    print(f"  Total time: {output['timing']['total']:.2f}s")
+    print(f"  Mean per item: {output['timing']['mean']:.4f}s")
     
     print(f"\nWorker Stats:")
     for ws in output['worker_stats']:

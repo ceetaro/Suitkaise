@@ -1,39 +1,39 @@
-# How to use `<suitkaise-api>cucumber</suitkaise-api>`
+# How to use `cucumber`
 
-`<suitkaise-api>cucumber</suitkaise-api>` is a module that handles serialization and deserialization of Python objects.
+`cucumber` is a module that handles serialization and deserialization of Python objects.
 
 Basically any object in Python will work, and it covers more types than `pickle`, `cloudpickle`, and `dill` combined.
 
-- extensive type coverage
-- superior speed for simple types compared to `cloudpickle` and `dill`
-- handles all circular references
-- works on class objects defined in `__main__`
-- and more
+- Extensive type coverage
+- Superior speed for simple types compared to `cloudpickle` and `dill`
+- Handles all circular references
+- Works on class objects defined in `__main__`
+- And more
 
 To see a list of supported types, see the supported types page.
 
-To see how `<suitkaise-api>cucumber</suitkaise-api>` stacks up against other serialization libraries, see the performance page.
+To see how `cucumber` stacks up against other serialization libraries, see the performance page.
 
-`<suitkaise-api>cucumber</suitkaise-api>` is mainly meant for internal, cross-process communication, not for external or cross-language serialization.
+`cucumber` is mainly meant for internal, cross-process communication, not for external or cross-language serialization.
 
 However, you can convert the intermediate representation (IR) to JSON, and you are welcome to use that to send data to other languages using your own tools.
 
 ## Importing
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+from suitkaise import cucumber
 ```
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>cucumber</suitkaise-api> import <suitkaise-api>serialize</suitkaise-api>, <suitkaise-api>deserialize</suitkaise-api>, <suitkaise-api>serialize_ir</suitkaise-api>, <suitkaise-api>deserialize_ir</suitkaise-api>, <suitkaise-api>ir_to_jsonable</suitkaise-api>, <suitkaise-api>ir_to_json</suitkaise-api>, <suitkaise-api>to_jsonable</suitkaise-api>, <suitkaise-api>to_json</suitkaise-api>, <suitkaise-api>reconnect_all</suitkaise-api>
+from suitkaise.cucumber import serialize, deserialize, serialize_ir, deserialize_ir, ir_to_jsonable, ir_to_json, to_jsonable, to_json, reconnect_all
 ```
 
-## `<suitkaise-api>serialize</suitkaise-api>()`
+## `serialize()`
 
-Serializes any Python object to bytes using `<suitkaise-api>cucumber</suitkaise-api>`'s intermediate representation (IR).
+Serializes any Python object to bytes using `cucumber`'s intermediate representation (IR).
 
 ```python
-data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)
+data = cucumber.serialize(obj)
 ```
 
 Arguments
@@ -50,21 +50,21 @@ Arguments
 - keyword only
 
 Returns
-`bytes`: `<suitkaise-api>cucumber</suitkaise-api>` IR as bytes.
+`bytes`: `cucumber` IR as bytes.
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If serialization fails.
+`SerializationError`: If serialization fails.
 
-This is a `<suitkaise-api>SerializationError</suitkaise-api>` that appears when you try to serialize a `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>.Anchor` point.
+This is a `SerializationError` that appears when you try to serialize a `suitkaise.processing.Pipe.Anchor` point.
 ```text
 Traceback (most recent call last):
   File "my_app.py", line 42, in <module>
-    payload = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)
-  File ".../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/api.py", line 90, in <suitkaise-api>serialize</suitkaise-api>
-    return _default_serializer.<suitkaise-api>serialize</suitkaise-api>(obj)
-  File ".../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/serializer.py", line 113, in <suitkaise-api>serialize</suitkaise-api>
-    raise <suitkaise-api>SerializationError</suitkaise-api>(message)
-<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>cucumber</suitkaise-api>._int.serializer.<suitkaise-api>SerializationError</suitkaise-api>:
+    payload = cucumber.serialize(obj)
+  File ".../suitkaise/cucumber/api.py", line 90, in serialize
+    return _default_serializer.serialize(obj)
+  File ".../suitkaise/cucumber/_int/serializer.py", line 113, in serialize
+    raise SerializationError(message)
+suitkaise.cucumber._int.serializer.SerializationError:
 ======================================================================
 HANDLER FAILED
 ======================================================================
@@ -80,9 +80,9 @@ Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
 
 ### `debug` and `verbose`
 
-`debug` and `verbose` are keyword only arguments.
+Note: `debug` and `verbose` are keyword-only arguments.
 
-When `debug=True`, `<suitkaise-api>cucumber</suitkaise-api>` shows you where it failed to serialize an object.
+When `debug=True`, `cucumber` shows you where it failed to serialize an object.
 ```text
 ======================================================================
 HANDLER FAILED
@@ -97,7 +97,7 @@ Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
 ======================================================================
 ```
 
-When `verbose=True`, `<suitkaise-api>cucumber</suitkaise-api>` prints the path it's taking through your object, color-coded by depth.
+When `verbose=True`, `cucumber` prints the path it's taking through your object, color-coded by depth.
 
 ```text
 [CUCUMBER] Starting serialization of dict
@@ -131,23 +131,23 @@ When `verbose=True`, `<suitkaise-api>cucumber</suitkaise-api>` prints the path i
 
 Colors will only display if your terminal supports color.
 
-## `<suitkaise-api>deserialize</suitkaise-api>()`
+## `deserialize()`
 
-Reconstructs a Python object from bytes created by `<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>`.
+Reconstructs a Python object from bytes created by `cucumber.serialize`.
 
-Will not work if the object was serialized with `pickle`, `cloudpickle`, or `dill`, as these libraries do not use `<suitkaise-api>cucumber</suitkaise-api>`'s IR.
+Will not work if the object was serialized with `pickle`, `cloudpickle`, or `dill`, as these libraries do not use `cucumber`'s IR.
 
-- restores all circular references before reconstructing objects
+- Restores all circular references before reconstructing objects
 - `Reconnector` objects are returned for certain types
 
 ```python
-data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)
+data = cucumber.serialize(obj)
 
-restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
+restored = cucumber.deserialize(data)
 ```
 
 Arguments
-`data`: Serialized bytes from `<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>`.
+`data`: Serialized bytes from `cucumber.serialize`.
 - `bytes`
 - required
 
@@ -164,18 +164,18 @@ Returns
 - `Any`
 
 Raises
-`<suitkaise-api>DeserializationError</suitkaise-api>`: If deserialization/reconstruction fails.
+`DeserializationError`: If deserialization/reconstruction fails.
 
-This is a `<suitkaise-api>DeserializationError</suitkaise-api>` that appears when you try to deserialize an object that is missing a required key.
+This is a `DeserializationError` that appears when you try to deserialize an object that is missing a required key.
 ```text
 Traceback (most recent call last):
   File "my_app.py", line 44, in <module>
-    restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-  File ".../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/api.py", line 177, in <suitkaise-api>deserialize</suitkaise-api>
-    return _default_deserializer.<suitkaise-api>deserialize</suitkaise-api>(data)
-  File ".../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/deserializer.py", line 88, in <suitkaise-api>deserialize</suitkaise-api>
-    raise <suitkaise-api>DeserializationError</suitkaise-api>(message)
-<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>cucumber</suitkaise-api>._int.deserializer.<suitkaise-api>DeserializationError</suitkaise-api>:
+    restored = cucumber.deserialize(data)
+  File ".../suitkaise/cucumber/api.py", line 177, in deserialize
+    return _default_deserializer.deserialize(data)
+  File ".../suitkaise/cucumber/_int/deserializer.py", line 88, in deserialize
+    raise DeserializationError(message)
+suitkaise.cucumber._int.deserializer.DeserializationError:
 ======================================================================
 DESERIALIZATION FAILED
 ======================================================================
@@ -189,7 +189,7 @@ Error: Missing key 'state' for class reconstruction
 ======================================================================
 ```
 
-## `<suitkaise-api>reconnect_all</suitkaise-api>()` and `Reconnectors`
+## `reconnect_all()` and `Reconnectors`
 
 `Reconnector` objects are returned for certain types when you deserialize an object.
 
@@ -197,7 +197,7 @@ These objects are placeholders for certain objects that cannot be directly seria
 
 - `DbReconnector` --> database connections
 - `SocketReconnector` --> network sockets
-- `PipeReconnector` --> OS pipes (not `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>` objects)
+- `PipeReconnector` --> OS pipes (not `suitkaise.processing.Pipe` objects)
 - `ThreadReconnector` --> threads
 - `SubprocessReconnector` --> subprocesses
 - `MatchReconnector` --> compiled regex matches
@@ -206,7 +206,7 @@ Each `Reconnector` has a `reconnect()` method that creates a new live resource, 
 
 For more information on each `Reconnector`, see the how it works page.
 
-`<suitkaise-api>reconnect_all</suitkaise-api>()` allows you to reconnect all `Reconnectors` in an object at once.
+`reconnect_all()` allows you to reconnect all `Reconnectors` in an object at once.
 
 Arguments
 `obj`: Object or container to traverse for `Reconnectors`.
@@ -227,7 +227,7 @@ Returns
 - `Any`
 
 Raises
-- Nothing by default. `<suitkaise-api>reconnect_all</suitkaise-api>()` swallows reconnect errors and keeps the original `Reconnector` in place if reconnect fails.
+- Nothing by default. `reconnect_all()` swallows reconnect errors and keeps the original `Reconnector` in place if reconnect fails.
 
 ### `**auth`
 
@@ -253,11 +253,11 @@ auth = {
     }
 }
 
-restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, start_threads=True, **auth)
+restored = cucumber.deserialize(data)
+restored = cucumber.reconnect_all(restored, start_threads=True, **auth)
 ```
 
-If no `auth` is provided for a reconnector, `reconnect()` and `<suitkaise-api>reconnect_all</suitkaise-api>()` are still called.
+If no `auth` is provided for a reconnector, `reconnect()` and `reconnect_all()` are still called.
 
 This is fine in most cases unless you are using database connections that require authentication (a password, token, ...).
 
@@ -284,9 +284,9 @@ This is fine in most cases unless you are using database connections that requir
 - `snowflake.Connection` (Snowflake): auth required
 - `duckdb.Connection` (DuckDB): no auth (file/":memory:" path)
 
-## IR, `<suitkaise-api>serialize_ir</suitkaise-api>()` and deserializing an IR
+## IR, `serialize_ir()` and deserializing an IR
 
-`<suitkaise-api>cucumber</suitkaise-api>` converts Python objects into an intermediate representation (IR) that is solely comprised of `pickle` native types. Then, `pickle` is used to serialize the IR to bytes.
+`cucumber` converts Python objects into an intermediate representation (IR) that is solely comprised of `pickle` native types. Then, `pickle` is used to serialize the IR to bytes.
 
 ```python
 {
@@ -303,17 +303,17 @@ This is fine in most cases unless you are using database connections that requir
 }
 ```
 
-### `<suitkaise-api>serialize_ir</suitkaise-api>()`
+### `serialize_ir()`
 
 Returns the IR without converting to bytes.
 
 Use this to inspect the IR of an object.
-- debugging
-- inspection
-- custom tooling
+- Debugging
+- Inspection
+- Custom tooling
 
 ```python
-ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
+ir = cucumber.serialize_ir(obj)
 ```
 
 Arguments
@@ -333,7 +333,7 @@ Returns
 A `pickle` native IR (nested `dict`/`list` structure)
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If serialization fails.
+`SerializationError`: If serialization fails.
 
 ### Deserializing an IR
 
@@ -342,19 +342,19 @@ In order to deserialize an IR, you must first convert it to bytes using `pickle.
 Generally, when serializing to an ir, you are doing it to inspect it, or directly work with it.
 
 ```python
-ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
+ir = cucumber.serialize_ir(obj)
 data = pickle.dumps(ir)
 
-restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize_ir</suitkaise-api>(ir)
+restored = cucumber.deserialize_ir(ir)
 ```
 
 Raises
-`<suitkaise-api>DeserializationError</suitkaise-api>`: If deserialization fails.
+`DeserializationError`: If deserialization fails.
 
 
 ## JSON conversion
 
-`<suitkaise-api>cucumber</suitkaise-api>` provides 4 ways to convert an IR to JSON.
+`cucumber` provides 4 ways to convert an IR to JSON.
 
 2 of them convert the IR to a JSON-serializable structure, and the other 2 convert the IR directly to a JSON string.
 
@@ -362,14 +362,14 @@ Raises
 
 A JSON-serializable structure is a Python `dict`/`list` tree that only uses JSON-safe types (`dict`, `list`, `str`, `int`, `float`, `bool`, `None`). 
 
-A JSON string is the final serialized text output (the result of `json.dumps`). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.
+A JSON string is the final serialized text output (the result of `json.dumps()`). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.
 
-### `<suitkaise-api>to_jsonable</suitkaise-api>()`
+### `to_jsonable()`
 
 Serialize an object to IR and return a JSON-serializable structure.
 
 ```python
-jsonable = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_jsonable</suitkaise-api>(obj)
+jsonable = cucumber.to_jsonable(obj)
 ```
 
 Arguments
@@ -389,14 +389,14 @@ Returns
 `Any`: A JSON-serializable structure.
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If serialization fails.
+`SerializationError`: If serialization fails.
 
-### `<suitkaise-api>to_json</suitkaise-api>()`
+### `to_json()`
 
 Serialize an object to IR and return a JSON string.
 
 ```python
-json_text = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_json</suitkaise-api>(obj)
+json_text = cucumber.to_json(obj)
 ```
 
 Arguments
@@ -424,16 +424,16 @@ Returns
 `str`: A JSON string.
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If serialization fails.
+`SerializationError`: If serialization fails.
 
 
-### `<suitkaise-api>ir_to_jsonable</suitkaise-api>()`
+### `ir_to_jsonable()`
 
 Convert an IR to a JSON-serializable structure.
 
 ```python
-ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
-jsonable = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>ir_to_jsonable</suitkaise-api>(ir)
+ir = cucumber.serialize_ir(obj)
+jsonable = cucumber.ir_to_jsonable(ir)
 ```
 
 Arguments
@@ -445,15 +445,15 @@ Returns
 `Any`: A JSON-serializable structure.
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If conversion fails.
+`SerializationError`: If conversion fails.
 
-### `<suitkaise-api>ir_to_json</suitkaise-api>()`
+### `ir_to_json()`
 
 Convert an IR to a JSON string.
 
 ```python
-ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
-json_text = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>ir_to_json</suitkaise-api>(ir)
+ir = cucumber.serialize_ir(obj)
+json_text = cucumber.ir_to_json(ir)
 ```
 
 Arguments
@@ -473,15 +473,15 @@ Returns
 `str`: A JSON string.
 
 Raises
-`<suitkaise-api>SerializationError</suitkaise-api>`: If conversion fails.
+`SerializationError`: If conversion fails.
 
 ### Crossing programming language boundaries using JSON
 
-`<suitkaise-api>cucumber</suitkaise-api>` is meant to work solely within Python.
+`cucumber` is meant to work solely within Python.
 
 Here are the steps to convert a Python object to an object in another programming language:
 
-1. Convert a Python object to a JSON-serializable IR using `<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_jsonable</suitkaise-api>()` (or directly to text using `<suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_json</suitkaise-api>()`), then write it out.
+1. Convert a Python object to a JSON-serializable IR using `cucumber.to_jsonable()` (or directly to text using `cucumber.to_json()`), then write it out.
 
 ```python
 class Counter:
@@ -497,7 +497,7 @@ class Counter:
 
 counter = Counter()
 
-jsonable = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_jsonable</suitkaise-api>(counter)
+jsonable = cucumber.to_jsonable(counter)
 with open("counter.json", "w") as f:
     json.dump(jsonable, f)
 ```

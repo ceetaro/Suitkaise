@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How to use `<suitkaise-api>sk</suitkaise-api>`"
+title = "How to use `sk`"
 
 # 1.2
 
@@ -17,14 +17,14 @@ text = "
 `<suitkaise-api>sk</suitkaise-api>` adds powerful modifiers to your functions and classes. No wrapper objects, no changed calls.
 
 `<suitkaise-api>sk</suitkaise-api>`: works as a decorator or a regular function.
-- works on functions and classes
+- Works on functions and classes
 - adds `.<suitkaise-api>asynced</suitkaise-api>()`, `.<suitkaise-api>retry</suitkaise-api>()`, `.<suitkaise-api>timeout</suitkaise-api>()`, `.<suitkaise-api>background</suitkaise-api>()`, `.rate_limit()`
-- generates `_shared_meta` for Share compatibility
-- auto-detects blocking code
+- Generates `_shared_meta` for `Share` compatibility
+- Auto-detects blocking code
 
-`@<suitkaise-api>blocking</suitkaise-api>` decorator: explicitly mark blocking code.
-- use when AST detection misses CPU-intensive work
-- skips AST analysis (faster)
+`<suitkaise-api>@blocking</suitkaise-api>` decorator: explicitly mark blocking code.
+- Use when AST detection misses CPU-intensive work
+- Skips AST analysis (faster)
 
 ## Importing
 
@@ -45,7 +45,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkais
 import requests
 
 # as a decorator
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def fetch_data(url):
     return requests.get(url).json()
 
@@ -77,9 +77,9 @@ data = fetch_data.<suitkaise-api>retry</suitkaise-api>(times=3, delay=1.0)("http
 data = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com/data")
 ```
 ```python
-# <suitkaise-api>run</suitkaise-api> in <suitkaise-api>background</suitkaise-api> (returns Future)
+# run in background (returns Future)
 future = fetch_data.<suitkaise-api>background</suitkaise-api>()("https://api.example.com/data")
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+result = future.<suitkaise-api>result</suitkaise-api>()
 ```
 ```python
 # rate limited
@@ -101,7 +101,7 @@ Both will retry up to 3 times, with a 5-second timeout per attempt.
 ### Checking for Blocking Calls
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def slow_fetch(url):
     return requests.get(url).text
 
@@ -117,14 +117,14 @@ Use as a decorator or call directly.
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 
 # as a decorator
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class DataProcessor:
     def __init__(self, config):
         self.config = config
         self.results = []
     
     def process(self, data):
-        # heavy <suitkaise-api>processing</suitkaise-api>
+        # heavy processing
         return transform(data)
     
     def save(self, path):
@@ -150,13 +150,13 @@ Use with modifiers:
 
 ```python
 # async
-await processor.process.<suitkaise-api>asynced</suitkaise-api>()(data)
+await processor.<suitkaise-api>process.asynced()</suitkaise-api>(data)
 
 # with timeout
 processor.save.<suitkaise-api>timeout</suitkaise-api>(10.0)("output.json")
 
 # with retry
-processor.process.<suitkaise-api>retry</suitkaise-api>(3)(data)
+processor.<suitkaise-api>process.retry(</suitkaise-api>3)(data)
 
 # in background
 future = processor.save.<suitkaise-api>background</suitkaise-api>()("output.json")
@@ -170,7 +170,7 @@ Get an async version of the entire class:
 AsyncProcessor = DataProcessor.<suitkaise-api>asynced</suitkaise-api>()
 processor = AsyncProcessor(config)
 
-# all <suitkaise-api>blocking</suitkaise-api> methods are now async
+# all blocking methods are now async
 await processor.process(data)
 await processor.save("output.json")
 ```
@@ -178,7 +178,7 @@ await processor.save("output.json")
 Only available if the class has blocking calls:
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -186,17 +186,17 @@ class Counter:
     def increment(self):
         self.value += 1
 
-Counter.<suitkaise-api>asynced</suitkaise-api>()  # raises <suitkaise-api>SkModifierError</suitkaise-api> - no <suitkaise-api>blocking</suitkaise-api> calls
+Counter.<suitkaise-api>asynced</suitkaise-api>()  # raises SkModifierError - no blocking calls
 ```
 
 ### `<suitkaise-api>Share</suitkaise-api>` Compatibility
 
-`@<suitkaise-api>sk</suitkaise-api>` generates `_shared_meta` automatically.
+`<suitkaise-api>@sk</suitkaise-api>` generates `_shared_meta` automatically.
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -204,7 +204,7 @@ class Counter:
     def increment(self):
         self.value += 1
 
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = Counter()
 
 # works across processes
@@ -212,7 +212,7 @@ share.counter.increment()
 print(share.counter.value)
 ```
 
-## `@<suitkaise-api>blocking</suitkaise-api>` Decorator
+## `<suitkaise-api>@blocking</suitkaise-api>` Decorator
 
 Explicitly mark code as blocking when AST detection doesn't catch it.
 
@@ -221,44 +221,44 @@ Explicitly mark code as blocking when AST detection doesn't catch it.
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def heavy_computation():
     # CPU intensive work that AST can't detect
     return sum(x**2 for x in range(10_000_000))
 
-# now .<suitkaise-api>asynced</suitkaise-api>() and .<suitkaise-api>background</suitkaise-api>() are available
-<suitkaise-api>result</suitkaise-api> = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()
+# now .asynced() and .background() are available
+result = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 ### On Methods
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Worker:
-    @<suitkaise-api>blocking</suitkaise-api>
+    <suitkaise-api>@blocking</suitkaise-api>
     def compute(self):
         # CPU-intensive work
         return complex_calculation()
     
     def quick_check(self):
-        # not <suitkaise-api>blocking</suitkaise-api>
+        # not blocking
         return self.ready
 
-# compute is <suitkaise-api>blocking</suitkaise-api>, quick_check is not
-print(Worker._blocking_methods)  # {'compute': ['@<suitkaise-api>blocking</suitkaise-api>']}
+# compute is blocking, quick_check is not
+print(Worker._blocking_methods)  # {'compute': ['@blocking']}
 ```
 
-### Why use `@<suitkaise-api>blocking</suitkaise-api>`?
+### Why use `<suitkaise-api>@blocking</suitkaise-api>`?
 
 AST detection looks for known patterns like `time.sleep()`, `requests.get()`, file I/O, database calls, etc.
 
 But it can't detect:
-- pure CPU work (tight loops, number crunching)
+- Pure CPU work (tight loops, number crunching)
 - C extensions that block
 - Custom blocking functions
 
-Use `@<suitkaise-api>blocking</suitkaise-api>` when you know code will block the event loop.
+Use `<suitkaise-api>@blocking</suitkaise-api>` when you know code will block the event loop.
 
 
 ## Modifiers reference
@@ -268,12 +268,12 @@ Use `@<suitkaise-api>blocking</suitkaise-api>` when you know code will block the
 Run the function asynchronously using `asyncio.to_thread()`.
 
 ```python
-<suitkaise-api>result</suitkaise-api> = await fetch_data.<suitkaise-api>asynced</suitkaise-api>()("https://example.com")
+result = await fetch_data.<suitkaise-api>asynced</suitkaise-api>()("https://example.com")
 ```
 
 Requirements:
 - Function must have blocking calls
-- Or be decorated with `@<suitkaise-api>blocking</suitkaise-api>`
+- Or be decorated with `<suitkaise-api>@blocking</suitkaise-api>`
 
 Raises:
 - `<suitkaise-api>SkModifierError</suitkaise-api>` if function has no blocking calls
@@ -284,17 +284,17 @@ Retry on failure with configurable backoff.
 
 ```python
 # basic: 3 attempts, 1 second delay
-<suitkaise-api>result</suitkaise-api> = fetch_data.<suitkaise-api>retry</suitkaise-api>(times=3)("https://example.com")
+result = fetch_data.<suitkaise-api>retry</suitkaise-api>(times=3)("https://example.com")
 
 # with exponential backoff
-<suitkaise-api>result</suitkaise-api> = fetch_data.<suitkaise-api>retry</suitkaise-api>(
+result = fetch_data.<suitkaise-api>retry</suitkaise-api>(
     times=5,
     delay=1.0,
     backoff_factor=2.0,  # 1s, 2s, 4s, 8s between retries
 )("https://example.com")
 
 # only retry specific exceptions
-<suitkaise-api>result</suitkaise-api> = fetch_data.<suitkaise-api>retry</suitkaise-api>(
+result = fetch_data.<suitkaise-api>retry</suitkaise-api>(
     times=3,
     exceptions=(ConnectionError, TimeoutError),
 )("https://example.com")
@@ -312,7 +312,7 @@ Raise error if execution exceeds time limit.
 
 ```python
 try:
-    <suitkaise-api>result</suitkaise-api> = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://slow-api.com")
+    result = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://slow-api.com")
 except <suitkaise-api>FunctionTimeoutError</suitkaise-api>:
     print("Request timed out")
 ```
@@ -332,8 +332,8 @@ future = fetch_data.<suitkaise-api>background</suitkaise-api>()("https://example
 
 # do other work...
 
-# block when you need the <suitkaise-api>result</suitkaise-api>
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+# block when you need the result
+result = future.<suitkaise-api>result</suitkaise-api>()
 ```
 
 Returns:
@@ -345,7 +345,7 @@ Throttle calls to a maximum rate.
 
 ```python
 # max 2 calls per second
-<suitkaise-api>result</suitkaise-api> = fetch_data.rate_limit(2.0)("https://example.com")
+result = fetch_data.rate_limit(2.0)("https://example.com")
 ```
 
 Arguments:
@@ -359,16 +359,16 @@ When using `.<suitkaise-api>asynced</suitkaise-api>()`, you can chain async-comp
 
 ```python
 # async with timeout
-<suitkaise-api>result</suitkaise-api> = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>timeout</suitkaise-api>(5.0)("https://example.com")
+result = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>timeout</suitkaise-api>(5.0)("https://example.com")
 
 # async with retry
-<suitkaise-api>result</suitkaise-api> = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>retry</suitkaise-api>(3)("https://example.com")
+result = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>retry</suitkaise-api>(3)("https://example.com")
 
 # async with rate limit
-<suitkaise-api>result</suitkaise-api> = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().rate_limit(2.0)("https://example.com")
+result = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().rate_limit(2.0)("https://example.com")
 
 # chain multiple
-<suitkaise-api>result</suitkaise-api> = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(10.0)("https://example.com")
+result = await fetch_data.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(10.0)("https://example.com")
 ```
 
 
@@ -393,7 +393,7 @@ fn.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>retry</suitkaise-a
 # 1. for each of 3 attempts:
 # 2.   start 5-second timer
 # 3.   call function
-# 4.   if timeout or <suitkaise-api>error</suitkaise-api>, retry
+# 4.   if timeout or error, retry
 ```
 
 
@@ -407,14 +407,14 @@ Raised when an invalid modifier is used.
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>SkModifierError</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def quick_fn():
     return 42
 
 try:
     await quick_fn.<suitkaise-api>asynced</suitkaise-api>()()
 except <suitkaise-api>SkModifierError</suitkaise-api> as e:
-    print(e)  # "quick_fn has no <suitkaise-api>blocking</suitkaise-api> calls"
+    print(e)  # "quick_fn has no blocking calls"
 ```
 
 ### `<suitkaise-api>FunctionTimeoutError</suitkaise-api>`
@@ -425,7 +425,7 @@ Raised when `.<suitkaise-api>timeout</suitkaise-api>()` is exceeded.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>FunctionTimeoutError</suitkaise-api>
 
 try:
-    <suitkaise-api>result</suitkaise-api> = slow_fn.<suitkaise-api>timeout</suitkaise-api>(1.0)()
+    result = slow_fn.<suitkaise-api>timeout</suitkaise-api>(1.0)()
 except <suitkaise-api>FunctionTimeoutError</suitkaise-api> as e:
     print(e)  # "slow_fn timed out after 1.0 seconds"
 ```
@@ -436,10 +436,10 @@ except <suitkaise-api>FunctionTimeoutError</suitkaise-api> as e:
 
 ### On Functions
 
-After `@<suitkaise-api>sk</suitkaise-api>`:
+After `<suitkaise-api>@sk</suitkaise-api>`:
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def my_fn():
     time.sleep(1)
 
@@ -449,10 +449,10 @@ my_fn.<suitkaise-api>blocking_calls</suitkaise-api> # ['time.sleep']
 
 ### On Classes
 
-After `@<suitkaise-api>sk</suitkaise-api>`:
+After `<suitkaise-api>@sk</suitkaise-api>`:
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class MyClass:
     def blocking_method(self):
         time.sleep(1)

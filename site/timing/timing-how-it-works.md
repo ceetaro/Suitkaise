@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How `<suitkaise-api>timing</suitkaise-api>` actually works"
+title = "How `timing` actually works"
 
 # 1.2
 
@@ -56,13 +56,13 @@ _sleep_impl = _AsyncableFunction(_sync_sleep, _async_sleep, name='sleep')
 def sleep(seconds: float) -> float:
     return _sleep_impl(seconds)
 
-sleep.<suitkaise-api>asynced</suitkaise-api> = _sleep_impl.<suitkaise-api>asynced</suitkaise-api>
+sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api>
 ```
 
 Arguments
 `seconds`: Number of seconds to sleep.
 - `float`
-- required
+- Required
 
 Returns
 `float`: Current time after sleeping.
@@ -87,11 +87,11 @@ def _elapsed_time(time1: float, time2: Optional[float] = None) -> float:
 Arguments
 `time1`: First timestamp.
 - `float`
-- required
+- Required
 
 `time2`: Second timestamp.
 - `float | None = None`
-- defaults to current time
+- Defaults to current time
 
 Returns
 `float`: Absolute elapsed time in seconds.
@@ -105,7 +105,7 @@ Statistical timer for collecting and analyzing execution times.
 Arguments
 `max_times`: Rolling window size.
 - `int | None = None`
-- if `None`, keeps all measurements
+- If `None`, keeps all measurements
 
 Returns
 `<suitkaise-api>Sktimer</suitkaise-api>`: A new timer instance.
@@ -190,13 +190,13 @@ Stop timing and record the measurement.
 ```python
 def <suitkaise-api>stop</suitkaise-api>(self) -> float:
     sess = self._get_or_create_session()
-    <suitkaise-api>elapsed</suitkaise-api>, paused_total = sess.<suitkaise-api>stop</suitkaise-api>()
+    elapsed, paused_total = sess.<suitkaise-api>stop</suitkaise-api>()
     
     with self._lock:
-        self.<suitkaise-api>times</suitkaise-api>.append(<suitkaise-api>elapsed</suitkaise-api>)
+        self.<suitkaise-api>times</suitkaise-api>.append(elapsed)
         self._paused_durations.append(paused_total)
         self._trim_to_max()
-    return <suitkaise-api>elapsed</suitkaise-api>
+    return elapsed
 ```
 
 1. Get session for current thread
@@ -217,9 +217,9 @@ Stop timing but do NOT record.
 ```python
 def <suitkaise-api>discard</suitkaise-api>(self) -> float:
     sess = self._get_or_create_session()
-    <suitkaise-api>elapsed</suitkaise-api>, _ = sess.<suitkaise-api>stop</suitkaise-api>()
+    elapsed, _ = sess.<suitkaise-api>stop</suitkaise-api>()
     # intentionally NOT appending to times or _paused_durations
-    return <suitkaise-api>elapsed</suitkaise-api>
+    return elapsed
 ```
 
 1. Get session for current thread
@@ -236,13 +236,13 @@ Record a lap time (stop + start in one call).
 ```python
 def <suitkaise-api>lap</suitkaise-api>(self) -> float:
     sess = self._get_or_create_session()
-    <suitkaise-api>elapsed</suitkaise-api>, paused_total = sess.<suitkaise-api>lap</suitkaise-api>()
+    elapsed, paused_total = sess.<suitkaise-api>lap</suitkaise-api>()
     
     with self._lock:
-        self.<suitkaise-api>times</suitkaise-api>.append(<suitkaise-api>elapsed</suitkaise-api>)
+        self.<suitkaise-api>times</suitkaise-api>.append(elapsed)
         self._paused_durations.append(paused_total)
         self._trim_to_max()
-    return <suitkaise-api>elapsed</suitkaise-api>
+    return elapsed
 ```
 
 1. Get session for current thread
@@ -330,18 +330,18 @@ All statistics properties are computed live from `times` list under lock.
 @property
 def <suitkaise-api>mean</suitkaise-api>(self) -> Optional[float]:
     with self._lock:
-        return statistics.<suitkaise-api>mean</suitkaise-api>(self.<suitkaise-api>times</suitkaise-api>) if self.<suitkaise-api>times</suitkaise-api> else None
+        return statistics.mean(self.<suitkaise-api>times</suitkaise-api>) if self.<suitkaise-api>times</suitkaise-api> else None
 
 @property
 def <suitkaise-api>stdev</suitkaise-api>(self) -> Optional[float]:
     with self._lock:
         if len(self.<suitkaise-api>times</suitkaise-api>) <= 1:
             return None
-        return statistics.<suitkaise-api>stdev</suitkaise-api>(self.<suitkaise-api>times</suitkaise-api>)
+        return statistics.stdev(self.<suitkaise-api>times</suitkaise-api>)
 ```
 
-Available properties:
-- `num_times`, `most_recent`, `<suitkaise-api>result</suitkaise-api>`, `most_recent_index`
+**Available properties:**
+- `num_times`, `most_recent`, `result`, `most_recent_index`
 - `total_time`, `total_time_paused`
 - `mean`, `median`, `min`, `max`
 - `fastest_time`, `slowest_time`, `fastest_index`, `slowest_index`
@@ -386,7 +386,8 @@ def get_statistics(self) -> Optional[TimerStats]:
         return TimerStats(self.<suitkaise-api>times</suitkaise-api>, self.original_start_time, self._paused_durations)
 ```
 
-Returns a `TimerStats` object with copied data that won't change.
+Returns
+A `TimerStats` object with copied data that won't change.
 
 ### Share Integration
 
@@ -417,7 +418,7 @@ _shared_meta = {
 }
 ```
 
-This metadata declares which attributes each method/property reads or writes, enabling the Share to coordinate synchronization.
+This metadata declares which attributes each method/property reads or writes, enabling the `<suitkaise-api>Share</suitkaise-api>` to coordinate synchronization.
 
 ## `TimerSession`
 
@@ -471,10 +472,10 @@ Pop the top frame and return elapsed time.
 def <suitkaise-api>stop</suitkaise-api>(self) -> tuple[float, float]:
     with self._lock:
         frame = self._top()
-        <suitkaise-api>elapsed</suitkaise-api> = self._elapsed_from_frame(frame)
+        elapsed = self._elapsed_from_frame(frame)
         paused_total = self._paused_total_from_frame(frame)
         self._frames.pop()
-        return <suitkaise-api>elapsed</suitkaise-api>, paused_total
+        return elapsed, paused_total
 ```
 
 ### `<suitkaise-api>lap</suitkaise-api>()`
@@ -485,14 +486,14 @@ Record elapsed time and restart the frame.
 def <suitkaise-api>lap</suitkaise-api>(self) -> tuple[float, float]:
     with self._lock:
         frame = self._top()
-        <suitkaise-api>elapsed</suitkaise-api> = self._elapsed_from_frame(frame)
+        elapsed = self._elapsed_from_frame(frame)
         paused_total = self._paused_total_from_frame(frame)
         # restart frame
         frame['start_time'] = self._now()
         frame['total_paused'] = 0.0
         frame['paused'] = False
         frame['pause_started_at'] = None
-        return <suitkaise-api>elapsed</suitkaise-api>, paused_total
+        return elapsed, paused_total
 ```
 
 Keeps the frame but resets its timing state.
@@ -543,7 +544,7 @@ Frozen snapshot of timer statistics.
 ```python
 class TimerStats:
     def __init__(self, times: List[float], original_start_time: Optional[float], paused_durations: List[float]):
-        self.<suitkaise-api>times</suitkaise-api> = <suitkaise-api>times</suitkaise-api>.copy()  # copy for immutability
+        self.<suitkaise-api>times</suitkaise-api> = times.copy()  # copy for immutability
         
         self.original_start_time = original_start_time
         self.<suitkaise-api>num_times</suitkaise-api> = len(times)
@@ -552,12 +553,12 @@ class TimerStats:
         self.<suitkaise-api>total_time</suitkaise-api> = sum(times) if times else None
         self.total_time_paused = sum(paused_durations) if paused_durations else None
         
-        self.<suitkaise-api>mean</suitkaise-api> = statistics.<suitkaise-api>mean</suitkaise-api>(times) if times else None
+        self.<suitkaise-api>mean</suitkaise-api> = statistics.mean(times) if times else None
         self.median = statistics.median(times) if times else None
         self.min = min(times) if times else None
         self.max = max(times) if times else None
-        self.<suitkaise-api>stdev</suitkaise-api> = statistics.<suitkaise-api>stdev</suitkaise-api>(times) if len(times) > 1 else None
-        self.<suitkaise-api>variance</suitkaise-api> = statistics.<suitkaise-api>variance</suitkaise-api>(times) if len(times) > 1 else None
+        self.<suitkaise-api>stdev</suitkaise-api> = statistics.stdev(times) if len(times) > 1 else None
+        self.<suitkaise-api>variance</suitkaise-api> = statistics.variance(times) if len(times) > 1 else None
         # ... etc
 ```
 
@@ -574,7 +575,7 @@ Context manager wrapper around `<suitkaise-api>Sktimer</suitkaise-api>`.
 ```python
 class <suitkaise-api>TimeThis</suitkaise-api>:
     def __init__(self, timer: Optional[<suitkaise-api>Sktimer</suitkaise-api>] = None, threshold: float = 0.0):
-        self.<suitkaise-api>timer</suitkaise-api> = timer or <suitkaise-api>Sktimer</suitkaise-api>()
+        self.<suitkaise-api>timer</suitkaise-api> = timer or <suitkaise-api>Sktimer(</suitkaise-api>)
         self.threshold = threshold
 
     def __enter__(self):
@@ -582,12 +583,12 @@ class <suitkaise-api>TimeThis</suitkaise-api>:
         return self.<suitkaise-api>timer</suitkaise-api>
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Get <suitkaise-api>elapsed</suitkaise-api> time without recording
-        <suitkaise-api>elapsed</suitkaise-api> = self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
+        # Get elapsed time without recording
+        elapsed = self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
         
         # Only record if above threshold
-        if <suitkaise-api>elapsed</suitkaise-api> >= self.threshold:
-            self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(<suitkaise-api>elapsed</suitkaise-api>)
+        if elapsed >= self.threshold:
+            self.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(elapsed)
 ```
 
 ### Flow
@@ -658,7 +659,7 @@ def decorator(func: Callable) -> Callable:
         else:
             timer_name = f"{module_name}_{func_qualname}_timer"
         
-        # get or create global <suitkaise-api>timer</suitkaise-api> (thread-safe)
+        # get or create global timer (thread-safe)
         if not hasattr(<suitkaise-api>timethis</suitkaise-api>, '_global_timers'):
             setattr(<suitkaise-api>timethis</suitkaise-api>, '_global_timers', {})
             setattr(<suitkaise-api>timethis</suitkaise-api>, '_timers_lock', threading.RLock())
@@ -667,7 +668,7 @@ def decorator(func: Callable) -> Callable:
         with lock:
             global_timers = getattr(<suitkaise-api>timethis</suitkaise-api>, '_global_timers')
             if timer_name not in global_timers:
-                global_timers[timer_name] = <suitkaise-api>Sktimer</suitkaise-api>(max_times=max_times)
+                global_timers[timer_name] = <suitkaise-api>Sktimer(</suitkaise-api>max_times=max_times)
         
         wrapper = _timethis_decorator(global_timers[timer_name], threshold)(func)
         setattr(wrapper, 'timer', global_timers[timer_name])
@@ -694,29 +695,29 @@ def _timethis_decorator(timer: <suitkaise-api>Sktimer</suitkaise-api>, threshold
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # avoid nested <suitkaise-api>timing</suitkaise-api> frames on the same timer
+            # avoid nested timing frames on the same timer
             if <suitkaise-api>timer</suitkaise-api>._has_active_frame():
                 start = perf_counter()
                 try:
                     return func(*args, **kwargs)
                 finally:
-                    <suitkaise-api>elapsed</suitkaise-api> = perf_counter() - start
-                    if <suitkaise-api>elapsed</suitkaise-api> >= threshold:
-                        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(<suitkaise-api>elapsed</suitkaise-api>)
+                    elapsed = perf_counter() - start
+                    if elapsed >= threshold:
+                        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(elapsed)
             else:
                 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
                 try:
-                    <suitkaise-api>result</suitkaise-api> = func(*args, **kwargs)
-                    return <suitkaise-api>result</suitkaise-api>
+                    result = func(*args, **kwargs)
+                    return result
                 finally:
-                    <suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
-                    if <suitkaise-api>elapsed</suitkaise-api> >= threshold:
-                        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(<suitkaise-api>elapsed</suitkaise-api>)
+                    elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()
+                    if elapsed >= threshold:
+                        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(elapsed)
         return wrapper
     return decorator
 ```
 
-Two paths:
+**Two paths:**
 1. **Already timing**: Use `perf_counter()` directly to avoid nested frames
 2. **Not timing**: Use `<suitkaise-api>start</suitkaise-api>()`/`<suitkaise-api>discard</suitkaise-api>()`/`<suitkaise-api>add_time</suitkaise-api>()` flow
 

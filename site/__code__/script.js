@@ -36,22 +36,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let loadingFrame = 0;
     let loadingInterval = null;
-
-    // Flag to track if we're waiting for animation to finish
+    let loadingDelayTimeout = null;
     let loadingComplete = false;
     
+    function hideLoadingScreen() {
+        loadingScreen.style.transition = '';
+        loadingScreen.classList.add('hidden');
+    }
+    
     function stopLoadingAnimation() {
-        // Mark that content is ready
         loadingComplete = true;
         
-        // If animation isn't running (instant page), hide immediately
-        if (!loadingInterval) {
-            loadingScreen.classList.add('hidden');
+        if (!loadingInterval && !loadingDelayTimeout) {
+            hideLoadingScreen();
             return;
         }
-        
-        // Otherwise, let the animation finish its current cycle
-        // The interval handler will check loadingComplete and hide when at frame 0
     }
     
     function startLoadingAnimation() {
@@ -59,26 +58,44 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingComplete = false;
         loadingImg.src = loadingImages[0].src;
         loadingImg.className = 'loading-img';
+        
+        loadingScreen.style.transition = 'none';
         loadingScreen.classList.remove('hidden');
         
-        // Clear any existing interval
         if (loadingInterval) {
             clearInterval(loadingInterval);
+            loadingInterval = null;
+        }
+        if (loadingDelayTimeout) {
+            clearTimeout(loadingDelayTimeout);
+            loadingDelayTimeout = null;
         }
         
-        loadingInterval = setInterval(() => {
-            loadingFrame = (loadingFrame + 1) % loadingImages.length;
-            const frame = loadingImages[loadingFrame];
-            loadingImg.src = frame.src;
-            loadingImg.className = 'loading-img ' + frame.class;
+        // Hold on the closed briefcase before cycling, matching the natural
+        // pause the user sees on a full page refresh (where the static HTML
+        // image is visible while resources load).  If content arrives during
+        // this window we skip the cycling animation entirely.
+        loadingDelayTimeout = setTimeout(() => {
+            loadingDelayTimeout = null;
             
-            // If content is ready and we're back at the start of the loop, hide
-            if (loadingComplete && loadingFrame === 0) {
-                clearInterval(loadingInterval);
-                loadingInterval = null;
-                loadingScreen.classList.add('hidden');
+            if (loadingComplete) {
+                hideLoadingScreen();
+                return;
             }
-        }, 250); // Change image every 250ms
+            
+            loadingInterval = setInterval(() => {
+                loadingFrame = (loadingFrame + 1) % loadingImages.length;
+                const frame = loadingImages[loadingFrame];
+                loadingImg.src = frame.src;
+                loadingImg.className = 'loading-img ' + frame.class;
+                
+                if (loadingComplete && loadingFrame === 0) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                    hideLoadingScreen();
+                }
+            }, 250);
+        }, 400);
     }
 
     // Preload loading images for smooth animation
@@ -352,6 +369,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_FLICKER_BASE_CHANCE = 0.03;
     const SKAPI_PLACEHOLDER_PATTERN = /__SKAPI_TOKEN_(\d+)__/g;
     const skapiManualTokenMap = new Map();
+    function isWithoutComparisonContext(node) {
+        const details = node?.closest?.('details');
+        if (!details) return false;
+        const summary = details.querySelector(':scope > summary');
+        if (!summary) return false;
+        const text = (summary.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        return text.startsWith('without ');
+    }
     const KNOWN_SKAPI_TOKENS = Array.from(new Set([
         // modules
         'suitkaise', 'timing', 'paths', 'circuits', 'cucumber', 'processing', 'sk', 'docs',
@@ -372,16 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
         'serialize', 'serialize_ir', 'deserialize_ir', 'deserialize', 'reconnect_all',
         'ir_to_jsonable', 'ir_to_json', 'to_jsonable', 'to_json',
         'autoreconnect', 'sk', 'blocking',
-        // common API members / chains
-        'start', 'stop', 'lap', 'pause', 'resume', 'discard', 'add_time', 'reset',
-        'set_max_times', 'most_recent', 'total_time', 'mean', 'stdev', 'variance',
-        'times', 'num_times', 'percentile', 'map', 'imap', 'unordered_map', 'unordered_imap',
-        'star', 'wait', 'result', 'tell', 'listen', 'kill', 'process_config',
-        'runs', 'join_in', 'lives', 'timeouts', 'prerun', 'run', 'postrun', 'onfinish', 'error',
-        'short', 'trip', 'reset_backoff', 'broken', 'times_shorted', 'total_trips',
-        'current_sleep_time', 'num_shorts_to_trip', 'asynced', 'retry', 'timeout',
-        'background', 'rate_limit', 'has_blocking_calls', 'blocking_calls', 'timer',
-        'id', 'root', 'parent',
+        // NOTE:
+        // Keep auto-tagging conservative. Generic member/property names (result, run,
+        // error, times, etc.) are intentionally excluded here and handled by the
+        // context-aware highlighter below to avoid false positives in local variables.
+        'asynced', 'retry', 'timeout', 'background', 'rate_limit',
+        'has_blocking_calls', 'blocking_calls',
         // Skprocess lifecycle dunders
         '__prerun__', '__run__', '__postrun__', '__onfinish__', '__result__', '__error__',
     ]));
@@ -403,6 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
         codeEls.forEach((codeEl) => {
             if (codeEl.classList.contains('language-text')) return;
             if (codeEl.closest('suitkaise-api')) return;
+            if (isWithoutComparisonContext(codeEl)) return;
 
             const walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null, false);
             const textNodes = [];
@@ -451,6 +473,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const tokenText = (tag.textContent || '').trim();
             if (!tokenText) {
                 tag.remove();
+                return;
+            }
+
+            // In explicit "Without ..." comparison blocks, keep raw text unhighlighted.
+            if (isWithoutComparisonContext(tag)) {
+                tag.replaceWith(document.createTextNode(tokenText));
                 return;
             }
 
@@ -640,6 +668,9 @@ document.addEventListener('DOMContentLoaded', () => {
         codeBlocks.forEach(codeBlock => {
             // Plain text blocks (tracebacks, logs, ASCII diagrams) should not get API highlight.
             if (codeBlock.classList.contains('language-text')) {
+                return;
+            }
+            if (isWithoutComparisonContext(codeBlock)) {
                 return;
             }
 
@@ -848,7 +879,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Manual placeholders (from <suitkaise-api> in code blocks):
                 // convert "__SKAPI_TOKEN_n__" back into forced api-highlight spans.
+                // If inside a comment span (from Prism), restore as plain text instead.
                 if (text && text.includes('__SKAPI_TOKEN_')) {
+                    let inComment = false;
+                    let ancestor = textNode.parentElement;
+                    while (ancestor && ancestor !== codeBlock) {
+                        if (ancestor.classList && (ancestor.classList.contains('comment') || ancestor.classList.contains('string'))) {
+                            inComment = true;
+                            break;
+                        }
+                        ancestor = ancestor.parentElement;
+                    }
                     SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
                     if (SKAPI_PLACEHOLDER_PATTERN.test(text)) {
                         SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
@@ -862,10 +903,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 parts.push(document.createTextNode(text.slice(lastIdx, matchStart)));
                             }
                             const replacementText = skapiManualTokenMap.get(fullMatch) || fullMatch;
-                            const span = document.createElement('span');
-                            span.className = 'api-highlight api-highlight-manual';
-                            span.textContent = replacementText;
-                            parts.push(span);
+                            if (inComment) {
+                                parts.push(document.createTextNode(replacementText));
+                            } else {
+                                const span = document.createElement('span');
+                                span.className = 'api-highlight api-highlight-manual';
+                                span.textContent = replacementText;
+                                parts.push(span);
+                            }
                             lastIdx = matchStart + fullMatch.length;
                         }
                         if (lastIdx < text.length) {
@@ -979,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 4. Variables with chains: t.mean, timer.stdev, circ.flowing
                 // 5. Override patterns: word.timer.chain... / word.process_config.chain...
                 let regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
-                    `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                    `\\b(${identifierPattern})\\b(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                 if (alwaysChainRootsPattern) {
                     regexPattern += `|(\\b\\w+)\\.(${alwaysChainRootsPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                 }
@@ -987,19 +1032,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Inferred variables (like pool, timer, breaker) only highlight when
                 // connected to known API chain segments.
                 if (variablePattern) {
-                    regexPattern += `|\\b(${variablePattern})(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
+                    regexPattern += `|\\b(${variablePattern})\\b(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
                 }
                 
                 // Add override pattern only if there are active overrides
                 if (activeOverrides.size > 0) {
                     regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
                         `(\\b\\w+)\\.(${overridesPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?|` +
-                        `\\b(${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
+                        `\\b(${identifierPattern})\\b(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                     if (alwaysChainRootsPattern) {
                         regexPattern += `|(\\b\\w+)\\.(${alwaysChainRootsPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                     }
                     if (variablePattern) {
-                        regexPattern += `|\\b(${variablePattern})(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
+                        regexPattern += `|\\b(${variablePattern})\\b(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
                     }
                 }
                 
@@ -1130,7 +1175,83 @@ document.addEventListener('DOMContentLoaded', () => {
                 return true;
             };
 
-            codeBlock.querySelectorAll('.api-highlight').forEach(absorbAdjacentCallParens);
+            const absorbAdjacentApiPrefix = (highlight) => {
+                let prevSibling = highlight.previousSibling;
+                while (prevSibling && prevSibling.nodeType === Node.TEXT_NODE && !prevSibling.textContent.trim()) {
+                    prevSibling = prevSibling.previousSibling;
+                }
+                if (!prevSibling) return false;
+
+                let prefixChar = '';
+                if (prevSibling.nodeType === Node.TEXT_NODE) {
+                    const text = prevSibling.textContent;
+                    if (text.endsWith('@') || text.endsWith('.')) {
+                        prefixChar = text.slice(-1);
+                        const remaining = text.slice(0, -1);
+                        if (remaining.length > 0) {
+                            prevSibling.textContent = remaining;
+                        } else if (prevSibling.parentNode) {
+                            prevSibling.parentNode.removeChild(prevSibling);
+                        }
+                    }
+                } else if (prevSibling.nodeType === Node.ELEMENT_NODE) {
+                    const text = (prevSibling.textContent || '').trim();
+                    if (text === '@' || text === '.') {
+                        prefixChar = text;
+                        if (prevSibling.parentNode) prevSibling.parentNode.removeChild(prevSibling);
+                    }
+                }
+
+                if (!prefixChar) return false;
+                highlight.textContent = prefixChar + highlight.textContent;
+                return true;
+            };
+
+            const mergeAdjacentApiDotChains = () => {
+                let mergedAny = false;
+                let keepMerging = true;
+                while (keepMerging) {
+                    keepMerging = false;
+                    const highlights = Array.from(codeBlock.querySelectorAll('.api-highlight'));
+                    for (const left of highlights) {
+                        let dotNode = left.nextSibling;
+                        while (dotNode && dotNode.nodeType === Node.TEXT_NODE && !dotNode.textContent.trim()) {
+                            dotNode = dotNode.nextSibling;
+                        }
+                        if (!dotNode) continue;
+
+                        const isDotNode =
+                            (dotNode.nodeType === Node.TEXT_NODE && dotNode.textContent === '.') ||
+                            (dotNode.nodeType === Node.ELEMENT_NODE && dotNode.textContent === '.');
+                        if (!isDotNode) continue;
+
+                        let right = dotNode.nextSibling;
+                        while (right && right.nodeType === Node.TEXT_NODE && !right.textContent.trim()) {
+                            right = right.nextSibling;
+                        }
+                        if (!right || !(right.nodeType === Node.ELEMENT_NODE && right.classList.contains('api-highlight'))) continue;
+
+                        left.textContent += '.' + right.textContent;
+                        if (dotNode.parentNode) dotNode.parentNode.removeChild(dotNode);
+                        if (right.parentNode) right.parentNode.removeChild(right);
+                        absorbAdjacentCallParens(left);
+                        keepMerging = true;
+                        mergedAny = true;
+                        break;
+                    }
+                }
+                return mergedAny;
+            };
+
+            let punctuationChanged = true;
+            while (punctuationChanged) {
+                punctuationChanged = false;
+                codeBlock.querySelectorAll('.api-highlight').forEach((highlight) => {
+                    if (absorbAdjacentApiPrefix(highlight)) punctuationChanged = true;
+                    if (absorbAdjacentCallParens(highlight)) punctuationChanged = true;
+                });
+                if (mergeAdjacentApiDotChains()) punctuationChanged = true;
+            }
             
             // Third pass: merge api-highlight chains connected by dots
             // This handles cases like my_function.timer.mean where Prism splits them
@@ -1587,7 +1708,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Page Content Storage
     // Core pages are inline (instant)
     // Module pages are fetched at startup
-    // Heavy pages (videos/tests) are lazy-loaded on demand
+    // Heavy pages (videos) are lazy-loaded on demand
     // ============================================
     
     // Core pages that are always inline (small, essential)
@@ -1683,32 +1804,26 @@ document.addEventListener('DOMContentLoaded', () => {
         initialPreloadComplete = true;
     });
     
-    // Registry of pages that need lazy loading (heavy content like videos/tests)
+    // Registry of pages that need lazy loading (heavy content like videos)
     // These pages will show the loading animation while content loads
     const lazyPages = {
         // Processing
         'processing-videos': async () => await fetchPage('processing-videos'),
-        'processing-tests': async () => await fetchPage('processing-tests'),
         
         // Cucumber
         'cucumber-videos': async () => await fetchPage('cucumber-videos'),
-        'cucumber-tests': async () => await fetchPage('cucumber-tests'),
         
         // Timing
         'timing-videos': async () => await fetchPage('timing-videos'),
-        'timing-tests': async () => await fetchPage('timing-tests'),
         
         // Paths
         'paths-videos': async () => await fetchPage('paths-videos'),
-        'paths-tests': async () => await fetchPage('paths-tests'),
 
         // Sk
         'sk-videos': async () => await fetchPage('sk-videos'),
-        'sk-tests': async () => await fetchPage('sk-tests'),
         
         // Circuits
         'circuits-videos': async () => await fetchPage('circuits-videos'),
-        'circuits-tests': async () => await fetchPage('circuits-tests'),
     };
     
     // Check if a page is available (core, preloaded module, or cached lazy page)
@@ -2300,9 +2415,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let allElements;
         if (hasDropdowns) {
             // Get direct children only, excluding details (handled separately)
-            allElements = Array.from(modulePage.querySelectorAll(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6, :scope > p, :scope > ul, :scope > ol, :scope > pre, :scope > hr'));
+            allElements = Array.from(modulePage.querySelectorAll(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6, :scope > p, :scope > ul, :scope > ol, :scope > pre, :scope > table, :scope > hr'));
         } else {
-            allElements = Array.from(modulePage.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, pre, hr'));
+            allElements = Array.from(modulePage.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, pre, table, hr'));
         }
         if (allElements.length === 0 && dropdownElements.length === 0) return;
         
@@ -2482,165 +2597,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
             
-            // Handle dropdowns separately.
-            // Summary follows visibility, and open dropdown content gets section-based
-            // opacity treatment similar to regular page content.
+            // Handle dropdowns with viewport-based activation.
+            // Each dropdown determines its own active state from its position
+            // in the viewport rather than relying on top-level sections (which
+            // can be sparse or absent on dropdown-heavy pages like examples).
             dropdownElements.forEach(details => {
-                const summary = details.querySelector('summary');
+                const summary = details.querySelector(':scope > summary');
                 if (!summary) {
                     details.style.opacity = 1;
                     return;
                 }
-                
-                // If dropdown is open, check if any part of the entire details is visible
-                // If closed, just check the summary
-                let isVisible;
-                if (details.open) {
-                    const detailsRect = details.getBoundingClientRect();
-                    isVisible = detailsRect.bottom > contentTop && detailsRect.top < contentBottom;
-                } else {
-                    const rect = summary.getBoundingClientRect();
-                    isVisible = rect.bottom > contentTop && rect.top < contentBottom;
-                }
-                
-                // Check if this dropdown is near any active section
-                // (within 100px of an active section element)
-                let isNearActiveSection = false;
-                const detailsRect = details.getBoundingClientRect();
-                
-                sections.forEach((section, index) => {
-                    if (activeIndices.has(index)) {
-                        section.elements.forEach(el => {
-                            const elRect = el.getBoundingClientRect();
-                            // Check if dropdown is adjacent to this element (within 50px)
-                            const gap = Math.min(
-                                Math.abs(detailsRect.top - elRect.bottom),
-                                Math.abs(detailsRect.bottom - elRect.top)
-                            );
-                            if (gap < 50) {
-                                isNearActiveSection = true;
-                            }
-                        });
-                    }
-                });
-                
-                const detailsActive = isVisible || isNearActiveSection;
-                
-                // Keep container fully opaque; we control summary/content directly.
+
                 details.style.opacity = 1;
-                summary.style.opacity = detailsActive ? 1 : 0.3;
-                
-                // Closed dropdown: only summary is visible.
+
                 if (!details.open) {
+                    const summaryRect = summary.getBoundingClientRect();
+                    const summaryCenterY = (summaryRect.top + summaryRect.bottom) / 2;
+                    const isVisible = summaryRect.bottom > contentTop && summaryRect.top < contentBottom;
+                    const isActive = isVisible && summaryCenterY >= safeZoneTop && summaryCenterY <= safeZoneBottom;
+                    summary.style.opacity = isActive ? 1 : 0.3;
                     return;
                 }
-                
-                // Prefer the generated dropdown content container if present.
+
+                // Open dropdown: use the center of the *visible* portion so
+                // tall dropdowns that span beyond the viewport still activate.
+                const detailsRect = details.getBoundingClientRect();
+                const visibleTop = Math.max(detailsRect.top, contentTop);
+                const visibleBottom = Math.min(detailsRect.bottom, contentBottom);
+                const isVisible = visibleBottom > visibleTop;
+                const visibleCenterY = (visibleTop + visibleBottom) / 2;
+                const isActive = isVisible && visibleCenterY >= safeZoneTop && visibleCenterY <= safeZoneBottom;
+                const opacity = isActive ? 1 : 0.3;
+
+                summary.style.opacity = opacity;
                 const contentRoot = details.querySelector(':scope > .dropdown-content') || details;
-                const rootSelector = contentRoot === details ? ':scope' : '';
-                const selectorPrefix = rootSelector ? `${rootSelector} > ` : ':scope > ';
-                
-                const dropdownFlow = Array.from(contentRoot.querySelectorAll(
-                    `${selectorPrefix}h1, ${selectorPrefix}h2, ${selectorPrefix}h3, ${selectorPrefix}h4, ${selectorPrefix}h5, ${selectorPrefix}h6, ${selectorPrefix}p, ${selectorPrefix}ul, ${selectorPrefix}ol, ${selectorPrefix}pre, ${selectorPrefix}hr`
-                ));
-                
-                if (dropdownFlow.length === 0) {
-                    // Fallback: keep entire dropdown content aligned with summary state.
-                    Array.from(contentRoot.children).forEach(child => {
-                        if (child !== summary) child.style.opacity = detailsActive ? 1 : 0.3;
-                    });
-                    return;
+                if (contentRoot !== details) {
+                    contentRoot.style.opacity = opacity;
                 }
-                
-                // Build sections inside the dropdown, mirroring top-level logic.
-                const dropdownSections = [];
-                let currentDropdownSection = null;
-                const dropdownSectionHasOnlyHeaders = (section) => (
-                    !!section && section.elements.every(el => /^h[1-6]$/i.test(el.tagName))
-                );
-                
-                dropdownFlow.forEach(el => {
-                    const tagName = el.tagName.toLowerCase();
-                    if (/^h[2-6]$/.test(tagName)) {
-                        if (dropdownSectionHasOnlyHeaders(currentDropdownSection)) {
-                            currentDropdownSection.elements.push(el);
-                        } else {
-                            if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
-                                dropdownSections.push(currentDropdownSection);
-                            }
-                            currentDropdownSection = { elements: [el] };
-                        }
-                    } else if (tagName === 'hr') {
-                        if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
-                            dropdownSections.push(currentDropdownSection);
-                        }
-                        currentDropdownSection = null;
-                    } else {
-                        if (!currentDropdownSection) currentDropdownSection = { elements: [] };
-                        currentDropdownSection.elements.push(el);
-                    }
-                });
-                if (currentDropdownSection && currentDropdownSection.elements.length > 0) {
-                    dropdownSections.push(currentDropdownSection);
-                }
-                
-                if (dropdownSections.length === 0) {
-                    dropdownFlow.forEach(el => {
-                        el.style.opacity = detailsActive ? 1 : 0.3;
-                    });
-                    return;
-                }
-                
-                const dropdownInfo = dropdownSections.map((section, index) => {
-                    const firstEl = section.elements[0];
-                    const lastEl = section.elements[section.elements.length - 1];
-                    const firstRect = firstEl.getBoundingClientRect();
-                    const lastRect = lastEl.getBoundingClientRect();
-                    const sectionTop = firstRect.top;
-                    const sectionBottom = lastRect.bottom;
-                    const isVisible = sectionBottom > contentTop && sectionTop < contentBottom;
-                    const isFullyVisible = sectionTop >= contentTop && sectionBottom <= contentBottom;
-                    const isInSafeZone = sectionTop >= safeZoneTop && sectionBottom <= safeZoneBottom;
-                    return { index, isVisible, isFullyVisible, isInSafeZone };
-                });
-                
-                const activeDropdownIndices = new Set();
-                dropdownInfo.forEach(info => {
-                    if (info.isFullyVisible && info.isInSafeZone) {
-                        activeDropdownIndices.add(info.index);
-                    }
-                });
-                
-                if (activeDropdownIndices.size === 0) {
-                    let bestIndex = -1;
-                    let bestVisibility = 0;
-                    dropdownInfo.forEach(info => {
-                        if (!info.isVisible) return;
-                        const section = dropdownSections[info.index];
-                        const firstRect = section.elements[0].getBoundingClientRect();
-                        const lastRect = section.elements[section.elements.length - 1].getBoundingClientRect();
-                        const visibleTop = Math.max(firstRect.top, contentTop);
-                        const visibleBottom = Math.min(lastRect.bottom, contentBottom);
-                        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-                        if (visibleHeight > bestVisibility) {
-                            bestVisibility = visibleHeight;
-                            bestIndex = info.index;
-                        }
-                    });
-                    if (bestIndex >= 0) activeDropdownIndices.add(bestIndex);
-                }
-                
-                dropdownSections.forEach((section, index) => {
-                    const isActive = detailsActive && activeDropdownIndices.has(index);
-                    section.elements.forEach(el => {
-                        el.style.opacity = isActive ? 1 : 0.3;
-                    });
-                });
-                
-                // Keep non-flow children aligned with dropdown active state.
+                // Set opacity only on direct children to avoid compounding on
+                // nested elements like table > tr > td (0.3^3 ≈ invisible).
+                // CSS opacity visually propagates to descendants automatically.
                 Array.from(contentRoot.children).forEach(child => {
-                    if (!dropdownFlow.includes(child)) {
-                        child.style.opacity = detailsActive ? 1 : 0.3;
+                    if (child !== summary) {
+                        child.style.opacity = opacity;
+                    }
+                });
+                Array.from(details.children).forEach(child => {
+                    if (child !== summary && child !== contentRoot) {
+                        child.style.opacity = opacity;
                     }
                 });
             });

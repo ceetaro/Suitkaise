@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How `<suitkaise-api>cucumber</suitkaise-api>` actually works"
+title = "How `cucumber` actually works"
 
 # 1.2
 
@@ -119,13 +119,13 @@ This is a compact IR format that skips the overhead of the standard flow. It doe
 
 Serialization is done by a central, internal `Serializer` class, that uses the handlers to deconstruct complex objects into a nested dictionary of native `pickle` types, which are then serialized to bytes by `pickle.dumps()`.
 
-- converts objects to IR format
-- tracks circular references
-- enforces maximum recursion depth of 1000
-- selects the right handler for a type
-- provides the fast paths for common cases
-- preserves debug context (object path, depth)
-- returns the bytes
+- Converts objects to IR format
+- Tracks circular references
+- Enforces maximum recursion depth of 1000
+- Selects the right handler for a type
+- Provides the fast paths for common cases
+- Preserves debug context (object path, depth)
+- Returns the bytes
 
 ### Tracking state
 
@@ -178,9 +178,9 @@ For common `pickle` native objects, skip handlers and wrap as a `pickle_native` 
 5. simple instance fast path
 If the object is:
 
-- a user defined class
-- has only primitive attributes
-- has no custom serialization
+- A user defined class
+- Has only primitive attributes
+- Has no custom serialization
 
 then use the `simple_class_instance` IR instead of a full handler.
 
@@ -229,7 +229,7 @@ All handlers are defined in `<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise
 They are placed into an `ALL_HANDLERS` list.
 
 - `ALL_HANDLERS` is an ordered list.
-- the most specific handlers are earlier in the list
+- The most specific handlers are earlier in the list
 - `ClassInstanceHandler` is last, acting as a catch all for generic or user defined classes
 - The serializer caches handler lookups by type, which speeds repeated serialization of the same types.
 
@@ -237,10 +237,10 @@ They are placed into an `ALL_HANDLERS` list.
 
 Deserialization is done by a central, internal `Deserializer` class, that uses the handlers to reconstruct the objects from the IR.
 
-- converts IR back to live objects
-- resolves circular references
-- restores handler-based objects
-- rebuilds `pickle` native and fast-path types
+- Converts IR back to live objects
+- Resolves circular references
+- Restores handler-based objects
+- Rebuilds `pickle` native and fast-path types
 
 ### State tracking
 
@@ -298,10 +298,10 @@ If nothing matches, the deserializer returns the IR node as-is. This keeps unkno
 `type_name`, `handler_name`, `obj_id`, `state` are extracted from the IR node.
 
 These fields tell the deserializer:
-- what kind of object it is
-- which handler knows how to rebuild it
-- the unique object id
-- provide the serialized state
+- What kind of object it is
+- Which handler knows how to rebuild it
+- The unique object id
+- Provide the serialized state
 
 2. Find handler
 The handler list is searched for a handler whose class name matches `handler_name`.
@@ -344,7 +344,7 @@ class Handler(ABC):
 
 All handlers are defined in `<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/handlers/` and are registered in `handlers/__init__.py`.
 
-(start of dropdown "FunctionHandler")
+(start of dropdown "`FunctionHandler`")
 ### `FunctionHandler`
 
 Serializes function objects.
@@ -353,7 +353,7 @@ Serializes function objects.
 
 For module-level functions without closures, stores `module` + `qualname` and imports on reconstruction. This is ~100x faster and smaller. It also stores a lightweight hash of the function signature to validate the reference.
 
-Requirements
+**Requirements**
 - Has `__module__` and `__qualname__`
 - Not a closure (no captured variables)
 - Not in `__main__` (can't import `__main__`)
@@ -363,21 +363,21 @@ Requirements
 
 For closures, nested functions, and dynamically created functions, stores bytecode, globals, and closure state.
 
-State captured:
+**State captured:**
 - `code`: Code object (recursively serialized)
 - `globals`: Only referenced global names (excludes `__builtins__`)
 - `name`, `defaults`, `kwdefaults`
 - `closure`: List of captured variable values
 - `annotations`, `doc`, `module`
 
-Reconstruction:
+**Reconstruction:**
 - Reference: import module and navigate qualname, then validate the signature hash.
 - If the hash mismatches, a placeholder is returned with a warning and future serializations switch to full fallback mode.
 - Full: rebuild function with `types.FunctionType()`, inject local `__builtins__`, recreate closure cells
 
 (end of dropdown "FunctionHandler")
 
-(start of dropdown "LambdaHandler")
+(start of dropdown "`LambdaHandler`")
 ### `LambdaHandler`
 
 Serializes lambda functions (anonymous functions with name `<lambda>`).
@@ -388,388 +388,388 @@ Since lambdas can't be referenced by name (they're anonymous), they always use t
 
 (end of dropdown "LambdaHandler")
 
-(start of dropdown "PartialFunctionHandler")
+(start of dropdown "`PartialFunctionHandler`")
 ### `PartialFunctionHandler`
 
 Serializes `functools.partial` objects.
 
-State captured:
+**State captured:**
 - `func`: The wrapped function (recursively serialized)
 - `args`: Positional arguments already bound
 - `keywords`: Keyword arguments already bound
 
-Reconstruction: `functools.partial(func, *args, **keywords)`
+**Reconstruction:** `functools.partial(func, *args, **keywords)`
 
 (end of dropdown "PartialFunctionHandler")
 
-(start of dropdown "BoundMethodHandler")
+(start of dropdown "`BoundMethodHandler`")
 ### `BoundMethodHandler`
 
 Serializes bound method objects (methods bound to an instance).
 
-State captured:
+**State captured:**
 - `instance`: The object the method is bound to (recursively serialized)
 - `function_name`: Name of the method
 - `class_name`, `module`: For debugging
 
-Reconstruction: Get the deserialized instance, then `getattr(instance, function_name)` to get the bound method. The method exists on the class, we just need to bind it to the instance.
+**Reconstruction:** Get the deserialized instance, then `getattr(instance, function_name)` to get the bound method. The method exists on the class, we just need to bind it to the instance.
 
 (end of dropdown "BoundMethodHandler")
 
-(start of dropdown "StaticMethodHandler")
+(start of dropdown "`StaticMethodHandler`")
 ### `StaticMethodHandler`
 
 Serializes `@staticmethod` wrappers.
 
-State captured:
+**State captured:**
 - `func`: The underlying function
 
-Reconstruction: `staticmethod(func)`
+**Reconstruction:** `staticmethod(func)`
 
 (end of dropdown "StaticMethodHandler")
 
-(start of dropdown "ClassMethodHandler")
+(start of dropdown "`ClassMethodHandler`")
 ### `ClassMethodHandler`
 
 Serializes `@classmethod` wrappers.
 
-State captured:
+**State captured:**
 - `func`: The underlying function
 
-Reconstruction: `classmethod(func)`
+**Reconstruction:** `classmethod(func)`
 
 (end of dropdown "ClassMethodHandler")
 
-(start of dropdown "LoggerHandler")
+(start of dropdown "`LoggerHandler`")
 ### `LoggerHandler`
 
 Serializes `logging.Logger` instances by capturing their configuration.
 
-State captured:
+**State captured:**
 - `name`: Logger name (loggers are singletons per name)
 - `level`: Logging level (DEBUG=10, INFO=20, etc.)
 - `handlers`: List of handler objects (recursively serialized)
 - `filters`: List of filter objects
 - `propagate`, `disabled`: Logger settings
 
-Reconstruction: `logging.getLogger(name)`, clear existing handlers, restore configuration. Leverages the fact that loggers are singletons - same name returns same instance.
+**Reconstruction:** `logging.getLogger(name)`, clear existing handlers, restore configuration. Leverages the fact that loggers are singletons - same name returns same instance.
 
 (end of dropdown "LoggerHandler")
 
-(start of dropdown "StreamHandlerHandler")
+(start of dropdown "`StreamHandlerHandler`")
 ### `StreamHandlerHandler`
 
 Serializes `logging.StreamHandler` objects.
 
-State captured:
+**State captured:**
 - `level`: Handler's logging level
 - `formatter`: Formatter object (recursively serialized)
 
-Reconstruction: Create new `StreamHandler()` (uses `sys.stderr` by default), set level and formatter. Stream itself is not serialized - uses default in target process.
+**Reconstruction:** Create new `StreamHandler()` (uses `sys.stderr` by default), set level and formatter. Stream itself is not serialized - uses default in target process.
 
 (end of dropdown "StreamHandlerHandler")
 
-(start of dropdown "FileHandlerHandler")
+(start of dropdown "`FileHandlerHandler`")
 ### `FileHandlerHandler`
 
 Serializes `logging.FileHandler` objects.
 
-State captured:
+**State captured:**
 - `filename`: Path to log file (`baseFilename`)
 - `mode`: File open mode ('a', 'w')
 - `encoding`: File encoding
 - `level`, `formatter`
 
-Reconstruction: `FileHandler(filename, mode, encoding)`, restore level and formatter.
+**Reconstruction:** `FileHandler(filename, mode, encoding)`, restore level and formatter.
 
 (end of dropdown "FileHandlerHandler")
 
-(start of dropdown "FormatterHandler")
+(start of dropdown "`FormatterHandler`")
 ### `FormatterHandler`
 
 Serializes `logging.Formatter` objects.
 
-State captured:
+**State captured:**
 - `fmt`: Format string (e.g., `'%(asctime)s - %(name)s'`)
 - `datefmt`: Date format string
 - `style`: Format style ('%', '{', or '$')
 
-Reconstruction: `Formatter(fmt, datefmt, style)`
+**Reconstruction:** `Formatter(fmt, datefmt, style)`
 
 (end of dropdown "FormatterHandler")
 
-(start of dropdown "FileHandleHandler")
+(start of dropdown "`FileHandleHandler`")
 ### `FileHandleHandler`
 
 Serializes open file handle objects (`TextIOWrapper`, `BufferedReader`, etc.).
 
-State captured:
+**State captured:**
 - `path`: Absolute file path
 - `relative_path`: Relative path using `<suitkaise-api>Skpath</suitkaise-api>` (if available)
 - `mode`: File open mode
-- `position`: Current position from `<suitkaise-api>tell</suitkaise-api>()`
+- `position`: Current position from `tell()`
 - `encoding`, `errors`, `newline`: Text mode settings
 - `closed`, `is_pipe`: State flags
 
-Reconstruction:
+**Reconstruction:**
 - Pipes/closed files: Return placeholder
 - Open files: Try relative path first (better for cross-machine), fall back to absolute. Open file, seek to position.
 
-Limitation: Assumes file exists in target process's filesystem.
+**Limitation:** Assumes file exists in target process's filesystem.
 
 (end of dropdown "FileHandleHandler")
 
-(start of dropdown "TemporaryFileHandler")
+(start of dropdown "`TemporaryFileHandler`")
 ### `TemporaryFileHandler`
 
 Serializes `tempfile.NamedTemporaryFile` objects.
 
-State captured:
+**State captured:**
 - `mode`, `position`
 - `content`: Full file content (reads entire file)
 - `suffix`, `prefix`, `delete`
 - `encoding`, `original_name`
 
-Reconstruction: Create NEW temp file with same properties, write content, seek to position.
+**Reconstruction:** Create NEW temp file with same properties, write content, seek to position.
 
-NOTE: Creates new temp file with DIFFERENT path than original. Content and properties preserved, but not exact path.
+**NOTE:** Creates new temp file with DIFFERENT path than original. Content and properties preserved, but not exact path.
 
 (end of dropdown "TemporaryFileHandler")
 
-(start of dropdown "StringIOHandler")
+(start of dropdown "`StringIOHandler`")
 ### `StringIOHandler`
 
 Serializes `io.StringIO` in-memory text streams.
 
-State captured:
+**State captured:**
 - `content`: Full string buffer
 - `position`: Current position
 
-Reconstruction: `StringIO(content)`, seek to position.
+**Reconstruction:** `StringIO(content)`, seek to position.
 
 (end of dropdown "StringIOHandler")
 
-(start of dropdown "BytesIOHandler")
+(start of dropdown "`BytesIOHandler`")
 ### `BytesIOHandler`
 
 Serializes `io.BytesIO` in-memory binary streams.
 
-State captured:
+**State captured:**
 - `content`: Full bytes buffer
 - `position`: Current position
 - `closed`: Whether closed
 
-Reconstruction: Handle closed state, `BytesIO(content)`, seek to position.
+**Reconstruction:** Handle closed state, `BytesIO(content)`, seek to position.
 
 (end of dropdown "BytesIOHandler")
 
-(start of dropdown "LockHandler")
+(start of dropdown "`LockHandler`")
 ### `LockHandler`
 
 Serializes `threading.Lock` and `threading.RLock` objects.
 
-State captured:
+**State captured:**
 - `lock_type`: "Lock" or "RLock"
 - `locked`: Whether lock is currently acquired
 
 For RLock (no `locked()` method): try non-blocking `acquire()` to check state.
 
-Reconstruction: Create new lock, acquire if it was locked.
+**Reconstruction:** Create new lock, acquire if it was locked.
 
-Limitation: Lock thread ownership does NOT transfer across processes. The lock is acquired by the reconstructing thread, not the original owner.
+**Limitation:** Lock thread ownership does NOT transfer across processes. The lock is acquired by the reconstructing thread, not the original owner.
 
 (end of dropdown "LockHandler")
 
-(start of dropdown "SemaphoreHandler")
+(start of dropdown "`SemaphoreHandler`")
 ### `SemaphoreHandler`
 
 Serializes `threading.Semaphore` and `BoundedSemaphore` objects.
 
-State captured:
+**State captured:**
 - `semaphore_type`: "Semaphore" or "BoundedSemaphore"
 - `initial_value`, `current_value`
 
-Reconstruction: Create semaphore with initial value, acquire repeatedly until counter matches current value.
+**Reconstruction:** Create semaphore with initial value, acquire repeatedly until counter matches current value.
 
 (end of dropdown "SemaphoreHandler")
 
-(start of dropdown "BarrierHandler")
+(start of dropdown "`BarrierHandler`")
 ### `BarrierHandler`
 
 Serializes `threading.Barrier` objects.
 
-State captured:
+**State captured:**
 - `parties`: Number of threads that must arrive
 - `action`: Optional function called when all arrive
 - `timeout`: Optional timeout
 
-Reconstruction: `Barrier(parties, action, timeout)`. Fresh barrier - doesn't capture how many threads are waiting.
+**Reconstruction:** `Barrier(parties, action, timeout)`. Fresh barrier - doesn't capture how many threads are waiting.
 
 (end of dropdown "BarrierHandler")
 
-(start of dropdown "ConditionHandler")
+(start of dropdown "`ConditionHandler`")
 ### `ConditionHandler`
 
 Serializes `threading.Condition` objects.
 
-State captured:
+**State captured:**
 - `lock`: The underlying lock (recursively serialized)
 
-Reconstruction: `Condition(lock=deserialized_lock)`
+**Reconstruction:** `Condition(lock=deserialized_lock)`
 
 (end of dropdown "ConditionHandler")
 
-(start of dropdown "QueueHandler")
+(start of dropdown "`QueueHandler`")
 ### `QueueHandler`
 
 Serializes `queue.Queue`, `LifoQueue`, `PriorityQueue`, and `SimpleQueue` objects.
 
-State captured:
+**State captured:**
 - `queue_type`: Type name
 - `maxsize`: Maximum queue size
 - `items`: Snapshot of items (non-destructive using mutex + internal deque)
 
-Reconstruction: Create queue of appropriate type, put all items back.
+**Reconstruction:** Create queue of appropriate type, put all items back.
 
 (end of dropdown "QueueHandler")
 
-(start of dropdown "MultiprocessingQueueHandler")
+(start of dropdown "`MultiprocessingQueueHandler`")
 ### `MultiprocessingQueueHandler`
 
 Serializes `multiprocessing.Queue` objects.
 
-State captured:
+**State captured:**
 - `maxsize`
 - `items`: Best-effort snapshot (drain and restore, limited to 10000 items)
 
-Reconstruction: Create new queue (different underlying pipes), put items back.
+**Reconstruction:** Create new queue (different underlying pipes), put items back.
 
-Limitation: For reliable cross-process sharing, use `<suitkaise-api>Share</suitkaise-api>` over raw `multiprocessing.Queue`, or `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` / `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()` for direct queue-based communication.
+**Limitation:** For reliable cross-process sharing, use `<suitkaise-api>Share</suitkaise-api>` over raw `multiprocessing.Queue`, or `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` / `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()` for direct queue-based communication.
 
 (end of dropdown "MultiprocessingQueueHandler")
 
-(start of dropdown "EventHandler")
+(start of dropdown "`EventHandler`")
 ### `EventHandler`
 
 Serializes `threading.Event` objects.
 
-State captured:
+**State captured:**
 - `is_set`: Whether event is set or clear
 
-Reconstruction: Create new `threading.Event`, set if it was set.
+**Reconstruction:** Create new `threading.Event`, set if it was set.
 
 (end of dropdown "EventHandler")
 
-(start of dropdown "MultiprocessingEventHandler")
+(start of dropdown "`MultiprocessingEventHandler`")
 ### `MultiprocessingEventHandler`
 
 Serializes `multiprocessing.Event` objects.
 
-State captured:
+**State captured:**
 - `is_set`: Whether event is set or clear
 
-Reconstruction: Create new `multiprocessing.Event`, set if it was set. Different underlying shared memory.
+**Reconstruction:** Create new `multiprocessing.Event`, set if it was set. Different underlying shared memory.
 
 (end of dropdown "MultiprocessingEventHandler")
 
-(start of dropdown "GeneratorHandler")
+(start of dropdown "`GeneratorHandler`")
 ### `GeneratorHandler`
 
 Serializes generator objects.
 
-State captured:
+**State captured:**
 - `generator_name`, `generator_qualname`: For debugging
 - `remaining_values`: All values not yet yielded
 
-Important: EXHAUSTS the generator. Original becomes empty. This is the only way to preserve remaining values.
+**Important:** EXHAUSTS the generator. Original becomes empty. This is the only way to preserve remaining values.
 
-Reconstruction: `iter(remaining_values)`. Returns iterator, not true generator. Values preserved but not pause/resume behavior.
+**Reconstruction:** `iter(remaining_values)`. Returns iterator, not true generator. Values preserved but not pause/resume behavior.
 
 (end of dropdown "GeneratorHandler")
 
-(start of dropdown "IteratorHandler")
+(start of dropdown "`IteratorHandler`")
 ### `IteratorHandler`
 
 Serializes iterator objects (`enumerate`, `zip`, `filter`, `map`, `reversed`, etc.).
 
-State captured:
+**State captured:**
 - `type_name`: Iterator type
 - `remaining_values`: All remaining items (limited to 100000 for safety)
 
-Important: EXHAUSTS the iterator. Original becomes empty.
+**Important:** EXHAUSTS the iterator. Original becomes empty.
 
-Reconstruction: `iter(remaining_values)`. The original iterator type is not preserved.
+**Reconstruction:** `iter(remaining_values)`. The original iterator type is not preserved.
 
 (end of dropdown "IteratorHandler")
 
-(start of dropdown "RangeHandler")
+(start of dropdown "`RangeHandler`")
 ### `RangeHandler`
 
 Serializes `range` objects.
 
-State captured:
+**State captured:**
 - `start`, `stop`, `step`
 
-Reconstruction: `range(start, stop, step)`. Range objects are immutable and easy to serialize.
+**Reconstruction:** `range(start, stop, step)`. Range objects are immutable and easy to serialize.
 
 (end of dropdown "RangeHandler")
 
-(start of dropdown "EnumerateHandler")
+(start of dropdown "`EnumerateHandler`")
 ### `EnumerateHandler`
 
 Serializes `enumerate` objects.
 
-State captured:
+**State captured:**
 - `remaining`: List of `(index, value)` tuples
 
-Reconstruction: `iter(remaining)`. The enumerate is consumed during serialization, and reconstruction returns a plain iterator over the remaining `(index, value)` pairs.
+**Reconstruction:** `iter(remaining)`. The enumerate is consumed during serialization, and reconstruction returns a plain iterator over the remaining `(index, value)` pairs.
 
 (end of dropdown "EnumerateHandler")
 
-(start of dropdown "ZipHandler")
+(start of dropdown "`ZipHandler`")
 ### `ZipHandler`
 
 Serializes `zip` objects.
 
-State captured:
+**State captured:**
 - `remaining`: List of tuples
 
-Reconstruction: `iter(remaining)`
+**Reconstruction:** `iter(remaining)`
 
 (end of dropdown "ZipHandler")
 
-(start of dropdown "RegexPatternHandler")
+(start of dropdown "`RegexPatternHandler`")
 ### `RegexPatternHandler`
 
 Serializes compiled `re.Pattern` objects.
 
-State captured:
+**State captured:**
 - `pattern`: The regex pattern string
 - `flags`: Compilation flags (integer bitmask)
 
-Reconstruction: `re.compile(pattern, flags)`
+**Reconstruction:** `re.compile(pattern, flags)`
 
 (end of dropdown "RegexPatternHandler")
 
-(start of dropdown "MatchObjectHandler")
+(start of dropdown "`MatchObjectHandler`")
 ### `MatchObjectHandler`
 
 Serializes `re.Match` objects.
 
-State captured:
+**State captured:**
 - `pattern`, `flags`, `string`, `pos`, `endpos`
 - `match_string`, `span`, `groups`, `groupdict`
 
-Reconstruction: Returns `MatchReconnector`. Call `reconnect()` to re-run the pattern on the original string and get a live `re.Match` object. Returns `None` if the match can't be reproduced (e.g., pattern or string changed).
+**Reconstruction:** Returns `MatchReconnector`. Call `reconnect()` to re-run the pattern on the original string and get a live `re.Match` object. Returns `None` if the match can't be reproduced (e.g., pattern or string changed).
 
 (end of dropdown "MatchObjectHandler")
 
-(start of dropdown "SQLiteConnectionHandler")
+(start of dropdown "`SQLiteConnectionHandler`")
 ### `SQLiteConnectionHandler`
 
 Serializes `sqlite3.Connection` objects.
 
-State captured:
+**State captured:**
 - `database`: Path or ':memory:'
 - `isolation_level`
 - `is_memory`: Whether in-memory database
@@ -778,184 +778,184 @@ For in-memory databases:
 - `schema`: All CREATE TABLE statements
 - `data`: All table data (expensive for large databases)
 
-Reconstruction: Returns `SQLiteConnectionReconnector`. Call `reconnect()` to create a new connection. For file databases, connects to the file. For in-memory databases, creates new connection and restores schema and data.
+**Reconstruction:** Returns `SQLiteConnectionReconnector`. Call `reconnect()` to create a new connection. For file databases, connects to the file. For in-memory databases, creates new connection and restores schema and data.
 
 (end of dropdown "SQLiteConnectionHandler")
 
-(start of dropdown "SQLiteCursorHandler")
+(start of dropdown "`SQLiteCursorHandler`")
 ### `SQLiteCursorHandler`
 
 Serializes `sqlite3.Cursor` objects.
 
-State captured:
+**State captured:**
 - `connection`: Database connection (recursively serialized)
 - `lastrowid`, `arraysize`
 
-Reconstruction: Returns `SQLiteCursorReconnector`. Call `reconnect()` to create a new cursor. If the connection is also a reconnector, it will be reconnected first. Result set NOT restored - user must re-execute query.
+**Reconstruction:** Returns `SQLiteCursorReconnector`. Call `reconnect()` to create a new cursor. If the connection is also a reconnector, it will be reconnected first. Result set NOT restored - user must re-execute query.
 
 (end of dropdown "SQLiteCursorHandler")
 
-(start of dropdown "HTTPSessionHandler")
+(start of dropdown "`HTTPSessionHandler`")
 ### `HTTPSessionHandler`
 
 Serializes `requests.Session` objects.
 
-State captured:
+**State captured:**
 - `cookies`: Session cookies (as dict)
 - `headers`: Default headers
 - `auth`: Authentication tuple
 - `proxies`, `verify`, `cert`, `max_redirects`
 
-Reconstruction: Create new Session, apply configuration. Active connections not preserved - connection pools recreated fresh.
+**Reconstruction:** Create new Session, apply configuration. Active connections not preserved - connection pools recreated fresh.
 
 (end of dropdown "HTTPSessionHandler")
 
-(start of dropdown "SocketHandler")
+(start of dropdown "`SocketHandler`")
 ### `SocketHandler`
 
 Serializes `socket.socket` objects.
 
-State captured:
+**State captured:**
 - `family`, `type`, `proto`: Socket parameters
-- `timeout`, `<suitkaise-api>blocking</suitkaise-api>`
+- `timeout`, `blocking`
 - `local_addr`, `remote_addr`: From getsockname/getpeername
 
-Reconstruction: Returns `SocketReconnector`. Call `reconnect()` to create new socket with same parameters, apply timeout/blocking settings, and best-effort bind/connect using saved addresses.
+**Reconstruction:** Returns `SocketReconnector`. Call `reconnect()` to create new socket with same parameters, apply timeout/blocking settings, and best-effort bind/connect using saved addresses.
 
-Limitation: Actual connection NOT preserved. Buffer contents lost.
+**Limitation:** Actual connection NOT preserved. Buffer contents lost.
 
 (end of dropdown "SocketHandler")
 
-(start of dropdown "DatabaseConnectionHandler")
+(start of dropdown "`DatabaseConnectionHandler`")
 ### `DatabaseConnectionHandler`
 
 Generic handler for database connections (PostgreSQL, MySQL, MongoDB, Redis, SQLAlchemy, etc.).
 
-State captured:
+**State captured:**
 - `module`, `class_name`
 - Common attributes: `host`, `port`, `user`, `database`
 - Driver-specific attributes (DSN, connection kwargs, etc.)
 
 Passwords/tokens intentionally NOT stored for security.
 
-Reconstruction: Returns typed `DbReconnector` (PostgresReconnector, MySQLReconnector, etc.). User calls `reconnect(auth=...)` to create a new live connection, providing credentials for protected databases.
+**Reconstruction:** Returns typed `DbReconnector` (PostgresReconnector, MySQLReconnector, etc.). User calls `reconnect(auth=...)` to create a new live connection, providing credentials for protected databases.
 
 (end of dropdown "DatabaseConnectionHandler")
 
-(start of dropdown "ThreadHandler")
+(start of dropdown "`ThreadHandler`")
 ### `ThreadHandler`
 
 Serializes `threading.Thread` objects.
 
-State captured:
+**State captured:**
 - `name`, `daemon`
 - `target`: Target function (recursively serialized)
 - `args`, `kwargs`
 - `is_alive`: Whether running
 
-Reconstruction: Returns `ThreadReconnector`. Call `reconnect(start=False)` to create new Thread. Thread NOT started by default.
+**Reconstruction:** Returns `ThreadReconnector`. Call `reconnect(start=False)` to create new Thread. Thread NOT started by default.
 
-Limitation: Thread execution state (call stack, locals) cannot be serialized.
+**Limitation:** Thread execution state (call stack, locals) cannot be serialized.
 
 (end of dropdown "ThreadHandler")
 
-(start of dropdown "ThreadPoolExecutorHandler")
+(start of dropdown "`ThreadPoolExecutorHandler`")
 ### `ThreadPoolExecutorHandler`
 
 Serializes `ThreadPoolExecutor` objects.
 
-State captured:
+**State captured:**
 - `max_workers`, `thread_name_prefix`
 
-Reconstruction: Fresh executor with same configuration. Running tasks NOT serialized.
+**Reconstruction:** Fresh executor with same configuration. Running tasks NOT serialized.
 
 (end of dropdown "ThreadPoolExecutorHandler")
 
-(start of dropdown "ProcessPoolExecutorHandler")
+(start of dropdown "`ProcessPoolExecutorHandler`")
 ### `ProcessPoolExecutorHandler`
 
 Serializes `ProcessPoolExecutor` objects.
 
-State captured:
+**State captured:**
 - `max_workers`
 
-Reconstruction: Fresh executor with same configuration.
+**Reconstruction:** Fresh executor with same configuration.
 
 (end of dropdown "ProcessPoolExecutorHandler")
 
-(start of dropdown "ThreadLocalHandler")
+(start of dropdown "`ThreadLocalHandler`")
 ### `ThreadLocalHandler`
 
 Serializes `threading.local` objects.
 
-State captured:
+**State captured:**
 - `data`: Current thread's local values (from `__dict__`)
 
 Only current thread's values serialized. Other threads' values lost.
 
-Reconstruction: New `threading.local()`, set attributes from data.
+**Reconstruction:** New `threading.local()`, set attributes from data.
 
 (end of dropdown "ThreadLocalHandler")
 
-(start of dropdown "WeakrefHandler")
+(start of dropdown "`WeakrefHandler`")
 ### `WeakrefHandler`
 
 Serializes `weakref.ref` objects.
 
-State captured:
+**State captured:**
 - `referenced_object`: The object (if still alive)
 - `is_dead`: Whether reference is dead
 
-Reconstruction:
+**Reconstruction:**
 - Dead reference: Return a dead weakref placeholder (callable returning None)
 - Alive: Create new weak reference to deserialized object
 
-Note: Weak references become strong references during serialization, then weak again in new weakref.
+**Note:** Weak references become strong references during serialization, then weak again in new weakref.
 
 (end of dropdown "WeakrefHandler")
 
-(start of dropdown "WeakValueDictionaryHandler")
+(start of dropdown "`WeakValueDictionaryHandler`")
 ### `WeakValueDictionaryHandler`
 
 Serializes `weakref.WeakValueDictionary` objects.
 
-State captured:
+**State captured:**
 - `items`: Current key-value pairs (values that exist)
 
-Reconstruction: New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted. If a value is not weakrefable, a weakrefable placeholder is stored (with a warning) so data is preserved.
+**Reconstruction:** New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted. If a value is not weakrefable, a weakrefable placeholder is stored (with a warning) so data is preserved.
 
 (end of dropdown "WeakValueDictionaryHandler")
 
-(start of dropdown "WeakKeyDictionaryHandler")
+(start of dropdown "`WeakKeyDictionaryHandler`")
 ### `WeakKeyDictionaryHandler`
 
 Serializes `weakref.WeakKeyDictionary` objects.
 
-State captured:
+**State captured:**
 - `items`: Current key-value pairs (keys that exist)
 
-Reconstruction: New WeakKeyDictionary, add items. Non-weakrefable keys are replaced with placeholder keys (with a warning) so data is preserved.
+**Reconstruction:** New WeakKeyDictionary, add items. Non-weakrefable keys are replaced with placeholder keys (with a warning) so data is preserved.
 
 (end of dropdown "WeakKeyDictionaryHandler")
 
-(start of dropdown "EnumHandler")
+(start of dropdown "`EnumHandler`")
 ### `EnumHandler`
 
 Serializes `enum.Enum` instances.
 
-State captured:
+**State captured:**
 - `module`, `enum_name`, `qualname`
 - `member_name`, `value`
 - `member_names` for Flag/IntFlag combinations
 - `definition` for dynamic enums (name, members, base_type)
 
-Reconstruction: Import enum class, get member by name (or by value as fallback). If import fails and a definition is present, reconstruct from definition.
+**Reconstruction:** Import enum class, get member by name (or by value as fallback). If import fails and a definition is present, reconstruct from definition.
 
 Works for Enum, IntEnum, Flag, IntFlag, and custom subclasses.
 
 (end of dropdown "EnumHandler")
 
-(start of dropdown "EnumClassHandler")
+(start of dropdown "`EnumClassHandler`")
 ### `EnumClassHandler`
 
 Serializes enum classes themselves (not instances).
@@ -963,64 +963,64 @@ Serializes enum classes themselves (not instances).
 Module-level enums: Store reference (`module` + `name`)
 Dynamic enums: Serialize full definition (`name`, `members`, `base_type`)
 
-Reconstruction:
+**Reconstruction:**
 - Reference: Import from module
 - Definition: `base_type(name, members)` using functional API
 
 (end of dropdown "EnumClassHandler")
 
-(start of dropdown "CoroutineHandler")
+(start of dropdown "`CoroutineHandler`")
 ### `CoroutineHandler`
 
 Serializes coroutine objects (from `async def` functions).
 
-State captured:
+**State captured:**
 - `cr_code`, `cr_name`, `cr_qualname`
 - `frame_locals`: If available
 
-Reconstruction: Returns `DeserializedCoroutine` placeholder. Coroutine execution state cannot be transferred - awaiting raises error.
+**Reconstruction:** Returns `DeserializedCoroutine` placeholder. Coroutine execution state cannot be transferred - awaiting raises error.
 
 (end of dropdown "CoroutineHandler")
 
-(start of dropdown "AsyncGeneratorHandler")
+(start of dropdown "`AsyncGeneratorHandler`")
 ### `AsyncGeneratorHandler`
 
 Serializes async generator objects.
 
-State captured:
+**State captured:**
 - `ag_name`, `ag_qualname`
 
-Reconstruction: Returns `DeserializedAsyncGenerator` placeholder. Async iteration raises error.
+**Reconstruction:** Returns `DeserializedAsyncGenerator` placeholder. Async iteration raises error.
 
 (end of dropdown "AsyncGeneratorHandler")
 
-(start of dropdown "TaskHandler")
+(start of dropdown "`TaskHandler`")
 ### `TaskHandler`
 
 Serializes `asyncio.Task` objects.
 
-State captured:
+**State captured:**
 - `task_name`, `is_done`, `is_cancelled`
-- `<suitkaise-api>result</suitkaise-api>`, `exception` (if done)
+- `result`, `exception` (if done)
 
-Reconstruction: Returns `DeserializedTask` placeholder with `done()`, `cancelled()`, `<suitkaise-api>result</suitkaise-api>()`, `exception()` methods.
+**Reconstruction:** Returns `DeserializedTask` placeholder with `done()`, `cancelled()`, `result()`, `exception()` methods.
 
 (end of dropdown "TaskHandler")
 
-(start of dropdown "FutureHandler")
+(start of dropdown "`FutureHandler`")
 ### `FutureHandler`
 
 Serializes `asyncio.Future` objects.
 
-State captured:
+**State captured:**
 - `is_done`, `is_cancelled`
-- `<suitkaise-api>result</suitkaise-api>`, `exception`
+- `result`, `exception`
 
-Reconstruction: Returns `DeserializedFuture` placeholder with Future-like interface.
+**Reconstruction:** Returns `DeserializedFuture` placeholder with Future-like interface.
 
 (end of dropdown "FutureHandler")
 
-(start of dropdown "ClassObjectHandler")
+(start of dropdown "`ClassObjectHandler`")
 ### `ClassObjectHandler`
 
 Serializes class objects themselves (not instances).
@@ -1028,13 +1028,13 @@ Serializes class objects themselves (not instances).
 Module-level classes: Store reference (`module` + `name`)
 Dynamic classes: Serialize full definition using `ClassInstanceHandler._serialize_class_definition()`
 
-Reconstruction:
+**Reconstruction:**
 - Reference: Import from module
 - Definition: Reconstruct with `type()`
 
 (end of dropdown "ClassObjectHandler")
 
-(start of dropdown "ClassInstanceHandler")
+(start of dropdown "`ClassInstanceHandler`")
 ### `ClassInstanceHandler`
 
 Serializes instances of user-defined classes. This is the catch-all handler (last in the chain).
@@ -1047,7 +1047,7 @@ Extraction strategy hierarchy:
 5. Both `__dict__` and `__slots__` (for hybrid classes)
 6. Special-case `types.GenericAlias` (stores `origin` + `args`)
 
-State captured:
+**State captured:**
 - `module`, `qualname`: Class identity
 - `strategy`: Which strategy was used
 - `class_definition`: For locally-defined or `__main__` classes
@@ -1059,7 +1059,7 @@ Handles:
 - Dynamically created classes
 - `__slots__` classes
 
-Reconstruction:
+**Reconstruction:**
 - Get or recreate class (import or rebuild from definition)
 - Apply strategy-specific reconstruction
 - For `dict` strategy: `cls.__new__(cls)`, then `__dict__.update()`
@@ -1082,7 +1082,7 @@ For these cases, we return `Reconnector` instances that store as much metadata a
 3. `Reconnector` is constructed from IR state and returned
 4. `Reconnector.reconnect()` is called to create a new live resource (may require authentication)
 
-How it works:
+**How it works:**
 - `<suitkaise-api>cucumber</suitkaise-api>` creates a placeholder `Reconnector` object
 - You call `reconnect()` to create the new live resource, providing any authentication needed
 
@@ -1090,7 +1090,7 @@ How it works:
 
 `<suitkaise-api>cucumber</suitkaise-api>` also includes a function called `<suitkaise-api>reconnect_all</suitkaise-api>()`.
 
-Args:
+**Args:**
 - `start_threads`: if True, any `threading.Thread` objects returned by reconnectors are automatically started after reconnect. This is a keyword only argument.
 - `**auth`: a mapping of type key to secrets (authentication).
 
@@ -1129,7 +1129,7 @@ auth = {
 4. Otherwise, fall back to `"*"` for that type
 5. If no auth is found, `reconnect()` is called with no credentials
 
-(start of dropdown "DbReconnector")
+(start of dropdown "`DbReconnector`")
 ### `DbReconnector`
 
 Database connections can't be pickled directly, and many require additional credentials (like a password or API key) to connect.
@@ -1330,22 +1330,22 @@ You still need to call `reconnect()` or `<suitkaise-api>reconnect_all</suitkaise
 
 Live sockets are OS resources that can't be serialized safely.
 
-Data collected:
+**Data collected:**
 - `family`
 - `type`
 - `proto`
 - `timeout`
-- `<suitkaise-api>blocking</suitkaise-api>`
+- `blocking`
 - `local_addr`
 - `remote_addr`
 
 When you call `reconnect()`, the socket is created with the same parameters and reconnects/binds as appropriate.
 
-Result: `socket.socket` (fresh socket)
+**Result:** `socket.socket` (fresh socket)
 
-Limitations:
-- any in-flight data is lost
-- the new socket is not the exact same connection instance
+**Limitations:**
+- Any in-flight data is lost
+- The new socket is not the exact same connection instance
 
 ### `ThreadReconnector` --> `threading.Thread`
 
@@ -1357,7 +1357,7 @@ If an object is bouncing around different places in memory (running in different
 
 It is also useful when doing something like adding a `ThreadReconnector` to shared memory using `<suitkaise-api>Share</suitkaise-api>` or `<suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()` to quickly start a thread in multiple different places.
 
-Data collected:
+**Data collected:**
 - `name`
 - `daemon`
 - `target`
@@ -1367,7 +1367,7 @@ Data collected:
 
 When you call `reconnect()`, a new `threading.Thread` object is constructed with the same exact configuration.
 
-Result: `threading.Thread` (not started)
+**Result:** `threading.Thread` (not started)
 
 `<suitkaise-api>cucumber</suitkaise-api>` does not start the thread by default because that could cause silent issues or unexpected behavior. 
 
@@ -1376,19 +1376,19 @@ If you want to start the thread automatically when you reconnect, use:
 ```python
 thread = reconnector.reconnect(start=True)
 
-# <suitkaise-api>reconnect_all</suitkaise-api>()
+# reconnect_all()
 <suitkaise-api>reconnect_all</suitkaise-api>(obj, start_threads=True, **auth)
 
-# <suitkaise-api>autoreconnect</suitkaise-api> decorator on <suitkaise-api>Skprocess</suitkaise-api> class
+# autoreconnect decorator on Skprocess class
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
-@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)
+<suitkaise-api>@autoreconnect</suitkaise-api>(start_threads=True, **auth)
 class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
     # ...
 ```
 
-Limitations:
-- original execution state is not preserved
+**Limitations:**
+- Original execution state is not preserved
 
 ### `PipeReconnector` --> `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>` / OS pipes
 
@@ -1400,14 +1400,14 @@ Since pipes are actually OS handles, they cannot be converted down to bytes and 
 
 If you want to use pipes with `<suitkaise-api>cucumber</suitkaise-api>`, use the `<suitkaise-api>Pipe</suitkaise-api>` class from `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>` instead of relying on the `PipeReconnector`.
 
-Data collected:
+**Data collected:**
 - `readable`
 - `writable`
 - `closed`
 - `duplex`
 - `preferred_end`
 
-Reconnector specific attributes:
+**Reconnector specific attributes:**
 - `has_endpoint` (True if the original pipe was strictly read-only or write-only)
 - `endpoint` (`"read"` or `"write"` when `has_endpoint` is True)
 
@@ -1419,17 +1419,17 @@ Reconnector specific attributes:
 
 These are new `multiprocessing.connection.Connection` objects, that do not point to the original parent, but are still valid and ready to use.
 
-NOTE: `PipeReconnector` does not apply to `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>` objects. These are handled directly using `__serialize__` and `__deserialize__` and preserve pipe handles.
+**NOTE:** `PipeReconnector` does not apply to `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>` objects. These are handled directly using `__serialize__` and `__deserialize__` and preserve pipe handles.
 
-Limitations:
-- buffered data in the old pipe is lost
-- the new pipe is not connected to the existing peer process it came from
+**Limitations:**
+- Buffered data in the old pipe is lost
+- The new pipe is not connected to the existing peer process it came from
 
 ### `SubprocessReconnector` --> `subprocess.Popen`
 
 Subprocesses are OS processes and cannot be paused and moved between processes. We store the command args and output metadata so you can restart it if needed, but the actual process and its runtime state are not preserved.
 
-Data collected:
+**Data collected:**
 - `args`
 - `returncode`
 - `pid` (original)
@@ -1439,11 +1439,11 @@ Data collected:
 
 When you call `reconnect()`, a new subprocess is started with the saved launch parameters (args and other state). Because `SubprocessReconnector` does not require auth, it will also lazily reconnect on first attribute access, which starts a new process; use `.snapshot()` if you want metadata without starting a process.
 
-Result: `subprocess.Popen` (new process)
+**Result:** `subprocess.Popen` (new process)
 
-Limitations:
-- original PID and runtime state are not preserved
-- if the original process was running, it is not resumed, it is restarted
+**Limitations:**
+- Original PID and runtime state are not preserved
+- If the original process was running, it is not resumed, it is restarted
 
 ### `MatchReconnector` --> `re.Match`
 
@@ -1451,7 +1451,7 @@ Limitations:
 
 When you call `reconnect()`, the pattern is recompiled and re-run on the same string, and then groups and span info are restored. If the match is identical, a new `re.Match` is returned. `None` is returned if it is not.
 
-Data collected:
+**Data collected:**
 - `pattern`
 - `flags`
 - `string`
@@ -1462,10 +1462,10 @@ Data collected:
 - `groups`
 - `groupdict`
 
-Result: `re.Match` (if the match can be reproduced)
+**Result:** `re.Match` (if the match can be reproduced)
 
-Limitations:
-- if the input string or flags differ, the match may not reproduce.
+**Limitations:**
+- If the input string or flags differ, the match may not reproduce.
 
 ### Limitations
 
@@ -1491,15 +1491,15 @@ In general, it is not good practice to include sensitive data when moving object
 
 Automatically reconnecting things like this is awkward for users.
 
-- connections normally don't reconnect automatically
-- silently reconnecting things can cause silent failures or user confusion
-- users expect modules/tools like these to adhere to good practices when it comes to security and authentication
+- Connections normally don't reconnect automatically
+- Silently reconnecting things can cause silent failures or user confusion
+- Users expect modules/tools like these to adhere to good practices when it comes to security and authentication
 
 `<suitkaise-api>suitkaise</suitkaise-api>` offers 3 levels of user control regarding reconnection.
 
 1. (most manual control) calling `reconnect()` on each `Reconnector` object, adding each `auth` individually
 2. calling `<suitkaise-api>reconnect_all</suitkaise-api>(obj, **auth)` on an entire object
-3. (most automatic) using `@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)` to decorate a `<suitkaise-api>Skprocess</suitkaise-api>` class
+3. (most automatic) using `<suitkaise-api>@autoreconnect</suitkaise-api>(start_threads=True, **auth)` to decorate a `<suitkaise-api>Skprocess</suitkaise-api>` class
 
 We can automatically reconnect for you, but it is controlled and requires you to provide authentication through a decorator and use a specific class.
 (end of dropdown "Reconnectors")

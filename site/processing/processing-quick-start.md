@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "Quick Start: `<suitkaise-api>processing</suitkaise-api>`"
+title = "`<suitkaise-api>processing</suitkaise-api>` quick start guide"
 
 # 1.2
 
@@ -34,8 +34,8 @@ class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
         return self.value
 
 process = Doubler(5)
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>() # start, wait, return <suitkaise-api>result</suitkaise-api>
-print(<suitkaise-api>result</suitkaise-api>) # 10
+result = <suitkaise-api>process.run()</suitkaise-api> # start, wait, return result
+print(result) # 10
 ```
 
 ## Run it multiple times
@@ -52,8 +52,8 @@ class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
     def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.value
 
-<suitkaise-api>result</suitkaise-api> = Doubler(5).<suitkaise-api>run</suitkaise-api>()
-print(<suitkaise-api>result</suitkaise-api>) # 40 (5 → 10 → 20 → 40)
+result = Doubler(5).<suitkaise-api>run</suitkaise-api>()
+print(result) # 40 (5 → 10 → 20 → 40)
 ```
 
 ## Batch processing with Pool
@@ -64,8 +64,8 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkai
 def double(x):
     return x * 2
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-results = pool.<suitkaise-api>map</suitkaise-api>(double, [1, 2, 3, 4, 5])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+results = <suitkaise-api>pool.map(</suitkaise-api>double, [1, 2, 3, 4, 5])
 print(results) # [2, 4, 6, 8, 10]
 ```
 
@@ -74,7 +74,7 @@ print(results) # [2, 4, 6, 8, 10]
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 share.results = []
 
@@ -87,8 +87,8 @@ class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.share.results.append(self.item * 2)
         self.share.counter += 1
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(10)])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(10)])
 
 print(share.counter) # 10
 print(share.results) # [0, 2, 4, ..., 18]
@@ -108,14 +108,14 @@ class Echo(<suitkaise-api>Skprocess</suitkaise-api>):
             self.<suitkaise-api>tell</suitkaise-api>(f"echo: {self.msg}")
 
 process = Echo()
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 
-process.<suitkaise-api>tell</suitkaise-api>("hello")
-response = process.<suitkaise-api>listen</suitkaise-api>(timeout=2.0)
+<suitkaise-api>process.tell(</suitkaise-api>"hello")
+response = <suitkaise-api>process.listen(</suitkaise-api>timeout=2.0)
 print(response) # "echo: hello"
 
-process.<suitkaise-api>stop</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>process.stop()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
 ```
 
 ## Add retries and timeouts
@@ -124,7 +124,7 @@ process.<suitkaise-api>wait</suitkaise-api>()
 class ReliableWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3 # retry up to 2 times on crash
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 10.0 # 10 second timeout per <suitkaise-api>run</suitkaise-api>
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 10.0 # 10 second timeout per run
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
         do_work()

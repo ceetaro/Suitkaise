@@ -6,13 +6,12 @@
         <a href="#processing" class="module-bar-link" data-page="processing">how to use</a>
         <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
         <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
-        <a href="#processing-tests" class="module-bar-link" data-page="processing-tests">tests</a>
         <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
         <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Quick Start: <code><suitkaise-api>processing</suitkaise-api></code></h1>
+    <h1><code><suitkaise-api>processing</suitkaise-api></code> quick start guide</h1>
     <pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
     <h2>Run a process</h2>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
@@ -28,8 +27,8 @@ class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
         return self.value
 
 process = Doubler(5)
-<suitkaise-api>result</suitkaise-api> = process.<suitkaise-api>run</suitkaise-api>() # start, wait, return <suitkaise-api>result</suitkaise-api>
-print(<suitkaise-api>result</suitkaise-api>) # 10</code></pre>
+result = <suitkaise-api>process.run()</suitkaise-api> # start, wait, return result
+print(result) # 10</code></pre>
     <h2>Run it multiple times</h2>
     <pre><code class="language-python">class Doubler(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, value):
@@ -42,21 +41,21 @@ print(<suitkaise-api>result</suitkaise-api>) # 10</code></pre>
     def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.value
 
-<suitkaise-api>result</suitkaise-api> = Doubler(5).<suitkaise-api>run</suitkaise-api>()
-print(<suitkaise-api>result</suitkaise-api>) # 40 (5 → 10 → 20 → 40)</code></pre>
+result = Doubler(5).<suitkaise-api>run</suitkaise-api>()
+print(result) # 40 (5 → 10 → 20 → 40)</code></pre>
     <h2>Batch processing with Pool</h2>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
 
 def double(x):
     return x * 2
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-results = pool.<suitkaise-api>map</suitkaise-api>(double, [1, 2, 3, 4, 5])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+results = <suitkaise-api>pool.map(</suitkaise-api>double, [1, 2, 3, 4, 5])
 print(results) # [2, 4, 6, 8, 10]</code></pre>
     <h2>Share state across processes</h2>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 share.results = []
 
@@ -69,8 +68,8 @@ class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.share.results.append(self.item * 2)
         self.share.counter += 1
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(10)])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(10)])
 
 print(share.counter) # 10
 print(share.results) # [0, 2, 4, ..., 18]</code></pre>
@@ -86,19 +85,19 @@ class Echo(<suitkaise-api>Skprocess</suitkaise-api>):
             self.<suitkaise-api>tell</suitkaise-api>(f&quot;echo: {self.msg}&quot;)
 
 process = Echo()
-process.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
 
-process.<suitkaise-api>tell</suitkaise-api>(&quot;hello&quot;)
-response = process.<suitkaise-api>listen</suitkaise-api>(timeout=2.0)
+<suitkaise-api>process.tell(</suitkaise-api>&quot;hello&quot;)
+response = <suitkaise-api>process.listen(</suitkaise-api>timeout=2.0)
 print(response) # &quot;echo: hello&quot;
 
-process.<suitkaise-api>stop</suitkaise-api>()
-process.<suitkaise-api>wait</suitkaise-api>()</code></pre>
+<suitkaise-api>process.stop()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api></code></pre>
     <h2>Add retries and timeouts</h2>
     <pre><code class="language-python">class ReliableWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3 # retry up to 2 times on crash
-        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 10.0 # 10 second timeout per <suitkaise-api>run</suitkaise-api>
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 10.0 # 10 second timeout per run
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
         do_work()</code></pre>

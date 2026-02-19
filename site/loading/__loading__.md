@@ -20,7 +20,7 @@ There are two types of pages:
 ### Lazy-loaded Pages (Fetch Required)
 - Stored as separate HTML files in __code__/pages/
 - Loading animation displays while fetching
-- Examples: videos, tests (for all modules)
+- Examples: videos (for all modules)
 
 ## 2. Loading Animation Behavior
 
@@ -60,15 +60,10 @@ __code__/
 ├── script.js
 └── pages/
     ├── processing-videos.html
-    ├── processing-tests.html
     ├── cucumber-videos.html
-    ├── cucumber-tests.html
     ├── timing-videos.html
-    ├── timing-tests.html
     ├── paths-videos.html
-    ├── paths-tests.html
-    ├── circuits-videos.html
-    └── circuits-tests.html
+    └── circuits-videos.html
 
 ## 6. Adding New Lazy Pages
 

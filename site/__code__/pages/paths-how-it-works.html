@@ -6,7 +6,6 @@
         <a href="#paths" class="module-bar-link" data-page="paths">how to use</a>
         <a href="#paths-how-it-works" class="module-bar-link active" data-page="paths-how-it-works">how it works</a>
         <a href="#paths-examples" class="module-bar-link" data-page="paths-examples">examples</a>
-        <a href="#paths-tests" class="module-bar-link" data-page="paths-tests">tests</a>
         <a href="#paths-videos" class="module-bar-link" data-page="paths-videos">videos</a>
         <a href="#paths-learn" class="module-bar-link" data-page="paths-learn">learn</a>
     </nav>
@@ -18,18 +17,18 @@
         <li><code><suitkaise-api>Skpath</suitkaise-api></code> - enhanced path object with automatic project root detection</li>
         <li><code><suitkaise-api>autopath</suitkaise-api></code> - decorator for automatic path type conversion</li>
         <li><code><suitkaise-api>AnyPath</suitkaise-api></code> - streamline path handling using this union type</li>
-        <li>utility functions for project paths, validation, and sanitization</li>
+        <li>Utility functions for project paths, validation, and sanitization</li>
     </ul>
     <p>All paths use normalized separators (<code>/</code>) internally for cross-platform consistency.</p>
     <h2><code><suitkaise-api>Skpath</suitkaise-api></code></h2>
     <p>Enhanced path object that wraps <code>pathlib.Path</code>.</p>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path to wrap.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
         <li>If <code>None</code>, uses the caller&#x27;s file path</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: A new <code><suitkaise-api>Skpath</suitkaise-api></code> object.</p>
     <p>When you create an <code><suitkaise-api>Skpath</suitkaise-api></code>, it automatically:</p>
     <ol>
@@ -38,7 +37,7 @@
         <li>Computes the relative path to root (<code>rp</code>)</li>
         <li>Generates a reversible encoded ID (<code>id</code>)</li>
     </ol>
-    <pre><code class="language-python"><suitkaise-api>Skpath</suitkaise-api>(&quot;feature/file.txt&quot;) → detects root → computes ap, rp, id</code></pre>
+    <pre><code class="language-python"><suitkaise-api>Skpath(</suitkaise-api>&quot;feature/file.txt&quot;) → detects root → computes ap, rp, id</code></pre>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> defines a module-level <code>threading.RLock</code> (<code>_skpath_lock</code>) for potential thread-safe operations.</p>
     <h3>Tracking state</h3>
     <p><code>_path: Path</code> The underlying <code>pathlib.Path</code> object. Always resolved to an absolute path.</p>
@@ -78,7 +77,7 @@
     elif isinstance(path, str):
         # try multiple interpretations
         self._path = self._resolve_string_path(path)</code></pre>
-    <p>If <code>path</code> is <code>None</code>: Uses <code>detect_caller_path()</code> which inspects the call stack to find the file that called <code><suitkaise-api>Skpath</suitkaise-api>()</code>. This allows <code><suitkaise-api>Skpath</suitkaise-api>()</code> to return a path to &quot;this file&quot; without passing any argument.</p>
+    <p>If <code>path</code> is <code>None</code>: Uses <code>detect_caller_path()</code> which inspects the call stack to find the file that called <code><suitkaise-api>Skpath(</suitkaise-api>)</code>. This allows <code><suitkaise-api>Skpath(</suitkaise-api>)</code> to return a path to &quot;this file&quot; without passing any argument.</p>
     <p>If <code>path</code> is <code><suitkaise-api>Skpath</suitkaise-api></code>: Copies all cached values directly. This is an optimization - if someone passes an existing Skpath, we don&#x27;t recompute <code>ap</code>, <code>rp</code>, <code>id</code>, etc.</p>
     <p>If <code>path</code> is <code>Path</code>: Calls <code>.resolve()</code> to get an absolute path with symlinks resolved.</p>
     <p>If <code>path</code> is <code>str</code>: Calls <code>_resolve_string_path()</code> which tries multiple interpretations (see below).</p>
@@ -131,7 +130,7 @@ def _compute_rp(self) -&gt; str:
         return normalize_separators(str(rel_path))
     except (ValueError, <suitkaise-api>PathDetectionError</suitkaise-api>):
         return &quot;&quot;  # outside project root</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p>empty string if path is outside project root.</p>
     <h4><code>id</code> (encoded ID)</h4>
     <p>Reversible base64url encoded ID.</p>
@@ -142,7 +141,7 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
         self._id = encode_path_id(path_to_encode)
     return self._id</code></pre>
     <p>Uses <code>rp</code> if available (for cross-platform compatibility), otherwise <code>ap</code>.</p>
-    <p>Can be used to reconstruct the path: <code><suitkaise-api>Skpath</suitkaise-api>(encoded_id)</code>.</p>
+    <p>Can be used to reconstruct the path: <code><suitkaise-api>Skpath(</suitkaise-api>encoded_id)</code>.</p>
     <h4><code>root</code>, <code>root_str</code>, <code>root_path</code></h4>
     <p>Project root access in different formats.</p>
     <ul>
@@ -163,7 +162,7 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
     <h3>Path joining</h3>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> supports the <code>/</code> operator for joining paths.</p>
     <pre><code class="language-python">def __truediv__(self, other: str | Path | <suitkaise-api>Skpath</suitkaise-api>) -&gt; <suitkaise-api>Skpath</suitkaise-api>:
-    return <suitkaise-api>Skpath</suitkaise-api>(self._path / other_str)</code></pre>
+    return <suitkaise-api>Skpath(</suitkaise-api>self._path / other_str)</code></pre>
     <h3>Equality and hashing</h3>
     <p>Equality compares <code>rp</code> first (for cross-platform consistency), then falls back to <code>ap</code>.</p>
     <pre><code class="language-python">def __eq__(self, other: Any) -&gt; bool:
@@ -175,7 +174,7 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> implements <code>__fspath__()</code> to work with <code>open()</code>, <code>os.path</code>, etc.:</p>
     <pre><code class="language-python">def __fspath__(self) -&gt; str:
     return to_os_separators(self.ap)</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p>OS-native separators (<code>\</code> on Windows, <code>/</code> elsewhere).</p>
     <h2>Project Root Detection</h2>
     <p>Root detection walks up from a path looking for project indicators.</p>
@@ -191,21 +190,21 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
     </ol>
     <h3>Algorithm</h3>
     <pre><code class="language-python">def _find_root_from_path(start_path: Path) -&gt; Path | None:
-    # First pass: look for setup.<suitkaise-api>sk</suitkaise-api> specifically
+    # First pass: look for setup.sk specifically
     check_path = current
-    while check_path != check_path.<suitkaise-api>parent</suitkaise-api>:
-        if (check_path / &quot;setup.<suitkaise-api>sk</suitkaise-api>&quot;).exists():
+    while check_path != check_path.parent:
+        if (check_path / &quot;setup.sk&quot;).exists():
             return check_path
-        check_path = check_path.<suitkaise-api>parent</suitkaise-api>
+        check_path = check_path.parent
     
     # Second pass: look for any indicator
-    # Keep going up to find outermost <suitkaise-api>root</suitkaise-api> (handles nested projects)
+    # Keep going up to find outermost root (handles nested projects)
     check_path = current
     best_root = None
-    while check_path != check_path.<suitkaise-api>parent</suitkaise-api>:
+    while check_path != check_path.parent:
         if _has_indicator(check_path):
             best_root = check_path
-        check_path = check_path.<suitkaise-api>parent</suitkaise-api>
+        check_path = check_path.parent
     
     return best_root</code></pre>
     <h3>Caching</h3>
@@ -218,11 +217,11 @@ _cached_root_source: Path | None = None  # path used to detect cached root</code
     <p><code><suitkaise-api>set_custom_root</suitkaise-api>(path)</code>: Override automatic detection.</p>
     <p><code><suitkaise-api>get_custom_root</suitkaise-api>()</code>: Get current custom root (or <code>None</code>).</p>
     <p><code><suitkaise-api>clear_custom_root</suitkaise-api>()</code>: Revert to automatic detection.</p>
-    <p><code><suitkaise-api>CustomRoot</suitkaise-api>(path)</code>: Context manager for temporary override.</p>
+    <p><code><suitkaise-api>CustomRoot(</suitkaise-api>path)</code>: Context manager for temporary override.</p>
     <p>All operations are thread-safe using <code>threading.RLock</code>.</p>
     <h2><code><suitkaise-api>autopath</suitkaise-api></code> Decorator</h2>
     <p>Decorator that automatically converts path parameters based on type annotations.</p>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>use_caller</code>: If True, parameters that accept <code><suitkaise-api>Skpath</suitkaise-api></code> or <code>Path</code> will use the caller&#x27;s file path if no value was provided.</p>
     <ul>
         <li><code>bool = False</code></li>
@@ -244,14 +243,14 @@ _cached_root_source: Path | None = None  # path used to detect cached root</code
         <li>Identifies parameters annotated with path types</li>
         <li>Wraps the function to convert inputs before calling</li>
     </ol>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>()
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>()
 def process(path: <suitkaise-api>Skpath</suitkaise-api>):
-    # path is guaranteed to be <suitkaise-api>Skpath</suitkaise-api>
+    # path is guaranteed to be Skpath
     ...
 
 # Equivalent to:
 def process(path):
-    path = <suitkaise-api>Skpath</suitkaise-api>(path) # conversion happens here
+    <suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>path) # conversion happens here
     ...</code></pre>
     <h3>Type detection</h3>
     <p>The decorator recognizes:</p>
@@ -277,22 +276,22 @@ def process(path):
     </ul>
     <pre><code class="language-python">def _convert_value(value, target_type, ...):
     if target_type is <suitkaise-api>Skpath</suitkaise-api>:
-        return <suitkaise-api>Skpath</suitkaise-api>(value)
+        return <suitkaise-api>Skpath(</suitkaise-api>value)
     elif target_type is Path:
-        return Path(<suitkaise-api>Skpath</suitkaise-api>(value).ap)
+        return Path(<suitkaise-api>Skpath(</suitkaise-api>value).ap)
     elif target_type is str:
-        return <suitkaise-api>Skpath</suitkaise-api>(value).ap</code></pre>
+        return <suitkaise-api>Skpath(</suitkaise-api>value).ap</code></pre>
     <h3><code>use_caller</code> option</h3>
     <p>When <code>use_caller=True</code>, missing path parameters are filled with the caller&#x27;s file path.</p>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>(use_caller=True)
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>(use_caller=True)
 def log_from(path: <suitkaise-api>Skpath</suitkaise-api> = None):
-    print(f&quot;Logging from: {path.rp}&quot;)
+    print(f&quot;Logging from: {<suitkaise-api>path.rp</suitkaise-api>}&quot;)
 
 # Called without argument - uses caller&#x27;s file
 log_from() # logs the file that called log_from()</code></pre>
     <h3><code>only</code> option</h3>
     <p>Restrict conversion to specific parameters.</p>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>(only=&quot;file_path&quot;)
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>(only=&quot;file_path&quot;)
 def process(file_path: str, names: list[str]):
     # only file_path is normalized
     # names is left unchanged (faster for large lists)
@@ -302,40 +301,40 @@ def process(file_path: str, names: list[str]):
     <p>Get the project root directory.</p>
     <pre><code class="language-python">def <suitkaise-api>get_project_root</suitkaise-api>(expected_name: str | None = None) -&gt; <suitkaise-api>Skpath</suitkaise-api>:
     root_path = detect_project_root(expected_name=expected_name)
-    return <suitkaise-api>Skpath</suitkaise-api>(root_path)</code></pre>
-    <p><strong>Arguments</strong></p>
+    return <suitkaise-api>Skpath(</suitkaise-api>root_path)</code></pre>
+    <p>Arguments</p>
     <p><code>expected_name</code>: If provided, detected root must have this name.</p>
     <ul>
         <li><code>str | None = None</code></li>
         <li>positional or keyword</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Project root directory.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If root cannot be detected or doesn&#x27;t match expected name.</p>
     <h3><code><suitkaise-api>get_caller_path</suitkaise-api>()</code></h3>
     <p>Get the file path of the caller.</p>
     <pre><code class="language-python">def <suitkaise-api>get_caller_path</suitkaise-api>() -&gt; <suitkaise-api>Skpath</suitkaise-api>:
     caller = detect_caller_path(skip_frames=1)
-    return <suitkaise-api>Skpath</suitkaise-api>(caller)</code></pre>
+    return <suitkaise-api>Skpath(</suitkaise-api>caller)</code></pre>
     <p>Uses <code>detect_caller_path()</code> which inspects the call stack, skipping internal frames to find the actual caller.</p>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Caller&#x27;s file path.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If caller detection fails.</p>
     <h3><code><suitkaise-api>get_current_dir</suitkaise-api>()</code></h3>
     <p>Get the directory containing the caller&#x27;s file.</p>
     <pre><code class="language-python">def <suitkaise-api>get_current_dir</suitkaise-api>() -&gt; <suitkaise-api>Skpath</suitkaise-api>:
     caller = detect_caller_path(skip_frames=1)
-    return <suitkaise-api>Skpath</suitkaise-api>(caller.<suitkaise-api>parent</suitkaise-api>)</code></pre>
-    <p><strong>Returns</strong></p>
+    return <suitkaise-api>Skpath(</suitkaise-api>caller.parent)</code></pre>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Caller&#x27;s directory.</p>
     <h3><code><suitkaise-api>get_cwd</suitkaise-api>()</code></h3>
     <p>Get the current working directory.</p>
     <pre><code class="language-python">def <suitkaise-api>get_cwd</suitkaise-api>() -&gt; <suitkaise-api>Skpath</suitkaise-api>:
-    return <suitkaise-api>Skpath</suitkaise-api>(get_cwd_path())</code></pre>
+    return <suitkaise-api>Skpath(</suitkaise-api>get_cwd_path())</code></pre>
     <p>Uses <code>Path.cwd()</code> internally.</p>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Current working directory.</p>
     <h3><code><suitkaise-api>get_module_path</suitkaise-api>()</code></h3>
     <p>Get the file path where an object is defined.</p>
@@ -343,8 +342,8 @@ def process(file_path: str, names: list[str]):
     path = get_module_file_path(obj)
     if path is None:
         return None
-    return <suitkaise-api>Skpath</suitkaise-api>(path)</code></pre>
-    <p><strong>Arguments</strong></p>
+    return <suitkaise-api>Skpath(</suitkaise-api>path)</code></pre>
+    <p>Arguments</p>
     <p><code>obj</code>: Object to inspect (module, class, function, etc.).</p>
     <ul>
         <li><code>Any</code></li>
@@ -356,23 +355,23 @@ def process(file_path: str, names: list[str]):
         <li>Module name strings: Imports the module, then uses <code>__file__</code></li>
         <li>Objects with <code>__module__</code>: Gets the module, then uses <code>__file__</code></li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api> | None</code>: Module file path, or None if not found.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>ImportError</code>: If obj is a module name string that cannot be imported.</p>
     <h3><code><suitkaise-api>get_id</suitkaise-api>()</code></h3>
     <p>Get the reversible encoded ID for a path.</p>
     <pre><code class="language-python">def <suitkaise-api>get_id</suitkaise-api>(path: str | Path | <suitkaise-api>Skpath</suitkaise-api>) -&gt; str:
     if isinstance(path, <suitkaise-api>Skpath</suitkaise-api>):
         return path.<suitkaise-api>id</suitkaise-api>
-    return <suitkaise-api>Skpath</suitkaise-api>(path).<suitkaise-api>id</suitkaise-api></code></pre>
-    <p><strong>Arguments</strong></p>
+    return <suitkaise-api>Skpath(</suitkaise-api>path).<suitkaise-api>id</suitkaise-api></code></pre>
+    <p>Arguments</p>
     <p><code>path</code>: Path to generate ID for.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api></code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Base64url encoded ID.</p>
     <h3><code><suitkaise-api>get_project_paths</suitkaise-api>()</code></h3>
     <p>Get all paths in the project.</p>
@@ -388,7 +387,7 @@ def process(file_path: str, names: list[str]):
         as_strings=as_strings,
         use_ignore_files=use_ignore_files,
     )</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory (defaults to detected project root).</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -417,9 +416,9 @@ def process(file_path: str, names: list[str]):
         <li>Filters out explicitly excluded paths</li>
         <li>Returns as Skpath objects or strings</li>
     </ol>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>list[<suitkaise-api>Skpath</suitkaise-api>] | list[str]</code>: All project paths.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If project root cannot be detected.</p>
     <h3><code><suitkaise-api>get_project_structure</suitkaise-api>()</code></h3>
     <p>Get a nested dict representing the project structure.</p>
@@ -433,7 +432,7 @@ def process(file_path: str, names: list[str]):
         exclude=exclude,
         use_ignore_files=use_ignore_files,
     )</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -449,7 +448,7 @@ def process(file_path: str, names: list[str]):
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p>a nested dict where:</p>
     <ul>
         <li>Keys are directory/file names</li>
@@ -464,9 +463,9 @@ def process(file_path: str, names: list[str]):
         &quot;tests&quot;: {...}
     }
 }</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>dict</code>: Nested dictionary of project structure.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If project root cannot be detected.</p>
     <h3><code><suitkaise-api>get_formatted_project_tree</suitkaise-api>()</code></h3>
     <p>Get a formatted tree string for the project structure.</p>
@@ -484,7 +483,7 @@ def process(file_path: str, names: list[str]):
         depth=depth,
         include_files=include_files,
     )</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -517,9 +516,9 @@ def process(file_path: str, names: list[str]):
 │   └── utils/
 └── tests/
     └── test_main.py</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Formatted tree string.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If project root cannot be detected.</p>
     <h2>Path ID Encoding</h2>
     <p>Path IDs use base64url encoding for safe transport.</p>
@@ -550,13 +549,13 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
     </ul>
     <h2>Path Validation and Sanitization</h2>
     <h3><code><suitkaise-api>is_valid_filename</suitkaise-api>()</code></h3>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>filename</code>: Filename to validate.</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>bool</code>: True if valid, False otherwise.</p>
     <p>Checks if a filename is valid across common operating systems.</p>
     <ol>
@@ -568,7 +567,7 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
     </ol>
     <h3><code><suitkaise-api>streamline_path</suitkaise-api>()</code></h3>
     <p>Sanitizes a path by replacing invalid characters.</p>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path to sanitize.</p>
     <ul>
         <li><code>str</code></li>
@@ -605,7 +604,7 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Sanitized path.</p>
     <ol>
         <li>Strip whitespace (if enabled)</li>
@@ -634,7 +633,7 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
         chars_to_replace=&quot; &quot;,
         allow_unicode=False,
     )</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path to sanitize.</p>
     <ul>
         <li><code>str</code></li>
@@ -655,9 +654,9 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
         <li><code>bool = False</code></li>
         <li>positional or keyword</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Sanitized path.</p>
-    <p>This version:</p>
+    <p><strong>This version:</strong></p>
     <ul>
         <li>Always strips whitespace</li>
         <li>Replaces spaces with replacement char</li>
@@ -666,7 +665,7 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
     <h2>Exceptions</h2>
     <h3><code><suitkaise-api>PathDetectionError</suitkaise-api></code></h3>
     <p>Raised when path or project root detection fails.</p>
-    <p>Examples:</p>
+    <p><strong>Examples:</strong></p>
     <ul>
         <li>Project root cannot be detected (no indicators found)</li>
         <li>Custom root path doesn&#x27;t exist or isn&#x27;t a directory</li>
@@ -674,19 +673,19 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
     </ul>
     <h3><code><suitkaise-api>NotAFileError</suitkaise-api></code></h3>
     <p>Raised when a file operation is attempted on a directory.</p>
-    <p>Example: Calling <code><suitkaise-api>Skpath</suitkaise-api>.unlink()</code> on a directory.</p>
+    <p><strong>Example:</strong> Calling <code><suitkaise-api>Skpath</suitkaise-api>.unlink()</code> on a directory.</p>
     <h2>Types</h2>
     <h3><code><suitkaise-api>AnyPath</suitkaise-api></code></h3>
     <p>Type alias for path parameters that accept multiple types.</p>
     <pre><code class="language-python">from typing import Union
 
 # using Union for forward reference compatibility at runtime
-<suitkaise-api>AnyPath</suitkaise-api> = Union[str, Path, &quot;<suitkaise-api>Skpath</suitkaise-api>&quot;]</code></pre>
+<suitkaise-api>AnyPath</suitkaise-api> = Union[str, Path, &quot;Skpath&quot;]</code></pre>
     <p>Note: Does NOT include <code>None</code> - use <code><suitkaise-api>AnyPath</suitkaise-api> | None</code> when <code>None</code> is acceptable.</p>
     <p>Use in function annotations to indicate a parameter accepts any path type:</p>
     <pre><code class="language-python">def process(path: <suitkaise-api>AnyPath</suitkaise-api>) -&gt; None:
     ...</code></pre>
-    <p>When used with <code>@<suitkaise-api>autopath</suitkaise-api>()</code>, parameters annotated with <code><suitkaise-api>AnyPath</suitkaise-api></code> are converted to <code><suitkaise-api>Skpath</suitkaise-api></code> (the richest type in the union).</p>
+    <p>When used with <code><suitkaise-api>@autopath</suitkaise-api>()</code>, parameters annotated with <code><suitkaise-api>AnyPath</suitkaise-api></code> are converted to <code><suitkaise-api>Skpath</suitkaise-api></code> (the richest type in the union).</p>
     <h2>Thread Safety</h2>
     <p>Module-level state is protected by <code>threading.RLock</code> instances.</p>
     <ul>
@@ -696,6 +695,6 @@ def decode_path_id(encoded_id: str) -&gt; str | None:
         <li><code>_autopath_lock</code>: Defined for potential autopath operations (currently unused)</li>
         <li><code>_id_lock</code>: Defined in id_utils for potential ID operations (currently unused)</li>
     </ul>
-    <p>RLock (reentrant lock) is used because operations may call each other (e.g., <code>detect_project_root()</code> is called from both <code><suitkaise-api>Skpath</suitkaise-api>()</code> and custom root validation).</p>
+    <p>RLock (reentrant lock) is used because operations may call each other (e.g., <code>detect_project_root()</code> is called from both <code><suitkaise-api>Skpath(</suitkaise-api>)</code> and custom root validation).</p>
     <p>The root detection functions (<code><suitkaise-api>set_custom_root</suitkaise-api></code>, <code><suitkaise-api>get_custom_root</suitkaise-api></code>, <code><suitkaise-api>clear_custom_root</suitkaise-api></code>, <code>detect_project_root</code>) actively use locks to protect shared state.</p>
 </section>

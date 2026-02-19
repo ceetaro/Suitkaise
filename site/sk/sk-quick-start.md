@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "Quick Start: `<suitkaise-api>sk</suitkaise-api>`"
+title = "`<suitkaise-api>sk</suitkaise-api>` quick start guide"
 
 # 1.2
 
@@ -23,7 +23,7 @@ pip install <suitkaise-api>suitkaise</suitkaise-api>
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def fetch(url):
     return requests.get(url).json()
 
@@ -36,9 +36,9 @@ data = fetch.<suitkaise-api>retry</suitkaise-api>(times=3)("https://api.example.
 # timeout after 5 seconds
 data = fetch.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com")
 
-# <suitkaise-api>run</suitkaise-api> in background, get a Future
+# run in background, get a Future
 future = fetch.<suitkaise-api>background</suitkaise-api>()("https://api.example.com")
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+result = future.<suitkaise-api>result</suitkaise-api>()
 
 # rate limit to 2 calls per second
 data = fetch.rate_limit(2.0)("https://api.example.com")
@@ -60,7 +60,7 @@ data = fetch.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>retry</s
 ## Use on classes
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class DataProcessor:
     def __init__(self, config):
         self.config = config
@@ -78,7 +78,7 @@ processor = DataProcessor(config)
 processor.process(data)
 
 # with modifiers
-processor.process.<suitkaise-api>retry</suitkaise-api>(3)(data)
+processor.<suitkaise-api>process.retry(</suitkaise-api>3)(data)
 processor.save.<suitkaise-api>timeout</suitkaise-api>(10.0)("output.json")
 future = processor.save.<suitkaise-api>background</suitkaise-api>()("output.json")
 ```
@@ -90,19 +90,19 @@ When AST detection misses CPU-intensive work:
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def heavy_computation():
     return sum(x**2 for x in range(10_000_000))
 
-# now .<suitkaise-api>asynced</suitkaise-api>() and .<suitkaise-api>background</suitkaise-api>() are available
-<suitkaise-api>result</suitkaise-api> = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()
+# now .asynced() and .background() are available
+result = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()
 ```
 
 ## Check for blocking calls
 
 ```python
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def slow_fetch(url):
     return requests.get(url).text
 

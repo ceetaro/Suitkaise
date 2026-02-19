@@ -1,13 +1,13 @@
-# How to use `<suitkaise-api>paths</suitkaise-api>`
+# How to use `paths`
 
-`<suitkaise-api>paths</suitkaise-api>` provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.
+`paths` provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.
 
 Use it to work with paths relative to your project root, regardless of where your code is executed from.
 
-- `<suitkaise-api>Skpath</suitkaise-api>`
+- `Skpath`
 Enhanced path object that detects your project root. Cross-platform compatible.
 
-- `<suitkaise-api>autopath</suitkaise-api>`
+- `autopath`
 Decorator for automatic path type conversion. Smack it on all of your functions that work with paths, and no more type mismatches will ever happen again.
 
 - other super useful functions
@@ -16,42 +16,42 @@ There are a lot of other random annoying things you might come across when worki
 ## Importing
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from suitkaise import paths
 ```
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>, <suitkaise-api>PathDetectionError</suitkaise-api>, <suitkaise-api>NotAFileError</suitkaise-api>, <suitkaise-api>CustomRoot</suitkaise-api>, <suitkaise-api>set_custom_root</suitkaise-api>, <suitkaise-api>get_custom_root</suitkaise-api>, <suitkaise-api>clear_custom_root</suitkaise-api>, <suitkaise-api>get_project_root</suitkaise-api>, <suitkaise-api>get_caller_path</suitkaise-api>, <suitkaise-api>get_current_dir</suitkaise-api>, <suitkaise-api>get_cwd</suitkaise-api>, <suitkaise-api>get_module_path</suitkaise-api>, <suitkaise-api>get_id</suitkaise-api>, <suitkaise-api>get_project_paths</suitkaise-api>, <suitkaise-api>get_project_structure</suitkaise-api>, <suitkaise-api>get_formatted_project_tree</suitkaise-api>, <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
+from suitkaise.paths import Skpath, autopath, AnyPath, PathDetectionError, NotAFileError, CustomRoot, set_custom_root, get_custom_root, clear_custom_root, get_project_root, get_caller_path, get_current_dir, get_cwd, get_module_path, get_id, get_project_paths, get_project_structure, get_formatted_project_tree, is_valid_filename, streamline_path, streamline_path_quick
 ```
 
-## `<suitkaise-api>Skpath</suitkaise-api>`
+## `Skpath`
 
 Enhanced path object with automatic project root detection.
 
 All paths use normalized separators (`/`) for cross-platform consistency.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
+from suitkaise.paths import Skpath
 
 # create from caller's file path
-path = <suitkaise-api>Skpath</suitkaise-api>()
+path = Skpath()
 
 # create from string
-path = <suitkaise-api>Skpath</suitkaise-api>("myproject/feature/file.txt")
+path = Skpath("myproject/feature/file.txt")
 
 # create from Path object
 from pathlib import Path
 path = Path("myproject/feature/file.txt")
-path = <suitkaise-api>Skpath</suitkaise-api>(path)
+path = Skpath(path)
 
 # create from encoded ID
-path = <suitkaise-api>Skpath</suitkaise-api>("bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ")
+path = Skpath("bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ")
 ```
 
 ### Constructor
 
 Arguments
 `path`: Path to wrap.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
+- `str | Path | Skpath | None = None`
 - If `None`, uses the caller's file path
 
 ### Core Properties
@@ -69,10 +69,10 @@ Arguments
 `id`: Reversible base64url encoded ID.
 - `str`
 - read-only
-- can be used to reconstruct the path: `<suitkaise-api>Skpath</suitkaise-api>(encoded_id)`
+- can be used to reconstruct the path: `Skpath(encoded_id)`
 
 `root`: Project root as Skpath object.
-- `<suitkaise-api>Skpath</suitkaise-api>`
+- `Skpath`
 - read-only
 
 `root_str`: Project root as string with normalized separators.
@@ -84,12 +84,12 @@ Arguments
 - read-only
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("src/main.py")
+path = Skpath("src/main.py")
 
 path.ap      # "/Users/me/myproject/src/main.py"
 path.rp      # "src/main.py"
-path.<suitkaise-api>id</suitkaise-api>      # "c3JjL21haW4ucHk"
-path.<suitkaise-api>root</suitkaise-api>    # <suitkaise-api>Skpath</suitkaise-api>('/Users/me/myproject')
+path.id      # "c3JjL21haW4ucHk"
+path.root    # Skpath('/Users/me/myproject')
 ```
 
 ### Properties
@@ -107,10 +107,10 @@ path.<suitkaise-api>root</suitkaise-api>    # <suitkaise-api>Skpath</suitkaise-a
 - `list[str]`
 
 `parent`: Parent directory as Skpath.
-- `<suitkaise-api>Skpath</suitkaise-api>`
+- `Skpath`
 
 `parents`: All parent directories as Skpath objects.
-- `tuple[<suitkaise-api>Skpath</suitkaise-api>, ...]`
+- `tuple[Skpath, ...]`
 
 `parts`: Path components as tuple.
 - `tuple[str, ...]`
@@ -150,7 +150,7 @@ path.<suitkaise-api>root</suitkaise-api>    # <suitkaise-api>Skpath</suitkaise-a
 Use the `/` operator to join paths:
 
 ```python
-root = <suitkaise-api>Skpath</suitkaise-api>()
+root = Skpath()
 data_file = root / "data" / "file.txt"
 ```
 
@@ -161,13 +161,13 @@ data_file = root / "data" / "file.txt"
 Iterate over directory contents.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("src")
+path = Skpath("src")
 for item in path.iterdir():
     print(item.name)
 ```
 
 Returns
-`Generator[<suitkaise-api>Skpath</suitkaise-api>]`: Each item in the directory.
+`Generator[Skpath]`: Each item in the directory.
 
 Raises
 `NotADirectoryError`: If path is not a directory.
@@ -177,7 +177,7 @@ Raises
 Find paths matching a pattern.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("src")
+path = Skpath("src")
 for py_file in path.glob("*.py"):
     print(py_file.name)
 ```
@@ -188,15 +188,15 @@ Arguments
 - required
 
 Returns
-`Generator[<suitkaise-api>Skpath</suitkaise-api>]`: Matching paths.
+`Generator[Skpath]`: Matching paths.
 
 #### `rglob()`
 
 Recursively find paths matching a pattern.
 
 ```python
-root = <suitkaise-api>Skpath</suitkaise-api>()
-for py_file in <suitkaise-api>root</suitkaise-api>.rglob("*.py"):
+root = Skpath()
+for py_file in root.rglob("*.py"):
     print(py_file.rp)
 ```
 
@@ -206,25 +206,25 @@ Arguments
 - required
 
 Returns
-`Generator[<suitkaise-api>Skpath</suitkaise-api>]`: Matching paths in all subdirectories.
+`Generator[Skpath]`: Matching paths in all subdirectories.
 
 #### `relative_to()`
 
 Get path relative to another path.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("src/utils/helpers.py")
+path = Skpath("src/utils/helpers.py")
 rel = path.relative_to("src")
-# <suitkaise-api>Skpath</suitkaise-api>("utils/helpers.py")
+# Skpath("utils/helpers.py")
 ```
 
 Arguments
 `other`: Base path.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api>`
+- `str | Path | Skpath`
 - required
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Relative path.
+`Skpath`: Relative path.
 
 Raises
 `ValueError`: If path is not relative to other.
@@ -234,9 +234,9 @@ Raises
 Return path with changed name.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
+path = Skpath("data/file.txt")
 new_path = path.with_name("other.txt")
-# <suitkaise-api>Skpath</suitkaise-api>("data/other.txt")
+# Skpath("data/other.txt")
 ```
 
 Arguments
@@ -245,14 +245,14 @@ Arguments
 - required
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Path with new name.
+`Skpath`: Path with new name.
 
 #### `read_text()` / `write_text()`
 
 Read and write text files (mirrors `pathlib.Path`).
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/config.json")
+path = Skpath("data/config.json")
 path.write_text("{}")
 contents = path.read_text()
 ```
@@ -268,7 +268,7 @@ Returns
 Read and write binary files (mirrors `pathlib.Path`).
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/blob.bin")
+path = Skpath("data/blob.bin")
 path.write_bytes(b"\x00\x01")
 data = path.read_bytes()
 ```
@@ -281,9 +281,9 @@ Returns
 Return path with changed stem (filename without suffix).
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
+path = Skpath("data/file.txt")
 new_path = path.with_stem("other")
-# <suitkaise-api>Skpath</suitkaise-api>("data/other.txt")
+# Skpath("data/other.txt")
 ```
 
 Arguments
@@ -292,16 +292,16 @@ Arguments
 - required
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Path with new stem.
+`Skpath`: Path with new stem.
 
 #### `with_suffix()`
 
 Return path with changed suffix.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
+path = Skpath("data/file.txt")
 new_path = path.with_suffix(".json")
-# <suitkaise-api>Skpath</suitkaise-api>("data/file.json")
+# Skpath("data/file.json")
 ```
 
 Arguments
@@ -310,18 +310,18 @@ Arguments
 - required
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Path with new suffix.
+`Skpath`: Path with new suffix.
 
 #### `mkdir()`
 
 Create directory.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("new_dir")
+path = Skpath("new_dir")
 path.mkdir()
 
 # create parent directories
-path = <suitkaise-api>Skpath</suitkaise-api>("parent/child/grandchild")
+path = Skpath("parent/child/grandchild")
 path.mkdir(parents=True)
 ```
 
@@ -347,7 +347,7 @@ Raises
 Create file or update timestamp.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("new_file.txt")
+path = Skpath("new_file.txt")
 path.touch()
 ```
 
@@ -365,7 +365,7 @@ Arguments
 Remove empty directory.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("empty_dir")
+path = Skpath("empty_dir")
 path.rmdir()
 ```
 
@@ -378,7 +378,7 @@ Raises
 Remove file or symbolic link.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("file.txt")
+path = Skpath("file.txt")
 path.unlink()
 
 # don't raise if file doesn't exist
@@ -399,31 +399,31 @@ Raises
 Return absolute path, resolving symlinks.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("./relative/path")
+path = Skpath("./relative/path")
 resolved = path.resolve()
 ```
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Absolute path with symlinks resolved.
+`Skpath`: Absolute path with symlinks resolved.
 
 #### `absolute()`
 
 Return absolute version of path.
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("relative/path")
+path = Skpath("relative/path")
 abs_path = path.absolute()
 ```
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Absolute path.
+`Skpath`: Absolute path.
 
 #### `copy_to()`
 
 Copy path to destination.
 
 ```python
-source = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
+source = Skpath("data/file.txt")
 dest = source.copy_to("backup/file.txt")
 
 # with options
@@ -432,7 +432,7 @@ dest = source.copy_to("backup/", overwrite=True, parents=True)
 
 Arguments
 `destination`: Target path or directory.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api>`
+- `str | Path | Skpath`
 - required
 
 `overwrite`: Remove existing destination.
@@ -444,7 +444,7 @@ Arguments
 - keyword only
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Path to the copied file/directory.
+`Skpath`: Path to the copied file/directory.
 
 Raises
 `FileNotFoundError`: If source path doesn't exist.
@@ -455,7 +455,7 @@ Raises
 Move path to destination.
 
 ```python
-source = <suitkaise-api>Skpath</suitkaise-api>("temp/file.txt")
+source = Skpath("temp/file.txt")
 dest = source.move_to("data/file.txt")
 
 # with options
@@ -464,7 +464,7 @@ dest = source.move_to("archive/", overwrite=True, parents=True)
 
 Arguments
 `destination`: Target path or directory.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api>`
+- `str | Path | Skpath`
 - required
 
 `overwrite`: Remove existing destination.
@@ -476,7 +476,7 @@ Arguments
 - keyword only
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Path to the moved file/directory.
+`Skpath`: Path to the moved file/directory.
 
 Raises
 `FileNotFoundError`: If source path doesn't exist.
@@ -484,10 +484,10 @@ Raises
 
 ### os.fspath Compatibility
 
-`<suitkaise-api>Skpath</suitkaise-api>` works with `open()`, `os.path`, and other functions that accept paths:
+`Skpath` works with `open()`, `os.path`, and other functions that accept paths:
 
 ```python
-path = <suitkaise-api>Skpath</suitkaise-api>("data/file.txt")
+path = Skpath("data/file.txt")
 
 # works directly with open()
 with open(path, 'r') as f:
@@ -498,22 +498,22 @@ import os
 os.path.exists(path)
 ```
 
-## `<suitkaise-api>autopath</suitkaise-api>` Decorator
+## `autopath` Decorator
 
 Automatically converts path parameters based on type annotations.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
+from suitkaise.paths import autopath, AnyPath, Skpath
 
-@<suitkaise-api>autopath</suitkaise-api>()
-def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
-    # path is guaranteed to be <suitkaise-api>Skpath</suitkaise-api>
-    return path.<suitkaise-api>id</suitkaise-api>
+@autopath()
+def process(path: AnyPath):
+    # path is guaranteed to be Skpath
+    return path.id
 
 # works with any input type
 process("src/main.py")
 process(Path("src/main.py"))
-process(<suitkaise-api>Skpath</suitkaise-api>("src/main.py"))
+process(Skpath("src/main.py"))
 ```
 
 Arguments
@@ -534,23 +534,23 @@ Arguments
 The decorator converts parameters based on their type annotations.
 
 Supported types:
-- `<suitkaise-api>Skpath</suitkaise-api>` → converted to Skpath
+- `Skpath` → converted to Skpath
 - `Path` → normalized through Skpath, converted to Path
 - `str` → normalized through Skpath, returns absolute path string
-- `<suitkaise-api>AnyPath</suitkaise-api>` (or any union containing Skpath) → converted to Skpath (richest type)
+- `AnyPath` (or any union containing Skpath) → converted to Skpath (richest type)
 - `str | Path` (union without Skpath) → converted to Path
 
 Supported iterables:
-- `list[<suitkaise-api>Skpath</suitkaise-api>]`, `list[Path]`, `list[str]`
-- `tuple[<suitkaise-api>Skpath</suitkaise-api>, ...]`, `tuple[Path, ...]`, `tuple[str, ...]`
-- `set[<suitkaise-api>Skpath</suitkaise-api>]`, `set[Path]`, `set[str]`
-- `frozenset[<suitkaise-api>Skpath</suitkaise-api>]`, `frozenset[Path]`, `frozenset[str]`
-- `Iterable[<suitkaise-api>Skpath</suitkaise-api>]`, `Iterable[Path]`, `Iterable[str]` (converted to list)
+- `list[Skpath]`, `list[Path]`, `list[str]`
+- `tuple[Skpath, ...]`, `tuple[Path, ...]`, `tuple[str, ...]`
+- `set[Skpath]`, `set[Path]`, `set[str]`
+- `frozenset[Skpath]`, `frozenset[Path]`, `frozenset[str]`
+- `Iterable[Skpath]`, `Iterable[Path]`, `Iterable[str]` (converted to list)
 
 ```python
-@<suitkaise-api>autopath</suitkaise-api>()
+@autopath()
 def process(
-    path: <suitkaise-api>Skpath</suitkaise-api>,
+    path: Skpath,
     files: list[Path],
     names: set[str],
 ):
@@ -562,8 +562,8 @@ def process(
 Fill missing path parameters with the caller's file path.
 
 ```python
-@<suitkaise-api>autopath</suitkaise-api>(use_caller=True)
-def log_from(path: <suitkaise-api>Skpath</suitkaise-api> = None):
+@autopath(use_caller=True)
+def log_from(path: Skpath = None):
     print(f"Logging from: {path.rp}")
 
 # called without argument - uses caller's file
@@ -575,7 +575,7 @@ log_from()  # prints the file that called log_from()
 Restrict conversion to specific parameters (faster for large lists).
 
 ```python
-@<suitkaise-api>autopath</suitkaise-api>(only="file_path")
+@autopath(only="file_path")
 def process(file_path: str, names: list[str], ids: list[str]):
     # only file_path is normalized
     # names and ids are left unchanged
@@ -587,25 +587,25 @@ def process(file_path: str, names: list[str], ids: list[str]):
 Print conversion messages.
 
 ```python
-@<suitkaise-api>autopath</suitkaise-api>(debug=True)
-def process(path: <suitkaise-api>Skpath</suitkaise-api>):
+@autopath(debug=True)
+def process(path: Skpath):
     return path
 
 process("src/main.py")
-# @<suitkaise-api>autopath</suitkaise-api>: Converted path: str → <suitkaise-api>Skpath</suitkaise-api>
+# @autopath: Converted path: str → Skpath
 ```
 
 ## Project Root
 
-### `<suitkaise-api>get_project_root</suitkaise-api>()`
+### `get_project_root()`
 
 Get the project root directory.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from suitkaise import paths
 
-root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
-# <suitkaise-api>Skpath</suitkaise-api>('/Users/me/myproject')
+root = paths.get_project_root()
+# Skpath('/Users/me/myproject')
 ```
 
 Arguments
@@ -614,17 +614,17 @@ Arguments
 - positional or keyword
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Project root directory.
+`Skpath`: Project root directory.
 
 Raises
-`<suitkaise-api>PathDetectionError</suitkaise-api>`: If root cannot be detected or doesn't match expected name.
+`PathDetectionError`: If root cannot be detected or doesn't match expected name.
 
-### `<suitkaise-api>set_custom_root</suitkaise-api>()`
+### `set_custom_root()`
 
 Override automatic root detection.
 
 ```python
-<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>set_custom_root</suitkaise-api>("/my/project")
+paths.set_custom_root("/my/project")
 ```
 
 Arguments
@@ -633,84 +633,84 @@ Arguments
 - required
 
 Raises
-`<suitkaise-api>PathDetectionError</suitkaise-api>`: If path doesn't exist or isn't a directory.
+`PathDetectionError`: If path doesn't exist or isn't a directory.
 
-### `<suitkaise-api>get_custom_root</suitkaise-api>()`
+### `get_custom_root()`
 
 Get the current custom root.
 
 ```python
-current = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_custom_root</suitkaise-api>()
+current = paths.get_custom_root()
 # "/my/project" or None
 ```
 
 Returns
 `str | None`: Custom root path or None.
 
-### `<suitkaise-api>clear_custom_root</suitkaise-api>()`
+### `clear_custom_root()`
 
 Revert to automatic root detection.
 
 ```python
-<suitkaise-api>paths</suitkaise-api>.<suitkaise-api>clear_custom_root</suitkaise-api>()
+paths.clear_custom_root()
 ```
 
-### `<suitkaise-api>CustomRoot</suitkaise-api>` Context Manager
+### `CustomRoot` Context Manager
 
 Temporarily set a custom root:
 
 ```python
-with <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>CustomRoot</suitkaise-api>("/my/project"):
-    root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
-    # <suitkaise-api>Skpath</suitkaise-api>('/my/project')
+with paths.CustomRoot("/my/project"):
+    root = paths.get_project_root()
+    # Skpath('/my/project')
 
 # reverts to automatic detection after the block
 ```
 
 ## Caller Path Functions
 
-### `<suitkaise-api>get_caller_path</suitkaise-api>()`
+### `get_caller_path()`
 
 Get the file path of the caller.
 
 ```python
-caller = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_caller_path</suitkaise-api>()
+caller = paths.get_caller_path()
 ```
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Caller's file path.
+`Skpath`: Caller's file path.
 
-### `<suitkaise-api>get_current_dir</suitkaise-api>()`
+### `get_current_dir()`
 
 Get the directory containing the caller's file.
 
 ```python
-current_dir = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_current_dir</suitkaise-api>()
+current_dir = paths.get_current_dir()
 ```
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Caller's directory.
+`Skpath`: Caller's directory.
 
-### `<suitkaise-api>get_cwd</suitkaise-api>()`
+### `get_cwd()`
 
 Get the current working directory.
 
 ```python
-cwd = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_cwd</suitkaise-api>()
+cwd = paths.get_cwd()
 ```
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api>`: Current working directory.
+`Skpath`: Current working directory.
 
-### `<suitkaise-api>get_module_path</suitkaise-api>()`
+### `get_module_path()`
 
 Get the file path where an object is defined.
 
 ```python
 from myapp import MyClass
 
-path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(MyClass)
-# <suitkaise-api>Skpath</suitkaise-api> pointing to the file where MyClass is defined
+path = paths.get_module_path(MyClass)
+# Skpath pointing to the file where MyClass is defined
 ```
 
 Arguments
@@ -719,38 +719,38 @@ Arguments
 - required
 
 Returns
-`<suitkaise-api>Skpath</suitkaise-api> | None`: Module file path or None if not found.
+`Skpath | None`: Module file path or None if not found.
 
 ## Project Path Functions
 
-### `<suitkaise-api>get_project_paths</suitkaise-api>()`
+### `get_project_paths()`
 
 Get all paths in the project.
 
 ```python
-# get all <suitkaise-api>paths</suitkaise-api>
-all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>()
+# get all paths
+all_paths = paths.get_project_paths()
 
 # use a custom root
-all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(root="src")
+all_paths = paths.get_project_paths(root="src")
 
-# exclude specific <suitkaise-api>paths</suitkaise-api>
-all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(exclude=["build", "dist"])
+# exclude specific paths
+all_paths = paths.get_project_paths(exclude=["build", "dist"])
 
 # get as strings for memory efficiency
-all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(as_strings=True)
+all_paths = paths.get_project_paths(as_strings=True)
 
 # ignore .*ignore files
-all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(use_ignore_files=False)
+all_paths = paths.get_project_paths(use_ignore_files=False)
 ```
 
 Arguments
 `root`: Custom root directory.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
+- `str | Path | Skpath | None = None`
 - keyword only
 
 `exclude`: Paths to exclude.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
+- `str | Path | Skpath | list[...] | None = None`
 - keyword only
 
 `as_strings`: Return string paths instead of Skpath objects.
@@ -762,14 +762,14 @@ Arguments
 - keyword only
 
 Returns
-`list[<suitkaise-api>Skpath</suitkaise-api>] | list[str]`: All project paths.
+`list[Skpath] | list[str]`: All project paths.
 
-### `<suitkaise-api>get_project_structure</suitkaise-api>()`
+### `get_project_structure()`
 
 Get a nested dict representing the project structure.
 
 ```python
-structure = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_structure</suitkaise-api>()
+structure = paths.get_project_structure()
 # {
 #     "myproject": {
 #         "src": {
@@ -783,11 +783,11 @@ structure = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_stru
 
 Arguments
 `root`: Custom root directory.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
+- `str | Path | Skpath | None = None`
 - keyword only
 
 `exclude`: Paths to exclude.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
+- `str | Path | Skpath | list[...] | None = None`
 - keyword only
 
 `use_ignore_files`: Respect .gitignore, .cursorignore, etc.
@@ -797,12 +797,12 @@ Arguments
 Returns
 `dict`: Nested dictionary of project structure.
 
-### `<suitkaise-api>get_formatted_project_tree</suitkaise-api>()`
+### `get_formatted_project_tree()`
 
 Get a formatted tree string for the project structure.
 
 ```python
-tree = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_formatted_project_tree</suitkaise-api>()
+tree = paths.get_formatted_project_tree()
 print(tree)
 # myproject/
 # ├── src/
@@ -814,11 +814,11 @@ print(tree)
 
 Arguments
 `root`: Custom root directory.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None`
+- `str | Path | Skpath | None = None`
 - keyword only
 
 `exclude`: Paths to exclude.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api> | list[...] | None = None`
+- `str | Path | Skpath | list[...] | None = None`
 - keyword only
 
 `use_ignore_files`: Respect .gitignore, .cursorignore, etc.
@@ -838,21 +838,21 @@ Returns
 
 ## Path ID Functions
 
-### `<suitkaise-api>get_id</suitkaise-api>()`
+### `get_id()`
 
 Get the reversible encoded ID for a path.
 
 ```python
-path_id = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_id</suitkaise-api>("myproject/feature/file.txt")
+path_id = paths.get_id("myproject/feature/file.txt")
 # "bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ"
 
 # same as
-path_id = <suitkaise-api>Skpath</suitkaise-api>("myproject/feature/file.txt").<suitkaise-api>id</suitkaise-api>
+path_id = Skpath("myproject/feature/file.txt").id
 ```
 
 Arguments
 `path`: Path to generate ID for.
-- `str | Path | <suitkaise-api>Skpath</suitkaise-api>`
+- `str | Path | Skpath`
 - required
 
 Returns
@@ -860,17 +860,17 @@ Returns
 
 ## Path Validation Functions
 
-### `<suitkaise-api>is_valid_filename</suitkaise-api>()`
+### `is_valid_filename()`
 
 Check if a filename is valid across operating systems.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>
+from suitkaise.paths import is_valid_filename
 
-<suitkaise-api>is_valid_filename</suitkaise-api>("my_file.txt")     # True
-<suitkaise-api>is_valid_filename</suitkaise-api>("file<name>.txt")  # False (contains <, >)
-<suitkaise-api>is_valid_filename</suitkaise-api>("CON")             # False (Windows reserved)
-<suitkaise-api>is_valid_filename</suitkaise-api>("")                # False (empty)
+is_valid_filename("my_file.txt")     # True
+is_valid_filename("file<name>.txt")  # False (contains <, >)
+is_valid_filename("CON")             # False (Windows reserved)
+is_valid_filename("")                # False (empty)
 ```
 
 Arguments
@@ -881,27 +881,27 @@ Arguments
 Returns
 `bool`: True if valid, False otherwise.
 
-### `<suitkaise-api>streamline_path</suitkaise-api>()`
+### `streamline_path()`
 
 Sanitize a path by replacing invalid characters.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>streamline_path</suitkaise-api>
+from suitkaise.paths import streamline_path
 
 # basic cleanup
-path = <suitkaise-api>streamline_path</suitkaise-api>("My File<1>.txt", chars_to_replace=" ")
+path = streamline_path("My File<1>.txt", chars_to_replace=" ")
 # "My_File_1_.txt"
 
 # lowercase and limit length
-path = <suitkaise-api>streamline_path</suitkaise-api>("My Long Filename.txt", max_len=10, lowercase=True, chars_to_replace=" ")
+path = streamline_path("My Long Filename.txt", max_len=10, lowercase=True, chars_to_replace=" ")
 # "my_long_fi.txt"
 
 # replace invalid chars with custom character
-path = <suitkaise-api>streamline_path</suitkaise-api>("file:name.txt", replacement_char="-")
+path = streamline_path("file:name.txt", replacement_char="-")
 # "file-name.txt"
 
 # ASCII only
-path = <suitkaise-api>streamline_path</suitkaise-api>("файл.txt", allow_unicode=False)
+path = streamline_path("файл.txt", allow_unicode=False)
 # "____.txt"
 ```
 
@@ -937,14 +937,14 @@ Arguments
 Returns
 `str`: Sanitized path.
 
-### `<suitkaise-api>streamline_path_quick</suitkaise-api>()`
+### `streamline_path_quick()`
 
-Simple version of `<suitkaise-api>streamline_path</suitkaise-api>` that replaces all invalid and unicode characters.
+Simple version of `streamline_path` that replaces all invalid and unicode characters.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
+from suitkaise import paths
 
-path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>streamline_path_quick</suitkaise-api>("My File<1>файл.txt")
+path = paths.streamline_path_quick("My File<1>файл.txt")
 # "My_File_1_____.txt"
 ```
 
@@ -970,17 +970,17 @@ Returns
 
 ## Exceptions
 
-### `<suitkaise-api>PathDetectionError</suitkaise-api>`
+### `PathDetectionError`
 
 Raised when path or project root detection fails.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>PathDetectionError</suitkaise-api>
+from suitkaise import paths
+from suitkaise.paths import PathDetectionError
 
 try:
-    root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
-except <suitkaise-api>PathDetectionError</suitkaise-api>:
+    root = paths.get_project_root()
+except PathDetectionError:
     print("Could not detect project root")
 ```
 
@@ -989,32 +989,32 @@ Common causes:
 - Custom root path doesn't exist or isn't a directory
 - Expected root name doesn't match detected root
 
-### `<suitkaise-api>NotAFileError</suitkaise-api>`
+### `NotAFileError`
 
 Raised when a file operation is attempted on a directory.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>NotAFileError</suitkaise-api>
+from suitkaise.paths import Skpath, NotAFileError
 
-path = <suitkaise-api>Skpath</suitkaise-api>("some_directory")
+path = Skpath("some_directory")
 try:
     path.unlink()  # attempting to unlink a directory
-except <suitkaise-api>NotAFileError</suitkaise-api>:
+except NotAFileError:
     print("Cannot unlink a directory")
 ```
 
 ## Types
 
-### `<suitkaise-api>AnyPath</suitkaise-api>`
+### `AnyPath`
 
 Type alias for parameters that accept any path type.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>AnyPath</suitkaise-api>
+from suitkaise.paths import AnyPath
 
-def process(path: <suitkaise-api>AnyPath</suitkaise-api>) -> None:
-    # path can be str, Path, or <suitkaise-api>Skpath</suitkaise-api>
+def process(path: AnyPath) -> None:
+    # path can be str, Path, or Skpath
     ...
 ```
 
-Note: `<suitkaise-api>AnyPath</suitkaise-api>` does NOT include `None`. Use `<suitkaise-api>AnyPath</suitkaise-api> | None` when `None` is acceptable.
+Note: `AnyPath` does NOT include `None`. Use `AnyPath | None` when `None` is acceptable.

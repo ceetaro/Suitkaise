@@ -6,7 +6,6 @@
         <a href="#paths" class="module-bar-link active" data-page="paths">how to use</a>
         <a href="#paths-how-it-works" class="module-bar-link" data-page="paths-how-it-works">how it works</a>
         <a href="#paths-examples" class="module-bar-link" data-page="paths-examples">examples</a>
-        <a href="#paths-tests" class="module-bar-link" data-page="paths-tests">tests</a>
         <a href="#paths-videos" class="module-bar-link" data-page="paths-videos">videos</a>
         <a href="#paths-learn" class="module-bar-link" data-page="paths-learn">learn</a>
     </nav>
@@ -24,7 +23,7 @@
     </ul>
     <p>Decorator for automatic path type conversion. Smack it on all of your functions that work with paths, and no more type mismatches will ever happen again.</p>
     <ul>
-        <li>other super useful functions</li>
+        <li>Other super useful functions</li>
     </ul>
     <p>There are a lot of other random annoying things you might come across when working with paths. Many of them are packed in here.</p>
     <h2>Importing</h2>
@@ -36,20 +35,20 @@
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
 # create from caller&#x27;s file path
-path = <suitkaise-api>Skpath</suitkaise-api>()
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>)
 
 # create from string
-path = <suitkaise-api>Skpath</suitkaise-api>(&quot;myproject/feature/file.txt&quot;)
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;myproject/feature/file.txt&quot;)
 
 # create from Path object
 from pathlib import Path
 path = Path(&quot;myproject/feature/file.txt&quot;)
-path = <suitkaise-api>Skpath</suitkaise-api>(path)
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>path)
 
 # create from encoded ID
-path = <suitkaise-api>Skpath</suitkaise-api>(&quot;bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ&quot;)</code></pre>
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ&quot;)</code></pre>
     <h3>Constructor</h3>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path to wrap.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -72,7 +71,7 @@ path = <suitkaise-api>Skpath</suitkaise-api>(&quot;bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZ
     <ul>
         <li><code>str</code></li>
         <li>read-only</li>
-        <li>can be used to reconstruct the path: <code><suitkaise-api>Skpath</suitkaise-api>(encoded_id)</code></li>
+        <li>can be used to reconstruct the path: <code><suitkaise-api>Skpath(</suitkaise-api>encoded_id)</code></li>
     </ul>
     <p><code>root</code>: Project root as Skpath object.</p>
     <ul>
@@ -89,12 +88,12 @@ path = <suitkaise-api>Skpath</suitkaise-api>(&quot;bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZ
         <li><code>Path</code></li>
         <li>read-only</li>
     </ul>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;src/main.py&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;src/main.py&quot;)
 
-path.ap      # &quot;/Users/me/myproject/src/main.py&quot;
-path.rp      # &quot;src/main.py&quot;
+<suitkaise-api>path.ap</suitkaise-api>      # &quot;/Users/me/myproject/src/main.py&quot;
+<suitkaise-api>path.rp</suitkaise-api>      # &quot;src/main.py&quot;
 path.<suitkaise-api>id</suitkaise-api>      # &quot;c3JjL21haW4ucHk&quot;
-path.<suitkaise-api>root</suitkaise-api>    # <suitkaise-api>Skpath</suitkaise-api>(&#x27;/Users/me/myproject&#x27;)</code></pre>
+path.<suitkaise-api>root</suitkaise-api>    # Skpath(&#x27;/Users/me/myproject&#x27;)</code></pre>
     <details>
         <summary>Properties</summary>
         <div class="dropdown-content">
@@ -169,125 +168,125 @@ path.<suitkaise-api>root</suitkaise-api>    # <suitkaise-api>Skpath</suitkaise-a
     </details>
     <h3>Path Joining</h3>
     <p>Use the <code>/</code> operator to join paths:</p>
-    <pre><code class="language-python">root = <suitkaise-api>Skpath</suitkaise-api>()
+    <pre><code class="language-python"><suitkaise-api>root</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>)
 data_file = root / &quot;data&quot; / &quot;file.txt&quot;</code></pre>
     <details>
         <summary>Methods</summary>
         <div class="dropdown-content">
     <h4><code>iterdir()</code></h4>
     <p>Iterate over directory contents.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;src&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;src&quot;)
 for item in path.iterdir():
     print(item.name)</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>Generator[<suitkaise-api>Skpath</suitkaise-api>]</code>: Each item in the directory.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>NotADirectoryError</code>: If path is not a directory.</p>
     <h4><code>glob()</code></h4>
     <p>Find paths matching a pattern.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;src&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;src&quot;)
 for py_file in path.glob(&quot;*.py&quot;):
     print(py_file.name)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>pattern</code>: Glob pattern (ex. <code>&#x27;*.txt&#x27;</code>).</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>Generator[<suitkaise-api>Skpath</suitkaise-api>]</code>: Matching paths.</p>
     <h4><code>rglob()</code></h4>
     <p>Recursively find paths matching a pattern.</p>
-    <pre><code class="language-python">root = <suitkaise-api>Skpath</suitkaise-api>()
+    <pre><code class="language-python"><suitkaise-api>root</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>)
 for py_file in <suitkaise-api>root</suitkaise-api>.rglob(&quot;*.py&quot;):
-    print(py_file.rp)</code></pre>
-    <p><strong>Arguments</strong></p>
+    print(<suitkaise-api>py_file.rp</suitkaise-api>)</code></pre>
+    <p>Arguments</p>
     <p><code>pattern</code>: Glob pattern (ex. <code>&#x27;*.py&#x27;</code>).</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>Generator[<suitkaise-api>Skpath</suitkaise-api>]</code>: Matching paths in all subdirectories.</p>
     <h4><code>relative_to()</code></h4>
     <p>Get path relative to another path.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;src/utils/helpers.py&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;src/utils/helpers.py&quot;)
 rel = path.relative_to(&quot;src&quot;)
-# <suitkaise-api>Skpath</suitkaise-api>(&quot;utils/helpers.py&quot;)</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath(&quot;utils/helpers.py&quot;)</code></pre>
+    <p>Arguments</p>
     <p><code>other</code>: Base path.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api></code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Relative path.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>ValueError</code>: If path is not relative to other.</p>
     <h4><code>with_name()</code></h4>
     <p>Return path with changed name.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/file.txt&quot;)
 new_path = path.with_name(&quot;other.txt&quot;)
-# <suitkaise-api>Skpath</suitkaise-api>(&quot;data/other.txt&quot;)</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath(&quot;data/other.txt&quot;)</code></pre>
+    <p>Arguments</p>
     <p><code>name</code>: New name.</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Path with new name.</p>
     <h4><code>read_text()</code> / <code>write_text()</code></h4>
     <p>Read and write text files (mirrors <code>pathlib.Path</code>).</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/config.json&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/config.json&quot;)
 path.write_text(&quot;{}&quot;)
 contents = path.read_text()</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>write_text(data, encoding=None, errors=None, newline=None)</code></p>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>int</code>: Number of characters written.</p>
     <h4><code>read_bytes()</code> / <code>write_bytes()</code></h4>
     <p>Read and write binary files (mirrors <code>pathlib.Path</code>).</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/blob.bin&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/blob.bin&quot;)
 path.write_bytes(b&quot;\x00\x01&quot;)
 data = path.read_bytes()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>bytes</code>: File contents.</p>
     <h4><code>with_stem()</code></h4>
     <p>Return path with changed stem (filename without suffix).</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/file.txt&quot;)
 new_path = path.with_stem(&quot;other&quot;)
-# <suitkaise-api>Skpath</suitkaise-api>(&quot;data/other.txt&quot;)</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath(&quot;data/other.txt&quot;)</code></pre>
+    <p>Arguments</p>
     <p><code>stem</code>: New stem.</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Path with new stem.</p>
     <h4><code>with_suffix()</code></h4>
     <p>Return path with changed suffix.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/file.txt&quot;)
 new_path = path.with_suffix(&quot;.json&quot;)
-# <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.json&quot;)</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath(&quot;data/file.json&quot;)</code></pre>
+    <p>Arguments</p>
     <p><code>suffix</code>: New suffix (including dot).</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Path with new suffix.</p>
     <h4><code>mkdir()</code></h4>
     <p>Create directory.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;new_dir&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;new_dir&quot;)
 path.mkdir()
 
 # create parent directories
-path = <suitkaise-api>Skpath</suitkaise-api>(&quot;parent/child/grandchild&quot;)
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;parent/child/grandchild&quot;)
 path.mkdir(parents=True)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>mode</code>: Directory permissions.</p>
     <ul>
         <li><code>int = 0o777</code></li>
@@ -303,13 +302,13 @@ path.mkdir(parents=True)</code></pre>
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>FileExistsError</code>: If directory exists and <code>exist_ok=False</code>. <code>FileNotFoundError</code>: If parent doesn&#x27;t exist and <code>parents=False</code>.</p>
     <h4><code>touch()</code></h4>
     <p>Create file or update timestamp.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;new_file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;new_file.txt&quot;)
 path.touch()</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>mode</code>: File permissions.</p>
     <ul>
         <li><code>int = 0o666</code></li>
@@ -322,45 +321,45 @@ path.touch()</code></pre>
     </ul>
     <h4><code>rmdir()</code></h4>
     <p>Remove empty directory.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;empty_dir&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;empty_dir&quot;)
 path.rmdir()</code></pre>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>OSError</code>: If directory is not empty. <code>NotADirectoryError</code>: If path is not a directory.</p>
     <h4><code>unlink()</code></h4>
     <p>Remove file or symbolic link.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;file.txt&quot;)
 path.unlink()
 
 # don&#x27;t raise if file doesn&#x27;t exist
 path.unlink(missing_ok=True)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>missing_ok</code>: Don&#x27;t raise if file doesn&#x27;t exist.</p>
     <ul>
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>FileNotFoundError</code>: If file doesn&#x27;t exist and <code>missing_ok=False</code>. <code>IsADirectoryError</code>: If path is a directory.</p>
     <h4><code>resolve()</code></h4>
     <p>Return absolute path, resolving symlinks.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;./relative/path&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;./relative/path&quot;)
 resolved = path.resolve()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Absolute path with symlinks resolved.</p>
     <h4><code>absolute()</code></h4>
     <p>Return absolute version of path.</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;relative/path&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;relative/path&quot;)
 abs_path = path.absolute()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Absolute path.</p>
     <h4><code>copy_to()</code></h4>
     <p>Copy path to destination.</p>
-    <pre><code class="language-python">source = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>source</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/file.txt&quot;)
 dest = source.copy_to(&quot;backup/file.txt&quot;)
 
 # with options
 dest = source.copy_to(&quot;backup/&quot;, overwrite=True, parents=True)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>destination</code>: Target path or directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api></code></li>
@@ -376,18 +375,18 @@ dest = source.copy_to(&quot;backup/&quot;, overwrite=True, parents=True)</code><
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Path to the copied file/directory.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>FileNotFoundError</code>: If source path doesn&#x27;t exist. <code>FileExistsError</code>: If destination exists and <code>overwrite=False</code>.</p>
     <h4><code>move_to()</code></h4>
     <p>Move path to destination.</p>
-    <pre><code class="language-python">source = <suitkaise-api>Skpath</suitkaise-api>(&quot;temp/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>source</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;temp/file.txt&quot;)
 dest = source.move_to(&quot;data/file.txt&quot;)
 
 # with options
 dest = source.move_to(&quot;archive/&quot;, overwrite=True, parents=True)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>destination</code>: Target path or directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api></code></li>
@@ -403,15 +402,15 @@ dest = source.move_to(&quot;archive/&quot;, overwrite=True, parents=True)</code>
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Path to the moved file/directory.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code>FileNotFoundError</code>: If source path doesn&#x27;t exist. <code>FileExistsError</code>: If destination exists and <code>overwrite=False</code>.</p>
         </div>
     </details>
-    <h3>os.fspath Compatibility</h3>
+    <h3><code>os.fspath</code> Compatibility</h3>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> works with <code>open()</code>, <code>os.path</code>, and other functions that accept paths:</p>
-    <pre><code class="language-python">path = <suitkaise-api>Skpath</suitkaise-api>(&quot;data/file.txt&quot;)
+    <pre><code class="language-python"><suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;data/file.txt&quot;)
 
 # works directly with open()
 with open(path, &#x27;r&#x27;) as f:
@@ -424,16 +423,16 @@ os.path.exists(path)</code></pre>
     <p>Automatically converts path parameters based on type annotations.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
 
-@<suitkaise-api>autopath</suitkaise-api>()
+<suitkaise-api>@autopath</suitkaise-api>()
 def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
-    # path is guaranteed to be <suitkaise-api>Skpath</suitkaise-api>
+    # path is guaranteed to be Skpath
     return path.<suitkaise-api>id</suitkaise-api>
 
 # works with any input type
 process(&quot;src/main.py&quot;)
 process(Path(&quot;src/main.py&quot;))
-process(<suitkaise-api>Skpath</suitkaise-api>(&quot;src/main.py&quot;))</code></pre>
-    <p><strong>Arguments</strong></p>
+process(<suitkaise-api>Skpath(</suitkaise-api>&quot;src/main.py&quot;))</code></pre>
+    <p>Arguments</p>
     <p><code>use_caller</code>: Use caller&#x27;s file path for missing parameters.</p>
     <ul>
         <li><code>bool = False</code></li>
@@ -451,7 +450,7 @@ process(<suitkaise-api>Skpath</suitkaise-api>(&quot;src/main.py&quot;))</code></
     </ul>
     <h3>Type Annotations</h3>
     <p>The decorator converts parameters based on their type annotations.</p>
-    <p>Supported types:</p>
+    <p><strong>Supported types:</strong></p>
     <ul>
         <li><code><suitkaise-api>Skpath</suitkaise-api></code> → converted to Skpath</li>
         <li><code>Path</code> → normalized through Skpath, converted to Path</li>
@@ -459,7 +458,7 @@ process(<suitkaise-api>Skpath</suitkaise-api>(&quot;src/main.py&quot;))</code></
         <li><code><suitkaise-api>AnyPath</suitkaise-api></code> (or any union containing Skpath) → converted to Skpath (richest type)</li>
         <li><code>str | Path</code> (union without Skpath) → converted to Path</li>
     </ul>
-    <p>Supported iterables:</p>
+    <p><strong>Supported iterables:</strong></p>
     <ul>
         <li><code>list[<suitkaise-api>Skpath</suitkaise-api>]</code>, <code>list[Path]</code>, <code>list[str]</code></li>
         <li><code>tuple[<suitkaise-api>Skpath</suitkaise-api>, ...]</code>, <code>tuple[Path, ...]</code>, <code>tuple[str, ...]</code></li>
@@ -467,7 +466,7 @@ process(<suitkaise-api>Skpath</suitkaise-api>(&quot;src/main.py&quot;))</code></
         <li><code>frozenset[<suitkaise-api>Skpath</suitkaise-api>]</code>, <code>frozenset[Path]</code>, <code>frozenset[str]</code></li>
         <li><code>Iterable[<suitkaise-api>Skpath</suitkaise-api>]</code>, <code>Iterable[Path]</code>, <code>Iterable[str]</code> (converted to list)</li>
     </ul>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>()
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>()
 def process(
     path: <suitkaise-api>Skpath</suitkaise-api>,
     files: list[Path],
@@ -476,27 +475,27 @@ def process(
     ...</code></pre>
     <h3><code>use_caller</code> Option</h3>
     <p>Fill missing path parameters with the caller&#x27;s file path.</p>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>(use_caller=True)
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>(use_caller=True)
 def log_from(path: <suitkaise-api>Skpath</suitkaise-api> = None):
-    print(f&quot;Logging from: {path.rp}&quot;)
+    print(f&quot;Logging from: {<suitkaise-api>path.rp</suitkaise-api>}&quot;)
 
 # called without argument - uses caller&#x27;s file
 log_from()  # prints the file that called log_from()</code></pre>
     <h3><code>only</code> Option</h3>
     <p>Restrict conversion to specific parameters (faster for large lists).</p>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>(only=&quot;file_path&quot;)
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>(only=&quot;file_path&quot;)
 def process(file_path: str, names: list[str], ids: list[str]):
     # only file_path is normalized
     # names and ids are left unchanged
     return file_path</code></pre>
     <h3><code>debug</code> Option</h3>
     <p>Print conversion messages.</p>
-    <pre><code class="language-python">@<suitkaise-api>autopath</suitkaise-api>(debug=True)
+    <pre><code class="language-python"><suitkaise-api>@autopath</suitkaise-api>(debug=True)
 def process(path: <suitkaise-api>Skpath</suitkaise-api>):
     return path
 
 process(&quot;src/main.py&quot;)
-# @<suitkaise-api>autopath</suitkaise-api>: Converted path: str → <suitkaise-api>Skpath</suitkaise-api></code></pre>
+# @autopath: Converted path: str → Skpath</code></pre>
     <details>
         <summary>Project Root</summary>
         <div class="dropdown-content">
@@ -505,42 +504,42 @@ process(&quot;src/main.py&quot;)
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
 root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
-# <suitkaise-api>Skpath</suitkaise-api>(&#x27;/Users/me/myproject&#x27;)</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath(&#x27;/Users/me/myproject&#x27;)</code></pre>
+    <p>Arguments</p>
     <p><code>expected_name</code>: If provided, detected root must have this name.</p>
     <ul>
         <li><code>str | None = None</code></li>
         <li>positional or keyword</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Project root directory.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If root cannot be detected or doesn&#x27;t match expected name.</p>
     <h3><code><suitkaise-api>set_custom_root</suitkaise-api>()</code></h3>
     <p>Override automatic root detection.</p>
     <pre><code class="language-python"><suitkaise-api>paths</suitkaise-api>.<suitkaise-api>set_custom_root</suitkaise-api>(&quot;/my/project&quot;)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path to use as project root.</p>
     <ul>
         <li><code>str | Path</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>PathDetectionError</suitkaise-api></code>: If path doesn&#x27;t exist or isn&#x27;t a directory.</p>
     <h3><code><suitkaise-api>get_custom_root</suitkaise-api>()</code></h3>
     <p>Get the current custom root.</p>
     <pre><code class="language-python">current = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_custom_root</suitkaise-api>()
 # &quot;/my/project&quot; or None</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str | None</code>: Custom root path or None.</p>
     <h3><code><suitkaise-api>clear_custom_root</suitkaise-api>()</code></h3>
     <p>Revert to automatic root detection.</p>
     <pre><code class="language-python"><suitkaise-api>paths</suitkaise-api>.<suitkaise-api>clear_custom_root</suitkaise-api>()</code></pre>
     <h3><code><suitkaise-api>CustomRoot</suitkaise-api></code> Context Manager</h3>
     <p>Temporarily set a custom root:</p>
-    <pre><code class="language-python">with <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>CustomRoot</suitkaise-api>(&quot;/my/project&quot;):
+    <pre><code class="language-python">with <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>CustomRoot(</suitkaise-api>&quot;/my/project&quot;):
     root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
-    # <suitkaise-api>Skpath</suitkaise-api>(&#x27;/my/project&#x27;)
+    # Skpath(&#x27;/my/project&#x27;)
 
 # reverts to automatic detection after the block</code></pre>
         </div>
@@ -551,31 +550,31 @@ root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</sui
     <h3><code><suitkaise-api>get_caller_path</suitkaise-api>()</code></h3>
     <p>Get the file path of the caller.</p>
     <pre><code class="language-python">caller = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_caller_path</suitkaise-api>()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Caller&#x27;s file path.</p>
     <h3><code><suitkaise-api>get_current_dir</suitkaise-api>()</code></h3>
     <p>Get the directory containing the caller&#x27;s file.</p>
     <pre><code class="language-python">current_dir = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_current_dir</suitkaise-api>()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Caller&#x27;s directory.</p>
     <h3><code><suitkaise-api>get_cwd</suitkaise-api>()</code></h3>
     <p>Get the current working directory.</p>
     <pre><code class="language-python">cwd = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_cwd</suitkaise-api>()</code></pre>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code>: Current working directory.</p>
     <h3><code><suitkaise-api>get_module_path</suitkaise-api>()</code></h3>
     <p>Get the file path where an object is defined.</p>
     <pre><code class="language-python">from myapp import MyClass
 
 path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(MyClass)
-# <suitkaise-api>Skpath</suitkaise-api> pointing to the file where MyClass is defined</code></pre>
-    <p><strong>Arguments</strong></p>
+# Skpath pointing to the file where MyClass is defined</code></pre>
+    <p>Arguments</p>
     <p><code>obj</code>: Object to inspect (module, class, function, etc.).</p>
     <ul>
         <li><code>Any</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code><suitkaise-api>Skpath</suitkaise-api> | None</code>: Module file path or None if not found.</p>
         </div>
     </details>
@@ -584,13 +583,13 @@ path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suit
         <div class="dropdown-content">
     <h3><code><suitkaise-api>get_project_paths</suitkaise-api>()</code></h3>
     <p>Get all paths in the project.</p>
-    <pre><code class="language-python"># get all <suitkaise-api>paths</suitkaise-api>
+    <pre><code class="language-python"># get all paths
 all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>()
 
 # use a custom root
 all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(root=&quot;src&quot;)
 
-# exclude specific <suitkaise-api>paths</suitkaise-api>
+# exclude specific paths
 all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(exclude=[&quot;build&quot;, &quot;dist&quot;])
 
 # get as strings for memory efficiency
@@ -598,7 +597,7 @@ all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_path
 
 # ignore .*ignore files
 all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_paths</suitkaise-api>(use_ignore_files=False)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -619,7 +618,7 @@ all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_path
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>list[<suitkaise-api>Skpath</suitkaise-api>] | list[str]</code>: All project paths.</p>
     <h3><code><suitkaise-api>get_project_structure</suitkaise-api>()</code></h3>
     <p>Get a nested dict representing the project structure.</p>
@@ -633,7 +632,7 @@ all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_path
 #         &quot;tests&quot;: {...}
 #     }
 # }</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -649,7 +648,7 @@ all_paths = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_path
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>dict</code>: Nested dictionary of project structure.</p>
     <h3><code><suitkaise-api>get_formatted_project_tree</suitkaise-api>()</code></h3>
     <p>Get a formatted tree string for the project structure.</p>
@@ -661,7 +660,7 @@ print(tree)
 # │   └── utils/
 # └── tests/
 #     └── test_main.py</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>root</code>: Custom root directory.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api> | None = None</code></li>
@@ -687,7 +686,7 @@ print(tree)
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Formatted tree string.</p>
         </div>
     </details>
@@ -700,14 +699,14 @@ print(tree)
 # &quot;bXlwcm9qZWN0L2ZlYXR1cmUvZmlsZS50eHQ&quot;
 
 # same as
-path_id = <suitkaise-api>Skpath</suitkaise-api>(&quot;myproject/feature/file.txt&quot;).<suitkaise-api>id</suitkaise-api></code></pre>
-    <p><strong>Arguments</strong></p>
+<suitkaise-api>path_id</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;myproject/feature/file.txt&quot;).<suitkaise-api>id</suitkaise-api></code></pre>
+    <p>Arguments</p>
     <p><code>path</code>: Path to generate ID for.</p>
     <ul>
         <li><code>str | Path | <suitkaise-api>Skpath</suitkaise-api></code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Base64url encoded ID.</p>
         </div>
     </details>
@@ -722,13 +721,13 @@ path_id = <suitkaise-api>Skpath</suitkaise-api>(&quot;myproject/feature/file.txt
 <suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file&lt;name&gt;.txt&quot;)  # False (contains &lt;, &gt;)
 <suitkaise-api>is_valid_filename</suitkaise-api>(&quot;CON&quot;)             # False (Windows reserved)
 <suitkaise-api>is_valid_filename</suitkaise-api>(&quot;&quot;)                # False (empty)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>filename</code>: Filename to validate (not a full path).</p>
     <ul>
         <li><code>str</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>bool</code>: True if valid, False otherwise.</p>
     <h3><code><suitkaise-api>streamline_path</suitkaise-api>()</code></h3>
     <p>Sanitize a path by replacing invalid characters.</p>
@@ -749,7 +748,7 @@ path = <suitkaise-api>streamline_path</suitkaise-api>(&quot;file:name.txt&quot;,
 # ASCII only
 path = <suitkaise-api>streamline_path</suitkaise-api>(&quot;файл.txt&quot;, allow_unicode=False)
 # &quot;____.txt&quot;</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path or filename to sanitize.</p>
     <ul>
         <li><code>str</code></li>
@@ -785,7 +784,7 @@ path = <suitkaise-api>streamline_path</suitkaise-api>(&quot;файл.txt&quot;, 
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Sanitized path.</p>
     <h3><code><suitkaise-api>streamline_path_quick</suitkaise-api>()</code></h3>
     <p>Simple version of <code><suitkaise-api>streamline_path</suitkaise-api></code> that replaces all invalid and unicode characters.</p>
@@ -793,7 +792,7 @@ path = <suitkaise-api>streamline_path</suitkaise-api>(&quot;файл.txt&quot;, 
 
 path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>streamline_path_quick</suitkaise-api>(&quot;My File&lt;1&gt;файл.txt&quot;)
 # &quot;My_File_1_____.txt&quot;</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>path</code>: Path or filename to sanitize.</p>
     <ul>
         <li><code>str</code></li>
@@ -814,7 +813,7 @@ path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>streamline_path_quick
         <li><code>bool = False</code></li>
         <li>positional or keyword</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: Sanitized path.</p>
     <h2>Exceptions</h2>
     <h3><code><suitkaise-api>PathDetectionError</suitkaise-api></code></h3>
@@ -826,7 +825,7 @@ try:
     root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
 except <suitkaise-api>PathDetectionError</suitkaise-api>:
     print(&quot;Could not detect project root&quot;)</code></pre>
-    <p>Common causes:</p>
+    <p><strong>Common causes:</strong></p>
     <ul>
         <li>No project root indicators found</li>
         <li>Custom root path doesn&#x27;t exist or isn&#x27;t a directory</li>
@@ -836,7 +835,7 @@ except <suitkaise-api>PathDetectionError</suitkaise-api>:
     <p>Raised when a file operation is attempted on a directory.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>NotAFileError</suitkaise-api>
 
-path = <suitkaise-api>Skpath</suitkaise-api>(&quot;some_directory&quot;)
+<suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;some_directory&quot;)
 try:
     path.unlink()  # attempting to unlink a directory
 except <suitkaise-api>NotAFileError</suitkaise-api>:
@@ -847,7 +846,7 @@ except <suitkaise-api>NotAFileError</suitkaise-api>:
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>AnyPath</suitkaise-api>
 
 def process(path: <suitkaise-api>AnyPath</suitkaise-api>) -&gt; None:
-    # path can be str, Path, or <suitkaise-api>Skpath</suitkaise-api>
+    # path can be str, Path, or Skpath
     ...</code></pre>
     <p>Note: <code><suitkaise-api>AnyPath</suitkaise-api></code> does NOT include <code>None</code>. Use <code><suitkaise-api>AnyPath</suitkaise-api> | None</code> when <code>None</code> is acceptable.</p>
 </section>

@@ -9,22 +9,22 @@ columns = 1
 
 # 1.1
 
-title = "Why you should use `<suitkaise-api>timing</suitkaise-api>`"
+title = "Why you should use `timing`"
 
 # 1.2
 
 text = "
 ## TLDR
 
-- **1-line setup** - `@<suitkaise-api>timethis</suitkaise-api>()` or `with <suitkaise-api>TimeThis</suitkaise-api>()`, done
-- **Deep statistics** - mean, median, stdev, variance, percentiles (way better than `timeit`)
+- **1-line setup** - `<suitkaise-api>@timethis()</suitkaise-api>` or `<suitkaise-api>with TimeThis()</suitkaise-api>`, done
+- **Deep statistics** - `mean`, `median`, `stdev`, `variance`, `percentiles` (way better than `timeit`)
 - **Pause/resume** - exclude user input or delays from measurements
 - **Thread-safe** - time concurrent operations without race conditions
 - **Discard bad runs** - throw away failed attempts without polluting stats
 - **Rolling windows** - bound memory in long-running processes
 - **Threshold filtering** - only record slow operations
 - **Frozen snapshots** - capture stats at a point in time
-- **Native async support** - `.<suitkaise-api>asynced</suitkaise-api>()` for async contexts
+- **Native async support** - `<suitkaise-api>.asynced()</suitkaise-api>` for async contexts
 
 ---
 
@@ -72,7 +72,7 @@ def my_function():
     return function_result, end_time - start_time
 
 # later...
-<suitkaise-api>result</suitkaise-api>, time_taken = my_function()
+result, time_taken = my_function()
 ```
 
 Then I had to manually add the times to a list.
@@ -86,7 +86,7 @@ And then calculate stats.
 ```python
 import statistics
 
-mean = statistics.<suitkaise-api>mean</suitkaise-api>(times1)
+mean = statistics.mean(times1)
 median = statistics.median(times1)
 ```
 
@@ -102,16 +102,17 @@ times3.append(time_taken)
 
 I wanted a super quick way to do this, that also made sense.
 
-Result:
+**Result:**
 - 100% coverage of your code (you can time anything and everything)
 - 1-line setup
-- thread safety
-- deep statistical analysis, much better than `timeit`
-- native async support
+- Thread safety
+- Deep statistical analysis, much better than `timeit`
+- Native async support
 
-## `@<suitkaise-api>timethis</suitkaise-api>` decorator
+## `<suitkaise-api>@timethis</suitkaise-api>` decorator
 
-(start of dropdown "Without `<suitkaise-api>timing</suitkaise-api>` - *7 lines*")
+**Without it** - *7 lines*
+
 ```python
 import time # 1
 from typing import Any
@@ -127,36 +128,36 @@ def my_function() -> tuple[Any, float]:
 
     return function_result, end_time - start_time # 5
 
-<suitkaise-api>result</suitkaise-api>, time_taken = my_function() # 6
+result, time_taken = my_function() # 6
 
 times_my_function.append(time_taken) # 7
 ```
-(end of dropdown)
 
-With `<suitkaise-api>timing</suitkaise-api>` - *2 lines*
+**With `<suitkaise-api>timing</suitkaise-api>`** - *2 lines*
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api> # 1
 
-@<suitkaise-api>timethis</suitkaise-api>() # 2
+<suitkaise-api>@timethis()</suitkaise-api> # 2
 def my_function():
 
     # whatever the function actually does
 
-    return <suitkaise-api>result</suitkaise-api>
+    return result
 
-<suitkaise-api>result</suitkaise-api> = my_function()
+result = my_function()
 ```
 
-- you can just slap `@<suitkaise-api>timethis</suitkaise-api>()` on any function you need to time
-- stored as a property of the function
-- don't have to edit a function to time it
+- You can just slap `<suitkaise-api>@timethis()</suitkaise-api>` on any function you need to time
+- Stored as a property of the function
+- Don't have to edit a function to time it
 
 ## `<suitkaise-api>TimeThis</suitkaise-api>` context manager
 
-This covers everything that `@<suitkaise-api>timethis</suitkaise-api>` doesn't in a context manager pattern.
+This covers everything that `<suitkaise-api>@timethis</suitkaise-api>` doesn't in a context manager pattern.
 
-(start of dropdown "Without `<suitkaise-api>timing</suitkaise-api>` - *6 lines*")
+**Without it** - *6 lines*
+
 ```python
 import time # 1
 
@@ -169,26 +170,25 @@ start_time = time.time() # 3
 end_time = time.time() # 4
 
 time_taken = end_time - start_time # 5
-<suitkaise-api>times</suitkaise-api>.append(time_taken) # 6
+times.append(time_taken) # 6
 ```
-(end of dropdown)
 
-With `<suitkaise-api>timing</suitkaise-api>` - *2 lines*
+**With `<suitkaise-api>timing</suitkaise-api>`** - *2 lines*
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>TimeThis</suitkaise-api> # 1
 
-with <suitkaise-api>TimeThis</suitkaise-api>() as timer: # 2
+with <suitkaise-api>TimeThis(</suitkaise-api>) as timer: # 2
 
     # whatever you need to time
 
 time_taken = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api> # 3
 ```
 
-- no manual tracking
-- context manager makes it clear what is being timed
-- error proof
-- clear indication of what is being timed
+- No manual tracking
+- Context manager makes it clear what is being timed
+- Error-proof
+- Clear indication of what is being timed
 
 ## Deep Statistical Analysis
 
@@ -196,46 +196,45 @@ time_taken = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</su
 
 You need mean, median, standard deviation, variance, and percentiles to actually understand performance.
 
-Without `<suitkaise-api>timing</suitkaise-api>` - *10+ lines*
+**Without it** - *10+ lines*
 ```python
-import time
-import statistics
+import time # 1
+import statistics # 2
 
-times = []
+times = [] # 3
 
 for i in range(100):
-    start = time.perf_counter()
+    start = time.perf_counter() # 4
     do_work()
-    end = time.perf_counter()
-    <suitkaise-api>times</suitkaise-api>.append(end - start)
+    end = time.perf_counter() # 5
+    times.append(end - start) # 6
 
-mean = statistics.<suitkaise-api>mean</suitkaise-api>(times)
-median = statistics.median(times)
-stdev = statistics.<suitkaise-api>stdev</suitkaise-api>(times)
+mean = statistics.mean(times) # 7
+median = statistics.median(times) # 8
+stdev = statistics.stdev(times) # 9
 
 # percentiles? have fun
-sorted_times = sorted(times)
-p95 = sorted_times[int(0.95 * len(sorted_times))]
+sorted_times = sorted(times) # 10
+p95 = sorted_times[int(0.95 * len(sorted_times))] # 11
+
+# and more stats calculations...
 ```
 
-With `<suitkaise-api>timing</suitkaise-api>`
+**With `<suitkaise-api>timing</suitkaise-api>`** - *2 lines*
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
-
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api> # 1
 
 for i in range(100):
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
-    do_work()
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as timer: # 2
+        do_work()
 
-# all statistics instantly available
+# all statistics automatically available, no extra work
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>
-<suitkaise-api>timer</suitkaise-api>.median
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>median</suitkaise-api>
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>variance</suitkaise-api>
-<suitkaise-api>timer</suitkaise-api>.min
-<suitkaise-api>timer</suitkaise-api>.max
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>min</suitkaise-api>
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>max</suitkaise-api>
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(99)
 ```
@@ -246,7 +245,7 @@ One object. Every stat you could want. No manual calculation.
 
 You're timing a database query, but you need to ask the user something in the middle.
 
-Without `<suitkaise-api>timing</suitkaise-api>`
+**Without it**
 ```python
 import time
 
@@ -254,7 +253,7 @@ start = time.perf_counter()
 
 results = database.query("SELECT * FROM users")
 
-# pause <suitkaise-api>timing</suitkaise-api>... manually?
+# pause timing... manually?
 pause_start = time.perf_counter()
 user_input = input("Export to CSV? (y/n): ")
 pause_end = time.perf_counter()
@@ -266,14 +265,14 @@ if user_input == 'y':
 end = time.perf_counter()
 
 # manually subtract pause time
-<suitkaise-api>elapsed</suitkaise-api> = (end - start) - pause_duration
+elapsed = (end - start) - pause_duration
 ```
 
-With `<suitkaise-api>timing</suitkaise-api>`
+**With `<suitkaise-api>timing</suitkaise-api>`**
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 
 results = database.query("SELECT * FROM users")
@@ -285,7 +284,7 @@ user_input = input("Export to CSV? (y/n): ")
 if user_input == 'y':
     export_to_csv(results)
 
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # user input time excluded
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # user input time excluded
 ```
 
 `<suitkaise-api>pause</suitkaise-api>()` and `<suitkaise-api>resume</suitkaise-api>()`. That's it. The timer handles the math.
@@ -294,28 +293,28 @@ if user_input == 'y':
 
 Sometimes things fail. You don't want failed attempts polluting your statistics.
 
-Without `<suitkaise-api>timing</suitkaise-api>`
+**Without it**
 ```python
 times = []
 
 for i in range(100):
     start = time.perf_counter()
     try:
-        <suitkaise-api>result</suitkaise-api> = unreliable_operation()
+        result = unreliable_operation()
         end = time.perf_counter()
-        <suitkaise-api>times</suitkaise-api>.append(end - start)
+        times.append(end - start)
     except Exception:
         pass  # awkward - start was recorded, now what?
 ```
 
-With `<suitkaise-api>timing</suitkaise-api>`
+**With `<suitkaise-api>timing</suitkaise-api>`**
 ```python
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
 for i in range(100):
     <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
     try:
-        <suitkaise-api>result</suitkaise-api> = unreliable_operation()
+        result = unreliable_operation()
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # success - record it
     except Exception:
         <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # failure - forget it
@@ -330,7 +329,7 @@ for i in range(100):
 Multiple threads timing the same thing? No problem.
 
 ```python
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()  # thread-safe by default
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)  # thread-safe by default
 
 def worker():
     for _ in range(100):
@@ -349,7 +348,7 @@ print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
 
 Timing items in a loop? `<suitkaise-api>lap</suitkaise-api>()` is stop + start in one call.
 
-Without `<suitkaise-api>timing</suitkaise-api>`
+**Without it**
 ```python
 times = []
 start = time.perf_counter()
@@ -357,18 +356,18 @@ start = time.perf_counter()
 for item in items:
     process(item)
     now = time.perf_counter()
-    <suitkaise-api>times</suitkaise-api>.append(now - start)
+    times.append(now - start)
     start = now  # easy to forget this
 ```
 
-With `<suitkaise-api>timing</suitkaise-api>`
+**With `<suitkaise-api>timing</suitkaise-api>`**
 ```python
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
 
 for item in items:
     process(item)
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()  # records time, continues <suitkaise-api>timing</suitkaise-api>
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()  # records time, continues timing
 
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # clean up the last pending measurement
 ```
@@ -377,7 +376,7 @@ for item in items:
 
 Long-running server? Can't keep every measurement forever.
 
-Without `<suitkaise-api>timing</suitkaise-api>`
+**Without it**
 ```python
 from collections import deque
 
@@ -388,9 +387,9 @@ lock = threading.Lock()
 # now manually manage this everywhere
 ```
 
-With `<suitkaise-api>timing</suitkaise-api>`
+**With `<suitkaise-api>timing</suitkaise-api>`**
 ```python
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>(max_times=1000)
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>max_times=1000)
 
 # that's it - automatically keeps only the last 1000 measurements
 ```
@@ -401,7 +400,7 @@ One parameter. Memory bound. Statistics always reflect recent performance.
 Only care about slow operations? Filter out the fast ones automatically.
 
 ```python
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(threshold=0.1)
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(threshold=0.1)
 def handle_request():
     # only records times >= 0.1 seconds
     ...
@@ -414,20 +413,20 @@ Fast operations are silently discarded. Your statistics focus on what matters.
 Want both combined stats AND per-function stats?
 
 ```python
-perf_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+perf_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
 def db_read():
     ...
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
 def db_write():
     ...
 
 # combined stats
-print(perf_timer.<suitkaise-api>mean</suitkaise-api>)
+print(perf_timer.mean)
 
 # individual stats
 print(db_read.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
@@ -449,7 +448,7 @@ do_more_work()
 <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
 # snapshot still has the old values
-print(snapshot.<suitkaise-api>mean</suitkaise-api>)  # unchanged
+print(snapshot.mean)  # unchanged
 ```
 
 `get_statistics()` returns an immutable `TimerStats` object. Perfect for logging or reporting.
@@ -479,26 +478,26 @@ No more `abs()` everywhere. No more "which one was first?" bugs.
 <suitkaise-api>timing</suitkaise-api>.sleep(1)
 
 # async
-await <suitkaise-api>timing</suitkaise-api>.sleep.<suitkaise-api>asynced</suitkaise-api>()(1)
+await <suitkaise-api>timing</suitkaise-api>.sleep.asynced()(1)
 ```
 
-Same API. Just add `.<suitkaise-api>asynced</suitkaise-api>()` when you need it.
+Same API. Just add `<suitkaise-api>.asynced()</suitkaise-api>` when you need it.
 
 This works with `<suitkaise-api>TimeThis</suitkaise-api>` too:
 
 ```python
 async def fetch_all():
-    async with <suitkaise-api>TimeThis</suitkaise-api>() as timer:
+    async with <suitkaise-api>TimeThis(</suitkaise-api>) as timer:
         await fetch_users()
         await fetch_orders()
     
     print(f"Total: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
 ```
 
-And with `@<suitkaise-api>timethis</suitkaise-api>`:
+And with `<suitkaise-api>@timethis</suitkaise-api>`:
 
 ```python
-@<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timethis</suitkaise-api>()
 async def fetch_data():
     async with aiohttp.ClientSession() as session:
         return await session.get("https://api.example.com")
@@ -517,8 +516,8 @@ Sync and async, same interface. No separate implementations needed.
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
 
-share = <suitkaise-api>Share</suitkaise-api>()
-share.<suitkaise-api>timer</suitkaise-api> = <suitkaise-api>Sktimer</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+<suitkaise-api>share.timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 
 class TimedWorker(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share, data):
@@ -527,19 +526,19 @@ class TimedWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
-        self.share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+        self.<suitkaise-api>share.timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
         process(self.data)
-        self.share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+        self.<suitkaise-api>share.timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
-pool = <suitkaise-api>Pool</suitkaise-api>(workers=4)
-pool.<suitkaise-api>star</suitkaise-api>().<suitkaise-api>map</suitkaise-api>(TimedWorker, [(share, item) for item in work_items])
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(TimedWorker, [(share, item) for item in work_items])
 
 # all 4 processes contributed to the same timer
-print(f"Mean across all workers: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"p95 across all workers: {share.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
+print(f"Mean across all workers: {<suitkaise-api>share.timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"p95 across all workers: {<suitkaise-api>share.timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
 ```
 
 Every process writes to the same timer. Stats aggregate automatically. No manual list management, no locks, no merging results.
 
-`<suitkaise-api>Skprocess</suitkaise-api>` also has built-in timers for every lifecycle method -- access them via `process.<suitkaise-api>__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>`, `process.<suitkaise-api>__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>`, etc. These are `<suitkaise-api>Sktimer</suitkaise-api>` objects with all the same statistical depth.
+`<suitkaise-api>Skprocess</suitkaise-api>` also has built-in timers for every lifecycle method -- access them via `<suitkaise-api>process.__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>`, `<suitkaise-api>process.__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>`, etc. These are `<suitkaise-api>Sktimer</suitkaise-api>` objects with all the same statistical depth.
 "

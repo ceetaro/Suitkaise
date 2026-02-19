@@ -1,11 +1,7 @@
 /*
 
-interactive tests to practice using the sktime module.
-
-all tests use text entry blocks where you directly edit code to solve the problem.
-
-there are 3 tests (easy, medium, hard)
+covers how I tested the timing module.
 
 */
 
-text = "tests"
+text = "

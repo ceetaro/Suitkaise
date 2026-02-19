@@ -8,21 +8,20 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
 </div>
 <section class="module-page">
-    <h1>Quick Start: <code><suitkaise-api>cucumber</suitkaise-api></code></h1>
+    <h1><code><suitkaise-api>cucumber</suitkaise-api></code> quick start guide</h1>
     <pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
     <h2>Serialize and deserialize</h2>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
 
-# <suitkaise-api>serialize</suitkaise-api> any object to bytes
+# serialize any object to bytes
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(my_object)
 
-# <suitkaise-api>deserialize</suitkaise-api> back
+# deserialize back
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)</code></pre>
     <h2>It works with things <code>pickle</code> can&#x27;t handle</h2>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
@@ -36,14 +35,34 @@ def make_multiplier(n):
 
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(make_multiplier(3))
 
-# classes defined in __main__
-class MyClass:
-    def __init__(self):
-        self.value = 42
+# classes defined in __main__ — the reason this matters is pickle
+# fails with __main__ classes across processes, cucumber doesn&#x27;t
+class Task:
+    def __init__(self, n):
+        self.n = n
+    def compute(self):
+        return self.n ** 2
 
-data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(MyClass())
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(Task(7))
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-print(restored.value)  # 42</code></pre>
+print(restored.compute())  # 49 — class definition survived serialization</code></pre>
+    <h2>Circular references? Handled automatically</h2>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+
+class Node:
+    def __init__(self, name):
+        self.name = name
+        self.parent = None
+        self.children = []
+
+root = Node(&quot;root&quot;)
+child = Node(&quot;child&quot;)
+root.children.append(child)
+child.parent = root  # circular: child → root → child
+
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(root)
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
+print(restored.children[0].parent.name)  # &quot;root&quot; — cycle preserved</code></pre>
     <h2>Live resources become <code>Reconnector</code> objects</h2>
     <p>Objects like database connections, sockets, and threads can&#x27;t be directly transferred between processes. <code><suitkaise-api>cucumber</suitkaise-api></code> serializes them as <code>Reconnector</code> placeholders, then you reconnect them:</p>
     <pre><code class="language-python">import sqlite3
@@ -57,13 +76,13 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
 
 <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored)
 # now it&#x27;s a live sqlite3 connection again</code></pre>
-    <p>For connections that require passwords:</p>
+    <p><strong>For connections that require passwords:</strong></p>
     <pre><code class="language-python"><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, **{
     &quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;my_password&quot;}
 })</code></pre>
-    <p><code>Reconnectors</code> that don&#x27;t require authentication will lazily reconnect on first access.</p>
+    <p><code>Reconnector</code>s that don&#x27;t require authentication will lazily reconnect on first access.</p>
     <h2>Debug mode</h2>
-    <p>When something goes wrong:</p>
+    <p><strong>When something goes wrong:</strong></p>
     <pre><code class="language-python"># see where serialization failed
 <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, debug=True)
 
@@ -71,7 +90,7 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
 <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj, verbose=True)</code></pre>
     <h2>Inspect the intermediate representation</h2>
     <pre><code class="language-python">ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(my_object)
-print(ir)  # dict/list structure showing how <suitkaise-api>cucumber</suitkaise-api> sees your object</code></pre>
+print(ir)  # dict/list structure showing how cucumber sees your object</code></pre>
     <h2>Convert to JSON</h2>
     <pre><code class="language-python">json_str = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_json</suitkaise-api>(my_object)</code></pre>
     <h2>Want to learn more?</h2>

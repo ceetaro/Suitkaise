@@ -9,20 +9,20 @@ columns = 1
 
 # 1.1
 
-title = "`<suitkaise-api>cucumber</suitkaise-api>` performance"
+title = "`cucumber` performance"
 
 # 1.2
 
 text = "
-Note from future me: I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).
+**Note from future me:** I made some slight changes to how non module level functions, weakrefs, and enums are handled. This may change benchmark results, but the changes should be insignificant (less than 33% slower).
 
 Here are the performance benchmarks for `<suitkaise-api>cucumber</suitkaise-api>` compared to other serialization libraries.
 
 These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.
 
-Windows users: Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.
+**Windows users:** Python is significantly slower on Windows than on macOS, so benchmarks across the board will be slower on Windows with similar hardware specs.
 
-Note: `<suitkaise-api>cucumber</suitkaise-api>` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
+**Note:** `<suitkaise-api>cucumber</suitkaise-api>` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
 
 To run the benchmarks yourself, run the following command:
 ```bash
@@ -161,7 +161,7 @@ If a 2nd place speed is less than 1.33x faster than `<suitkaise-api>cucumber</su
   Type                                  speed with `cloudpickle`         How much faster than 2nd place?
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
   `Skclass`                             9.8µs                            5.24x (`<suitkaise-api>cucumber</suitkaise-api>`)
-  `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>`                6.6µs                            4.77x (`dill`)
+  `multiprocessing.Pipe`                6.6µs                            4.77x (`dill`)
   `SQLiteReconnector`                   5.1µs                            4.06x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `CodeType`                            9.4µs                            3.82x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `PurePath`                            3.8µs                            3.82x (`dill`)
@@ -293,7 +293,7 @@ If a 2nd place speed is less than 1.33x faster than `<suitkaise-api>cucumber</su
   threading.local                17.0µs             fail               fail               fail              
   multiprocessing.Queue          14.0µs             fail               fail               fail              
   multiprocessing.Event          35.1µs             fail               fail               fail              
-  multiprocessing.<suitkaise-api>Pipe</suitkaise-api>           44.6µs             3.4µs              31.5µs             6.6µs             
+  multiprocessing.Pipe           44.6µs             3.4µs              31.5µs             6.6µs             
   multiprocessing.Manager        190.5µs            fail               fail               fail              
   SharedMemory                   52.8µs             5.9µs              43.3µs             12.0µs            
   queue.Queue                    23.2µs             fail               133.7µs            fail              

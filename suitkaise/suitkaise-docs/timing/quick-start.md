@@ -1,20 +1,20 @@
-# Quick Start: `<suitkaise-api>timing</suitkaise-api>`
+# `timing` quick start guide
 
 ```bash
-pip install <suitkaise-api>suitkaise</suitkaise-api>
+pip install suitkaise
 ```
 
 ## Time a function
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api>
+from suitkaise.timing import timethis
 
-@<suitkaise-api>timethis</suitkaise-api>()
+@timethis()
 def process_data():
     do_work()
 
 process_data()
-print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>)  # time for the last call
+print(process_data.timer.most_recent)  # time for the last call
 ```
 
 ## Get statistics over multiple calls
@@ -23,82 +23,82 @@ print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_rece
 for _ in range(100):
     process_data()
 
-print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.median)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
-print(process_data.<suitkaise-api>timer</suitkaise-api>.min)
-print(process_data.<suitkaise-api>timer</suitkaise-api>.max)
+print(process_data.timer.mean)
+print(process_data.timer.median)
+print(process_data.timer.stdev)
+print(process_data.timer.percentile(95))
+print(process_data.timer.min)
+print(process_data.timer.max)
 ```
 
 ## Time a code block
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>TimeThis</suitkaise-api>
+from suitkaise.timing import TimeThis
 
-with <suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with TimeThis() as timer:
     do_work()
 
-print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>)
+print(timer.most_recent)
 ```
 
 ## Use a timer directly
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
+from suitkaise.timing import Sktimer
 
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
+timer = Sktimer()
 
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 do_work()
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+elapsed = timer.stop()
 
-print(<suitkaise-api>elapsed</suitkaise-api>)
-print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(elapsed)
+print(timer.mean)
 ```
 
 ## Pause timing (exclude user input, delays, etc.)
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer = Sktimer()
+timer.start()
 
 results = database.query("SELECT * FROM users")
 
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>pause</suitkaise-api>()
+timer.pause()
 answer = input("Export? (y/n): ")
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
+timer.resume()
 
 if answer == 'y':
     export(results)
 
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # user input time excluded
+timer.stop()  # user input time excluded
 ```
 
 ## Discard failed measurements
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>()
+timer = Sktimer()
 
 for _ in range(100):
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    timer.start()
     try:
-        <suitkaise-api>result</suitkaise-api> = unreliable_operation()
-        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+        result = unreliable_operation()
+        timer.stop()
     except Exception:
-        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don't pollute stats with failures
+        timer.discard()  # don't pollute stats with failures
 ```
 
 ## Rolling window for long-running processes
 
 ```python
-timer = <suitkaise-api>Sktimer</suitkaise-api>(max_times=1000)  # keep only last 1000 measurements
+timer = Sktimer(max_times=1000)  # keep only last 1000 measurements
 ```
 
 ## Only record slow operations
 
 ```python
-@<suitkaise-api>timethis</suitkaise-api>(threshold=0.1)
+@timethis(threshold=0.1)
 def handle_request():
     # only records times >= 0.1 seconds
     process_request()
@@ -106,7 +106,7 @@ def handle_request():
 
 ## Want to learn more?
 
-- **Why page** — why `<suitkaise-api>timing</suitkaise-api>` exists and what it does better than `timeit`
-- **How to use** — full API reference for `<suitkaise-api>Sktimer</suitkaise-api>`, `<suitkaise-api>timethis</suitkaise-api>`, `<suitkaise-api>TimeThis</suitkaise-api>`
+- **Why page** — why `timing` exists and what it does better than `timeit`
+- **How to use** — full API reference for `Sktimer`, `timethis`, `TimeThis`
 - **Examples** — progressively complex examples into a full script
 - **How it works** — internal architecture (per-thread sessions, statistics) (level: intermediate)

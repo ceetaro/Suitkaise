@@ -5,9 +5,9 @@ module bar for suitkaise.paths
 */
 
 rows = 1
-columns = 9
+columns = 8
 
-order = [why, quick start, how to use, how it works, examples, tests, videos, learn]
+order = [why, quick start, how to use, how it works, examples, videos, learn]
 
 # 1.1
 
@@ -40,15 +40,10 @@ link = "paths-examples.md"
 
 # 1.7
 
-button = "tests"
-link = "paths-tests.md"
-
-# 1.8
-
 button = "videos"
 link = "paths-videos.md"
 
-# 1.9
+# 1.8
 
 button = "learn"
 link = "paths-learn.md"

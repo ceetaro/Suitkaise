@@ -7,7 +7,6 @@
         <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
         <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
         <a href="#sk-blocking-calls" class="module-bar-link" data-page="sk-blocking-calls">blocking calls</a>
-        <a href="#sk-tests" class="module-bar-link" data-page="sk-tests">tests</a>
         <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
         <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
     </nav>
@@ -16,9 +15,9 @@
     <h1>Why you should use <code><suitkaise-api>sk</suitkaise-api></code></h1>
     <h2>TLDR</h2>
     <ul>
-        <li><strong>One decorator, five superpowers</strong> - Add <code>.<suitkaise-api>retry</suitkaise-api>()</code>, <code>.<suitkaise-api>timeout</suitkaise-api>()</code>, <code>.<suitkaise-api>background</suitkaise-api>()</code>, <code>.rate_limit()</code>, and <code>.<suitkaise-api>asynced</suitkaise-api>()</code> to any function or class</li>
+        <li><strong>One decorator, five superpowers</strong> - Add <code><suitkaise-api>.retry()</suitkaise-api></code>, <code><suitkaise-api>.timeout()</suitkaise-api></code>, <code><suitkaise-api>.background()</suitkaise-api></code>, <code><suitkaise-api>.rate_limit()</suitkaise-api></code>, and <code><suitkaise-api>.asynced()</suitkaise-api></code> to any function or class</li>
         <li><strong>Modify at the call site, not the definition</strong> - Define your function once, decide how to call it each time</li>
-        <li><strong>Chain modifiers in any order</strong> - <code>fn.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)</code> and <code>fn.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>retry</suitkaise-api>(3)</code> do the same thing</li>
+        <li><strong>Chain modifiers in any order</strong> - <code><suitkaise-api>fn.retry(3).timeout(5.0)</suitkaise-api></code> and <code><suitkaise-api>fn.timeout(5.0).retry(3)</suitkaise-api></code> do the same thing</li>
         <li><strong>Auto-detects blocking code</strong> - AST analysis identifies I/O, network calls, and sleep patterns automatically</li>
         <li><strong><code><suitkaise-api>Share</suitkaise-api></code> metadata generation</strong> - The kicker. Makes your classes work efficiently inside <code><suitkaise-api>Share</suitkaise-api></code></li>
         <li><strong>Classes too</strong> - Works on entire classes, giving every method the same modifier capabilities, and an async class pattern as well</li>
@@ -28,7 +27,7 @@
     <p>You probably already use something for retry logic. Maybe <code>tenacity</code>. Maybe a hand-rolled decorator.</p>
     <pre><code class="language-python">from tenacity import retry, stop_after_attempt, wait_exponential
 
-@<suitkaise-api>retry</suitkaise-api>(stop=stop_after_attempt(3), wait=wait_exponential())
+<suitkaise-api>@retry</suitkaise-api>(stop=stop_after_attempt(3), wait=wait_exponential())
 def fetch_data(url):
     return requests.get(url).json()</code></pre>
     <p>This works. But now your function always retries. Every call. Every time.</p>
@@ -38,7 +37,7 @@ def fetch_data(url):
     <p><code><suitkaise-api>sk</suitkaise-api></code> takes a different approach. You define your function once, cleanly. Then you decide how to call it each time.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def fetch_data(url):
     return requests.get(url).json()</code></pre>
     <p>The function works exactly like before:</p>
@@ -50,9 +49,9 @@ data = fetch_data.<suitkaise-api>retry</suitkaise-api>(times=3, delay=1.0, backo
 # timeout after 5 seconds
 data = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0)(&quot;https://api.example.com&quot;)
 
-# <suitkaise-api>run</suitkaise-api> in background, get a Future
+# run in background, get a Future
 future = fetch_data.<suitkaise-api>background</suitkaise-api>()(&quot;https://api.example.com&quot;)
-<suitkaise-api>result</suitkaise-api> = future.<suitkaise-api>result</suitkaise-api>()
+result = future.<suitkaise-api>result</suitkaise-api>()
 
 # rate limit to 2 calls per second
 data = fetch_data.rate_limit(2.0)(&quot;https://api.example.com&quot;)
@@ -76,7 +75,7 @@ data = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>ret
     </ol>
     <p>This means you don&#x27;t have to think about ordering. Just add what you need.</p>
     <pre><code class="language-python"># all five modifiers, chained
-<suitkaise-api>result</suitkaise-api> = await (
+result = await (
     fetch_data.<suitkaise-api>asynced</suitkaise-api>()
     .<suitkaise-api>retry</suitkaise-api>(times=3, delay=0.5)
     .<suitkaise-api>timeout</suitkaise-api>(10.0)
@@ -92,8 +91,8 @@ data = fetch_data.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>ret
     <p>Once you see it, it&#x27;s easy to read: everything before the last parentheses is configuration, the last parentheses are the call.</p>
     <p>But now when reviewing code, you can quickly see how it is being modified without sifting through 5 extra args in the main function call.</p>
     <h2>Works on classes too</h2>
-    <p><code>@<suitkaise-api>sk</suitkaise-api></code> isn&#x27;t just for functions. Put it on a class and every method gets modifiers:</p>
-    <pre><code class="language-python">@<suitkaise-api>sk</suitkaise-api>
+    <p><code><suitkaise-api>@sk</suitkaise-api></code> isn&#x27;t just for functions. Put it on a class and every method gets modifiers:</p>
+    <pre><code class="language-python"><suitkaise-api>@sk</suitkaise-api>
 class DataProcessor:
     def __init__(self, config):
         self.config = config
@@ -115,7 +114,7 @@ processor.process(data)
 processor.save.<suitkaise-api>timeout</suitkaise-api>(10.0)(&quot;output.json&quot;)
 
 # with retry
-processor.process.<suitkaise-api>retry</suitkaise-api>(3)(data)
+processor.<suitkaise-api>process.retry(</suitkaise-api>3)(data)
 
 # in background
 future = processor.save.<suitkaise-api>background</suitkaise-api>()(&quot;output.json&quot;)</code></pre>
@@ -123,30 +122,30 @@ future = processor.save.<suitkaise-api>background</suitkaise-api>()(&quot;output
     <pre><code class="language-python">AsyncProcessor = DataProcessor.<suitkaise-api>asynced</suitkaise-api>()
 processor = AsyncProcessor(config)
 
-# all <suitkaise-api>blocking</suitkaise-api> methods are now async
+# all blocking methods are now async
 await processor.process(data)
 await processor.save(&quot;output.json&quot;)</code></pre>
     <h2>Auto-detects blocking code</h2>
     <p><code><suitkaise-api>sk</suitkaise-api></code> uses AST analysis to inspect your function&#x27;s source code and detect blocking patterns — <code>time.sleep()</code>, <code>requests.get()</code>, file I/O, database calls, subprocess calls, and many more.</p>
-    <pre><code class="language-python">@<suitkaise-api>sk</suitkaise-api>
+    <pre><code class="language-python"><suitkaise-api>@sk</suitkaise-api>
 def slow_fetch(url):
     return requests.get(url).text
 
 slow_fetch.<suitkaise-api>has_blocking_calls</suitkaise-api>  # True
 slow_fetch.<suitkaise-api>blocking_calls</suitkaise-api>      # [&#x27;requests.get&#x27;]</code></pre>
-    <p>This detection controls which modifiers are available. <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> are only allowed on functions that actually block — preventing you from wrapping pure CPU code in <code>asyncio.to_thread()</code> where it wouldn&#x27;t help.</p>
-    <p>If the AST can&#x27;t detect your blocking code (C extensions, custom blocking functions, tight CPU loops), use <code>@<suitkaise-api>blocking</suitkaise-api></code> to explicitly mark it:</p>
-    <pre><code class="language-python">@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+    <p>This detection controls which modifiers are available. <code><suitkaise-api>.asynced()</suitkaise-api></code> and <code><suitkaise-api>.background()</suitkaise-api></code> are only allowed on functions that actually block — preventing you from wrapping pure CPU code in <code>asyncio.to_thread()</code> where it wouldn&#x27;t help.</p>
+    <p>If the AST can&#x27;t detect your blocking code (C extensions, custom blocking functions, tight CPU loops), use <code><suitkaise-api>@blocking</suitkaise-api></code> to explicitly mark it:</p>
+    <pre><code class="language-python"><suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def heavy_computation():
     return sum(x**2 for x in range(10_000_000))
 
-# now .<suitkaise-api>asynced</suitkaise-api>() and .<suitkaise-api>background</suitkaise-api>() are available
-<suitkaise-api>result</suitkaise-api> = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+# now .asynced() and .background() are available
+result = await heavy_computation.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
     <h2>The hidden killer feature: <code>_shared_meta</code></h2>
     <p>This is what makes <code><suitkaise-api>sk</suitkaise-api></code> essential to the <code><suitkaise-api>suitkaise</suitkaise-api></code> ecosystem.</p>
-    <p>When you put <code>@<suitkaise-api>sk</suitkaise-api></code> on a class, it analyzes every method&#x27;s AST to figure out which instance attributes each method reads and writes. It stores this as <code>_shared_meta</code>:</p>
-    <pre><code class="language-python">@<suitkaise-api>sk</suitkaise-api>
+    <p>When you put <code><suitkaise-api>@sk</suitkaise-api></code> on a class, it analyzes every method&#x27;s AST to figure out which instance attributes each method reads and writes. It stores this as <code>_shared_meta</code>:</p>
+    <pre><code class="language-python"><suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -166,7 +165,7 @@ print(Counter._shared_meta)
     <p>With <code>_shared_meta</code>, <code><suitkaise-api>Share</suitkaise-api></code> only syncs the attributes that actually changed. This is what makes <code><suitkaise-api>Share</suitkaise-api></code> practical at scale: the overhead is proportional to what you actually touch, not to the total size of the shared object.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -174,24 +173,53 @@ class Counter:
     def increment(self):
         self.value += 1
 
-share = <suitkaise-api>Share</suitkaise-api>()
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = Counter()
 
-# works across processes — <suitkaise-api>Share</suitkaise-api> knows to sync only &#x27;value&#x27; after increment()
+# works across processes — Share knows to sync only &#x27;value&#x27; after increment()
 share.counter.increment()</code></pre>
-    <p>If you&#x27;re using <code><suitkaise-api>Share</suitkaise-api></code> with custom classes, <code>@<suitkaise-api>sk</suitkaise-api></code> is what makes it efficient. Without it, <code><suitkaise-api>Share</suitkaise-api></code> still works, but you lose time every time <code><suitkaise-api>Share</suitkaise-api></code> needs to calculate <code>_shared_meta</code> for each object of that class.</p>
+    <p>If you&#x27;re using <code><suitkaise-api>Share</suitkaise-api></code> with custom classes, <code><suitkaise-api>@sk</suitkaise-api></code> is what makes it efficient. Without it, <code><suitkaise-api>Share</suitkaise-api></code> still works, but you lose time every time <code><suitkaise-api>Share</suitkaise-api></code> needs to calculate <code>_shared_meta</code> for each object of that class.</p>
     <h2>Compared to alternatives</h2>
-    <p><strong>vs <code>tenacity</code></strong> — Tenacity is a great retry library with more retry strategies and conditions than <code><suitkaise-api>sk</suitkaise-api></code>. But tenacity only does retry, and it bakes the retry config into the function definition. <code><suitkaise-api>sk</suitkaise-api></code> gives you retry + timeout + background + rate_limit + async in one decorator, and lets you choose per call site.</p>
-    <p><strong>vs <code>asyncio.to_thread</code></strong> — What <code>.<suitkaise-api>asynced</suitkaise-api>()</code> uses under the hood. <code><suitkaise-api>sk</suitkaise-api></code> wraps it in a consistent API and prevents you from using it on non-blocking code.</p>
-    <p><strong>vs <code>concurrent.futures</code></strong> — What <code>.<suitkaise-api>background</suitkaise-api>()</code> uses under the hood. <code><suitkaise-api>sk</suitkaise-api></code> wraps it in the same chaining API as everything else.</p>
-    <p><strong>vs writing it yourself</strong> — You could absolutely implement retry + timeout + background manually. The value of <code><suitkaise-api>sk</suitkaise-api></code> is that all five modifiers share a consistent interface, chain naturally, and — most importantly — generate <code>_shared_meta</code> for <code><suitkaise-api>Share</suitkaise-api></code> compatibility, which you would never build yourself.</p>
+    <h3>vs <code>tenacity</code></h3>
+    <p>Tenacity is a great retry library with more retry strategies and conditions than <code><suitkaise-api>sk</suitkaise-api></code>.</p>
+    <p>But tenacity bakes retry config into the function definition:</p>
+    <pre><code class="language-python">from tenacity import retry, stop_after_attempt, wait_exponential
+
+<suitkaise-api>@retry</suitkaise-api>(stop=stop_after_attempt(3), wait=wait_exponential())
+def fetch_data(url):
+    return requests.get(url).json()
+
+# every call retries. always. even in tests.
+# want a timeout too? add another library or wrap it yourself.</code></pre>
+    <p>With <code><suitkaise-api>sk</suitkaise-api></code>, you decide per call site:</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+def fetch_data(url):
+    return requests.get(url).json()
+
+# production: retry with timeout
+data = fetch_data.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(&quot;https://api.example.com&quot;)
+
+# tests: no retry, no timeout — just a normal call
+data = fetch_data(&quot;https://api.example.com&quot;)
+
+# one-off background fetch
+future = fetch_data.<suitkaise-api>background</suitkaise-api>()(&quot;https://api.example.com&quot;)</code></pre>
+    <p>Tenacity only does retry. <code><suitkaise-api>sk</suitkaise-api></code> gives you retry + timeout + background + rate_limit + async in one decorator, and lets you choose per call site.</p>
+    <h3>vs <code>asyncio.to_thread</code></h3>
+    <p>What <code><suitkaise-api>.asynced()</suitkaise-api></code> uses under the hood. <code><suitkaise-api>sk</suitkaise-api></code> wraps it in a consistent API and prevents you from using it on non-blocking code.</p>
+    <h3>vs <code>concurrent.futures</code></h3>
+    <p>What <code><suitkaise-api>.background()</suitkaise-api></code> uses under the hood. <code><suitkaise-api>sk</suitkaise-api></code> wraps it in the same chaining API as everything else.</p>
+    <h3>vs writing it yourself</h3>
+    <p>You could absolutely implement retry + timeout + background manually. The value of <code><suitkaise-api>sk</suitkaise-api></code> is that all five modifiers share a consistent interface, chain naturally, and — most importantly — generate <code>_shared_meta</code> for <code><suitkaise-api>Share</suitkaise-api></code> compatibility, which you would never build yourself.</p>
     <h2>Works with the rest of <code><suitkaise-api>suitkaise</suitkaise-api></code></h2>
     <ul>
         <li><code><suitkaise-api>processing</suitkaise-api></code> — <code><suitkaise-api>Pool</suitkaise-api></code> methods use <code><suitkaise-api>sk</suitkaise-api></code> modifiers. <code><suitkaise-api>Pool</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(20).<suitkaise-api>asynced</suitkaise-api>()</code> works because of <code><suitkaise-api>sk</suitkaise-api></code>.</li>
         <li><code><suitkaise-api>Share</suitkaise-api></code> — <code>_shared_meta</code> from <code><suitkaise-api>sk</suitkaise-api></code> is what makes <code><suitkaise-api>Share</suitkaise-api></code> efficient with custom classes.</li>
-        <li><code><suitkaise-api>circuits</suitkaise-api></code> — <code><suitkaise-api>Circuit</suitkaise-api>.<suitkaise-api>short</suitkaise-api>()</code> has <code>.<suitkaise-api>asynced</suitkaise-api>()</code> because <code><suitkaise-api>circuits</suitkaise-api></code> uses <code><suitkaise-api>sk</suitkaise-api></code> internally.</li>
-        <li><code><suitkaise-api>timing</suitkaise-api></code> — <code><suitkaise-api>timing</suitkaise-api>.sleep</code> has <code>.<suitkaise-api>asynced</suitkaise-api>()</code> via <code><suitkaise-api>sk</suitkaise-api></code>.</li>
-        <li><code><suitkaise-api>paths</suitkaise-api></code> — <code>@<suitkaise-api>autopath</suitkaise-api>()</code> can be combined with <code>@<suitkaise-api>sk</suitkaise-api></code> on the same function.</li>
+        <li><code><suitkaise-api>circuits</suitkaise-api></code> — <code><suitkaise-api>Circuit</suitkaise-api>.<suitkaise-api>short</suitkaise-api>()</code> has <code><suitkaise-api>.asynced()</suitkaise-api></code> because <code><suitkaise-api>circuits</suitkaise-api></code> uses <code><suitkaise-api>sk</suitkaise-api></code> internally.</li>
+        <li><code><suitkaise-api>timing</suitkaise-api></code> — <code><suitkaise-api>timing</suitkaise-api>.sleep</code> has <code><suitkaise-api>.asynced()</suitkaise-api></code> via <code><suitkaise-api>sk</suitkaise-api></code>.</li>
+        <li><code><suitkaise-api>paths</suitkaise-api></code> — <code><suitkaise-api>@autopath</suitkaise-api>()</code> can be combined with <code><suitkaise-api>@sk</suitkaise-api></code> on the same function.</li>
     </ul>
     <p><code><suitkaise-api>sk</suitkaise-api></code> is the glue. All <code><suitkaise-api>suitkaise</suitkaise-api></code> modules use it internally when applicable, and now your own code benefits from the same modifier system.</p>
 </section>

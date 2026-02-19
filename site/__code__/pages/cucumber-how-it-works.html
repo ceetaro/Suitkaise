@@ -8,7 +8,6 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
@@ -75,13 +74,13 @@
     <h2>Serialization</h2>
     <p>Serialization is done by a central, internal <code>Serializer</code> class, that uses the handlers to deconstruct complex objects into a nested dictionary of native <code>pickle</code> types, which are then serialized to bytes by <code>pickle.dumps()</code>.</p>
     <ul>
-        <li>converts objects to IR format</li>
-        <li>tracks circular references</li>
-        <li>enforces maximum recursion depth of 1000</li>
-        <li>selects the right handler for a type</li>
-        <li>provides the fast paths for common cases</li>
-        <li>preserves debug context (object path, depth)</li>
-        <li>returns the bytes</li>
+        <li>Converts objects to IR format</li>
+        <li>Tracks circular references</li>
+        <li>Enforces maximum recursion depth of 1000</li>
+        <li>Selects the right handler for a type</li>
+        <li>Provides the fast paths for common cases</li>
+        <li>Preserves debug context (object path, depth)</li>
+        <li>Returns the bytes</li>
     </ul>
     <h3>Tracking state</h3>
     <p><code>seen_objects: Dict[int, Any]</code> Tracks object IDs that were already serialized to detect circular references.</p>
@@ -124,9 +123,9 @@
         <li>simple instance fast path If the object is:</li>
     </ol>
     <ul>
-        <li>a user defined class</li>
-        <li>has only primitive attributes</li>
-        <li>has no custom serialization</li>
+        <li>A user defined class</li>
+        <li>Has only primitive attributes</li>
+        <li>Has no custom serialization</li>
     </ul>
     <p>then use the <code>simple_class_instance</code> IR instead of a full handler.</p>
     <ol>
@@ -167,17 +166,17 @@
     <p>They are placed into an <code>ALL_HANDLERS</code> list.</p>
     <ul>
         <li><code>ALL_HANDLERS</code> is an ordered list.</li>
-        <li>the most specific handlers are earlier in the list</li>
+        <li>The most specific handlers are earlier in the list</li>
         <li><code>ClassInstanceHandler</code> is last, acting as a catch all for generic or user defined classes</li>
         <li>The serializer caches handler lookups by type, which speeds repeated serialization of the same types.</li>
     </ul>
     <h2>Deserialization</h2>
     <p>Deserialization is done by a central, internal <code>Deserializer</code> class, that uses the handlers to reconstruct the objects from the IR.</p>
     <ul>
-        <li>converts IR back to live objects</li>
-        <li>resolves circular references</li>
-        <li>restores handler-based objects</li>
-        <li>rebuilds <code>pickle</code> native and fast-path types</li>
+        <li>Converts IR back to live objects</li>
+        <li>Resolves circular references</li>
+        <li>Restores handler-based objects</li>
+        <li>Rebuilds <code>pickle</code> native and fast-path types</li>
     </ul>
     <h3>State tracking</h3>
     <p><code>_object_registry: Dict[int, Any]</code> Maps <code>__object_id__</code> to placeholders or reconstructed objects.</p>
@@ -220,10 +219,10 @@
     </ol>
     <p>These fields tell the deserializer:</p>
     <ul>
-        <li>what kind of object it is</li>
-        <li>which handler knows how to rebuild it</li>
-        <li>the unique object id</li>
-        <li>provide the serialized state</li>
+        <li>What kind of object it is</li>
+        <li>Which handler knows how to rebuild it</li>
+        <li>The unique object id</li>
+        <li>Provide the serialized state</li>
     </ul>
     <ol>
         <li>Find handler The handler list is searched for a handler whose class name matches <code>handler_name</code>.</li>
@@ -263,7 +262,7 @@
     def reconstruct(self, state: Dict[str, Any]) -&gt; Any: ...</code></pre>
     <p>All handlers are defined in <code><suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/handlers/</code> and are registered in <code>handlers/__init__.py</code>.</p>
         <details>
-        <summary>FunctionHandler</summary>
+        <summary><code>FunctionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>FunctionHandler</code></h3>
     <p>Serializes function objects.</p>
@@ -271,7 +270,7 @@
         <li>Reference-based (fast path)</li>
     </ol>
     <p>For module-level functions without closures, stores <code>module</code> + <code>qualname</code> and imports on reconstruction. This is ~100x faster and smaller. It also stores a lightweight hash of the function signature to validate the reference.</p>
-    <p>Requirements</p>
+    <p><strong>Requirements</strong></p>
     <ul>
         <li>Has <code>__module__</code> and <code>__qualname__</code></li>
         <li>Not a closure (no captured variables)</li>
@@ -282,7 +281,7 @@
         <li>Full serialization (slow path)</li>
     </ol>
     <p>For closures, nested functions, and dynamically created functions, stores bytecode, globals, and closure state.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>code</code>: Code object (recursively serialized)</li>
         <li><code>globals</code>: Only referenced global names (excludes <code>__builtins__</code>)</li>
@@ -290,7 +289,7 @@
         <li><code>closure</code>: List of captured variable values</li>
         <li><code>annotations</code>, <code>doc</code>, <code>module</code></li>
     </ul>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Reference: import module and navigate qualname, then validate the signature hash.</li>
         <li>If the hash mismatches, a placeholder is returned with a warning and future serializations switch to full fallback mode.</li>
@@ -299,7 +298,7 @@
             </div>
     </details>
     <details>
-        <summary>LambdaHandler</summary>
+        <summary><code>LambdaHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>LambdaHandler</code></h3>
     <p>Serializes lambda functions (anonymous functions with name <code>&lt;lambda&gt;</code>).</p>
@@ -308,63 +307,63 @@
             </div>
     </details>
     <details>
-        <summary>PartialFunctionHandler</summary>
+        <summary><code>PartialFunctionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>PartialFunctionHandler</code></h3>
     <p>Serializes <code>functools.partial</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>func</code>: The wrapped function (recursively serialized)</li>
         <li><code>args</code>: Positional arguments already bound</li>
         <li><code>keywords</code>: Keyword arguments already bound</li>
     </ul>
-    <p>Reconstruction: <code>functools.partial(func, *args, **keywords)</code></p>
+    <p><strong>Reconstruction:</strong> <code>functools.partial(func, *args, **keywords)</code></p>
             </div>
     </details>
     <details>
-        <summary>BoundMethodHandler</summary>
+        <summary><code>BoundMethodHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>BoundMethodHandler</code></h3>
     <p>Serializes bound method objects (methods bound to an instance).</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>instance</code>: The object the method is bound to (recursively serialized)</li>
         <li><code>function_name</code>: Name of the method</li>
         <li><code>class_name</code>, <code>module</code>: For debugging</li>
     </ul>
-    <p>Reconstruction: Get the deserialized instance, then <code>getattr(instance, function_name)</code> to get the bound method. The method exists on the class, we just need to bind it to the instance.</p>
+    <p><strong>Reconstruction:</strong> Get the deserialized instance, then <code>getattr(instance, function_name)</code> to get the bound method. The method exists on the class, we just need to bind it to the instance.</p>
             </div>
     </details>
     <details>
-        <summary>StaticMethodHandler</summary>
+        <summary><code>StaticMethodHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>StaticMethodHandler</code></h3>
     <p>Serializes <code>@staticmethod</code> wrappers.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>func</code>: The underlying function</li>
     </ul>
-    <p>Reconstruction: <code>staticmethod(func)</code></p>
+    <p><strong>Reconstruction:</strong> <code>staticmethod(func)</code></p>
             </div>
     </details>
     <details>
-        <summary>ClassMethodHandler</summary>
+        <summary><code>ClassMethodHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ClassMethodHandler</code></h3>
     <p>Serializes <code>@classmethod</code> wrappers.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>func</code>: The underlying function</li>
     </ul>
-    <p>Reconstruction: <code>classmethod(func)</code></p>
+    <p><strong>Reconstruction:</strong> <code>classmethod(func)</code></p>
             </div>
     </details>
     <details>
-        <summary>LoggerHandler</summary>
+        <summary><code>LoggerHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>LoggerHandler</code></h3>
     <p>Serializes <code>logging.Logger</code> instances by capturing their configuration.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>name</code>: Logger name (loggers are singletons per name)</li>
         <li><code>level</code>: Logging level (DEBUG=10, INFO=20, etc.)</li>
@@ -372,318 +371,318 @@
         <li><code>filters</code>: List of filter objects</li>
         <li><code>propagate</code>, <code>disabled</code>: Logger settings</li>
     </ul>
-    <p>Reconstruction: <code>logging.getLogger(name)</code>, clear existing handlers, restore configuration. Leverages the fact that loggers are singletons - same name returns same instance.</p>
+    <p><strong>Reconstruction:</strong> <code>logging.getLogger(name)</code>, clear existing handlers, restore configuration. Leverages the fact that loggers are singletons - same name returns same instance.</p>
             </div>
     </details>
     <details>
-        <summary>StreamHandlerHandler</summary>
+        <summary><code>StreamHandlerHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>StreamHandlerHandler</code></h3>
     <p>Serializes <code>logging.StreamHandler</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>level</code>: Handler's logging level</li>
         <li><code>formatter</code>: Formatter object (recursively serialized)</li>
     </ul>
-    <p>Reconstruction: Create new <code>StreamHandler()</code> (uses <code>sys.stderr</code> by default), set level and formatter. Stream itself is not serialized - uses default in target process.</p>
+    <p><strong>Reconstruction:</strong> Create new <code>StreamHandler()</code> (uses <code>sys.stderr</code> by default), set level and formatter. Stream itself is not serialized - uses default in target process.</p>
             </div>
     </details>
     <details>
-        <summary>FileHandlerHandler</summary>
+        <summary><code>FileHandlerHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>FileHandlerHandler</code></h3>
     <p>Serializes <code>logging.FileHandler</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>filename</code>: Path to log file (<code>baseFilename</code>)</li>
         <li><code>mode</code>: File open mode ('a', 'w')</li>
         <li><code>encoding</code>: File encoding</li>
         <li><code>level</code>, <code>formatter</code></li>
     </ul>
-    <p>Reconstruction: <code>FileHandler(filename, mode, encoding)</code>, restore level and formatter.</p>
+    <p><strong>Reconstruction:</strong> <code>FileHandler(filename, mode, encoding)</code>, restore level and formatter.</p>
             </div>
     </details>
     <details>
-        <summary>FormatterHandler</summary>
+        <summary><code>FormatterHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>FormatterHandler</code></h3>
     <p>Serializes <code>logging.Formatter</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>fmt</code>: Format string (e.g., <code>'%(asctime)s - %(name)s'</code>)</li>
         <li><code>datefmt</code>: Date format string</li>
         <li><code>style</code>: Format style ('%', '{', or '$')</li>
     </ul>
-    <p>Reconstruction: <code>Formatter(fmt, datefmt, style)</code></p>
+    <p><strong>Reconstruction:</strong> <code>Formatter(fmt, datefmt, style)</code></p>
             </div>
     </details>
     <details>
-        <summary>FileHandleHandler</summary>
+        <summary><code>FileHandleHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>FileHandleHandler</code></h3>
     <p>Serializes open file handle objects (<code>TextIOWrapper</code>, <code>BufferedReader</code>, etc.).</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>path</code>: Absolute file path</li>
         <li><code>relative_path</code>: Relative path using <code><suitkaise-api>Skpath</suitkaise-api></code> (if available)</li>
         <li><code>mode</code>: File open mode</li>
-        <li><code>position</code>: Current position from <code><suitkaise-api>tell</suitkaise-api>()</code></li>
+        <li><code>position</code>: Current position from <code>tell()</code></li>
         <li><code>encoding</code>, <code>errors</code>, <code>newline</code>: Text mode settings</li>
         <li><code>closed</code>, <code>is_pipe</code>: State flags</li>
     </ul>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Pipes/closed files: Return placeholder</li>
         <li>Open files: Try relative path first (better for cross-machine), fall back to absolute. Open file, seek to position.</li>
     </ul>
-    <p>Limitation: Assumes file exists in target process's filesystem.</p>
+    <p><strong>Limitation:</strong> Assumes file exists in target process's filesystem.</p>
             </div>
     </details>
     <details>
-        <summary>TemporaryFileHandler</summary>
+        <summary><code>TemporaryFileHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>TemporaryFileHandler</code></h3>
     <p>Serializes <code>tempfile.NamedTemporaryFile</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>mode</code>, <code>position</code></li>
         <li><code>content</code>: Full file content (reads entire file)</li>
         <li><code>suffix</code>, <code>prefix</code>, <code>delete</code></li>
         <li><code>encoding</code>, <code>original_name</code></li>
     </ul>
-    <p>Reconstruction: Create NEW temp file with same properties, write content, seek to position.</p>
-    <p>NOTE: Creates new temp file with DIFFERENT path than original. Content and properties preserved, but not exact path.</p>
+    <p><strong>Reconstruction:</strong> Create NEW temp file with same properties, write content, seek to position.</p>
+    <p><strong>NOTE:</strong> Creates new temp file with DIFFERENT path than original. Content and properties preserved, but not exact path.</p>
             </div>
     </details>
     <details>
-        <summary>StringIOHandler</summary>
+        <summary><code>StringIOHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>StringIOHandler</code></h3>
     <p>Serializes <code>io.StringIO</code> in-memory text streams.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>content</code>: Full string buffer</li>
         <li><code>position</code>: Current position</li>
     </ul>
-    <p>Reconstruction: <code>StringIO(content)</code>, seek to position.</p>
+    <p><strong>Reconstruction:</strong> <code>StringIO(content)</code>, seek to position.</p>
             </div>
     </details>
     <details>
-        <summary>BytesIOHandler</summary>
+        <summary><code>BytesIOHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>BytesIOHandler</code></h3>
     <p>Serializes <code>io.BytesIO</code> in-memory binary streams.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>content</code>: Full bytes buffer</li>
         <li><code>position</code>: Current position</li>
         <li><code>closed</code>: Whether closed</li>
     </ul>
-    <p>Reconstruction: Handle closed state, <code>BytesIO(content)</code>, seek to position.</p>
+    <p><strong>Reconstruction:</strong> Handle closed state, <code>BytesIO(content)</code>, seek to position.</p>
             </div>
     </details>
     <details>
-        <summary>LockHandler</summary>
+        <summary><code>LockHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>LockHandler</code></h3>
     <p>Serializes <code>threading.Lock</code> and <code>threading.RLock</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>lock_type</code>: &quot;Lock&quot; or &quot;RLock&quot;</li>
         <li><code>locked</code>: Whether lock is currently acquired</li>
     </ul>
     <p>For RLock (no <code>locked()</code> method): try non-blocking <code>acquire()</code> to check state.</p>
-    <p>Reconstruction: Create new lock, acquire if it was locked.</p>
-    <p>Limitation: Lock thread ownership does NOT transfer across processes. The lock is acquired by the reconstructing thread, not the original owner.</p>
+    <p><strong>Reconstruction:</strong> Create new lock, acquire if it was locked.</p>
+    <p><strong>Limitation:</strong> Lock thread ownership does NOT transfer across processes. The lock is acquired by the reconstructing thread, not the original owner.</p>
             </div>
     </details>
     <details>
-        <summary>SemaphoreHandler</summary>
+        <summary><code>SemaphoreHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>SemaphoreHandler</code></h3>
     <p>Serializes <code>threading.Semaphore</code> and <code>BoundedSemaphore</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>semaphore_type</code>: &quot;Semaphore&quot; or &quot;BoundedSemaphore&quot;</li>
         <li><code>initial_value</code>, <code>current_value</code></li>
     </ul>
-    <p>Reconstruction: Create semaphore with initial value, acquire repeatedly until counter matches current value.</p>
+    <p><strong>Reconstruction:</strong> Create semaphore with initial value, acquire repeatedly until counter matches current value.</p>
             </div>
     </details>
     <details>
-        <summary>BarrierHandler</summary>
+        <summary><code>BarrierHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>BarrierHandler</code></h3>
     <p>Serializes <code>threading.Barrier</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>parties</code>: Number of threads that must arrive</li>
         <li><code>action</code>: Optional function called when all arrive</li>
         <li><code>timeout</code>: Optional timeout</li>
     </ul>
-    <p>Reconstruction: <code>Barrier(parties, action, timeout)</code>. Fresh barrier - doesn't capture how many threads are waiting.</p>
+    <p><strong>Reconstruction:</strong> <code>Barrier(parties, action, timeout)</code>. Fresh barrier - doesn't capture how many threads are waiting.</p>
             </div>
     </details>
     <details>
-        <summary>ConditionHandler</summary>
+        <summary><code>ConditionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ConditionHandler</code></h3>
     <p>Serializes <code>threading.Condition</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>lock</code>: The underlying lock (recursively serialized)</li>
     </ul>
-    <p>Reconstruction: <code>Condition(lock=deserialized_lock)</code></p>
+    <p><strong>Reconstruction:</strong> <code>Condition(lock=deserialized_lock)</code></p>
             </div>
     </details>
     <details>
-        <summary>QueueHandler</summary>
+        <summary><code>QueueHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>QueueHandler</code></h3>
     <p>Serializes <code>queue.Queue</code>, <code>LifoQueue</code>, <code>PriorityQueue</code>, and <code>SimpleQueue</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>queue_type</code>: Type name</li>
         <li><code>maxsize</code>: Maximum queue size</li>
         <li><code>items</code>: Snapshot of items (non-destructive using mutex + internal deque)</li>
     </ul>
-    <p>Reconstruction: Create queue of appropriate type, put all items back.</p>
+    <p><strong>Reconstruction:</strong> Create queue of appropriate type, put all items back.</p>
             </div>
     </details>
     <details>
-        <summary>MultiprocessingQueueHandler</summary>
+        <summary><code>MultiprocessingQueueHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>MultiprocessingQueueHandler</code></h3>
     <p>Serializes <code>multiprocessing.Queue</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>maxsize</code></li>
         <li><code>items</code>: Best-effort snapshot (drain and restore, limited to 10000 items)</li>
     </ul>
-    <p>Reconstruction: Create new queue (different underlying pipes), put items back.</p>
-    <p>Limitation: For reliable cross-process sharing, use <code><suitkaise-api>Share</suitkaise-api></code> over raw <code>multiprocessing.Queue</code>, or <code><suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()</code> / <code><suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()</code> for direct queue-based communication.</p>
+    <p><strong>Reconstruction:</strong> Create new queue (different underlying pipes), put items back.</p>
+    <p><strong>Limitation:</strong> For reliable cross-process sharing, use <code><suitkaise-api>Share</suitkaise-api></code> over raw <code>multiprocessing.Queue</code>, or <code><suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()</code> / <code><suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>listen</suitkaise-api>()</code> for direct queue-based communication.</p>
             </div>
     </details>
     <details>
-        <summary>EventHandler</summary>
+        <summary><code>EventHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>EventHandler</code></h3>
     <p>Serializes <code>threading.Event</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>is_set</code>: Whether event is set or clear</li>
     </ul>
-    <p>Reconstruction: Create new <code>threading.Event</code>, set if it was set.</p>
+    <p><strong>Reconstruction:</strong> Create new <code>threading.Event</code>, set if it was set.</p>
             </div>
     </details>
     <details>
-        <summary>MultiprocessingEventHandler</summary>
+        <summary><code>MultiprocessingEventHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>MultiprocessingEventHandler</code></h3>
     <p>Serializes <code>multiprocessing.Event</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>is_set</code>: Whether event is set or clear</li>
     </ul>
-    <p>Reconstruction: Create new <code>multiprocessing.Event</code>, set if it was set. Different underlying shared memory.</p>
+    <p><strong>Reconstruction:</strong> Create new <code>multiprocessing.Event</code>, set if it was set. Different underlying shared memory.</p>
             </div>
     </details>
     <details>
-        <summary>GeneratorHandler</summary>
+        <summary><code>GeneratorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>GeneratorHandler</code></h3>
     <p>Serializes generator objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>generator_name</code>, <code>generator_qualname</code>: For debugging</li>
         <li><code>remaining_values</code>: All values not yet yielded</li>
     </ul>
-    <p>Important: EXHAUSTS the generator. Original becomes empty. This is the only way to preserve remaining values.</p>
-    <p>Reconstruction: <code>iter(remaining_values)</code>. Returns iterator, not true generator. Values preserved but not pause/resume behavior.</p>
+    <p><strong>Important:</strong> EXHAUSTS the generator. Original becomes empty. This is the only way to preserve remaining values.</p>
+    <p><strong>Reconstruction:</strong> <code>iter(remaining_values)</code>. Returns iterator, not true generator. Values preserved but not pause/resume behavior.</p>
             </div>
     </details>
     <details>
-        <summary>IteratorHandler</summary>
+        <summary><code>IteratorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>IteratorHandler</code></h3>
     <p>Serializes iterator objects (<code>enumerate</code>, <code>zip</code>, <code>filter</code>, <code>map</code>, <code>reversed</code>, etc.).</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>type_name</code>: Iterator type</li>
         <li><code>remaining_values</code>: All remaining items (limited to 100000 for safety)</li>
     </ul>
-    <p>Important: EXHAUSTS the iterator. Original becomes empty.</p>
-    <p>Reconstruction: <code>iter(remaining_values)</code>. The original iterator type is not preserved.</p>
+    <p><strong>Important:</strong> EXHAUSTS the iterator. Original becomes empty.</p>
+    <p><strong>Reconstruction:</strong> <code>iter(remaining_values)</code>. The original iterator type is not preserved.</p>
             </div>
     </details>
     <details>
-        <summary>RangeHandler</summary>
+        <summary><code>RangeHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>RangeHandler</code></h3>
     <p>Serializes <code>range</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>start</code>, <code>stop</code>, <code>step</code></li>
     </ul>
-    <p>Reconstruction: <code>range(start, stop, step)</code>. Range objects are immutable and easy to serialize.</p>
+    <p><strong>Reconstruction:</strong> <code>range(start, stop, step)</code>. Range objects are immutable and easy to serialize.</p>
             </div>
     </details>
     <details>
-        <summary>EnumerateHandler</summary>
+        <summary><code>EnumerateHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>EnumerateHandler</code></h3>
     <p>Serializes <code>enumerate</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>remaining</code>: List of <code>(index, value)</code> tuples</li>
     </ul>
-    <p>Reconstruction: <code>iter(remaining)</code>. The enumerate is consumed during serialization, and reconstruction returns a plain iterator over the remaining <code>(index, value)</code> pairs.</p>
+    <p><strong>Reconstruction:</strong> <code>iter(remaining)</code>. The enumerate is consumed during serialization, and reconstruction returns a plain iterator over the remaining <code>(index, value)</code> pairs.</p>
             </div>
     </details>
     <details>
-        <summary>ZipHandler</summary>
+        <summary><code>ZipHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ZipHandler</code></h3>
     <p>Serializes <code>zip</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>remaining</code>: List of tuples</li>
     </ul>
-    <p>Reconstruction: <code>iter(remaining)</code></p>
+    <p><strong>Reconstruction:</strong> <code>iter(remaining)</code></p>
             </div>
     </details>
     <details>
-        <summary>RegexPatternHandler</summary>
+        <summary><code>RegexPatternHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>RegexPatternHandler</code></h3>
     <p>Serializes compiled <code>re.Pattern</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>pattern</code>: The regex pattern string</li>
         <li><code>flags</code>: Compilation flags (integer bitmask)</li>
     </ul>
-    <p>Reconstruction: <code>re.compile(pattern, flags)</code></p>
+    <p><strong>Reconstruction:</strong> <code>re.compile(pattern, flags)</code></p>
             </div>
     </details>
     <details>
-        <summary>MatchObjectHandler</summary>
+        <summary><code>MatchObjectHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>MatchObjectHandler</code></h3>
     <p>Serializes <code>re.Match</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>pattern</code>, <code>flags</code>, <code>string</code>, <code>pos</code>, <code>endpos</code></li>
         <li><code>match_string</code>, <code>span</code>, <code>groups</code>, <code>groupdict</code></li>
     </ul>
-    <p>Reconstruction: Returns <code>MatchReconnector</code>. Call <code>reconnect()</code> to re-run the pattern on the original string and get a live <code>re.Match</code> object. Returns <code>None</code> if the match can't be reproduced (e.g., pattern or string changed).</p>
+    <p><strong>Reconstruction:</strong> Returns <code>MatchReconnector</code>. Call <code>reconnect()</code> to re-run the pattern on the original string and get a live <code>re.Match</code> object. Returns <code>None</code> if the match can't be reproduced (e.g., pattern or string changed).</p>
             </div>
     </details>
     <details>
-        <summary>SQLiteConnectionHandler</summary>
+        <summary><code>SQLiteConnectionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>SQLiteConnectionHandler</code></h3>
     <p>Serializes <code>sqlite3.Connection</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>database</code>: Path or ':memory:'</li>
         <li><code>isolation_level</code></li>
@@ -694,185 +693,185 @@
         <li><code>schema</code>: All CREATE TABLE statements</li>
         <li><code>data</code>: All table data (expensive for large databases)</li>
     </ul>
-    <p>Reconstruction: Returns <code>SQLiteConnectionReconnector</code>. Call <code>reconnect()</code> to create a new connection. For file databases, connects to the file. For in-memory databases, creates new connection and restores schema and data.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>SQLiteConnectionReconnector</code>. Call <code>reconnect()</code> to create a new connection. For file databases, connects to the file. For in-memory databases, creates new connection and restores schema and data.</p>
             </div>
     </details>
     <details>
-        <summary>SQLiteCursorHandler</summary>
+        <summary><code>SQLiteCursorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>SQLiteCursorHandler</code></h3>
     <p>Serializes <code>sqlite3.Cursor</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>connection</code>: Database connection (recursively serialized)</li>
         <li><code>lastrowid</code>, <code>arraysize</code></li>
     </ul>
-    <p>Reconstruction: Returns <code>SQLiteCursorReconnector</code>. Call <code>reconnect()</code> to create a new cursor. If the connection is also a reconnector, it will be reconnected first. Result set NOT restored - user must re-execute query.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>SQLiteCursorReconnector</code>. Call <code>reconnect()</code> to create a new cursor. If the connection is also a reconnector, it will be reconnected first. Result set NOT restored - user must re-execute query.</p>
             </div>
     </details>
     <details>
-        <summary>HTTPSessionHandler</summary>
+        <summary><code>HTTPSessionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>HTTPSessionHandler</code></h3>
     <p>Serializes <code>requests.Session</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>cookies</code>: Session cookies (as dict)</li>
         <li><code>headers</code>: Default headers</li>
         <li><code>auth</code>: Authentication tuple</li>
         <li><code>proxies</code>, <code>verify</code>, <code>cert</code>, <code>max_redirects</code></li>
     </ul>
-    <p>Reconstruction: Create new Session, apply configuration. Active connections not preserved - connection pools recreated fresh.</p>
+    <p><strong>Reconstruction:</strong> Create new Session, apply configuration. Active connections not preserved - connection pools recreated fresh.</p>
             </div>
     </details>
     <details>
-        <summary>SocketHandler</summary>
+        <summary><code>SocketHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>SocketHandler</code></h3>
     <p>Serializes <code>socket.socket</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>family</code>, <code>type</code>, <code>proto</code>: Socket parameters</li>
-        <li><code>timeout</code>, <code><suitkaise-api>blocking</suitkaise-api></code></li>
+        <li><code>timeout</code>, <code>blocking</code></li>
         <li><code>local_addr</code>, <code>remote_addr</code>: From getsockname/getpeername</li>
     </ul>
-    <p>Reconstruction: Returns <code>SocketReconnector</code>. Call <code>reconnect()</code> to create new socket with same parameters, apply timeout/blocking settings, and best-effort bind/connect using saved addresses.</p>
-    <p>Limitation: Actual connection NOT preserved. Buffer contents lost.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>SocketReconnector</code>. Call <code>reconnect()</code> to create new socket with same parameters, apply timeout/blocking settings, and best-effort bind/connect using saved addresses.</p>
+    <p><strong>Limitation:</strong> Actual connection NOT preserved. Buffer contents lost.</p>
             </div>
     </details>
     <details>
-        <summary>DatabaseConnectionHandler</summary>
+        <summary><code>DatabaseConnectionHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>DatabaseConnectionHandler</code></h3>
     <p>Generic handler for database connections (PostgreSQL, MySQL, MongoDB, Redis, SQLAlchemy, etc.).</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>module</code>, <code>class_name</code></li>
         <li>Common attributes: <code>host</code>, <code>port</code>, <code>user</code>, <code>database</code></li>
         <li>Driver-specific attributes (DSN, connection kwargs, etc.)</li>
     </ul>
     <p>Passwords/tokens intentionally NOT stored for security.</p>
-    <p>Reconstruction: Returns typed <code>DbReconnector</code> (PostgresReconnector, MySQLReconnector, etc.). User calls <code>reconnect(auth=...)</code> to create a new live connection, providing credentials for protected databases.</p>
+    <p><strong>Reconstruction:</strong> Returns typed <code>DbReconnector</code> (PostgresReconnector, MySQLReconnector, etc.). User calls <code>reconnect(auth=...)</code> to create a new live connection, providing credentials for protected databases.</p>
             </div>
     </details>
     <details>
-        <summary>ThreadHandler</summary>
+        <summary><code>ThreadHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ThreadHandler</code></h3>
     <p>Serializes <code>threading.Thread</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>name</code>, <code>daemon</code></li>
         <li><code>target</code>: Target function (recursively serialized)</li>
         <li><code>args</code>, <code>kwargs</code></li>
         <li><code>is_alive</code>: Whether running</li>
     </ul>
-    <p>Reconstruction: Returns <code>ThreadReconnector</code>. Call <code>reconnect(start=False)</code> to create new Thread. Thread NOT started by default.</p>
-    <p>Limitation: Thread execution state (call stack, locals) cannot be serialized.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>ThreadReconnector</code>. Call <code>reconnect(start=False)</code> to create new Thread. Thread NOT started by default.</p>
+    <p><strong>Limitation:</strong> Thread execution state (call stack, locals) cannot be serialized.</p>
             </div>
     </details>
     <details>
-        <summary>ThreadPoolExecutorHandler</summary>
+        <summary><code>ThreadPoolExecutorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ThreadPoolExecutorHandler</code></h3>
     <p>Serializes <code>ThreadPoolExecutor</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>max_workers</code>, <code>thread_name_prefix</code></li>
     </ul>
-    <p>Reconstruction: Fresh executor with same configuration. Running tasks NOT serialized.</p>
+    <p><strong>Reconstruction:</strong> Fresh executor with same configuration. Running tasks NOT serialized.</p>
             </div>
     </details>
     <details>
-        <summary>ProcessPoolExecutorHandler</summary>
+        <summary><code>ProcessPoolExecutorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ProcessPoolExecutorHandler</code></h3>
     <p>Serializes <code>ProcessPoolExecutor</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>max_workers</code></li>
     </ul>
-    <p>Reconstruction: Fresh executor with same configuration.</p>
+    <p><strong>Reconstruction:</strong> Fresh executor with same configuration.</p>
             </div>
     </details>
     <details>
-        <summary>ThreadLocalHandler</summary>
+        <summary><code>ThreadLocalHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ThreadLocalHandler</code></h3>
     <p>Serializes <code>threading.local</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>data</code>: Current thread's local values (from <code>__dict__</code>)</li>
     </ul>
     <p>Only current thread's values serialized. Other threads' values lost.</p>
-    <p>Reconstruction: New <code>threading.local()</code>, set attributes from data.</p>
+    <p><strong>Reconstruction:</strong> New <code>threading.local()</code>, set attributes from data.</p>
             </div>
     </details>
     <details>
-        <summary>WeakrefHandler</summary>
+        <summary><code>WeakrefHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>WeakrefHandler</code></h3>
     <p>Serializes <code>weakref.ref</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>referenced_object</code>: The object (if still alive)</li>
         <li><code>is_dead</code>: Whether reference is dead</li>
     </ul>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Dead reference: Return a dead weakref placeholder (callable returning None)</li>
         <li>Alive: Create new weak reference to deserialized object</li>
     </ul>
-    <p>Note: Weak references become strong references during serialization, then weak again in new weakref.</p>
+    <p><strong>Note:</strong> Weak references become strong references during serialization, then weak again in new weakref.</p>
             </div>
     </details>
     <details>
-        <summary>WeakValueDictionaryHandler</summary>
+        <summary><code>WeakValueDictionaryHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>WeakValueDictionaryHandler</code></h3>
     <p>Serializes <code>weakref.WeakValueDictionary</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>items</code>: Current key-value pairs (values that exist)</li>
     </ul>
-    <p>Reconstruction: New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted. If a value is not weakrefable, a weakrefable placeholder is stored (with a warning) so data is preserved.</p>
+    <p><strong>Reconstruction:</strong> New WeakValueDictionary, add items. Values become strong during transfer, weak again when inserted. If a value is not weakrefable, a weakrefable placeholder is stored (with a warning) so data is preserved.</p>
             </div>
     </details>
     <details>
-        <summary>WeakKeyDictionaryHandler</summary>
+        <summary><code>WeakKeyDictionaryHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>WeakKeyDictionaryHandler</code></h3>
     <p>Serializes <code>weakref.WeakKeyDictionary</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>items</code>: Current key-value pairs (keys that exist)</li>
     </ul>
-    <p>Reconstruction: New WeakKeyDictionary, add items. Non-weakrefable keys are replaced with placeholder keys (with a warning) so data is preserved.</p>
+    <p><strong>Reconstruction:</strong> New WeakKeyDictionary, add items. Non-weakrefable keys are replaced with placeholder keys (with a warning) so data is preserved.</p>
             </div>
     </details>
     <details>
-        <summary>EnumHandler</summary>
+        <summary><code>EnumHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>EnumHandler</code></h3>
     <p>Serializes <code>enum.Enum</code> instances.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>module</code>, <code>enum_name</code>, <code>qualname</code></li>
         <li><code>member_name</code>, <code>value</code></li>
         <li><code>member_names</code> for Flag/IntFlag combinations</li>
         <li><code>definition</code> for dynamic enums (name, members, base_type)</li>
     </ul>
-    <p>Reconstruction: Import enum class, get member by name (or by value as fallback). If import fails and a definition is present, reconstruct from definition.</p>
+    <p><strong>Reconstruction:</strong> Import enum class, get member by name (or by value as fallback). If import fails and a definition is present, reconstruct from definition.</p>
     <p>Works for Enum, IntEnum, Flag, IntFlag, and custom subclasses.</p>
             </div>
     </details>
     <details>
-        <summary>EnumClassHandler</summary>
+        <summary><code>EnumClassHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>EnumClassHandler</code></h3>
     <p>Serializes enum classes themselves (not instances).</p>
     <p>Module-level enums: Store reference (<code>module</code> + <code>name</code>) Dynamic enums: Serialize full definition (<code>name</code>, <code>members</code>, <code>base_type</code>)</p>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Reference: Import from module</li>
         <li>Definition: <code>base_type(name, members)</code> using functional API</li>
@@ -880,63 +879,63 @@
             </div>
     </details>
     <details>
-        <summary>CoroutineHandler</summary>
+        <summary><code>CoroutineHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>CoroutineHandler</code></h3>
     <p>Serializes coroutine objects (from <code>async def</code> functions).</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>cr_code</code>, <code>cr_name</code>, <code>cr_qualname</code></li>
         <li><code>frame_locals</code>: If available</li>
     </ul>
-    <p>Reconstruction: Returns <code>DeserializedCoroutine</code> placeholder. Coroutine execution state cannot be transferred - awaiting raises error.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>DeserializedCoroutine</code> placeholder. Coroutine execution state cannot be transferred - awaiting raises error.</p>
             </div>
     </details>
     <details>
-        <summary>AsyncGeneratorHandler</summary>
+        <summary><code>AsyncGeneratorHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>AsyncGeneratorHandler</code></h3>
     <p>Serializes async generator objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>ag_name</code>, <code>ag_qualname</code></li>
     </ul>
-    <p>Reconstruction: Returns <code>DeserializedAsyncGenerator</code> placeholder. Async iteration raises error.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>DeserializedAsyncGenerator</code> placeholder. Async iteration raises error.</p>
             </div>
     </details>
     <details>
-        <summary>TaskHandler</summary>
+        <summary><code>TaskHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>TaskHandler</code></h3>
     <p>Serializes <code>asyncio.Task</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>task_name</code>, <code>is_done</code>, <code>is_cancelled</code></li>
-        <li><code><suitkaise-api>result</suitkaise-api></code>, <code>exception</code> (if done)</li>
+        <li><code>result</code>, <code>exception</code> (if done)</li>
     </ul>
-    <p>Reconstruction: Returns <code>DeserializedTask</code> placeholder with <code>done()</code>, <code>cancelled()</code>, <code><suitkaise-api>result</suitkaise-api>()</code>, <code>exception()</code> methods.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>DeserializedTask</code> placeholder with <code>done()</code>, <code>cancelled()</code>, <code>result()</code>, <code>exception()</code> methods.</p>
             </div>
     </details>
     <details>
-        <summary>FutureHandler</summary>
+        <summary><code>FutureHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>FutureHandler</code></h3>
     <p>Serializes <code>asyncio.Future</code> objects.</p>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>is_done</code>, <code>is_cancelled</code></li>
-        <li><code><suitkaise-api>result</suitkaise-api></code>, <code>exception</code></li>
+        <li><code>result</code>, <code>exception</code></li>
     </ul>
-    <p>Reconstruction: Returns <code>DeserializedFuture</code> placeholder with Future-like interface.</p>
+    <p><strong>Reconstruction:</strong> Returns <code>DeserializedFuture</code> placeholder with Future-like interface.</p>
             </div>
     </details>
     <details>
-        <summary>ClassObjectHandler</summary>
+        <summary><code>ClassObjectHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ClassObjectHandler</code></h3>
     <p>Serializes class objects themselves (not instances).</p>
     <p>Module-level classes: Store reference (<code>module</code> + <code>name</code>) Dynamic classes: Serialize full definition using <code>ClassInstanceHandler._serialize_class_definition()</code></p>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Reference: Import from module</li>
         <li>Definition: Reconstruct with <code>type()</code></li>
@@ -944,7 +943,7 @@
             </div>
     </details>
     <details>
-        <summary>ClassInstanceHandler</summary>
+        <summary><code>ClassInstanceHandler</code></summary>
         <div class="dropdown-content">
 <h3><code>ClassInstanceHandler</code></h3>
     <p>Serializes instances of user-defined classes. This is the catch-all handler (last in the chain).</p>
@@ -957,7 +956,7 @@
         <li>Both <code>__dict__</code> and <code>__slots__</code> (for hybrid classes)</li>
         <li>Special-case <code>types.GenericAlias</code> (stores <code>origin</code> + <code>args</code>)</li>
     </ol>
-    <p>State captured:</p>
+    <p><strong>State captured:</strong></p>
     <ul>
         <li><code>module</code>, <code>qualname</code>: Class identity</li>
         <li><code>strategy</code>: Which strategy was used</li>
@@ -971,7 +970,7 @@
         <li>Dynamically created classes</li>
         <li><code>__slots__</code> classes</li>
     </ul>
-    <p>Reconstruction:</p>
+    <p><strong>Reconstruction:</strong></p>
     <ul>
         <li>Get or recreate class (import or rebuild from definition)</li>
         <li>Apply strategy-specific reconstruction</li>
@@ -996,14 +995,14 @@
         <li><code>Reconnector</code> is constructed from IR state and returned</li>
         <li><code>Reconnector.reconnect()</code> is called to create a new live resource (may require authentication)</li>
     </ol>
-    <p>How it works:</p>
+    <p><strong>How it works:</strong></p>
     <ul>
         <li><code><suitkaise-api>cucumber</suitkaise-api></code> creates a placeholder <code>Reconnector</code> object</li>
         <li>You call <code>reconnect()</code> to create the new live resource, providing any authentication needed</li>
     </ul>
     <h3><code><suitkaise-api>reconnect_all</suitkaise-api>(obj, **auth)</code></h3>
     <p><code><suitkaise-api>cucumber</suitkaise-api></code> also includes a function called <code><suitkaise-api>reconnect_all</suitkaise-api>()</code>.</p>
-    <p>Args:</p>
+    <p><strong>Args:</strong></p>
     <ul>
         <li><code>start_threads</code>: if True, any <code>threading.Thread</code> objects returned by reconnectors are automatically started after reconnect. This is a keyword only argument.</li>
         <li><code>**auth</code>: a mapping of type key to secrets (authentication).</li>
@@ -1036,10 +1035,10 @@
         <li>If no auth is found, <code>reconnect()</code> is called with no credentials</li>
     </ol>
     <details>
-        <summary>DbReconnector</summary>
+        <summary><code>DbReconnector</code></summary>
         <div class="dropdown-content">
         <details>
-        <summary>DbReconnector</summary>
+        <summary><code>DbReconnector</code></summary>
         <div class="dropdown-content">
 <h3><code>DbReconnector</code></h3>
     <p>Database connections can't be pickled directly, and many require additional credentials (like a password or API key) to connect.</p>
@@ -1101,29 +1100,29 @@
     </details>
     <h3><code>SocketReconnector</code> --&gt; <code>socket.socket</code></h3>
     <p>Live sockets are OS resources that can't be serialized safely.</p>
-    <p>Data collected:</p>
+    <p><strong>Data collected:</strong></p>
     <ul>
         <li><code>family</code></li>
         <li><code>type</code></li>
         <li><code>proto</code></li>
         <li><code>timeout</code></li>
-        <li><code><suitkaise-api>blocking</suitkaise-api></code></li>
+        <li><code>blocking</code></li>
         <li><code>local_addr</code></li>
         <li><code>remote_addr</code></li>
     </ul>
     <p>When you call <code>reconnect()</code>, the socket is created with the same parameters and reconnects/binds as appropriate.</p>
-    <p>Result: <code>socket.socket</code> (fresh socket)</p>
-    <p>Limitations:</p>
+    <p><strong>Result:</strong> <code>socket.socket</code> (fresh socket)</p>
+    <p><strong>Limitations:</strong></p>
     <ul>
-        <li>any in-flight data is lost</li>
-        <li>the new socket is not the exact same connection instance</li>
+        <li>Any in-flight data is lost</li>
+        <li>The new socket is not the exact same connection instance</li>
     </ul>
     <h3><code>ThreadReconnector</code> --&gt; <code>threading.Thread</code></h3>
     <p>Threads run in their own process's memory space. You cannot directly serialize and reconnect to the exact same thread in the same memory space if the thread object has moved to a different process.</p>
     <p>However, it is still useful to quickly recreate the exact same thread in a different process. This is why <code><suitkaise-api>cucumber</suitkaise-api></code> includes a <code>ThreadReconnector</code>.</p>
     <p>If an object is bouncing around different places in memory (running in different processes with different GILs), it is useful and convenient to be able to quickly start something like a background runner thread or a monitoring thread without having to manually create the thread object and start it.</p>
     <p>It is also useful when doing something like adding a <code>ThreadReconnector</code> to shared memory using <code><suitkaise-api>Share</suitkaise-api></code> or <code><suitkaise-api>Skprocess</suitkaise-api>.<suitkaise-api>tell</suitkaise-api>()</code> to quickly start a thread in multiple different places.</p>
-    <p>Data collected:</p>
+    <p><strong>Data collected:</strong></p>
     <ul>
         <li><code>name</code></li>
         <li><code>daemon</code></li>
@@ -1133,30 +1132,30 @@
         <li><code>is_alive</code> (informational only)</li>
     </ul>
     <p>When you call <code>reconnect()</code>, a new <code>threading.Thread</code> object is constructed with the same exact configuration.</p>
-    <p>Result: <code>threading.Thread</code> (not started)</p>
+    <p><strong>Result:</strong> <code>threading.Thread</code> (not started)</p>
     <p><code><suitkaise-api>cucumber</suitkaise-api></code> does not start the thread by default because that could cause silent issues or unexpected behavior.</p>
     <p>If you want to start the thread automatically when you reconnect, use:</p>
     <pre><code class="language-python">thread = reconnector.reconnect(start=True)
 
-# <suitkaise-api>reconnect_all</suitkaise-api>()
+# reconnect_all()
 <suitkaise-api>reconnect_all</suitkaise-api>(obj, start_threads=True, **auth)
 
-# <suitkaise-api>autoreconnect</suitkaise-api> decorator on <suitkaise-api>Skprocess</suitkaise-api> class
+# autoreconnect decorator on Skprocess class
 from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
-@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)
+<suitkaise-api>@autoreconnect</suitkaise-api>(start_threads=True, **auth)
 class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 
     # ...</code></pre>
-    <p>Limitations:</p>
+    <p><strong>Limitations:</strong></p>
     <ul>
-        <li>original execution state is not preserved</li>
+        <li>Original execution state is not preserved</li>
     </ul>
     <h3><code>PipeReconnector</code> --&gt; <code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code> / OS pipes</h3>
-    <p>Created from OS pipe file objects and <code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code> endpoints.</p>
+    <p>Created from OS pipe file objects and <code>multiprocessing.Pipe</code> endpoints.</p>
     <p>Pipes are OS level handles tied to a specific process. The file descriptors or connection handles are not valid outside the original process boundary unless one side of the pipe is explicitly passed to a new process as it is being created.</p>
     <p>Since pipes are actually OS handles, they cannot be converted down to bytes and then passed. When going through <code><suitkaise-api>cucumber</suitkaise-api></code> without using the <code><suitkaise-api>Skprocess</suitkaise-api></code> class, OS handles get lost because of this, meaning pipes won't actually work correctly.</p>
     <p>If you want to use pipes with <code><suitkaise-api>cucumber</suitkaise-api></code>, use the <code><suitkaise-api>Pipe</suitkaise-api></code> class from <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api></code> instead of relying on the <code>PipeReconnector</code>.</p>
-    <p>Data collected:</p>
+    <p><strong>Data collected:</strong></p>
     <ul>
         <li><code>readable</code></li>
         <li><code>writable</code></li>
@@ -1164,7 +1163,7 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         <li><code>duplex</code></li>
         <li><code>preferred_end</code></li>
     </ul>
-    <p>Reconnector specific attributes:</p>
+    <p><strong>Reconnector specific attributes:</strong></p>
     <ul>
         <li><code>has_endpoint</code> (True if the original pipe was strictly read-only or write-only)</li>
         <li><code>endpoint</code> (<code>&quot;read&quot;</code> or <code>&quot;write&quot;</code> when <code>has_endpoint</code> is True)</li>
@@ -1176,15 +1175,15 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         <li><code>pair()</code> -&gt; returns both ends of a new pipe, ready for use</li>
     </ul>
     <p>These are new <code>multiprocessing.connection.Connection</code> objects, that do not point to the original parent, but are still valid and ready to use.</p>
-    <p>NOTE: <code>PipeReconnector</code> does not apply to <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api></code> objects. These are handled directly using <code>__serialize__</code> and <code>__deserialize__</code> and preserve pipe handles.</p>
-    <p>Limitations:</p>
+    <p><strong>NOTE:</strong> <code>PipeReconnector</code> does not apply to <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api></code> objects. These are handled directly using <code>__serialize__</code> and <code>__deserialize__</code> and preserve pipe handles.</p>
+    <p><strong>Limitations:</strong></p>
     <ul>
-        <li>buffered data in the old pipe is lost</li>
-        <li>the new pipe is not connected to the existing peer process it came from</li>
+        <li>Buffered data in the old pipe is lost</li>
+        <li>The new pipe is not connected to the existing peer process it came from</li>
     </ul>
     <h3><code>SubprocessReconnector</code> --&gt; <code>subprocess.Popen</code></h3>
     <p>Subprocesses are OS processes and cannot be paused and moved between processes. We store the command args and output metadata so you can restart it if needed, but the actual process and its runtime state are not preserved.</p>
-    <p>Data collected:</p>
+    <p><strong>Data collected:</strong></p>
     <ul>
         <li><code>args</code></li>
         <li><code>returncode</code></li>
@@ -1194,16 +1193,16 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         <li><code>stderr_data</code></li>
     </ul>
     <p>When you call <code>reconnect()</code>, a new subprocess is started with the saved launch parameters (args and other state). Because <code>SubprocessReconnector</code> does not require auth, it will also lazily reconnect on first attribute access, which starts a new process; use <code>.snapshot()</code> if you want metadata without starting a process.</p>
-    <p>Result: <code>subprocess.Popen</code> (new process)</p>
-    <p>Limitations:</p>
+    <p><strong>Result:</strong> <code>subprocess.Popen</code> (new process)</p>
+    <p><strong>Limitations:</strong></p>
     <ul>
-        <li>original PID and runtime state are not preserved</li>
-        <li>if the original process was running, it is not resumed, it is restarted</li>
+        <li>Original PID and runtime state are not preserved</li>
+        <li>If the original process was running, it is not resumed, it is restarted</li>
     </ul>
     <h3><code>MatchReconnector</code> --&gt; <code>re.Match</code></h3>
     <p><code>re.Match</code> objects are not constructible directly because Python doesn’t expose a public constructor for them. They only exist as the result of running a compiled regex pattern against a specific string. To recreate one, we store all of the data needed to recreate the match.</p>
     <p>When you call <code>reconnect()</code>, the pattern is recompiled and re-run on the same string, and then groups and span info are restored. If the match is identical, a new <code>re.Match</code> is returned. <code>None</code> is returned if it is not.</p>
-    <p>Data collected:</p>
+    <p><strong>Data collected:</strong></p>
     <ul>
         <li><code>pattern</code></li>
         <li><code>flags</code></li>
@@ -1215,10 +1214,10 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         <li><code>groups</code></li>
         <li><code>groupdict</code></li>
     </ul>
-    <p>Result: <code>re.Match</code> (if the match can be reproduced)</p>
-    <p>Limitations:</p>
+    <p><strong>Result:</strong> <code>re.Match</code> (if the match can be reproduced)</p>
+    <p><strong>Limitations:</strong></p>
     <ul>
-        <li>if the input string or flags differ, the match may not reproduce.</li>
+        <li>If the input string or flags differ, the match may not reproduce.</li>
     </ul>
     <h3>Limitations</h3>
     <p>As seen above, some limitations are present.</p>
@@ -1233,15 +1232,15 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     <h4>User expectations</h4>
     <p>Automatically reconnecting things like this is awkward for users.</p>
     <ul>
-        <li>connections normally don't reconnect automatically</li>
-        <li>silently reconnecting things can cause silent failures or user confusion</li>
-        <li>users expect modules/tools like these to adhere to good practices when it comes to security and authentication</li>
+        <li>Connections normally don't reconnect automatically</li>
+        <li>Silently reconnecting things can cause silent failures or user confusion</li>
+        <li>Users expect modules/tools like these to adhere to good practices when it comes to security and authentication</li>
     </ul>
     <p><code><suitkaise-api>suitkaise</suitkaise-api></code> offers 3 levels of user control regarding reconnection.</p>
     <ol>
         <li>(most manual control) calling <code>reconnect()</code> on each <code>Reconnector</code> object, adding each <code>auth</code> individually</li>
         <li>calling <code><suitkaise-api>reconnect_all</suitkaise-api>(obj, **auth)</code> on an entire object</li>
-        <li>(most automatic) using <code>@<suitkaise-api>autoreconnect</suitkaise-api>(start_threads=True, **auth)</code> to decorate a <code><suitkaise-api>Skprocess</suitkaise-api></code> class</li>
+        <li>(most automatic) using <code><suitkaise-api>@autoreconnect</suitkaise-api>(start_threads=True, **auth)</code> to decorate a <code><suitkaise-api>Skprocess</suitkaise-api></code> class</li>
     </ol>
     <p>We can automatically reconnect for you, but it is controlled and requires you to provide authentication through a decorator and use a specific class.</p>
     

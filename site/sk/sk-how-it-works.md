@@ -9,7 +9,7 @@ columns = 1
 
 # 1.1
 
-title = "How `<suitkaise-api>sk</suitkaise-api>` works"
+title = "How `sk` works"
 
 # 1.2
 
@@ -20,7 +20,7 @@ text = "
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                           @<suitkaise-api>sk</suitkaise-api> decorator or <suitkaise-api>sk</suitkaise-api>()                            │
+│                           <suitkaise-api>@sk</suitkaise-api> decorator or <suitkaise-api>sk</suitkaise-api>()                            │
 │                                                                            │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                         Input: class or function                     │  │
@@ -59,13 +59,13 @@ text = "
 
 ## Blocking Detection
 
-The sk module detects blocking code to decide whether `.<suitkaise-api>asynced</suitkaise-api>()` and `.<suitkaise-api>background</suitkaise-api>()` are allowed.
+The `sk` module detects blocking code to decide whether `.<suitkaise-api>asynced</suitkaise-api>()` and `.<suitkaise-api>background</suitkaise-api>()` are allowed.
 
 ### Detection Order
 
-1. Check for `@<suitkaise-api>blocking</suitkaise-api>` decorator - if a function/method has `@<suitkaise-api>blocking</suitkaise-api>`, it's immediately marked as blocking. AST analysis for blocking calls is skipped (performance optimization).
+1. Check for `<suitkaise-api>@blocking</suitkaise-api>` decorator - if a function/method has `<suitkaise-api>@blocking</suitkaise-api>`, it's immediately marked as blocking. AST analysis for blocking calls is skipped (performance optimization).
 
-2. AST analysis - if no `@<suitkaise-api>blocking</suitkaise-api>` decorator, parse the source code and look for known blocking patterns.
+2. AST analysis - if no `<suitkaise-api>@blocking</suitkaise-api>` decorator, parse the source code and look for known blocking patterns.
 
 ### Known Blocking Calls
 
@@ -80,7 +80,7 @@ BLOCKING_CALLS = {
     'open', 'read', 'write', 'readline', 'readlines',
     
     # subprocess
-    'subprocess.<suitkaise-api>run</suitkaise-api>', 'subprocess.call', 'subprocess.check_call',
+    'subprocess.run', 'subprocess.call', 'subprocess.check_call',
     
     # requests
     'requests.get', 'requests.post', 'requests.put', ...
@@ -88,7 +88,7 @@ BLOCKING_CALLS = {
     # database connectors
     'sqlite3.connect', 'psycopg2.connect', 'pymysql.connect', ...
     
-    # for the whole list, see the <suitkaise-api>blocking</suitkaise-api> calls page
+    # for the whole list, see the blocking calls page
 }
 ```
 
@@ -102,7 +102,7 @@ BLOCKING_METHOD_PATTERNS = {
     'recv', 'send', 'accept', 'connect',
     'read', 'write', 'fetch', 'fetchone', 'fetchall',
     'execute', 'commit', 'rollback',
-    # for the whole list, see the <suitkaise-api>blocking</suitkaise-api> calls page
+    # for the whole list, see the blocking calls page
 }
 ```
 
@@ -158,7 +158,7 @@ class _AttributeVisitor(ast.NodeVisitor):
         self.writes: Set[str] = set()
     
     def visit_Attribute(self, node: ast.Attribute):
-        if isinstance(node.value, ast.Name) and node.value.<suitkaise-api>id</suitkaise-api> == 'self':
+        if isinstance(node.value, ast.Name) and node.value.id == 'self':
             attr_name = node.attr
             
             if isinstance(node.ctx, ast.Store):
@@ -171,7 +171,7 @@ class _AttributeVisitor(ast.NodeVisitor):
     def visit_AugAssign(self, node: ast.AugAssign):
         # self.x += 1 is both read and write
         if isinstance(node.target, ast.Attribute):
-            if isinstance(node.target.value, ast.Name) and node.target.value.<suitkaise-api>id</suitkaise-api> == 'self':
+            if isinstance(node.target.value, ast.Name) and node.target.value.id == 'self':
                 attr_name = node.target.attr
                 self.reads.add(attr_name)
                 self.writes.add(attr_name)
@@ -203,7 +203,7 @@ When you apply `<suitkaise-api>sk</suitkaise-api>` to a function (as a decorator
 
 ```python
 # as decorator
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 def slow_fetch(url):
     return requests.get(url).text
 
@@ -216,7 +216,7 @@ slow_fetch = <suitkaise-api>sk</suitkaise-api>(slow_fetch)
 
 ### What Happens
 
-1. Detect blocking calls - check for `@<suitkaise-api>blocking</suitkaise-api>` or analyze AST
+1. Detect blocking calls - check for `<suitkaise-api>@blocking</suitkaise-api>` or analyze AST
 2. Attach attributes:
    - `func.<suitkaise-api>has_blocking_calls</suitkaise-api>` - `bool`
    - `func.<suitkaise-api>blocking_calls</suitkaise-api>` - list of detected calls
@@ -224,7 +224,7 @@ slow_fetch = <suitkaise-api>sk</suitkaise-api>(slow_fetch)
 
 ```python
 def <suitkaise-api>sk</suitkaise-api>(func):
-    # detect <suitkaise-api>blocking</suitkaise-api> calls
+    # detect blocking calls
     blocking_calls = detect_blocking(func)
     
     # attach attributes
@@ -261,7 +261,7 @@ When you apply `<suitkaise-api>sk</suitkaise-api>` to a class (as a decorator or
 
 ```python
 # as decorator
-@<suitkaise-api>sk</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
 class Counter:
     def __init__(self):
         self.value = 0
@@ -300,7 +300,7 @@ def <suitkaise-api>sk</suitkaise-api>(cls):
     cls._blocking_methods = blocking_methods
     cls.<suitkaise-api>has_blocking_calls</suitkaise-api> = len(blocking_methods) > 0
     
-    # attach <suitkaise-api>asynced</suitkaise-api>() static method
+    # attach asynced() static method
     def <suitkaise-api>asynced</suitkaise-api>():
         if not blocking_methods:
             raise <suitkaise-api>SkModifierError</suitkaise-api>(f"{cls.__name__} has no <suitkaise-api>blocking</suitkaise-api> calls")
@@ -334,10 +334,10 @@ When you access a method on an instance, you get a `_ModifiableBoundMethod` that
 
 ```python
 counter.increment()                    # direct call
-counter.increment.<suitkaise-api>asynced</suitkaise-api>()()          # async version using asyncio.to_thread()
-counter.increment.<suitkaise-api>retry</suitkaise-api>(3)()           # with retry
-counter.increment.<suitkaise-api>timeout</suitkaise-api>(5.0)()       # with timeout
-counter.increment.<suitkaise-api>background</suitkaise-api>()()       # returns Future
+counter.increment.asynced()()          # async version using asyncio.to_thread()
+counter.increment.retry(3)()           # with retry
+counter.increment.timeout(5.0)()       # with timeout
+counter.increment.background()()       # returns Future
 counter.increment.rate_limit(2.0)()    # rate limited
 ```
 
@@ -352,7 +352,7 @@ When you call `MyClass.<suitkaise-api>asynced</suitkaise-api>()`, it creates a n
 1. Create new class - name it `_Async{ClassName}`
 2. Copy all methods - non-blocking methods stay as-is
 3. Wrap blocking methods - use `asyncio.to_thread()` wrapper
-4. Copy metadata - preserve `_shared_meta` for Share
+4. Copy metadata - preserve `_shared_meta` for `Share`
 
 ```python
 def create_async_class(cls, blocking_methods):
@@ -451,13 +451,13 @@ When you finally call the `Skfunction` (e.g., `fn.<suitkaise-api>retry</suitkais
 2. Check rate limit first - if rate limiting is configured, block until we're allowed to proceed. This happens before any execution attempts.
 
 3. Build the execution function - create an inner function that:
-   - if timeout is set: run the real function in a `ThreadPoolExecutor` with a timeout on `future.<suitkaise-api>result</suitkaise-api>()`
-   - if no timeout: just call the function directly
+   - If timeout is set: run the real function in a `ThreadPoolExecutor` with a timeout on `future.<suitkaise-api>result</suitkaise-api>()`
+   - If no timeout: just call the function directly
 
 4. Apply retry logic - if retry is configured:
-   - loop up to `times` attempts
-   - on each failure, sleep for `delay` seconds (multiplied by `backoff_factor` each time)
-   - if all attempts fail, raise the last exception
+   - Loop up to `times` attempts
+   - On each failure, sleep for `delay` seconds (multiplied by `backoff_factor` each time)
+   - If all attempts fail, raise the last exception
 
 5. Return the result - either from the first successful attempt, or raise if all failed
 
@@ -529,8 +529,8 @@ The async version follows the same modifier pattern, but:
 
 1. Check rate limit - await the async limiter if configured
 2. Build async execution - create a coroutine that:
-   - wraps the sync function in `asyncio.to_thread()`
-   - if timeout is set, wraps that in `asyncio.wait_for()`
+   - Wraps the sync function in `asyncio.to_thread()`
+   - If timeout is set, wraps that in `asyncio.wait_for()`
 3. Apply retry logic - same loop as sync, but using `await` for the execution and `asyncio.sleep()` for delays
 4. Return the result - the awaited result from the function
 
@@ -586,9 +586,9 @@ The rate limiter ensures a maximum number of calls per second using a simple int
 2. Track last call time - store when the last call happened
 
 3. On each acquire:
-   - calculate how long since the last call
-   - if less than the minimum interval, sleep for the remaining time
-   - update the last call timestamp
+   - Calculate how long since the last call
+   - If less than the minimum interval, sleep for the remaining time
+   - Update the last call timestamp
 
 4. Thread safety - the sync version uses a lock to prevent race conditions when multiple threads call simultaneously
 
@@ -625,20 +625,20 @@ class RateLimiter:
 
 ## Share Integration
 
-When `<suitkaise-api>Share</suitkaise-api>` receives an `@<suitkaise-api>sk</suitkaise-api>`-decorated class, it can use `_shared_meta` for efficient synchronization.
+When `<suitkaise-api>Share</suitkaise-api>` receives an `<suitkaise-api>@sk</suitkaise-api>`-decorated class, it can use `_shared_meta` for efficient synchronization.
 
 ### How It Works
 
 1. `share.counter = Counter()` - share sees `Counter._shared_meta`
 2. Share creates proxy that intercepts method calls
 3. When `share.counter.increment()` is called:
-   - proxy looks up `_shared_meta['methods']['increment']['writes']`
-   - proxy increments pending counter for `counter.value`
-   - proxy queues the command
+   - Proxy looks up `_shared_meta['methods']['increment']['writes']`
+   - Proxy increments pending counter for `counter.value`
+   - Proxy queues the command
 4. When reading `share.counter.value`:
-   - proxy looks up `_shared_meta['properties']['value']['reads']`
-   - proxy waits for pending writes to `counter.value`
-   - proxy fetches and returns the value
+   - Proxy looks up `_shared_meta['properties']['value']['reads']`
+   - Proxy waits for pending writes to `counter.value`
+   - Proxy fetches and returns the value
 
 This ensures reads see the effects of prior writes.
 "

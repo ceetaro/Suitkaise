@@ -24,7 +24,7 @@ They are also placed in the footer of every site page.
 
 # 2.1
 
-title = "About `<suitkaise-api>suitkaise</suitkaise-api>`"
+title = "About `suitkaise`"
 
 # 3.1
 
@@ -65,15 +65,15 @@ All files and code in this repository is licensed under the Apache License 2.0.
 
 `<suitkaise-api>suitkaise</suitkaise-api>` contains the following modules:
 
-- cucumber: serialization engine
+- `cucumber`: serialization engine
 
-- circuit: flow control
+- `circuit`: flow control
 
-- processing: multiprocessing/subprocesses
+- `processing`: multiprocessing/subprocesses
 
-- skpath: path utilities
+- `skpath`: path utilities
 
-- sktime: timing utilities
+- `sktime`: timing utilities
 
 #### Documentation
 
@@ -162,7 +162,7 @@ These are all much more involved than just creating a processing pool to work wi
 - Detailed logging and debugging
 - Cross process communication
 - Thoughtful lifecycle management
-- and more
+- And more
 
 Trying to do all of this manually for each individual scenario is overwhelming and time consuming.
 
@@ -178,7 +178,7 @@ class MyProcess(Process):
     def __init__(self, num_loops: int):
         self.counter = 0
 
-        # <suitkaise-api>run</suitkaise-api> N times
+        # run N times
         self.config.num_loops = num_loops
 
 
@@ -214,7 +214,7 @@ class MyProcess(Process):
 
     def <suitkaise-api>__result__</suitkaise-api>(self):
 
-        # this returns the <suitkaise-api>result</suitkaise-api> of the process
+        # this returns the result of the process
         # don't have to worry about confusing returns
         # store your results as instance attributes
         # and return them here
@@ -222,7 +222,7 @@ class MyProcess(Process):
 
     def <suitkaise-api>__error__</suitkaise-api>(self):
 
-        # this is <suitkaise-api>__result__</suitkaise-api>() when an <suitkaise-api>error</suitkaise-api> occurs
+        # this is __result__() when an error occurs
 
 ```
 
@@ -236,13 +236,13 @@ You can start the process with one line.
 p = MyProcess(num_loops=10)
 
 # start the process
-p.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>p.start()</suitkaise-api>
 
 # wait for the process to finish
-p.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>p.wait()</suitkaise-api>
 
-# access the <suitkaise-api>result</suitkaise-api>
-<suitkaise-api>result</suitkaise-api> = p.<suitkaise-api>result</suitkaise-api>
+# access the result
+result = p.<suitkaise-api>result</suitkaise-api>
 ```
 
 (button)
@@ -272,7 +272,7 @@ Your loggers don't pickle.
 
 Your class objects don't pickle.
 
-Solution: use `<suitkaise-api>cucumber</suitkaise-api>` to serialize your objects.
+**Solution:** use `<suitkaise-api>cucumber</suitkaise-api>` to serialize your objects.
 
 I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.
     
@@ -320,7 +320,7 @@ Or, maybe your laptop at home is also Windows, but the project is placed in a di
 
 And then everything breaks.
 
-Solution: use `SKPath`.
+**Solution:** use `SKPath`.
 
 `SKPaths` automatically detect your project root using a custom detection system, and calculate a path relative to your project root.
 
@@ -338,24 +338,24 @@ Cross-platform compatibility.
 
 Try using `<suitkaise-api>Circuit</suitkaise-api>` to manage your loops.
 
-- cleaner code
-- easy to think about
-- automatic error handling
+- Cleaner code
+- Easy to think about
+- Automatic error handling
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
 results = []
-circ = <suitkaise-api>Circuit</suitkaise-api>(shorts=3)
+<suitkaise-api>circ</suitkaise-api> = <suitkaise-api>Circuit(</suitkaise-api>shorts=3)
 
 while circ.flowing:
-    <suitkaise-api>result</suitkaise-api> = risky_operation()
+    result = risky_operation()
 
     if <suitkaise-api>result</suitkaise-api>:
-        results.append(<suitkaise-api>result</suitkaise-api>)
+        results.append(result)
     
     else:
-        circ.<suitkaise-api>short</suitkaise-api>()
+        <suitkaise-api>circ.short()</suitkaise-api>
 ```
 
 ## I hate having to write code to time things.
@@ -370,7 +370,7 @@ def my_function():
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
 
-# <suitkaise-api>run</suitkaise-api> my_function many times
+# run my_function many times
 for i in range(100):
     my_function()
 
@@ -382,7 +382,7 @@ stdev = my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</s
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import sktime
 
-with sktime.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with sktime.<suitkaise-api>TimeThis(</suitkaise-api>) as timer:
 
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
@@ -431,18 +431,18 @@ print(f"Potential lagger 3: {mean_3:.3f}s")
 
 And I don't want to use `pathlib.Path.resolve()` every single time.
 
-Use `skpath.<suitkaise-api>autopath</suitkaise-api>()` to automatically convert paths to whatever the function accepts.
+Use `skpath.<suitkaise-api>autopath()</suitkaise-api>` to automatically convert paths to whatever the function accepts.
 
 ```python
 from <suitkaise-api>suitkaise</suitkaise-api> import skpath
 
-@skpath.<suitkaise-api>autopath</suitkaise-api>()
+@skpath.<suitkaise-api>autopath()</suitkaise-api>
 def my_function(path: str):
     
     # all Paths are converted to strings
     # all strings are left as is
 
-@skpath.<suitkaise-api>autopath</suitkaise-api>()
+@skpath.<suitkaise-api>autopath()</suitkaise-api>
 def my_function_2(path: Path)
 
     # all strings are converted to Paths
@@ -461,7 +461,9 @@ Why? Because I tried to have AI do all of these kinds of things for me and it fa
 
 However, there are 2 ways to let AI use `<suitkaise-api>suitkaise</suitkaise-api>`:
 
-1. Have it search this page! Copy this into your prompt:
+### 1. Have it search this page!
+
+Copy this into your prompt:
 
 ```text
 I would like you to understand and use the <suitkaise-api>suitkaise</suitkaise-api> modules in my project.
@@ -471,7 +473,7 @@ It is installable using `pip install <suitkaise-api>suitkaise</suitkaise-api>`.
 Can you go to the website (<suitkaise-api>suitkaise</suitkaise-api>.info) and look at the "how to use" section for each module?
 ```
 
-2. Download the official docs and place them in your project.
+### 2. Download the official docs and place them in your project.
 
 (Button) Download (end of button)
 
@@ -500,7 +502,7 @@ They will appear as a folder in the specified directory.
 
 ### Has `<suitkaise-api>suitkaise</suitkaise-api>` solved your problem? We want to know!
 
-That's the whole point of `<suitkaise-api>suitkaise</suitkaise-api>`, so yeah, let us know at `<suitkaise-api>suitkaise</suitkaise-api>@<suitkaise-api>suitkaise</suitkaise-api>.info`.
+That's the whole point of `<suitkaise-api>suitkaise</suitkaise-api>`, so yeah, let us know at `<suitkaise-api>suitkaise</suitkaise-api><suitkaise-api>@suitkaise</suitkaise-api>.info`.
 
 
 

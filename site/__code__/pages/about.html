@@ -23,11 +23,11 @@
             <p>All files and code in this repository is licensed under the Apache License 2.0.</p>
             <p><code><suitkaise-api>suitkaise</suitkaise-api></code> contains the following modules:</p>
             <ul>
-                <li>cucumber: serialization engine</li>
-                <li>circuit: flow control</li>
-                <li>processing: multiprocessing/subprocesses</li>
-                <li>skpath: path utilities</li>
-                <li>sktime: timing utilities</li>
+                <li><code>cucumber</code>: serialization engine</li>
+                <li><code>circuit</code>: flow control</li>
+                <li><code>processing</code>: multiprocessing/subprocesses</li>
+                <li><code>skpath</code>: path utilities</li>
+                <li><code>sktime</code>: timing utilities</li>
             </ul>
 
             <h4>Documentation</h4>
@@ -84,7 +84,7 @@ with Permission():
             <li>Detailed logging and debugging</li>
             <li>Cross process communication</li>
             <li>Thoughtful lifecycle management</li>
-            <li>and more</li>
+            <li>And more</li>
         </ul>
         <p>Trying to do all of this manually for each individual scenario is overwhelming and time consuming.</p>
         <p>So, I turned processing into one class.</p>
@@ -96,7 +96,7 @@ class MyProcess(Process):
     def __init__(self, num_loops: int):
         self.counter = 0
 
-        # <suitkaise-api>run</suitkaise-api> N times
+        # run N times
         self.config.num_loops = num_loops
 
 
@@ -132,7 +132,7 @@ class MyProcess(Process):
 
     def <suitkaise-api>__result__</suitkaise-api>(self):
 
-        # this returns the <suitkaise-api>result</suitkaise-api> of the process
+        # this returns the result of the process
         # don't have to worry about confusing returns
         # store your results as instance attributes
         # and return them here
@@ -140,20 +140,20 @@ class MyProcess(Process):
 
     def <suitkaise-api>__error__</suitkaise-api>(self):
 
-        # this is <suitkaise-api>__result__</suitkaise-api>() when an <suitkaise-api>error</suitkaise-api> occurs</code></pre>
+        # this is __result__() when an error occurs</code></pre>
         <p>Everything is separated into pieces that make much more sense.</p>
         <p>Everything is encapsulated into a single class.</p>
         <p>You can start the process with one line.</p>
 <pre><code class="language-python">p = MyProcess(num_loops=10)
 
 # start the process
-p.<suitkaise-api>start</suitkaise-api>()
+<suitkaise-api>p.start()</suitkaise-api>
 
 # wait for the process to finish
-p.<suitkaise-api>wait</suitkaise-api>()
+<suitkaise-api>p.wait()</suitkaise-api>
 
-# access the <suitkaise-api>result</suitkaise-api>
-<suitkaise-api>result</suitkaise-api> = p.<suitkaise-api>result</suitkaise-api></code></pre>
+# access the result
+result = p.<suitkaise-api>result</suitkaise-api></code></pre>
         <a href="#processing" class="learn-more-link arrow-right nav-link" data-page="processing">
             learn more <span class="arrow">⟶</span>
         </a>
@@ -169,7 +169,7 @@ p.<suitkaise-api>wait</suitkaise-api>()
         <p>Your functions don't pickle.</p>
         <p>Your loggers don't pickle.</p>
         <p>Your class objects don't pickle.</p>
-        <p>Solution: use <code><suitkaise-api>cucumber</suitkaise-api></code> to serialize your objects.</p>
+        <p><strong>Solution:</strong> use <code><suitkaise-api>cucumber</suitkaise-api></code> to serialize your objects.</p>
         <p>I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.</p>
         <p>But being able to serialize "anything" is a steep challenge. I needed a rival, an enemy, a final boss to defeat. One that, after winning, would let me say "I think I can serialize anything now."</p>
         <p>So, I created the <code>WorstPossibleObject</code>.</p>
@@ -195,7 +195,7 @@ p.<suitkaise-api>wait</suitkaise-api>()
         <p>Do you ever pull a repo from your Windows PC at work and it doesn't work on your Mac at home?</p>
         <p>Or, maybe your laptop at home is also Windows, but the project is placed in a different directory than the one you use at work.</p>
         <p>And then everything breaks.</p>
-        <p>Solution: use <code>SKPath</code>.</p>
+        <p><strong>Solution:</strong> use <code>SKPath</code>.</p>
         <p><code>SKPaths</code> automatically detect your project root using a custom detection system, and calculate a path relative to your project root.</p>
         <p>This way, as long as you have the same project, the paths will still work, regardless of where you are.</p>
         <p>No need to convert paths between operating systems.</p>
@@ -208,23 +208,23 @@ p.<suitkaise-api>wait</suitkaise-api>()
         <summary>I'm newer to programming and I'm having trouble organizing my <code>while</code> loop code in a way that makes sense to me.</summary>
         <p>Try using <code><suitkaise-api>Circuit</suitkaise-api></code> to manage your loops.</p>
         <ul>
-            <li>cleaner code</li>
-            <li>easy to think about</li>
-            <li>automatic error handling</li>
+            <li>Cleaner code</li>
+            <li>Easy to think about</li>
+            <li>Automatic error handling</li>
         </ul>
 <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
 results = []
-circ = <suitkaise-api>Circuit</suitkaise-api>(shorts=3)
+<suitkaise-api>circ</suitkaise-api> = <suitkaise-api>Circuit(</suitkaise-api>shorts=3)
 
 while circ.flowing:
-    <suitkaise-api>result</suitkaise-api> = risky_operation()
+    result = risky_operation()
 
     if <suitkaise-api>result</suitkaise-api>:
-        results.append(<suitkaise-api>result</suitkaise-api>)
+        results.append(result)
     
     else:
-        circ.<suitkaise-api>short</suitkaise-api>()</code></pre>
+        <suitkaise-api>circ.short()</suitkaise-api></code></pre>
     </details>
 
     <details>
@@ -241,7 +241,7 @@ def my_function():
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
 
-# <suitkaise-api>run</suitkaise-api> my_function many times
+# run my_function many times
 for i in range(100):
     my_function()
 
@@ -253,7 +253,7 @@ stdev = my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</s
 
 <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import sktime
 
-with sktime.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with sktime.<suitkaise-api>TimeThis(</suitkaise-api>) as timer:
 
     r_int = random.randint(0, 100)
     sktime.sleep(r_int)
@@ -297,16 +297,16 @@ print(f"Potential lagger 3: {mean_3:.3f}s")</code></pre>
     <details>
         <summary>Some of my team uses <code>pathlib</code> and some use strings, and I am tired of converting back and forth.</summary>
         <p>And I don't want to use <code>pathlib.Path.resolve()</code> every single time.</p>
-        <p>Use <code>skpath.<suitkaise-api>autopath</suitkaise-api>()</code> to automatically convert paths to whatever the function accepts.</p>
+        <p>Use <code>skpath.<suitkaise-api>autopath()</suitkaise-api></code> to automatically convert paths to whatever the function accepts.</p>
 <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import skpath
 
-@skpath.<suitkaise-api>autopath</suitkaise-api>()
+@skpath.<suitkaise-api>autopath()</suitkaise-api>
 def my_function(path: str):
     
     # all Paths are converted to strings
     # all strings are left as is
 
-@skpath.<suitkaise-api>autopath</suitkaise-api>()
+@skpath.<suitkaise-api>autopath()</suitkaise-api>
 def my_function_2(path: Path)
 
     # all strings are converted to Paths
@@ -321,7 +321,8 @@ def my_function_2(path: Path)
     <p>Even with AI, using <code><suitkaise-api>suitkaise</suitkaise-api></code> benefits you.</p>
     <p>Why? Because I tried to have AI do all of these kinds of things for me and it failed miserably (I still say Please and Thank You, don't worry).</p>
     <p>However, there are 2 ways to let AI use <code><suitkaise-api>suitkaise</suitkaise-api></code>:</p>
-    <p><strong>1. Have it search this page!</strong> Copy this into your prompt:</p>
+    <h3>1. Have it search this page!</h3>
+    <p>Copy this into your prompt:</p>
 
 <pre><code class="language-text">I would like you to understand and use the <suitkaise-api>suitkaise</suitkaise-api> modules in my project.
 
@@ -329,7 +330,7 @@ It is installable using `pip install <suitkaise-api>suitkaise</suitkaise-api>`.
 
 Can you go to the website (<suitkaise-api>suitkaise</suitkaise-api>.info) and look at the "how to use" section for each module?</code></pre>
 
-    <p><strong>2. Download the official docs and place them in your project.</strong></p>
+    <h3>2. Download the official docs and place them in your project.</h3>
     <p>Run this as python code in your terminal:</p>
 <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>docs</suitkaise-api>
 

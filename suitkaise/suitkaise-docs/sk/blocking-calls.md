@@ -1,10 +1,10 @@
 # Blocking Calls Reference
 
-This page lists all function and method calls that the `<suitkaise-api>sk</suitkaise-api>` module auto-detects as blocking. If your code uses any of these, `.<suitkaise-api>asynced</suitkaise-api>()` and `.<suitkaise-api>background</suitkaise-api>()` become available.
+This page lists all function and method calls that the `sk` module auto-detects as blocking. If your code uses any of these, `.asynced()` and `.background()` become available.
 
 Note: Detection is case-insensitive.
 
-Note: You can always use the `@<suitkaise-api>blocking</suitkaise-api>` decorator to explicitly mark code as blocking when AST detection doesn't catch it (for things like heavy, time consuming CPU bound work)
+Note: You can always use the `@blocking` decorator to explicitly mark code as blocking when AST detection doesn't catch it (for things like heavy, time consuming CPU bound work)
 
 ---
 
@@ -16,8 +16,8 @@ These are matched exactly (full call path).
 
 - `time.sleep`
 - `sleep`
-- `<suitkaise-api>timing</suitkaise-api>.sleep`
-- `<suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api>.sleep`
+- `timing.sleep`
+- `suitkaise.timing.sleep`
 
 ### File I/O
 
@@ -37,7 +37,7 @@ These are matched exactly (full call path).
 
 ### Subprocess
 
-- `subprocess.<suitkaise-api>run</suitkaise-api>`
+- `subprocess.run`
 - `subprocess.call`
 - `subprocess.check_call`
 - `subprocess.check_output`
@@ -287,7 +287,7 @@ If any call ends with one of these method names, it's considered blocking.
 ### Other Databases
 
 - `execute`
-- `<suitkaise-api>run</suitkaise-api>`
+- `run`
 - `query`
 - `write_points`
 - `write_api`
@@ -417,10 +417,10 @@ calculate()                      # unknown function
 ### Use @blocking for undetected cases
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
+from suitkaise import sk, blocking
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+@sk
+@blocking
 def cpu_intensive():
     # pure computation, no I/O calls
     return sum(x**2 for x in range(10_000_000))

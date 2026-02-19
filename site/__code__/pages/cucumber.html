@@ -8,7 +8,6 @@
         <a href="#cucumber-supported-types" class="module-bar-link" data-page="cucumber-supported-types">supported types</a>
         <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
         <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
-        <a href="#cucumber-tests" class="module-bar-link" data-page="cucumber-tests">tests</a>
         <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
         <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
     </nav>
@@ -18,11 +17,11 @@
     <p><code><suitkaise-api>cucumber</suitkaise-api></code> is a module that handles serialization and deserialization of Python objects.</p>
     <p>Basically any object in Python will work, and it covers more types than <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> combined.</p>
     <ul>
-        <li>extensive type coverage</li>
-        <li>superior speed for simple types compared to <code>cloudpickle</code> and <code>dill</code></li>
-        <li>handles all circular references</li>
-        <li>works on class objects defined in <code>__main__</code></li>
-        <li>and more</li>
+        <li>Extensive type coverage</li>
+        <li>Superior speed for simple types compared to <code>cloudpickle</code> and <code>dill</code></li>
+        <li>Handles all circular references</li>
+        <li>Works on class objects defined in <code>__main__</code></li>
+        <li>And more</li>
     </ul>
     <p>To see a list of supported types, see the supported types page.</p>
     <p>To see how <code><suitkaise-api>cucumber</suitkaise-api></code> stacks up against other serialization libraries, see the performance page.</p>
@@ -34,7 +33,7 @@
     <h2><code><suitkaise-api>serialize</suitkaise-api>()</code></h2>
     <p>Serializes any Python object to bytes using <code><suitkaise-api>cucumber</suitkaise-api></code>&#x27;s intermediate representation (IR).</p>
     <pre><code class="language-python">data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>obj</code>: Any Python object</p>
     <ul>
         <li><code>Any</code></li>
@@ -50,17 +49,17 @@
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>bytes</code>: <code><suitkaise-api>cucumber</suitkaise-api></code> IR as bytes.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If serialization fails.</p>
     <p>This is a <code><suitkaise-api>SerializationError</suitkaise-api></code> that appears when you try to serialize a <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api>.<suitkaise-api>Pipe</suitkaise-api>.Anchor</code> point.</p>
     <pre><code class="language-text">Traceback (most recent call last):
   File &quot;my_app.py&quot;, line 42, in &lt;module&gt;
     payload = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)
-  File &quot;.../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/api.py&quot;, line 90, in <suitkaise-api>serialize</suitkaise-api>
+  File &quot;.../suitkaise/cucumber/api.py&quot;, line 90, in <suitkaise-api>serialize</suitkaise-api>
     return _default_serializer.<suitkaise-api>serialize</suitkaise-api>(obj)
-  File &quot;.../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/serializer.py&quot;, line 113, in <suitkaise-api>serialize</suitkaise-api>
+  File &quot;.../suitkaise/cucumber/_int/serializer.py&quot;, line 113, in <suitkaise-api>serialize</suitkaise-api>
     raise <suitkaise-api>SerializationError</suitkaise-api>(message)
 <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>cucumber</suitkaise-api>._int.serializer.<suitkaise-api>SerializationError</suitkaise-api>:
 ======================================================================
@@ -75,7 +74,7 @@ The handler failed to extract state from this object.
 Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
 ======================================================================</code></pre>
     <h3><code>debug</code> and <code>verbose</code></h3>
-    <p><code>debug</code> and <code>verbose</code> are keyword only arguments.</p>
+    <p>Note: <code>debug</code> and <code>verbose</code> are keyword-only arguments.</p>
     <p>When <code>debug=True</code>, <code><suitkaise-api>cucumber</suitkaise-api></code> shows you where it failed to serialize an object.</p>
     <pre><code class="language-text">======================================================================
 HANDLER FAILED
@@ -122,13 +121,13 @@ Error: Locked pipe endpoint cannot be serialized. Keep it in the parent process.
     <p>Reconstructs a Python object from bytes created by <code><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api></code>.</p>
     <p>Will not work if the object was serialized with <code>pickle</code>, <code>cloudpickle</code>, or <code>dill</code>, as these libraries do not use <code><suitkaise-api>cucumber</suitkaise-api></code>&#x27;s IR.</p>
     <ul>
-        <li>restores all circular references before reconstructing objects</li>
+        <li>Restores all circular references before reconstructing objects</li>
         <li><code>Reconnector</code> objects are returned for certain types</li>
     </ul>
     <pre><code class="language-python">data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(obj)
 
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>data</code>: Serialized bytes from <code><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api></code>.</p>
     <ul>
         <li><code>bytes</code></li>
@@ -144,20 +143,20 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>obj</code>: Reconstructed Python object.</p>
     <ul>
         <li><code>Any</code></li>
     </ul>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>DeserializationError</suitkaise-api></code>: If deserialization/reconstruction fails.</p>
     <p>This is a <code><suitkaise-api>DeserializationError</suitkaise-api></code> that appears when you try to deserialize an object that is missing a required key.</p>
     <pre><code class="language-text">Traceback (most recent call last):
   File &quot;my_app.py&quot;, line 44, in &lt;module&gt;
     restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
-  File &quot;.../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/api.py&quot;, line 177, in <suitkaise-api>deserialize</suitkaise-api>
+  File &quot;.../suitkaise/cucumber/api.py&quot;, line 177, in <suitkaise-api>deserialize</suitkaise-api>
     return _default_deserializer.<suitkaise-api>deserialize</suitkaise-api>(data)
-  File &quot;.../<suitkaise-api>suitkaise</suitkaise-api>/<suitkaise-api>cucumber</suitkaise-api>/_int/deserializer.py&quot;, line 88, in <suitkaise-api>deserialize</suitkaise-api>
+  File &quot;.../suitkaise/cucumber/_int/deserializer.py&quot;, line 88, in <suitkaise-api>deserialize</suitkaise-api>
     raise <suitkaise-api>DeserializationError</suitkaise-api>(message)
 <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>cucumber</suitkaise-api>._int.deserializer.<suitkaise-api>DeserializationError</suitkaise-api>:
 ======================================================================
@@ -185,7 +184,7 @@ Error: Missing key &#x27;state&#x27; for class reconstruction
     <p>Each <code>Reconnector</code> has a <code>reconnect()</code> method that creates a new live resource, using stored metadata. If the resource requires authentication, you must provide it again. We do not store secrets in the IR for security reasons.</p>
     <p>For more information on each <code>Reconnector</code>, see the how it works page.</p>
     <p><code><suitkaise-api>reconnect_all</suitkaise-api>()</code> allows you to reconnect all <code>Reconnectors</code> in an object at once.</p>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>obj</code>: Object or container to traverse for <code>Reconnectors</code>.</p>
     <ul>
         <li><code>Any</code></li>
@@ -202,12 +201,12 @@ Error: Missing key &#x27;state&#x27; for class reconstruction
         <li>keyword only</li>
         <li>default: <code>{}</code> (no auth)</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>obj</code>: Object with all <code>Reconnectors</code> replaced by live resources.</p>
     <ul>
         <li><code>Any</code></li>
     </ul>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <ul>
         <li>Nothing by default. <code><suitkaise-api>reconnect_all</suitkaise-api>()</code> swallows reconnect errors and keeps the original <code>Reconnector</code> in place if reconnect fails.</li>
     </ul>
@@ -272,16 +271,16 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all<
     }
 }</code></pre>
     <h3><code><suitkaise-api>serialize_ir</suitkaise-api>()</code></h3>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p>the IR without converting to bytes.</p>
     <p>Use this to inspect the IR of an object.</p>
     <ul>
-        <li>debugging</li>
-        <li>inspection</li>
-        <li>custom tooling</li>
+        <li>Debugging</li>
+        <li>Inspection</li>
+        <li>Custom tooling</li>
     </ul>
     <pre><code class="language-python">ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>obj</code>: Any Python object</p>
     <ul>
         <li><code>Any</code></li>
@@ -297,9 +296,9 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all<
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p>A <code>pickle</code> native IR (nested <code>dict</code>/<code>list</code> structure)</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If serialization fails.</p>
     <h3>Deserializing an IR</h3>
     <p>In order to deserialize an IR, you must first convert it to bytes using <code>pickle.dumps()</code>.</p>
@@ -308,18 +307,18 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all<
 data = pickle.dumps(ir)
 
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize_ir</suitkaise-api>(ir)</code></pre>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>DeserializationError</suitkaise-api></code>: If deserialization fails.</p>
     <h2>JSON conversion</h2>
     <p><code><suitkaise-api>cucumber</suitkaise-api></code> provides 4 ways to convert an IR to JSON.</p>
     <p>2 of them convert the IR to a JSON-serializable structure, and the other 2 convert the IR directly to a JSON string.</p>
     <h3>What is the difference between a JSON-serializable structure and a JSON string?</h3>
     <p>A JSON-serializable structure is a Python <code>dict</code>/<code>list</code> tree that only uses JSON-safe types (<code>dict</code>, <code>list</code>, <code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>, <code>None</code>).</p>
-    <p>A JSON string is the final serialized text output (the result of <code>json.dumps</code>). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.</p>
+    <p>A JSON string is the final serialized text output (the result of <code>json.dumps()</code>). The structure is useful if you want to inspect or modify the IR in Python before turning it into a string.</p>
     <h3><code><suitkaise-api>to_jsonable</suitkaise-api>()</code></h3>
     <p>Serialize an object to IR and return a JSON-serializable structure.</p>
     <pre><code class="language-python">jsonable = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_jsonable</suitkaise-api>(obj)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>obj</code>: Any Python object to convert to IR before JSON conversion.</p>
     <ul>
         <li><code>Any</code></li>
@@ -335,14 +334,14 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize_ir
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>Any</code>: A JSON-serializable structure.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If serialization fails.</p>
     <h3><code><suitkaise-api>to_json</suitkaise-api>()</code></h3>
     <p>Serialize an object to IR and return a JSON string.</p>
     <pre><code class="language-python">json_text = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>to_json</suitkaise-api>(obj)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>obj</code>: Any Python object to convert to IR before JSON conversion.</p>
     <ul>
         <li><code>Any</code></li>
@@ -368,29 +367,29 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize_ir
         <li><code>bool = False</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: A JSON string.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If serialization fails.</p>
     <h3><code><suitkaise-api>ir_to_jsonable</suitkaise-api>()</code></h3>
     <p>Convert an IR to a JSON-serializable structure.</p>
     <pre><code class="language-python">ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
 jsonable = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>ir_to_jsonable</suitkaise-api>(ir)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>ir</code>: The IR to convert.</p>
     <ul>
         <li><code>Any</code></li>
         <li>required</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>Any</code>: A JSON-serializable structure.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If conversion fails.</p>
     <h3><code><suitkaise-api>ir_to_json</suitkaise-api>()</code></h3>
     <p>Convert an IR to a JSON string.</p>
     <pre><code class="language-python">ir = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize_ir</suitkaise-api>(obj)
 json_text = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>ir_to_json</suitkaise-api>(ir)</code></pre>
-    <p><strong>Arguments</strong></p>
+    <p>Arguments</p>
     <p><code>ir</code>: The IR to convert.</p>
     <ul>
         <li><code>Any</code></li>
@@ -406,9 +405,9 @@ json_text = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>ir_to_json</s
         <li><code>bool = True</code></li>
         <li>keyword only</li>
     </ul>
-    <p><strong>Returns</strong></p>
+    <p>Returns</p>
     <p><code>str</code>: A JSON string.</p>
-    <p><strong>Raises</strong></p>
+    <p>Raises</p>
     <p><code><suitkaise-api>SerializationError</suitkaise-api></code>: If conversion fails.</p>
     <h3>Crossing programming language boundaries using JSON</h3>
     <p><code><suitkaise-api>cucumber</suitkaise-api></code> is meant to work solely within Python.</p>

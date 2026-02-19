@@ -1,17 +1,17 @@
-# How to use `<suitkaise-api>timing</suitkaise-api>`
+# How to use `timing`
 
-`<suitkaise-api>timing</suitkaise-api>` provides simple and powerful timing utilities for measuring execution time, collecting statistics, and analyzing performance.
+`timing` provides simple and powerful timing utilities for measuring execution time, collecting statistics, and analyzing performance.
 
-- Everything runs using `<suitkaise-api>Sktimer</suitkaise-api>`
+- Everything runs using `Sktimer`
 Statistical timer that collects timing measurements and provides comprehensive statistics (mean, median, stdev, percentiles). Has more statistics that `timeit`.
 
-- `<suitkaise-api>timethis</suitkaise-api>`
+- `timethis`
 Decorator for timing function executions with automatic statistics collection.
 
-- `<suitkaise-api>TimeThis</suitkaise-api>`
+- `TimeThis`
 Context manager for timing code blocks with automatic start/stop.
 
-With `<suitkaise-api>timethis</suitkaise-api>` and `<suitkaise-api>TimeThis</suitkaise-api>` you have 100% coverage. Anything and everything can be timed with one line of code.
+With `timethis` and `TimeThis` you have 100% coverage. Anything and everything can be timed with one line of code.
 
 Includes:
 - thread safety
@@ -22,11 +22,11 @@ Includes:
 ## Importing
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 ```
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>, <suitkaise-api>TimeThis</suitkaise-api>, <suitkaise-api>timethis</suitkaise-api>, time, sleep, <suitkaise-api>elapsed</suitkaise-api>, <suitkaise-api>clear_global_timers</suitkaise-api>
+from suitkaise.timing import Sktimer, TimeThis, timethis, time, sleep, elapsed, clear_global_timers
 ```
 
 ## Simple Functions
@@ -36,12 +36,12 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-a
 Get the current Unix timestamp.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-start_time = <suitkaise-api>timing</suitkaise-api>.time()
+start_time = timing.time()
 ```
 
-Wraps `time.time()` so that you don't have to import both `<suitkaise-api>timing</suitkaise-api>` and `time`.
+Wraps `time.time()` so that you don't have to import both `timing` and `time`.
 
 Returns
 `float`: Current Unix timestamp.
@@ -51,13 +51,13 @@ Returns
 Sleep the current thread for a given number of seconds.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
 # sleep for 2 seconds
-<suitkaise-api>timing</suitkaise-api>.sleep(2)
+timing.sleep(2)
 
 # returns current time after sleeping
-end_time = <suitkaise-api>timing</suitkaise-api>.sleep(2)
+end_time = timing.sleep(2)
 ```
 
 Arguments
@@ -70,31 +70,31 @@ Returns
 
 #### Async Support
 
-Use `.<suitkaise-api>asynced</suitkaise-api>()` for async contexts.
+Use `.asynced()` for async contexts.
 
 ```python
 # in an async function
-end_time = await <suitkaise-api>timing</suitkaise-api>.sleep.<suitkaise-api>asynced</suitkaise-api>()(2)
+end_time = await timing.sleep.asynced()(2)
 ```
 
 Uses `asyncio.sleep` internally.
 
-### `<suitkaise-api>elapsed</suitkaise-api>()`
+### `elapsed()`
 
 Get the elapsed time between two timestamps.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-start_time = <suitkaise-api>timing</suitkaise-api>.time()
-<suitkaise-api>timing</suitkaise-api>.sleep(2)
-end_time = <suitkaise-api>timing</suitkaise-api>.time()
+start_time = timing.time()
+timing.sleep(2)
+end_time = timing.time()
 
 # with two times
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start_time, end_time)  # 2.0
+elapsed = timing.elapsed(start_time, end_time)  # 2.0
 
 # with one time (uses current time as end)
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>elapsed</suitkaise-api>(start_time)
+elapsed = timing.elapsed(start_time)
 ```
 
 Arguments
@@ -111,23 +111,23 @@ Returns
 
 Note: Order doesn't matter - always returns positive elapsed time.
 
-## `<suitkaise-api>Sktimer</suitkaise-api>`
+## `Sktimer`
 
 Statistical timer for collecting and analyzing execution times.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+timer = timing.Sktimer()
 
 for i in range(100):
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    timer.start()
     do_work()
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+    timer.stop()
 
-print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
-print(f"Std Dev: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stdev</suitkaise-api>:.3f}s")
-print(f"95th percentile: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95):.3f}s")
+print(f"Mean: {timer.mean:.3f}s")
+print(f"Std Dev: {timer.stdev:.3f}s")
+print(f"95th percentile: {timer.percentile(95):.3f}s")
 ```
 
 ### Constructor
@@ -139,12 +139,12 @@ Arguments
 
 ### Control Methods
 
-#### `<suitkaise-api>start</suitkaise-api>()`
+#### `start()`
 
 Start timing a new measurement.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 ```
 
 Returns
@@ -153,14 +153,14 @@ Returns
 Raises
 `UserWarning`: If called while timing is already in progress (creates nested frame).
 
-#### `<suitkaise-api>stop</suitkaise-api>()`
+#### `stop()`
 
 Stop timing and record the measurement.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 do_work()
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # returns <suitkaise-api>elapsed</suitkaise-api> time, records it
+elapsed = timer.stop()  # returns elapsed time, records it
 ```
 
 Returns
@@ -169,17 +169,17 @@ Returns
 Raises
 `RuntimeError`: If timer was not started.
 
-#### `<suitkaise-api>discard</suitkaise-api>()`
+#### `discard()`
 
 Stop timing but do NOT record the measurement.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 try:
-    <suitkaise-api>result</suitkaise-api> = risky_operation()
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # record successful <suitkaise-api>timing</suitkaise-api>
+    result = risky_operation()
+    timer.stop()  # record successful timing
 except Exception:
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don't record failed <suitkaise-api>timing</suitkaise-api>
+    timer.discard()  # don't record failed timing
 ```
 
 Use when you want to abandon the current timing without polluting statistics.
@@ -190,20 +190,20 @@ Returns
 Raises
 `RuntimeError`: If timer was not started.
 
-#### `<suitkaise-api>lap</suitkaise-api>()`
+#### `lap()`
 
 Record a lap time (stop + start in one call).
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 
 for i in range(100):
     do_work()
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()  # records time since last lap/start, continues <suitkaise-api>timing</suitkaise-api>
+    timer.lap()  # records time since last lap/start, continues timing
 
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don't record the 101st measurement still running
+timer.discard()  # don't record the 101st measurement still running
 
-print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)  # 100 measurements recorded
+print(timer.mean)  # 100 measurements recorded
 ```
 
 Returns
@@ -212,20 +212,20 @@ Returns
 Raises
 `RuntimeError`: If timer was not started.
 
-#### `<suitkaise-api>pause</suitkaise-api>()`
+#### `pause()`
 
 Pause the current timing measurement.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 do_work()
 
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>pause</suitkaise-api>()
-user_input = input("Continue? ")  # not counted in <suitkaise-api>timing</suitkaise-api>
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
+timer.pause()
+user_input = input("Continue? ")  # not counted in timing
+timer.resume()
 
 do_more_work()
-<suitkaise-api>elapsed</suitkaise-api> = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()  # only counts work, not user input
+elapsed = timer.stop()  # only counts work, not user input
 ```
 
 Time spent paused is excluded from the final elapsed time.
@@ -234,28 +234,28 @@ Raises
 `RuntimeError`: If timer is not running.
 `UserWarning`: If already paused.
 
-#### `<suitkaise-api>resume</suitkaise-api>()`
+#### `resume()`
 
 Resume a paused timing measurement.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
+timer.resume()
 ```
 
 Raises
 `RuntimeError`: If timer is not running.
 `UserWarning`: If not currently paused.
 
-#### `<suitkaise-api>add_time</suitkaise-api>()`
+#### `add_time()`
 
-Manually add a timing measurement to the `<suitkaise-api>Sktimer</suitkaise-api>`.
+Manually add a timing measurement to the `Sktimer`.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(1.5)
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(2.3)
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(1.8)
+timer.add_time(1.5)
+timer.add_time(2.3)
+timer.add_time(1.8)
 
-print(<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)  # 1.867
+print(timer.mean)  # 1.867
 ```
 
 Arguments
@@ -263,13 +263,13 @@ Arguments
 - `float`
 - required
 
-#### `<suitkaise-api>set_max_times</suitkaise-api>()`
+#### `set_max_times()`
 
 Set the rolling window size for stored measurements.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>set_max_times</suitkaise-api>(100)  # keep only last 100 measurements
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>set_max_times</suitkaise-api>(None)  # keep all measurements
+timer.set_max_times(100)  # keep only last 100 measurements
+timer.set_max_times(None)  # keep all measurements
 ```
 
 Arguments
@@ -277,12 +277,12 @@ Arguments
 - `int | None`
 - `None` keeps all
 
-#### `<suitkaise-api>reset</suitkaise-api>()`
+#### `reset()`
 
 Clear all timing measurements.
 
 ```python
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>reset</suitkaise-api>()  # clears all measurements, like a new <suitkaise-api>Sktimer</suitkaise-api>()
+timer.reset()  # clears all measurements, like a new Sktimer()
 ```
 
 ### Statistics Properties
@@ -295,7 +295,7 @@ All statistics are accessed directly on the timer and are always up-to-date.
 `most_recent`: Most recent timing measurement.
 - `float | None`
 
-`<suitkaise-api>result</suitkaise-api>`: Alias for `most_recent`.
+`result`: Alias for `most_recent`.
 - `float | None`
 
 `total_time`: Sum of all times.
@@ -346,8 +346,8 @@ All statistics are accessed directly on the timer and are always up-to-date.
 Get a specific measurement by index.
 
 ```python
-first_time = <suitkaise-api>timer</suitkaise-api>.get_time(0)
-last_time = <suitkaise-api>timer</suitkaise-api>.get_time(-1)
+first_time = timer.get_time(0)
+last_time = timer.get_time(-1)
 ```
 
 Arguments
@@ -357,14 +357,14 @@ Arguments
 Returns
 `float | None`: Timing measurement or `None` if index is invalid.
 
-#### `<suitkaise-api>percentile</suitkaise-api>()`
+#### `percentile()`
 
 Calculate any percentile of timing measurements.
 
 ```python
-p50 = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(50)   # median
-p95 = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95)   # 95th percentile
-p99 = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(99)   # 99th percentile
+p50 = timer.percentile(50)   # median
+p95 = timer.percentile(95)   # 95th percentile
+p99 = timer.percentile(99)   # 99th percentile
 ```
 
 Arguments
@@ -382,15 +382,15 @@ Raises
 Get a frozen snapshot of all timing statistics.
 
 ```python
-snapshot = <suitkaise-api>timer</suitkaise-api>.get_statistics()
+snapshot = timer.get_statistics()
 
 # snapshot won't change even if timer continues
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+timer.start()
 do_more_work()
-<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+timer.stop()
 
 # snapshot still has old values
-print(snapshot.<suitkaise-api>mean</suitkaise-api>)
+print(snapshot.mean)
 ```
 
 Returns a `TimerStats` object containing all statistics calculated at the moment the method was called.
@@ -400,13 +400,13 @@ Returns
 
 ### `TimerStats`
 
-Frozen snapshot of `<suitkaise-api>Sktimer</suitkaise-api>` statistics returned by `<suitkaise-api>Sktimer</suitkaise-api>.get_statistics()`.
+Frozen snapshot of `Sktimer` statistics returned by `Sktimer.get_statistics()`.
 
 All values are pre-computed and won't change even if the timer continues recording.
 
 ### Properties
 
-All properties from `<suitkaise-api>Sktimer</suitkaise-api>` are available:
+All properties from `Sktimer` are available:
 - `times`, `num_times`, `most_recent`, `most_recent_index`
 - `total_time`, `total_time_paused`
 - `mean`, `median`, `min`, `max`
@@ -415,30 +415,30 @@ All properties from `<suitkaise-api>Sktimer</suitkaise-api>` are available:
 
 ### Methods
 
-#### `<suitkaise-api>percentile</suitkaise-api>()`
+#### `percentile()`
 
-Same as `<suitkaise-api>Sktimer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>()`.
+Same as `Sktimer.percentile()`.
 
 ```python
-p95 = snapshot.<suitkaise-api>percentile</suitkaise-api>(95)
+p95 = snapshot.percentile(95)
 ```
 
 #### `get_time()`
 
-Same as `<suitkaise-api>Sktimer</suitkaise-api>.get_time()`.
+Same as `Sktimer.get_time()`.
 
 ```python
 first = snapshot.get_time(0)
 ```
 
-## `<suitkaise-api>timethis</suitkaise-api>` Decorator
+## `timethis` Decorator
 
-Decorator that times function executions and records results in a `<suitkaise-api>Sktimer</suitkaise-api>`.
+Decorator that times function executions and records results in a `Sktimer`.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+@timing.timethis()
 def quick_function():
     # ...
     pass
@@ -446,19 +446,19 @@ def quick_function():
 quick_function()
 
 # access the auto-created timer
-print(f"Last time: {quick_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+print(f"Last time: {quick_function.timer.most_recent:.3f}s")
 
 # calling multiple times builds statistics
 for i in range(100):
     quick_function()
 
-print(f"Mean: {quick_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Mean: {quick_function.timer.mean:.3f}s")
 ```
 
 ### Arguments
 
 `timer`: Sktimer to accumulate timing data in.
-- `<suitkaise-api>Sktimer</suitkaise-api> | None = None`
+- `Sktimer | None = None`
 - if `None`, creates an auto-named global timer attached to the function
 
 `threshold`: Minimum elapsed time to record.
@@ -474,15 +474,15 @@ When no timer is provided, the decorator creates a global timer with a naming co
 - Module-level functions: `module_function_timer`
 - Class methods: `module_ClassName_method_timer`
 
-The timer is attached to the function as `.<suitkaise-api>timer</suitkaise-api>`:
+The timer is attached to the function as `.timer`:
 
 ```python
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+@timing.timethis()
 def my_function():
     pass
 
 my_function()
-print(my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(my_function.timer.mean)
 ```
 
 ### Shared Timer
@@ -490,14 +490,14 @@ print(my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suit
 Use a single timer across multiple functions:
 
 ```python
-perf_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-perf_timer.<suitkaise-api>set_max_times</suitkaise-api>(1000)
+perf_timer = timing.Sktimer()
+perf_timer.set_max_times(1000)
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)
+@timing.timethis(perf_timer)
 def multiply(a, b):
     return a * b
 
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)
+@timing.timethis(perf_timer)
 def divide(a, b):
     return a / b
 
@@ -505,7 +505,7 @@ for a, b in zip(range(1000), range(1, 1001)):
     multiply(a, b)
     divide(a, b)
 
-print(f"Combined mean: {perf_timer.<suitkaise-api>mean</suitkaise-api>:.6f}s")
+print(f"Combined mean: {perf_timer.mean:.6f}s")
 ```
 
 ### Stacked Decorators
@@ -513,50 +513,50 @@ print(f"Combined mean: {perf_timer.<suitkaise-api>mean</suitkaise-api>:.6f}s")
 Use both a shared timer and a function-specific timer:
 
 ```python
-perf_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
-overall_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+perf_timer = timing.Sktimer()
+overall_timer = timing.Sktimer()
 
 # 2 stacked decorators on the same function
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+@timing.timethis(perf_timer)
+@timing.timethis()
 def multiply(a, b):
     return a * b
 
 # supports infinite stacking
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall_timer)
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)
-@<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+@timing.timethis(overall_timer)
+@timing.timethis(perf_timer)
+@timing.timethis()
 def divide(a, b):
     return a / b
 
 # ... call functions ...
 
 # combined stats
-print(f"Combined mean: {perf_timer.<suitkaise-api>mean</suitkaise-api>:.6f}s")
+print(f"Combined mean: {perf_timer.mean:.6f}s")
 
 # individual stats
-print(f"Multiply mean: {multiply.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s")
-print(f"Divide mean: {divide.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.6f}s")
+print(f"Multiply mean: {multiply.timer.mean:.6f}s")
+print(f"Divide mean: {divide.timer.mean:.6f}s")
 ```
 
-## `<suitkaise-api>TimeThis</suitkaise-api>` Context Manager
+## `TimeThis` Context Manager
 
 Context manager for timing code blocks with automatic timer management.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with timing.TimeThis() as timer:
     do_work()
 
-print(f"Time taken: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+print(f"Time taken: {timer.most_recent:.3f}s")
 ```
 
 ### Constructor
 
 Arguments
 `timer`: Sktimer instance to use.
-- `<suitkaise-api>Sktimer</suitkaise-api> | None = None`
+- `Sktimer | None = None`
 - if `None`, creates a new Sktimer
 
 `threshold`: Minimum elapsed time to record.
@@ -568,10 +568,10 @@ Arguments
 For quick, one-off measurements:
 
 ```python
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with timing.TimeThis() as timer:
     compress_file_with_gzip("data.csv")
 
-print(f"Compression took: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s")
+print(f"Compression took: {timer.most_recent:.3f}s")
 ```
 
 ### Shared Timer
@@ -579,53 +579,53 @@ print(f"Compression took: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>m
 For accumulating statistics across multiple runs:
 
 ```python
-api_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+api_timer = timing.Sktimer()
 
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>(api_timer):
+with timing.TimeThis(api_timer):
     response = requests.get("https://api.example.com/users")
 
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>(api_timer):
+with timing.TimeThis(api_timer):
     response = requests.get("https://api.example.com/posts")
 
-print(f"Average API time: {api_timer.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Average API time: {api_timer.mean:.3f}s")
 ```
 
 ### Pause and Resume
 
 ```python
-with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis</suitkaise-api>() as timer:
+with timing.TimeThis() as timer:
     results = database.query("SELECT * FROM users")
     
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>pause</suitkaise-api>()
+    timer.pause()
     user_wants_export = input("Export to CSV? (y/n): ")
-    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
+    timer.resume()
     
     if user_wants_export.lower() == 'y':
         export_to_csv(results)
 
-print(f"Database operation took: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>most_recent</suitkaise-api>:.3f}s (excluding user input)")
+print(f"Database operation took: {timer.most_recent:.3f}s (excluding user input)")
 ```
 
 ### Methods
 
-`<suitkaise-api>pause</suitkaise-api>()`: Pause timing.
+`pause()`: Pause timing.
 
-`<suitkaise-api>resume</suitkaise-api>()`: Resume timing.
+`resume()`: Resume timing.
 
-`<suitkaise-api>lap</suitkaise-api>()`: Record a lap and continue timing.
+`lap()`: Record a lap and continue timing.
 
 
-## `<suitkaise-api>clear_global_timers</suitkaise-api>()`
+## `clear_global_timers()`
 
-Clear all auto-created global timers used by the `@<suitkaise-api>timethis</suitkaise-api>()` decorator.
+Clear all auto-created global timers used by the `@timethis()` decorator.
 
 ```python
-from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+from suitkaise import timing
 
-# ... many @<suitkaise-api>timethis</suitkaise-api>() decorated functions called ...
+# ... many @timethis() decorated functions called ...
 
 # clear data from auto-created timers to save resources
-<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>clear_global_timers</suitkaise-api>()
+timing.clear_global_timers()
 ```
 
 Useful for:
@@ -635,7 +635,7 @@ Useful for:
 
 ## Thread Safety
 
-All `<suitkaise-api>Sktimer</suitkaise-api>` operations are thread-safe.
+All `Sktimer` operations are thread-safe.
 
 - Each thread gets its own timing session
 - Multiple threads can time concurrently
@@ -644,21 +644,21 @@ All `<suitkaise-api>Sktimer</suitkaise-api>` operations are thread-safe.
 ```python
 import threading
 
-timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer</suitkaise-api>()
+timer = timing.Sktimer()
 
 def worker():
     for _ in range(100):
-        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+        timer.start()
         do_work()
-        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+        timer.stop()
 
 threads = [threading.Thread(target=worker) for _ in range(4)]
 for t in threads:
-    t.<suitkaise-api>start</suitkaise-api>()
+    t.start()
 for t in threads:
     t.join()
 
 # 400 total measurements across all threads (4 threads * 100 iterations)
-print(f"Total measurements: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>num_times</suitkaise-api>}")
-print(f"Mean: {<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Total measurements: {timer.num_times}")
+print(f"Mean: {timer.mean:.3f}s")
 ```

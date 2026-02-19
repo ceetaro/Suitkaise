@@ -860,8 +860,7 @@ body {
 /* Keep list item child text on the alternating tone (p was overriding this before) */
 .module-page li > p,
 .module-page li > span,
-.module-page li > em,
-.module-page li > strong {
+.module-page li > em {
     color: inherit;
 }
 
@@ -986,11 +985,44 @@ body {
 .module-page strong,
 .about-page strong,
 .why-page strong {
-    color: rgb(93, 198, 127);
     font-weight: 600;
+}
+
+/* Bold in <p> text → list-item green (contrast against bright p text) */
+.module-page p strong,
+.about-page p strong,
+.why-page p strong {
+    color: rgb(102, 176, 126);
     text-shadow:
-        0 0 2px rgba(93, 198, 127, 0.14),
-        0 0 5px rgba(93, 198, 127, 0.08);
+        0 0 2px rgba(102, 176, 126, 0.14),
+        0 0 5px rgba(102, 176, 126, 0.08);
+}
+
+/* Bold in <li> text → bright p-white (contrast against dim li text) */
+.module-page li strong,
+.about-page li strong,
+.why-page li strong {
+    color: rgb(191, 255, 211);
+    text-shadow:
+        0 0 2px rgba(191, 255, 211, 0.14),
+        0 0 5px rgba(191, 255, 211, 0.08);
+}
+
+/* Bold in headers → retain header color */
+.module-page h1 strong,
+.module-page h2 strong,
+.module-page h3 strong,
+.module-page h4 strong,
+.about-page h1 strong,
+.about-page h2 strong,
+.about-page h3 strong,
+.about-page h4 strong,
+.why-page h1 strong,
+.why-page h2 strong,
+.why-page h3 strong,
+.why-page h4 strong {
+    color: inherit;
+    text-shadow: none;
 }
 
 .module-page em {
@@ -1099,12 +1131,19 @@ body {
 
 /* Default dropdown titles: style like h3 headings */
 .module-page details summary:not(.dropdown-title-h2) {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 10px;
     margin: 0;
     padding-top: 6px;
     padding-bottom: 6px;
+}
+
+/* Keep line-count highlighted summaries visually aligned with normal h3 dropdown titles. */
+.module-page details summary.line-count-row,
+.about-page details summary.line-count-row,
+.why-page details summary.line-count-row {
+    font-weight: 500;
 }
 
 .module-page details summary:not(.dropdown-title-h2)::before {
@@ -1361,15 +1400,15 @@ pre code .api-highlight {
    ============================================ */
 
 .why-page details summary {
-    color: rgba(62, 180, 137, 0.8);
+    color: rgba(150, 245, 180, 0.88);
 }
 
 .why-page details summary:hover {
-    color: rgb(62, 180, 137);
+    color: rgba(176, 248, 203, 0.94);
 }
 
 .why-page details[open] summary {
-    color: rgb(62, 180, 137);
+    color: rgba(169, 244, 196, 0.92);
 }
 
 .why-page em {

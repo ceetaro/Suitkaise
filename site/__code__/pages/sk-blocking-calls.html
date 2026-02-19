@@ -7,7 +7,6 @@
         <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
         <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
         <a href="#sk-blocking-calls" class="module-bar-link active" data-page="sk-blocking-calls">blocking calls</a>
-        <a href="#sk-tests" class="module-bar-link" data-page="sk-tests">tests</a>
         <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
         <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
     </nav>
@@ -16,10 +15,10 @@
     <h1>Blocking Calls Reference</h1>
     <p>This page lists all function and method calls that the <code><suitkaise-api>sk</suitkaise-api></code> module auto-detects as blocking. If your code uses any of these, <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> become available.</p>
     <p>Note: Detection is case-insensitive.</p>
-    <p>Note: You can always use the <code>@<suitkaise-api>blocking</suitkaise-api></code> decorator to explicitly mark code as blocking when AST detection doesn&#x27;t catch it (for things like heavy, time consuming CPU bound work)</p>
+    <p>Note: You can always use the <code><suitkaise-api>@blocking</suitkaise-api></code> decorator to explicitly mark code as blocking when <code>AST</code> detection doesn&#x27;t catch it (for things like heavy, time consuming CPU bound work)</p>
     <hr>
     <h2>Exact Blocking Calls</h2>
-    <p>These are matched exactly (full call path).</p>
+    <p>These are matched exactly (full <code>call path</code>).</p>
     <h3>Time / Sleep</h3>
     <ul>
         <li><code>time.sleep</code></li>
@@ -163,7 +162,7 @@
     </ul>
     <hr>
     <h2>Blocking Method Patterns</h2>
-    <p>If any call ends with one of these method names, it&#x27;s considered blocking.</p>
+    <p>If any call ends with one of these <code>method names</code>, it&#x27;s considered blocking.</p>
     <h3>Core Blocking</h3>
     <ul>
         <li><code>sleep</code></li>
@@ -307,7 +306,7 @@
     </ul>
     <hr>
     <h2>Broad Blocking Patterns</h2>
-    <p>These method names are only considered blocking when the call path contains an I/O context keyword.</p>
+    <p>These <code>method names</code> are only considered blocking when the <code>call path</code> contains an <code>I/O context keyword</code>.</p>
     <h3>Broad Methods</h3>
     <ul>
         <li><code>get</code></li>
@@ -328,7 +327,7 @@
         <li><code>rollback</code></li>
     </ul>
     <h3>I/O Context Keywords</h3>
-    <p>For a broad method to trigger blocking detection, the call path must contain one of these:</p>
+    <p>For a broad method to trigger <code>blocking detection</code>, the <code>call path</code> must contain one of these:</p>
     <h4>Databases</h4>
     <ul>
         <li><code>db</code></li>
@@ -407,8 +406,8 @@ calculate()                      # unknown function</code></pre>
     <h3>Use @blocking for undetected cases</h3>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
 
-@<suitkaise-api>sk</suitkaise-api>
-@<suitkaise-api>blocking</suitkaise-api>
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
 def cpu_intensive():
     # pure computation, no I/O calls
     return sum(x**2 for x in range(10_000_000))</code></pre>
