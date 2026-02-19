@@ -2630,22 +2630,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opacity = isActive ? 1 : 0.3;
 
                 summary.style.opacity = opacity;
-                const contentRoot = details.querySelector(':scope > .dropdown-content') || details;
-                if (contentRoot !== details) {
-                    contentRoot.style.opacity = opacity;
-                }
-                // Set opacity only on direct children to avoid compounding on
-                // nested elements like table > tr > td (0.3^3 ≈ invisible).
-                // CSS opacity visually propagates to descendants automatically.
-                Array.from(contentRoot.children).forEach(child => {
-                    if (child !== summary) {
-                        child.style.opacity = opacity;
-                    }
-                });
+                // Apply opacity to direct children only (not the wrapper itself)
+                // to avoid compounding on nested elements like tables.
                 Array.from(details.children).forEach(child => {
-                    if (child !== summary && child !== contentRoot) {
-                        child.style.opacity = opacity;
-                    }
+                    if (child.tagName === 'SUMMARY') return;
+                    child.style.opacity = opacity;
                 });
             });
         }
