@@ -54,6 +54,7 @@ cloudpickle.dumps(worker)
 # TypeError: cannot pickle &#x27;_thread.lock&#x27; objects</code></pre>
     <p><strong>With <code><suitkaise-api>cucumber</suitkaise-api></code>:</strong></p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+        
 data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(worker)
 restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)
 # works. lock and thread become Reconnectors, ready to be recreated.
@@ -177,8 +178,6 @@ restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</s
         <li>Reconnect everything</li>
     </ol>
     <p>It can then verify that it is the same object as it was when it got created, and that all of its complex objects within still work as expected.</p>
-    <p>Run the WorstPossibleObject round‑trip test:</p>
-    <pre><code class="language-bash">python tests/<suitkaise-api>cucumber</suitkaise-api>/test_worst_possible_object.py</code></pre>
     <p>This test includes a full round trip.</p>
     <pre><code class="language-text">`<suitkaise-api>serialize</suitkaise-api>()` → another process → `<suitkaise-api>deserialize</suitkaise-api>()` → `<suitkaise-api>reconnect_all</suitkaise-api>()` → verify → `<suitkaise-api>serialize</suitkaise-api>()` → back to original process → `<suitkaise-api>deserialize</suitkaise-api>()` → `<suitkaise-api>reconnect_all</suitkaise-api>()` → verify</code></pre>
     <p>To see the full <code>WorstPossibleObject</code> code, head to the worst possible object page. Have fun!</p>

@@ -233,3 +233,10 @@ __all__ = [
     # Docs
     "docs",
 ]
+
+# ============================================================================
+# Post-install welcome (once per version, interactive terminals only)
+# ============================================================================
+from ._welcome import _show_welcome as _show_welcome
+_show_welcome(__version__)
+del _show_welcome

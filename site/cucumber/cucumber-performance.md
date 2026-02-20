@@ -24,10 +24,6 @@ These benchmarks were run on a 2024 MacBook Pro M3 with 32GB of RAM.
 
 **Note:** `<suitkaise-api>cucumber</suitkaise-api>` is tuned in order to cover the most types possible with as much consistency as possible. Speed is very competitive, but the data size and resource overhead is noticeably higher than other libraries due to the IR and extra complexity.
 
-To run the benchmarks yourself, run the following command:
-```bash
-python -m tests.<suitkaise-api>cucumber</suitkaise-api>.run_all_benchmarks
-```
 
 (start of dropdown "Types only `<suitkaise-api>cucumber</suitkaise-api>` can handle")
 ## Types only `<suitkaise-api>cucumber</suitkaise-api>` can handle

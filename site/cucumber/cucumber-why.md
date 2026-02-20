@@ -245,11 +245,6 @@ Not only does `<suitkaise-api>cucumber</suitkaise-api>` handle this object, but 
 
 It can then verify that it is the same object as it was when it got created, and that all of its complex objects within still work as expected.
 
-Run the WorstPossibleObject round‑trip test:
-
-```bash
-python tests/<suitkaise-api>cucumber</suitkaise-api>/test_worst_possible_object.py
-```
 This test includes a full round trip.
 
 ```text
