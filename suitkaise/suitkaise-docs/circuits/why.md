@@ -39,8 +39,6 @@ One worker hits a fatal error. All four workers see `shutdown.broken` and stop g
 
 And with `Share` from `processing`, this works across processes too -- not just threads. More on that below.
 
----
-
 Your code calls an external service. Sometimes that service fails.
 
 What do you do?

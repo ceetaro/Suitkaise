@@ -33,9 +33,9 @@
     <p>When you create an <code><suitkaise-api>Skpath</suitkaise-api></code>, it automatically:</p>
     <ol>
         <li>Detects the project root</li>
-        <li>Computes the absolute path (<code>ap</code>)</li>
-        <li>Computes the relative path to root (<code>rp</code>)</li>
-        <li>Generates a reversible encoded ID (<code>id</code>)</li>
+        <li>Computes the absolute path (<code><suitkaise-api>ap</suitkaise-api></code>)</li>
+        <li>Computes the relative path to root (<code><suitkaise-api>rp</suitkaise-api></code>)</li>
+        <li>Generates a reversible encoded ID (<code><suitkaise-api>id</suitkaise-api></code>)</li>
     </ol>
     <pre><code class="language-python"><suitkaise-api>Skpath(</suitkaise-api>&quot;feature/file.txt&quot;) → detects root → computes ap, rp, id</code></pre>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> defines a module-level <code>threading.RLock</code> (<code>_skpath_lock</code>) for potential thread-safe operations.</p>
@@ -78,7 +78,7 @@
         # try multiple interpretations
         self._path = self._resolve_string_path(path)</code></pre>
     <p>If <code>path</code> is <code>None</code>: Uses <code>detect_caller_path()</code> which inspects the call stack to find the file that called <code><suitkaise-api>Skpath(</suitkaise-api>)</code>. This allows <code><suitkaise-api>Skpath(</suitkaise-api>)</code> to return a path to &quot;this file&quot; without passing any argument.</p>
-    <p>If <code>path</code> is <code><suitkaise-api>Skpath</suitkaise-api></code>: Copies all cached values directly. This is an optimization - if someone passes an existing Skpath, we don&#x27;t recompute <code>ap</code>, <code>rp</code>, <code>id</code>, etc.</p>
+    <p>If <code>path</code> is <code><suitkaise-api>Skpath</suitkaise-api></code>: Copies all cached values directly. This is an optimization - if someone passes an existing Skpath, we don&#x27;t recompute <code><suitkaise-api>ap</suitkaise-api></code>, <code><suitkaise-api>rp</suitkaise-api></code>, <code><suitkaise-api>id</suitkaise-api></code>, etc.</p>
     <p>If <code>path</code> is <code>Path</code>: Calls <code>.resolve()</code> to get an absolute path with symlinks resolved.</p>
     <p>If <code>path</code> is <code>str</code>: Calls <code>_resolve_string_path()</code> which tries multiple interpretations (see below).</p>
     <h3>String path resolution</h3>
@@ -107,7 +107,7 @@
         <li>Fall back to treating as path (may not exist)</li>
     </ol>
     <h3>Core properties</h3>
-    <h4><code>ap</code> (absolute path)</h4>
+    <h4><code><suitkaise-api>ap</suitkaise-api></code> (absolute path)</h4>
     <p>Absolute path with normalized separators (<code>/</code>).</p>
     <pre><code class="language-python">@property
 def ap(self) -&gt; str:
@@ -115,7 +115,7 @@ def ap(self) -&gt; str:
         self._ap = normalize_separators(str(self._path))
     return self._ap</code></pre>
     <p>Always available, even for paths outside project root.</p>
-    <h4><code>rp</code> (relative path)</h4>
+    <h4><code><suitkaise-api>rp</suitkaise-api></code> (relative path)</h4>
     <p>Path relative to project root with normalized separators.</p>
     <pre><code class="language-python">@property
 def rp(self) -&gt; str:
@@ -132,7 +132,7 @@ def _compute_rp(self) -&gt; str:
         return &quot;&quot;  # outside project root</code></pre>
     <p>Returns</p>
     <p>empty string if path is outside project root.</p>
-    <h4><code>id</code> (encoded ID)</h4>
+    <h4><code><suitkaise-api>id</suitkaise-api></code> (encoded ID)</h4>
     <p>Reversible base64url encoded ID.</p>
     <pre><code class="language-python">@property
 def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
@@ -140,7 +140,7 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
         path_to_encode = self.rp if self.rp else self.ap
         self._id = encode_path_id(path_to_encode)
     return self._id</code></pre>
-    <p>Uses <code>rp</code> if available (for cross-platform compatibility), otherwise <code>ap</code>.</p>
+    <p>Uses <code><suitkaise-api>rp</suitkaise-api></code> if available (for cross-platform compatibility), otherwise <code><suitkaise-api>ap</suitkaise-api></code>.</p>
     <p>Can be used to reconstruct the path: <code><suitkaise-api>Skpath(</suitkaise-api>encoded_id)</code>.</p>
     <h4><code>root</code>, <code>root_str</code>, <code>root_path</code></h4>
     <p>Project root access in different formats.</p>
@@ -156,20 +156,20 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
     <p>Additional methods: <code>copy_to()</code>, <code>move_to()</code> (with <code>overwrite</code> and <code>parents</code> options)</p>
     <p>Additional properties:</p>
     <ul>
-        <li><code>as_dict</code>: Dictionary representation with <code>ap</code>, <code>rp</code>, <code>root</code>, <code>name</code>, <code>exists</code></li>
-        <li><code>platform</code>: Absolute path with OS-native separators (backslash on Windows)</li>
+        <li><code>as_dict</code>: Dictionary representation with <code><suitkaise-api>ap</suitkaise-api></code>, <code><suitkaise-api>rp</suitkaise-api></code>, <code>root</code>, <code>name</code>, <code>exists</code></li>
+        <li><code><suitkaise-api>platform</suitkaise-api></code>: Absolute path with OS-native separators (backslash on Windows)</li>
     </ul>
     <h3>Path joining</h3>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> supports the <code>/</code> operator for joining paths.</p>
     <pre><code class="language-python">def __truediv__(self, other: str | Path | <suitkaise-api>Skpath</suitkaise-api>) -&gt; <suitkaise-api>Skpath</suitkaise-api>:
     return <suitkaise-api>Skpath(</suitkaise-api>self._path / other_str)</code></pre>
     <h3>Equality and hashing</h3>
-    <p>Equality compares <code>rp</code> first (for cross-platform consistency), then falls back to <code>ap</code>.</p>
+    <p>Equality compares <code><suitkaise-api>rp</suitkaise-api></code> first (for cross-platform consistency), then falls back to <code><suitkaise-api>ap</suitkaise-api></code>.</p>
     <pre><code class="language-python">def __eq__(self, other: Any) -&gt; bool:
     if self.rp and other_skpath.rp and self.rp == other_skpath.rp:
         return True
     return self.ap == other_skpath.ap</code></pre>
-    <p>Hashing uses MD5 of <code>rp</code> (or <code>ap</code> if outside project root).</p>
+    <p>Hashing uses MD5 of <code><suitkaise-api>rp</suitkaise-api></code> (or <code><suitkaise-api>ap</suitkaise-api></code> if outside project root).</p>
     <h3><code>__fspath__</code> compatibility</h3>
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> implements <code>__fspath__()</code> to work with <code>open()</code>, <code>os.path</code>, etc.:</p>
     <pre><code class="language-python">def __fspath__(self) -&gt; str:
@@ -181,7 +181,7 @@ def <suitkaise-api>id</suitkaise-api>(self) -&gt; str:
     <h3>Detection priority</h3>
     <ol>
         <li>Custom root (if set via <code><suitkaise-api>set_custom_root</suitkaise-api>()</code>)</li>
-        <li><code>setup.<suitkaise-api>sk</suitkaise-api></code> file (<code><suitkaise-api>suitkaise</suitkaise-api></code> marker - highest priority)</li>
+        <li><code><suitkaise-api>setup.sk</suitkaise-api></code> file (<code><suitkaise-api>suitkaise</suitkaise-api></code> marker - highest priority)</li>
         <li>Definitive indicators: <code>setup.py</code>, <code>setup.cfg</code>, <code>pyproject.toml</code></li>
         <li>Strong indicators: <code>.git</code>, <code>.gitignore</code></li>
         <li>License files: <code>LICENSE</code>, <code>LICENSE.txt</code>, etc. (case-insensitive)</li>

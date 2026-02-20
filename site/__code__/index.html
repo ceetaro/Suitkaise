@@ -4,15 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suitkaise</title>
-    <link rel="stylesheet" href="styles.css?v=20260216-30">
+    <link rel="stylesheet" href="styles.css?v=20260220-36">
     <!-- Prism.js syntax highlighting (Tomorrow Night theme) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 </head>
 <body>
     <!-- Loading Screen -->
     <div class="loading-screen" id="loadingScreen">
-        <div class="loading-briefcase">
-            <img src="../__assets__/briefcase-laptop-closed.png" alt="Loading..." class="loading-img" id="loadingImg">
+        <div class="loading-briefcase" id="loadingBriefcase">
+            <img src="../__assets__/briefcase-laptop-closed.png" alt="Loading..." class="loading-img loading-frame" id="loadingFrame0">
+            <img src="../__assets__/briefcase-laptop-half-open.png" alt="" class="loading-img loading-frame half-open" id="loadingFrame1" style="display:none">
+            <img src="../__assets__/briefcase-laptop-fully-open.png" alt="" class="loading-img loading-frame fully-open" id="loadingFrame2" style="display:none">
         </div>
     </div>
 
@@ -130,7 +132,8 @@ easy_multiprocessing.<suitkaise-api>start</suitkaise-api>()</code></pre>
     <!-- Prism.js for syntax highlighting -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     
-    <script src="script.js?v=20260219-3"></script>
+    <script src="script.js?v=20260220-9"></script>
 </body>
 </html>

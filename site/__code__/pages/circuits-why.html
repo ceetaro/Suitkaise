@@ -313,15 +313,16 @@ for t in threads:
     <p>Both circuits track useful state:</p>
     <pre><code class="language-python"><suitkaise-api>circuit</suitkaise-api> = <suitkaise-api>Circuit(</suitkaise-api>num_shorts_to_trip=5, sleep_time_after_trip=1.0)
 
-<suitkaise-api>circuit.times_shorted</suitkaise-api>      # failures since last trip
-<suitkaise-api>circuit.total_trips</suitkaise-api>        # lifetime trip count
-<suitkaise-api>circuit.current_sleep_time</suitkaise-api> # current backoff delay
+<suitkaise-api>circuit.times_shorted</suitkaise-api>        # failures since last trip
+<suitkaise-api>circuit.total_trips</suitkaise-api>          # lifetime trip count
+<suitkaise-api>circuit.current_sleep_time</suitkaise-api>   # current backoff delay
 
 <suitkaise-api>breaker</suitkaise-api> = <suitkaise-api>BreakingCircuit(</suitkaise-api>num_shorts_to_trip=3)
 
-<suitkaise-api>breaker.broken</suitkaise-api>             # is it broken?
-<suitkaise-api>breaker.times_shorted</suitkaise-api>      # failures since last reset
-<suitkaise-api>breaker.total_trips</suitkaise-api>        # lifetime trip count</code></pre>
+<suitkaise-api>breaker.broken</suitkaise-api>               # is it broken?
+<suitkaise-api>breaker.times_shorted</suitkaise-api>        # failures since last reset
+<suitkaise-api>breaker.total_trips</suitkaise-api>          # lifetime trip count
+<suitkaise-api>breaker.current_sleep_time</suitkaise-api>   # current backoff delay</code></pre>
     <hr>
     <h2>Cross-process circuit breaking with <code><suitkaise-api>Share</suitkaise-api></code></h2>
     <p>The coordinated shutdown example above works with threads. But with <code><suitkaise-api>Share</suitkaise-api></code> from <code><suitkaise-api>processing</suitkaise-api></code>, it works across entirely separate processes.</p>
@@ -331,7 +332,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCirc
 <suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 <suitkaise-api>share.circuit</suitkaise-api> = <suitkaise-api>BreakingCircuit(</suitkaise-api>num_shorts_to_trip=3)
 
-class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>ResilientWorker</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
 
@@ -346,7 +347,7 @@ class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
             self.share.<suitkaise-api>circuit.short()</suitkaise-api>
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=8)
-<suitkaise-api>pool.map(</suitkaise-api>ResilientWorker, [share] * 8)</code></pre>
+<suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>ResilientWorker</suitkaise-api>, [share] * 8)</code></pre>
     <p>Eight separate processes, each with their own GIL, their own memory space -- and they all see the same circuit state. When three failures accumulate from any combination of workers, the circuit trips and all workers can respond.</p>
     <p>This is the kind of cross-process coordination that normally requires Redis or a database. With <code><suitkaise-api>circuits</suitkaise-api></code> + <code><suitkaise-api>Share</suitkaise-api></code>, it&#x27;s zero infrastructure.</p>
 </section>

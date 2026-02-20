@@ -17,18 +17,18 @@
         <li><code><suitkaise-api>Sktimer</suitkaise-api></code> - statistical timer with thread-safe concurrent sessions</li>
         <li><code>TimerStats</code> - frozen snapshot of timer statistics</li>
         <li><code><suitkaise-api>TimeThis</suitkaise-api></code> - context manager for timing code blocks</li>
-        <li><code><suitkaise-api>timethis</suitkaise-api></code> - decorator for timing function executions</li>
-        <li>Simple functions: <code>time()</code>, <code>sleep()</code>, <code><suitkaise-api>elapsed</suitkaise-api>()</code></li>
+        <li><code><suitkaise-api>@timethis</suitkaise-api></code> - decorator for timing function executions</li>
+        <li>Simple functions: <code><suitkaise-api>time()</suitkaise-api></code>, <code><suitkaise-api>sleep()</suitkaise-api></code>, <code><suitkaise-api>elapsed</suitkaise-api>()</code></li>
     </ul>
     <h2>Simple Functions</h2>
-    <h3><code>time()</code></h3>
+    <h3><code><suitkaise-api>time()</suitkaise-api></code></h3>
     <p>Get the current Unix timestamp.</p>
     <pre><code class="language-python">def time() -&gt; float:
     return time.time()</code></pre>
     <p>Returns</p>
     <p><code>float</code>: Current Unix timestamp.</p>
     <p>Directly wraps Python&#x27;s <code>time.time()</code>.</p>
-    <h3><code>sleep()</code></h3>
+    <h3><code><suitkaise-api>sleep()</suitkaise-api></code></h3>
     <p>Sleep the current thread.</p>
     <pre><code class="language-python">def _sync_sleep(seconds: float) -&gt; float:
     time.sleep(seconds)
@@ -98,16 +98,20 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     <p><code>_sessions: dict[int, TimerSession]</code> Per-thread timing sessions, keyed by thread ident.</p>
     <h3>Thread Model</h3>
     <p><code><suitkaise-api>Sktimer</suitkaise-api></code> uses a session-per-thread model for concurrent safety.</p>
-    <pre><code class="language-text">Thread 1                    Thread 2
-   │                           │
-   ├─ <suitkaise-api>start</suitkaise-api>() ──────────┐      ├─ <suitkaise-api>start</suitkaise-api>() ──────────┐
-   │                    │      │                    │
-   │  TimerSession 1    │      │  TimerSession 2    │
-   │   └─ frames: [f1]  │      │   └─ frames: [f2]  │
-   │                    │      │                    │
-   ├─ <suitkaise-api>stop</suitkaise-api>() ───────────┘      ├─ <suitkaise-api>stop</suitkaise-api>() ───────────┘
-   │                           │
-   └───────────────────────────┴─────────────────────→ times[]</code></pre>
+    <pre><code class="language-text">Thread 1                              Thread 2
+  │                                     │
+  ├─ start() ──┐                        ├─ start() ──┐
+  │            │                        │            │
+  │   ┌──────────────────┐              │   ┌──────────────────┐
+  │   │  TimerSession 1  │              │   │  TimerSession 2  │
+  │   │  frames: [f1]    │              │   │  frames: [f2]    │
+  │   └──────────────────┘              │   └──────────────────┘
+  │            │                        │            │
+  ├─ stop() ───┘                        ├─ stop() ───┘
+  │                                     │
+  └──────────────────────────────┬──────────────────────────────→ times[]
+                                 │
+                        aggregate under _lock</code></pre>
     <p>Each thread gets its own <code>TimerSession</code>. Results aggregate into shared <code>times</code> list protected by <code>_lock</code>.</p>
     <h3><code><suitkaise-api>start</suitkaise-api>()</code></h3>
     <p>Start timing a new measurement.</p>
@@ -123,7 +127,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     
     # get or create session for current thread
     sess = self._get_or_create_session()
-    started = sess.<suitkaise-api>start</suitkaise-api>()
+    started = sess.start()
     
     with self._lock:
         if self.original_start_time is None:
@@ -133,7 +137,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
         <li>Check if current thread already has an active timing frame</li>
         <li>Warn if nesting (user might not intend this)</li>
         <li>Get or create a <code>TimerSession</code> for current thread</li>
-        <li>Call <code>sess.<suitkaise-api>start</suitkaise-api>()</code> to push a new frame</li>
+        <li>Call <code>sess.start()</code> to push a new frame</li>
         <li>Record <code>original_start_time</code> if this is the first ever start</li>
     </ol>
     <p>Returns</p>
@@ -142,7 +146,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     <p>Stop timing and record the measurement.</p>
     <pre><code class="language-python">def <suitkaise-api>stop</suitkaise-api>(self) -&gt; float:
     sess = self._get_or_create_session()
-    elapsed, paused_total = sess.<suitkaise-api>stop</suitkaise-api>()
+    elapsed, paused_total = sess.stop()
     
     with self._lock:
         self.<suitkaise-api>times</suitkaise-api>.append(elapsed)
@@ -151,7 +155,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     return elapsed</code></pre>
     <ol>
         <li>Get session for current thread</li>
-        <li>Call <code>sess.<suitkaise-api>stop</suitkaise-api>()</code> to pop frame and get elapsed time</li>
+        <li>Call <code>sess.stop()</code> to pop frame and get elapsed time</li>
         <li>Under lock: append to <code>times</code> and <code>_paused_durations</code></li>
         <li>Trim to rolling window if configured</li>
     </ol>
@@ -163,12 +167,12 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     <p>Stop timing but do NOT record.</p>
     <pre><code class="language-python">def <suitkaise-api>discard</suitkaise-api>(self) -&gt; float:
     sess = self._get_or_create_session()
-    elapsed, _ = sess.<suitkaise-api>stop</suitkaise-api>()
+    elapsed, _ = sess.stop()
     # intentionally NOT appending to times or _paused_durations
     return elapsed</code></pre>
     <ol>
         <li>Get session for current thread</li>
-        <li>Call <code>sess.<suitkaise-api>stop</suitkaise-api>()</code> to pop frame</li>
+        <li>Call <code>sess.stop()</code> to pop frame</li>
         <li>Return elapsed time without recording</li>
     </ol>
     <p>Returns</p>
@@ -177,7 +181,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     <p>Record a lap time (stop + start in one call).</p>
     <pre><code class="language-python">def <suitkaise-api>lap</suitkaise-api>(self) -&gt; float:
     sess = self._get_or_create_session()
-    elapsed, paused_total = sess.<suitkaise-api>lap</suitkaise-api>()
+    elapsed, paused_total = sess.lap()
     
     with self._lock:
         self.<suitkaise-api>times</suitkaise-api>.append(elapsed)
@@ -186,7 +190,7 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     return elapsed</code></pre>
     <ol>
         <li>Get session for current thread</li>
-        <li>Call <code>sess.<suitkaise-api>lap</suitkaise-api>()</code> which records elapsed and restarts frame</li>
+        <li>Call <code>sess.lap()</code> which records elapsed and restarts frame</li>
         <li>Under lock: append to lists and trim</li>
     </ol>
     <p>Returns</p>
@@ -195,11 +199,11 @@ sleep.asynced = _sleep_impl.<suitkaise-api>asynced</suitkaise-api></code></pre>
     <p>Pause and resume the current timing measurement.</p>
     <pre><code class="language-python">def <suitkaise-api>pause</suitkaise-api>(self) -&gt; None:
     sess = self._get_or_create_session()
-    sess.<suitkaise-api>pause</suitkaise-api>()
+    sess.pause()
 
 def <suitkaise-api>resume</suitkaise-api>(self) -&gt; None:
     sess = self._get_or_create_session()
-    sess.<suitkaise-api>resume</suitkaise-api>()</code></pre>
+    sess.resume()</code></pre>
     <p>Delegates to session which tracks pause state in the current frame.</p>
     <h3><code><suitkaise-api>add_time</suitkaise-api>()</code></h3>
     <p>Manually add a timing measurement.</p>

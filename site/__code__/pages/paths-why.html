@@ -41,7 +41,7 @@
     <p><code><suitkaise-api>Skpath</suitkaise-api></code> wraps <code>pathlib.Path</code>. Everything <code>pathlib.Path</code> does, <code><suitkaise-api>Skpath</suitkaise-api></code> does too -- same methods, same interface, same behavior. You don&#x27;t have to relearn anything.</p>
     <p>What <code><suitkaise-api>Skpath</suitkaise-api></code> adds on top:</p>
     <ul>
-        <li>Project-relative paths (<code>rp</code>) that are identical on every machine and OS</li>
+        <li>Project-relative paths (<code><suitkaise-api>rp</suitkaise-api></code>) that are identical on every machine and OS</li>
         <li>Automatic project root detection</li>
         <li>Platform-aware absolute paths</li>
         <li>Reversible path IDs for database storage</li>
@@ -55,12 +55,12 @@
     <h2><code><suitkaise-api>Skpath</suitkaise-api></code> paths</h2>
     <p>Every <code><suitkaise-api>Skpath</suitkaise-api></code> stores three paths:</p>
     <ul>
-        <li><code>ap</code> — absolute path, always forward slashes (<code>/Users/me/project/data/file.txt</code>)</li>
-        <li><code>rp</code> — normalized path relative to project root (<code>data/file.txt</code>)</li>
-        <li><code>platform</code> — absolute path with the correct separators for the current platform</li>
+        <li><code><suitkaise-api>ap</suitkaise-api></code> — absolute path, always forward slashes (<code>/Users/me/project/data/file.txt</code>)</li>
+        <li><code><suitkaise-api>rp</suitkaise-api></code> — normalized path relative to project root (<code>data/file.txt</code>)</li>
+        <li><code><suitkaise-api>platform</suitkaise-api></code> — absolute path with the correct separators for the current platform</li>
     </ul>
-    <p><code>rp</code> is the same on every machine, every OS, as long as the project structure is the same. Which it should be! Make sure to pull guys! Haha! Resolve those merge conflicts!</p>
-    <p>On a serious note, this changes everything -- and is a huge jump in path standardization.</p>
+    <p><code><suitkaise-api>rp</suitkaise-api></code> is the same on every machine, every OS, as long as the project structure is the same.</p>
+    <p>This changes everything -- and is a huge jump in path standardization.</p>
     <h2><code><suitkaise-api>@autopath</suitkaise-api></code> — make any function path-safe</h2>
     <p>The fastest way to make your codebase cross-platform: slap <code><suitkaise-api>@autopath</suitkaise-api>()</code> on any function that takes paths.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
@@ -114,7 +114,7 @@ print(Path(config_path).resolve())
 
 str(path)  # Always forward slashes (same as ap)</code></pre>
     <p>Need to pass a path to a Windows-specific tool or open a file? Use <code><suitkaise-api>path.platform</suitkaise-api></code>. Want to log or store paths consistently? Use <code><suitkaise-api>path.rp</suitkaise-api></code> (or <code><suitkaise-api>path.ap</suitkaise-api></code>).</p>
-    <p><code><suitkaise-api>Skpath</suitkaise-api></code> normalizes to forward slashes everywhere, except for <code>platform</code>, which you would want to use for OS-specific operations.</p>
+    <p><code><suitkaise-api>Skpath</suitkaise-api></code> normalizes to forward slashes everywhere, except for <code><suitkaise-api>platform</suitkaise-api></code>, which you would want to use for OS-specific operations.</p>
         </div>
     </details>
     <details>
@@ -168,7 +168,7 @@ PROJECT_ROOT = find_project_root()</code></pre>
     <p>One line. Auto-detects the project root. Need a different type? <code><suitkaise-api>Skpath(</suitkaise-api>).<suitkaise-api>root_path</suitkaise-api></code> for <code>pathlib.Path</code>, <code><suitkaise-api>Skpath(</suitkaise-api>).<suitkaise-api>root_str</suitkaise-api></code> for <code>str</code>, or <code><suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()</code> as a standalone function.</p>
     <p>With <code><suitkaise-api>paths</suitkaise-api></code> you can also use different roots quickly and easily.</p>
     <ul>
-        <li>You can add a <code>setup.<suitkaise-api>sk</suitkaise-api></code> file to your project root to guarantee detection (it will look for things like <code>setup.py</code> even if you don&#x27;t do this, but it will look for this first)</li>
+        <li>You can add a <code><suitkaise-api>setup.sk</suitkaise-api></code> file to your project root to guarantee detection (it will look for things like <code>setup.py</code> even if you don&#x27;t do this, but it will look for this first)</li>
         <li>You can use <code><suitkaise-api>set_custom_root</suitkaise-api></code> to set a custom root that all <code><suitkaise-api>Skpath</suitkaise-api></code> objects will use</li>
         <li>You can use the <code><suitkaise-api>CustomRoot</suitkaise-api></code> context manager to temporarily set a custom root for a code block for things like testing</li>
     </ul>
@@ -347,7 +347,7 @@ print(<suitkaise-api>same_path.rp</suitkaise-api>)
     <ul>
         <li>Base64url encoded (URL-safe, no weird characters)</li>
         <li>Reversible (you can always get the original path back)</li>
-        <li>Cross-platform (uses the normalized <code>rp</code>, not the absolute path)</li>
+        <li>Cross-platform (uses the normalized <code><suitkaise-api>rp</suitkaise-api></code>, not the absolute path)</li>
         <li>Compact (shorter than most full paths)</li>
     </ul>
     <p>Perfect for databases, APIs, cache keys, and anywhere you need to reference a file without storing a full path.</p>
@@ -432,10 +432,10 @@ print(tree)
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>is_valid_filename</suitkaise-api>, <suitkaise-api>streamline_path</suitkaise-api>, <suitkaise-api>streamline_path_quick</suitkaise-api>
 
 # check if a filename is valid on all platforms
-<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;report.pdf&quot;)           # True
-<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file&lt;name&gt;.txt&quot;)       # False - contains &lt; and &gt;
-<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;CON&quot;)                  # False - Windows reserved name
-<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file\twith\ttabs.txt&quot;) # False - contains tabs
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;report.pdf&quot;)               # True
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file&lt;name&gt;.txt&quot;)           # False - contains &lt; and &gt;
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;CON&quot;)                      # False - Windows reserved name
+<suitkaise-api>is_valid_filename</suitkaise-api>(&quot;file\twith\ttabs.txt&quot;)     # False - contains tabs
 
 # sanitize a filename to be safe everywhere
 clean = <suitkaise-api>streamline_path_quick</suitkaise-api>(&quot;My Report (Final) — версия 2.pdf&quot;)
@@ -453,7 +453,7 @@ clean = <suitkaise-api>streamline_path</suitkaise-api>(
         </div>
     </details>
     <details>
-        <summary>10b. File operations without the boilerplate</summary>
+        <summary>11. File operations without the boilerplate</summary>
         <div class="dropdown-content">
     <p>Moving or copying files shouldn&#x27;t require three imports and five lines.</p>
     <p><strong>Without <code><suitkaise-api>paths</suitkaise-api></code></strong></p>
@@ -475,7 +475,7 @@ source.<suitkaise-api>copy_to</suitkaise-api>(&quot;backup/2024/report.csv&quot;
         </div>
     </details>
     <details>
-        <summary>11. Temporary root override for testing</summary>
+        <summary>12. Temporary root override for testing</summary>
         <div class="dropdown-content">
     <p>Testing code that uses project paths is annoying. Your tests run from a different directory, your CI runs from yet another place.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>CustomRoot</suitkaise-api>, <suitkaise-api>Skpath</suitkaise-api>
@@ -497,7 +497,7 @@ def test_config_loading():
         </div>
     </details>
     <details>
-        <summary>12. Using paths as dict keys or in sets</summary>
+        <summary>13. Using paths as dict keys or in sets</summary>
         <div class="dropdown-content">
     <p>You want to track which files you&#x27;ve seen. Simple, right?</p>
     <p><strong>Without it</strong> - <em>8 lines</em></p>
@@ -522,7 +522,7 @@ def is_seen(path: str):
 # this STILL might mess up and have duplicate paths
 len(seen)</code></pre>
     <p>You have to manually normalize every time you add or check. And if you forget once, you get duplicates or missed lookups.</p>
-    <p><strong>With <code><suitkaise-api>paths</suitkaise-api></code></strong></p>
+    <p><strong>With <code><suitkaise-api>paths</suitkaise-api></code></strong> - <em>4 lines</em></p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api> # 1
 
 seen = set() # 2
@@ -536,7 +536,7 @@ def is_seen(path: <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>AnyPath</s
     return path in seen
 
 len(seen) # no duplicates</code></pre>
-    <p><code><suitkaise-api>Skpath</suitkaise-api></code> objects hash and compare using their normalized path (<code>rp</code>), so different representations of the same file are recognized as equal.</p>
+    <p><code><suitkaise-api>Skpath</suitkaise-api></code> objects hash and compare using their normalized path (<code><suitkaise-api>rp</suitkaise-api></code>), so different representations of the same file are recognized as equal.</p>
     <p>Works in sets, works as dict keys, no extra effort.</p>
         </div>
     </details>

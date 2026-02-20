@@ -27,7 +27,22 @@
     <h2><code><suitkaise-api>Circuit</suitkaise-api></code></h2>
     <p><code><suitkaise-api>Circuit</suitkaise-api></code> is an auto-resetting circuit that sleeps, and then automatically resets to continue.</p>
     <p>When the short counter reaches the <code>num_shorts_to_trip</code> threshold, the circuit trips.</p>
-    <pre><code class="language-text"><suitkaise-api>short</suitkaise-api>() -&gt; increment counter -&gt; if shorts == num_shorts_to_trip? -&gt; trip -&gt; sleep and reset</code></pre>
+    <pre><code class="language-text">┌─────────┐    ┌───────────────────┐    ┌──────────────────────────────────┐
+│ short() │───▶│ increment counter │───▶│ shorts == num_shorts_to_trip ? │
+└─────────┘    └───────────────────┘    └───────────────┬──────────────────┘
+                                                         │
+                                   ┌─────────────────────┴────────────────────┐
+                                   │                                          │
+                                yes│                                          │no
+                                   ▼                                          ▼
+                            ┌──────────┐                              ┌──────────┐
+                            │   trip   │                              │ continue │
+                            └────┬─────┘                              └──────────┘
+                                 │
+                                 ▼
+                         ┌────────────────┐
+                         │ sleep + reset  │
+                         └────────────────┘</code></pre>
     <p><code><suitkaise-api>Circuit</suitkaise-api></code> uses a <code>threading.RLock</code> to ensure that internal state is thread-safe.</p>
     <h3>Tracking state</h3>
     <p><code>_num_shorts_to_trip: int</code> Number of shorts required before the circuit trips. Set at initialization.</p>
@@ -209,7 +224,22 @@ await <suitkaise-api>circ.short</suitkaise-api>.<suitkaise-api>asynced</suitkais
     <p>Breaking circuit that stops when the failure threshold is reached.</p>
     <p>Unlike <code><suitkaise-api>Circuit</suitkaise-api></code>, it stays broken until you manually reset it. Use this for stopping after a threshold is reached and deciding what to do next.</p>
     <p>When the short counter reaches the <code>num_shorts_to_trip</code> threshold, the circuit breaks.</p>
-    <pre><code class="language-text"><suitkaise-api>short</suitkaise-api>() -&gt; increment counter -&gt; if shorts &gt;= num_shorts_to_trip? -&gt; break -&gt; sleep (but stay broken)</code></pre>
+    <pre><code class="language-text">┌─────────┐    ┌───────────────────┐    ┌──────────────────────────────────┐
+│ short() │───▶│ increment counter │───▶│ shorts >= num_shorts_to_trip ? │
+└─────────┘    └───────────────────┘    └───────────────┬──────────────────┘
+                                                         │
+                                   ┌─────────────────────┴────────────────────┐
+                                   │                                          │
+                                yes│                                          │no
+                                   ▼                                          ▼
+                            ┌──────────┐                              ┌──────────┐
+                            │  break   │                              │ continue │
+                            └────┬─────┘                              └──────────┘
+                                 │
+                                 ▼
+                      ┌───────────────────────┐
+                      │ sleep (stay broken)   │
+                      └───────────────────────┘</code></pre>
     <p><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> uses a <code>threading.RLock</code> to ensure that internal state is thread-safe.</p>
     <h3>Tracking state</h3>
     <p><code>_num_shorts_to_trip: int</code> Number of shorts required before the circuit breaks. Set at initialization.</p>

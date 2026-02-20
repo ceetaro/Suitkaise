@@ -39,7 +39,7 @@ share.counter = 0
 share.results = []
 share.log = logging.getLogger(&quot;worker&quot;)
 
-class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>Worker</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share, item):
         self.share = share
         self.item = item
@@ -51,7 +51,7 @@ class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.share.log.info(f&quot;done: {result}&quot;)  # shared logger
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
-<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(Worker, [(share, x) for x in range(20)])
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(<suitkaise-api>Worker</suitkaise-api>, [(share, x) for x in range(20)])
 
 print(share.counter)         # 20
 print(len(share.results))    # 20
@@ -435,7 +435,7 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkai
 import psycopg2
 
 <suitkaise-api>@autoreconnect</suitkaise-api>(**{&quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;password&quot;}})
-class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>DatabaseWorker</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
 
     def __init__(self, db_connection):
         # this automatically reconnects
@@ -485,8 +485,8 @@ class DatabaseWorker(<suitkaise-api>Skprocess</suitkaise-api>):
 db = psycopg2.connect(host=&#x27;localhost&#x27;, database=&#x27;mydb&#x27;, password=&#x27;secret&#x27;)
 
 # init and start the worker process
-worker = DatabaseWorker(db)
-worker.start()
+worker = <suitkaise-api>DatabaseWorker</suitkaise-api>(db)
+<suitkaise-api>worker.start()</suitkaise-api>
 
 # list of queries to run (counted as a single line)
 queries = [
@@ -580,7 +580,7 @@ share.log = logging.getLogger(&quot;ShareLog&quot;)
 
 
 
-class ShareCounter(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>ShareCounter</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
 
     # pass the Share instance to the process
     def __init__(self, share: <suitkaise-api>Share</suitkaise-api>):
@@ -595,7 +595,7 @@ class ShareCounter(<suitkaise-api>Skprocess</suitkaise-api>):
 
 # just add share
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
-<suitkaise-api>pool.map(</suitkaise-api>ShareCounter, [share] * 10)
+<suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>ShareCounter</suitkaise-api>, [share] * 10)
 
 print(share.counter) # 100 (10 total workers, 10 runs each)
 print(share.log.messages) # [&#x27;1&#x27;, &#x27;2&#x27;, &#x27;3&#x27;, &#x27;4&#x27;, &#x27;5&#x27;, ..., &#x27;100&#x27;] in order</code></pre>
@@ -617,7 +617,7 @@ print(share.log.messages) # [&#x27;1&#x27;, &#x27;2&#x27;, &#x27;3&#x27;, &#x27;
     <p>These are automatically 2 way, and use <code><suitkaise-api>cucumber</suitkaise-api></code>.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
 
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def <suitkaise-api>__prerun__</suitkaise-api>(self):
 
         self.command = self.<suitkaise-api>listen</suitkaise-api>(timeout=1.0)
@@ -639,7 +639,7 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         
 
 
-p = MyProcess()
+p = <suitkaise-api>MyProcess</suitkaise-api>()
 <suitkaise-api>p.start()</suitkaise-api>
 for i in range(10):
     <suitkaise-api>p.tell(</suitkaise-api>&quot;print&quot;)
@@ -655,7 +655,7 @@ for i in range(10):
 
 anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
 
     def __init__(self, pipe_point: <suitkaise-api>Pipe</suitkaise-api>.Point):
         self.pipe = pipe_point
@@ -666,7 +666,7 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         result = self.pipe.recv()
         print(result)
 
-process = MyProcess(point)
+process = <suitkaise-api>MyProcess</suitkaise-api>(point)
 <suitkaise-api>process.start()</suitkaise-api>
 
 anchor.send(&quot;hello&quot;)
@@ -681,7 +681,7 @@ print(result)
 # one way pipe: only anchor can send data, point can only receive
 anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)
 
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, pipe_point: <suitkaise-api>Pipe</suitkaise-api>.Point):
         self.pipe = pipe_point
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1

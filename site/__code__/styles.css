@@ -61,9 +61,14 @@ body {
 .loading-briefcase {
     width: 250px;
     height: 250px;
+    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.loading-frame {
+    position: absolute;
 }
 
 .loading-img {
@@ -72,7 +77,6 @@ body {
     object-fit: contain;
 }
 
-/* Adjust sizes for open briefcase images to match visual size */
 .loading-img.half-open {
     max-width: 115%;
     max-height: 115%;
@@ -900,6 +904,7 @@ body {
     padding: 0.13em 0.38em 0.27em !important;
     border-radius: 4px;
     line-height: 1.1 !important;
+    white-space: pre;
     text-shadow: none;
 }
 
@@ -920,6 +925,308 @@ body {
     line-height: 1.65;
     display: block;
     white-space: pre;
+}
+
+.module-page pre.mermaid,
+.about-page pre.mermaid,
+.why-page pre.mermaid {
+    white-space: normal;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-right: 36px;
+}
+
+.module-page pre.mermaid svg,
+.about-page pre.mermaid svg,
+.why-page pre.mermaid svg {
+    max-width: none;
+    min-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    overflow: visible;
+}
+
+.module-page pre.mermaid .cluster rect,
+.about-page pre.mermaid .cluster rect,
+.why-page pre.mermaid .cluster rect {
+    fill: #0c1611 !important;
+    stroke: #2f7c4a !important;
+    stroke-width: 1.4px !important;
+}
+
+.module-page pre.mermaid .node rect,
+.module-page pre.mermaid .node polygon,
+.module-page pre.mermaid .node path,
+.about-page pre.mermaid .node rect,
+.about-page pre.mermaid .node polygon,
+.about-page pre.mermaid .node path,
+.why-page pre.mermaid .node rect,
+.why-page pre.mermaid .node polygon,
+.why-page pre.mermaid .node path {
+    fill: #0f1f15 !important;
+    stroke: #2f7c4a !important;
+}
+
+.module-page pre.mermaid .edgePath .path,
+.about-page pre.mermaid .edgePath .path,
+.why-page pre.mermaid .edgePath .path {
+    stroke: #6de995 !important;
+}
+
+.module-page pre.mermaid .label,
+.about-page pre.mermaid .label,
+.why-page pre.mermaid .label {
+    color: #c6f8d7 !important;
+}
+
+.module-page pre.mermaid .edgeLabel,
+.about-page pre.mermaid .edgeLabel,
+.why-page pre.mermaid .edgeLabel {
+    background: #09130f !important;
+    color: #c6f8d7 !important;
+}
+
+.module-page .thread-model-chart,
+.about-page .thread-model-chart,
+.why-page .thread-model-chart {
+    background: rgb(9, 13, 11);
+    border: 1px solid rgba(109, 233, 149, 0.08);
+    border-radius: 6px;
+    padding: 14px;
+    margin: 24px 0 40px 0;
+    overflow-x: auto;
+}
+
+.module-page .thread-model-chart svg,
+.about-page .thread-model-chart svg,
+.why-page .thread-model-chart svg {
+    width: 100%;
+    min-width: 900px;
+    height: auto;
+    display: block;
+}
+
+.module-page .thread-model-chart .chart-line,
+.about-page .thread-model-chart .chart-line,
+.why-page .thread-model-chart .chart-line {
+    stroke: rgba(210, 220, 216, 0.92);
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: square;
+}
+
+.module-page .thread-model-chart .chart-label,
+.about-page .thread-model-chart .chart-label,
+.why-page .thread-model-chart .chart-label {
+    fill: rgba(220, 227, 224, 0.96);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.module-page .thread-model-chart .chart-text,
+.about-page .thread-model-chart .chart-text,
+.why-page .thread-model-chart .chart-text {
+    fill: rgba(210, 220, 216, 0.96);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 17px;
+    font-weight: 500;
+    text-rendering: geometricPrecision;
+}
+
+.module-page .thread-model-chart .chart-label-accent,
+.module-page .thread-model-chart .chart-text-accent,
+.about-page .thread-model-chart .chart-label-accent,
+.about-page .thread-model-chart .chart-text-accent,
+.why-page .thread-model-chart .chart-label-accent,
+.why-page .thread-model-chart .chart-text-accent {
+    fill: rgba(147, 228, 175, 0.96);
+}
+
+.module-page .thread-model-chart .chart-subtext,
+.about-page .thread-model-chart .chart-subtext,
+.why-page .thread-model-chart .chart-subtext {
+    fill: rgba(161, 173, 168, 0.88);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    text-rendering: geometricPrecision;
+}
+
+/* Diagram blocks (replacement for ASCII charts) */
+.module-page .doc-diagram,
+.about-page .doc-diagram,
+.why-page .doc-diagram {
+    background: rgb(9, 13, 11);
+    border: 1px solid rgba(109, 233, 149, 0.08);
+    border-radius: 6px;
+    padding: 22px;
+    margin: 24px 0 40px 0;
+}
+
+.module-page .flow-diagram,
+.about-page .flow-diagram,
+.why-page .flow-diagram {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.module-page .flow-step,
+.about-page .flow-step,
+.why-page .flow-step {
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(109, 233, 149, 0.08);
+    border: 1px solid rgba(109, 233, 149, 0.2);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.82rem;
+}
+
+.module-page .flow-arrow,
+.about-page .flow-arrow,
+.why-page .flow-arrow {
+    color: rgba(191, 255, 211, 0.7);
+    font-size: 1.05rem;
+}
+
+.module-page .thread-diagram .doc-diagram-row,
+.about-page .thread-diagram .doc-diagram-row,
+.why-page .thread-diagram .doc-diagram-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.module-page .doc-node-column,
+.about-page .doc-node-column,
+.why-page .doc-node-column {
+    border: 1px solid rgba(109, 233, 149, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(109, 233, 149, 0.04);
+}
+
+.module-page .doc-node-title,
+.about-page .doc-node-title,
+.why-page .doc-node-title {
+    color: rgba(191, 255, 211, 0.95);
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.module-page .doc-node-step,
+.about-page .doc-node-step,
+.why-page .doc-node-step {
+    padding: 6px 9px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    background: rgba(109, 233, 149, 0.08);
+    border: 1px solid rgba(109, 233, 149, 0.2);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.8rem;
+}
+
+.module-page .doc-node-meta,
+.about-page .doc-node-meta,
+.why-page .doc-node-meta {
+    margin: 2px 0 10px 0;
+    color: rgba(191, 255, 211, 0.7);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.78rem;
+}
+
+.module-page .doc-diagram-output,
+.about-page .doc-diagram-output,
+.why-page .doc-diagram-output {
+    margin-top: 14px;
+    color: rgba(191, 255, 211, 0.9);
+}
+
+.module-page .architecture-diagram,
+.about-page .architecture-diagram,
+.why-page .architecture-diagram {
+    display: grid;
+    gap: 10px;
+}
+
+.module-page .arch-stage,
+.about-page .arch-stage,
+.why-page .arch-stage {
+    border: 1px solid rgba(109, 233, 149, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(109, 233, 149, 0.04);
+}
+
+.module-page .arch-title,
+.about-page .arch-title,
+.why-page .arch-title {
+    font-weight: 700;
+    color: rgba(191, 255, 211, 0.95);
+    margin-bottom: 8px;
+}
+
+.module-page .arch-subtitle,
+.about-page .arch-subtitle,
+.why-page .arch-subtitle {
+    color: rgba(191, 255, 211, 0.75);
+}
+
+.module-page .arch-grid,
+.about-page .arch-grid,
+.why-page .arch-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.module-page .arch-chip,
+.about-page .arch-chip,
+.why-page .arch-chip {
+    border-radius: 6px;
+    background: rgba(109, 233, 149, 0.08);
+    border: 1px solid rgba(109, 233, 149, 0.2);
+    padding: 8px 10px;
+    font-size: 0.82rem;
+}
+
+.module-page .arch-columns,
+.about-page .arch-columns,
+.why-page .arch-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.module-page .arch-columns ul,
+.about-page .arch-columns ul,
+.why-page .arch-columns ul {
+    margin: 8px 0 0 18px;
+}
+
+.module-page .arch-arrow,
+.about-page .arch-arrow,
+.why-page .arch-arrow {
+    text-align: center;
+    color: rgba(191, 255, 211, 0.75);
+    font-size: 1.2rem;
+}
+
+@media (max-width: 820px) {
+    .module-page .thread-diagram .doc-diagram-row,
+    .module-page .arch-columns,
+    .module-page .arch-grid,
+    .about-page .thread-diagram .doc-diagram-row,
+    .about-page .arch-columns,
+    .about-page .arch-grid,
+    .why-page .thread-diagram .doc-diagram-row,
+    .why-page .arch-columns,
+    .why-page .arch-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Inline code styling only when API highlighting is active */

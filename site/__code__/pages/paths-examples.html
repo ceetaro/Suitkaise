@@ -47,7 +47,7 @@ data_dir = current_dir / &quot;data&quot;
 
 # check if they exist
 if config_file.exists:
-    print(f&quot;Config found at: {config_file.rp}&quot;)</code></pre>
+    print(f&quot;Config found at: {<suitkaise-api>config_file.rp</suitkaise-api>}&quot;)</code></pre>
     <h3>Alternative: use the helper functions</h3>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>paths</suitkaise-api>
 
@@ -117,12 +117,12 @@ data_file = root / &quot;data&quot; / &quot;users.json&quot;
 print(type(data_file))
 # &lt;class &#x27;suitkaise.paths._int.skpath.Skpath&#x27;&gt;
 
-print(data_file.ap)
+print(<suitkaise-api>data_file.ap</suitkaise-api>)
 # &quot;/Users/me/myproject/data/users.json&quot;
 
-print(data_file.rp)
+print(<suitkaise-api>data_file.rp</suitkaise-api>)
 # &quot;data/users.json&quot;</code></pre>
-    <h3>Core properties: <code>ap</code>, <code>rp</code>, <code>id</code>, <code>platform</code></h3>
+    <h3>Core properties: <code><suitkaise-api>ap</suitkaise-api></code>, <code><suitkaise-api>rp</suitkaise-api></code>, <code><suitkaise-api>id</suitkaise-api></code>, <code><suitkaise-api>platform</suitkaise-api></code></h3>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>
 
 <suitkaise-api>path</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>&quot;src/utils/helpers.py&quot;)
@@ -280,18 +280,18 @@ import json
 
 # get the file path where a module is defined
 json_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(json)
-print(json_path.ap)
+print(<suitkaise-api>json_path.ap</suitkaise-api>)
 # &quot;/usr/lib/python3.11/json/__init__.py&quot;
 
 # works with classes too
 from collections import OrderedDict
 od_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(OrderedDict)
-print(od_path.ap)
+print(<suitkaise-api>od_path.ap</suitkaise-api>)
 
 # works with your own modules
 from myapp.utils import MyClass
 my_path = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_module_path</suitkaise-api>(MyClass)
-print(my_path.rp)
+print(<suitkaise-api>my_path.rp</suitkaise-api>)
 # &quot;myapp/utils.py&quot;</code></pre>
     <h3>Thread safety</h3>
     <pre><code class="language-python">import threading
@@ -482,7 +482,7 @@ def get_unprocessed_files() -&gt; list[<suitkaise-api>Skpath</suitkaise-api>]:
 
 # get files and process them
 for file_path in get_unprocessed_files():
-    print(f&quot;Processing: {file_path.rp}&quot;)
+    print(f&quot;Processing: {<suitkaise-api>file_path.rp</suitkaise-api>}&quot;)
     
     # mark as processed
     conn.execute(
@@ -503,7 +503,7 @@ def get_cached_result(source_path: <suitkaise-api>Skpath</suitkaise-api>) -&gt; 
     &quot;&quot;&quot;Get cached result for a file, or None if not cached.&quot;&quot;&quot;
     
     # use <suitkaise-api>path.id</suitkaise-api> as cache key - it&#x27;s safe for filenames
-    cache_file = CACHE_DIR / f&quot;{source_path.id}.json&quot;
+    cache_file = CACHE_DIR / f&quot;{<suitkaise-api>source_path.id</suitkaise-api>}.json&quot;
     
     if cache_file.exists():
         # check if cache is still valid (source hasn&#x27;t changed)
@@ -518,7 +518,7 @@ def get_cached_result(source_path: <suitkaise-api>Skpath</suitkaise-api>) -&gt; 
 
 def save_cached_result(source_path: <suitkaise-api>Skpath</suitkaise-api>, result: dict):
     &quot;&quot;&quot;Save result to cache.&quot;&quot;&quot;
-    cache_file = CACHE_DIR / f&quot;{source_path.id}.json&quot;
+    cache_file = CACHE_DIR / f&quot;{<suitkaise-api>source_path.id</suitkaise-api>}.json&quot;
     cache_file.write_text(json.dumps(result))
 
 def process_with_cache(path: <suitkaise-api>Skpath</suitkaise-api>) -&gt; dict:
@@ -634,14 +634,14 @@ class ConfigLoader:
 
 # usage
 config = ConfigLoader(&quot;configs/production.json&quot;)
-print(f&quot;Data dir: {config.get_data_dir().rp}&quot;)
+print(f&quot;Data dir: {<suitkaise-api>config.get_data_dir().rp</suitkaise-api>}&quot;)
 for input_file in config.get_input_files():
-    print(f&quot;Input: {input_file.rp}&quot;)</code></pre>
+    print(f&quot;Input: {<suitkaise-api>input_file.rp</suitkaise-api>}&quot;)</code></pre>
         </div>
     </details>
-    <p>(no dropdown for the full script needed)</p>
+
     <h2>Full Script Using <code><suitkaise-api>paths</suitkaise-api></code></h2>
-    <p>A complete file organizer that demonstrates cross-platform compatibility, advanced Skpath usage, <code><suitkaise-api>autopath</suitkaise-api></code>, and <code><suitkaise-api>AnyPath</suitkaise-api></code>.</p>
+    <p>A complete file organizer that demonstrates cross-platform compatibility, advanced <code><suitkaise-api>Skpath</suitkaise-api></code> usage, <code><suitkaise-api>autopath</suitkaise-api></code>, and <code><suitkaise-api>AnyPath</suitkaise-api></code>.</p>
     <pre><code class="language-python">&quot;&quot;&quot;
 File Organizer
 
@@ -782,22 +782,22 @@ class FileOrganizer:
         &quot;&quot;&quot;
         # get project root for default paths
         try:
-            self.project_root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_project_root</suitkaise-api>()
+            self.<suitkaise-api>project_root</suitkaise-api> = <suitkaise-api>paths.get_project_root</suitkaise-api>()
         except <suitkaise-api>PathDetectionError</suitkaise-api>:
             # no project root found - use current directory
-            self.project_root = <suitkaise-api>paths</suitkaise-api>.<suitkaise-api>get_cwd</suitkaise-api>()
+            self.<suitkaise-api>project_root</suitkaise-api> = <suitkaise-api>paths.get_cwd</suitkaise-api>()
         
         # set output directory
         if output_dir is None:
-            self.output_dir = self.project_root / &quot;organized&quot;
+            self.<suitkaise-api>output_dir</suitkaise-api> = <suitkaise-api>self.project_root</suitkaise-api> / &quot;organized&quot;
         else:
             self.<suitkaise-api>output_dir</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>output_dir)
         
         # ensure output directory exists
-        ensure_directory(self.output_dir)
+        ensure_directory(self.<suitkaise-api>output_dir</suitkaise-api>)
         
         # manifest file to track organized files
-        self.manifest_path = self.output_dir / &quot;manifest.json&quot;
+        self.<suitkaise-api>manifest_path</suitkaise-api> = <suitkaise-api>self.output_dir</suitkaise-api> / &quot;manifest.json&quot;
         self.manifest: list[OrganizedFile] = []
         
         # load existing manifest if present
@@ -805,8 +805,8 @@ class FileOrganizer:
     
     def _load_manifest(self):
         &quot;&quot;&quot;Load the manifest file if it exists.&quot;&quot;&quot;
-        if self.manifest_path.exists:
-            with open(self.manifest_path, &quot;r&quot;) as f:
+        if self.<suitkaise-api>manifest_path</suitkaise-api>.exists:
+            with open(self.<suitkaise-api>manifest_path</suitkaise-api>, &quot;r&quot;) as f:
                 data = json.load(f)
                 self.manifest = [
                     OrganizedFile(**item) for item in data
@@ -841,8 +841,8 @@ class FileOrganizer:
             OrganizeResult with summary of operations.
         &quot;&quot;&quot;
         result = OrganizeResult(
-            source_dir=source_dir.rp,
-            output_dir=self.output_dir.rp,
+            source_dir=<suitkaise-api>source_dir.rp</suitkaise-api>,
+            output_dir=<suitkaise-api>self.output_dir.rp</suitkaise-api>,
         )
         
         # get files to organize
@@ -870,11 +870,11 @@ class FileOrganizer:
             # build destination path
             # sanitize filename for cross-platform compatibility
             safe_name = <suitkaise-api>streamline_path_quick</suitkaise-api>(file_path.name)
-            dest_path = self.output_dir / category / safe_name
+            dest_path = self.<suitkaise-api>output_dir</suitkaise-api> / category / safe_name
             
             if dry_run:
                 # just record what would happen
-                print(f&quot;Would organize: {file_path.rp} → {dest_path.rp}&quot;)
+                print(f&quot;Would organize: {<suitkaise-api>file_path.rp</suitkaise-api>} → {<suitkaise-api>dest_path.rp</suitkaise-api>}&quot;)
                 result.files_organized += 1
                 continue
             
@@ -885,8 +885,8 @@ class FileOrganizer:
                 if copied:
                     # record the operation
                     record = OrganizedFile(
-                        original_path=file_path.rp,
-                        new_path=copied.rp,
+                        original_path=<suitkaise-api>file_path.rp</suitkaise-api>,
+                        new_path=<suitkaise-api>copied.rp</suitkaise-api>,
                         category=category,
                         size=file_path.stat.st_size,
                         organized_at=datetime.now().isoformat(),
@@ -899,7 +899,7 @@ class FileOrganizer:
                     result.files_skipped += 1
                     
             except Exception as e:
-                result.errors.append(f&quot;{file_path.rp}: {str(e)}&quot;)
+                result.errors.append(f&quot;{<suitkaise-api>file_path.rp</suitkaise-api>}: {str(e)}&quot;)
         
         # save manifest
         if not dry_run:
@@ -933,7 +933,7 @@ class FileOrganizer:
         print(f&quot;\n{&#x27;=&#x27;*50}&quot;)
         print(&quot;File Organizer Summary&quot;)
         print(f&quot;{&#x27;=&#x27;*50}&quot;)
-        print(f&quot;Output directory: {self.output_dir.rp}&quot;)
+        print(f&quot;Output directory: {<suitkaise-api>self.output_dir.rp</suitkaise-api>}&quot;)
         print(f&quot;Total files: {len(self.manifest)}&quot;)
         print()
         
@@ -977,8 +977,8 @@ def main():
         # create organizer with temp output directory
         organizer = FileOrganizer(output_dir=output_dir)
         
-        print(f&quot;Organizing files from: {source_dir.rp}&quot;)
-        print(f&quot;Output directory: {organizer.output_dir.rp}&quot;)
+        print(f&quot;Organizing files from: {<suitkaise-api>source_dir.rp</suitkaise-api>}&quot;)
+        print(f&quot;Output directory: {<suitkaise-api>organizer.output_dir.rp</suitkaise-api>}&quot;)
         print()
         
         # dry run
@@ -1014,7 +1014,7 @@ def main():
             
             # reconstruct path from ID
             <suitkaise-api>reconstructed</suitkaise-api> = <suitkaise-api>Skpath(</suitkaise-api>record.path_id)
-            print(f&quot;  Reconstructed: {reconstructed.rp}&quot;)
+            print(f&quot;  Reconstructed: {<suitkaise-api>reconstructed.rp</suitkaise-api>}&quot;)
 
 
 if __name__ == &quot;__main__&quot;:

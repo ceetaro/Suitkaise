@@ -14,13 +14,9 @@
     <h1>How to use <code><suitkaise-api>paths</suitkaise-api></code></h1>
     <p><code><suitkaise-api>paths</suitkaise-api></code> provides project-aware path handling, streamlining how you handle paths and ensuring cross-platform compatibility.</p>
     <p>Use it to work with paths relative to your project root, regardless of where your code is executed from.</p>
-    <ul>
-        <li><code><suitkaise-api>Skpath</suitkaise-api></code></li>
-    </ul>
+    <h3><code><suitkaise-api>Skpath</suitkaise-api></code></h3>
     <p>Enhanced path object that detects your project root. Cross-platform compatible.</p>
-    <ul>
-        <li><code><suitkaise-api>autopath</suitkaise-api></code></li>
-    </ul>
+    <h3><code><suitkaise-api>autopath</suitkaise-api></code></h3>
     <p>Decorator for automatic path type conversion. Smack it on all of your functions that work with paths, and no more type mismatches will ever happen again.</p>
     <ul>
         <li>Other super useful functions</li>
@@ -55,19 +51,19 @@ path = Path(&quot;myproject/feature/file.txt&quot;)
         <li>If <code>None</code>, uses the caller&#x27;s file path</li>
     </ul>
     <h3>Core Properties</h3>
-    <p><code>ap</code>: Absolute path with normalized separators (<code>/</code>).</p>
+    <p><code><suitkaise-api>ap</suitkaise-api></code>: Absolute path with normalized separators (<code>/</code>).</p>
     <ul>
         <li><code>str</code></li>
         <li>read-only</li>
         <li>always available</li>
     </ul>
-    <p><code>rp</code>: Relative path to project root.</p>
+    <p><code><suitkaise-api>rp</suitkaise-api></code>: Relative path to project root.</p>
     <ul>
         <li><code>str</code></li>
         <li>read-only</li>
         <li>returns empty string if path is outside project root</li>
     </ul>
-    <p><code>id</code>: Reversible base64url encoded ID.</p>
+    <p><code><suitkaise-api>id</suitkaise-api></code>: Reversible base64url encoded ID.</p>
     <ul>
         <li><code>str</code></li>
         <li>read-only</li>
@@ -157,9 +153,9 @@ path.<suitkaise-api>root</suitkaise-api>    # Skpath(&#x27;/Users/me/myproject&#
     <p><code>as_dict</code>: Dictionary representation of the path.</p>
     <ul>
         <li><code>dict[str, Any]</code></li>
-        <li>contains <code>ap</code>, <code>rp</code>, <code>root</code>, <code>name</code>, <code>exists</code></li>
+        <li>contains <code><suitkaise-api>ap</suitkaise-api></code>, <code><suitkaise-api>rp</suitkaise-api></code>, <code>root</code>, <code>name</code>, <code>exists</code></li>
     </ul>
-    <p><code>platform</code>: Absolute path with OS-native separators.</p>
+    <p><code><suitkaise-api>platform</suitkaise-api></code>: Absolute path with OS-native separators.</p>
     <ul>
         <li><code>str</code></li>
         <li>backslashes on Windows, forward slashes elsewhere</li>

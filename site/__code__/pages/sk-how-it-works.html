@@ -15,42 +15,41 @@
     <h1>How <code><suitkaise-api>sk</suitkaise-api></code> works</h1>
     <p><code><suitkaise-api>sk</suitkaise-api></code> attaches modifiers and async support to classes and functions without changing how you call them. It also pre-computes <code>_shared_meta</code> for <code><suitkaise-api>Share</suitkaise-api></code> compatibility.</p>
     <h2>Architecture Overview</h2>
-    <pre><code class="language-text">┌────────────────────────────────────────────────────────────────────────────┐
-│                           <suitkaise-api>@sk</suitkaise-api> decorator or <suitkaise-api>sk</suitkaise-api>()                            │
-│                                                                            │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │                         Input: class or function                     │  │
-│  └─────────────────────────────────┬────────────────────────────────────┘  │
-│                                    │                                       │
-│                                    ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      AST Analysis (analyzer.py)                     │   │
-│  │                                                                     │   │
-│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │   │
-│  │  │ Attribute Reads │  │ Attribute Writes│  │ Blocking Detection  │  │   │
-│  │  │ (self.x reads)  │  │ (self.x writes) │  │ (time.sleep, I/O)   │  │   │
-│  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │   │
-│  └─────────────────────────────────┬───────────────────────────────────┘   │
-│                                    │                                       │
-│                                    ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                          Attach Features                            │   │
-│  │                                                                     │   │
-│  │  Classes:                      Functions:                           │   │
-│  │  - _shared_meta                - has_blocking_calls                 │   │
-│  │  - _blocking_methods           - blocking_calls                     │   │
-│  │  - .<suitkaise-api>asynced</suitkaise-api>()                  - .<suitkaise-api>asynced</suitkaise-api>()                         │   │
-│  │  - Method modifiers            - .<suitkaise-api>retry</suitkaise-api>()                           │   │
-│  │                                - .<suitkaise-api>timeout</suitkaise-api>()                         │   │
-│  │                                - .<suitkaise-api>background</suitkaise-api>()                      │   │
-│  │                                - .rate_limit()                      │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                    │                                       │
-│                                    ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Return Original (enhanced)                       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────────────┘</code></pre>
+    <pre><code class="language-text">┌──────────────────────────────────────────────────────┐
+│ @sk decorator / sk()                                 │
+│ input: class or function                             │
+└─────────────────────────────┬────────────────────────┘
+                              ▼
+                 ┌────────────────────────────┐
+                 │ AST analysis (analyzer.py) │
+                 └──────────────┬─────────────┘
+                                │
+        ┌───────────────────────┼────────────────────────┐
+        ▼                       ▼                        ▼
+┌──────────────────┐   ┌──────────────────┐   ┌─────────────────────────┐
+│ attribute reads  │   │ attribute writes │   │ blocking detection      │
+│ (self.x reads)   │   │ (self.x writes)  │   │ (time.sleep, I/O, etc.) │
+└────────┬─────────┘   └────────┬─────────┘   └────────────┬────────────┘
+         └──────────────────────┴──────────────────────────┘
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ attach sk features      │
+                    └────────────┬────────────┘
+                                 │
+                 ┌───────────────┴────────────────┐
+                 ▼                                ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────────────┐
+│ classes                              │  │ functions                            │
+│ - _shared_meta                       │  │ - has_blocking_calls                 │
+│ - _blocking_methods                  │  │ - blocking_calls                     │
+│ - .asynced()                         │  │ - .asynced() .retry() .timeout()     │
+│ - method modifiers                   │  │ - .background() .rate_limit()        │
+└───────────────────┬──────────────────┘  └───────────────────┬──────────────────┘
+                    └──────────────────────┬──────────────────┘
+                                           ▼
+                    ┌──────────────────────────────────────────┐
+                    │ return original object (enhanced)        │
+                    └──────────────────────────────────────────┘</code></pre>
     <h2>Blocking Detection</h2>
     <p>The <code>sk</code> module detects blocking code to decide whether <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> are allowed.</p>
     <h3>Detection Order</h3>

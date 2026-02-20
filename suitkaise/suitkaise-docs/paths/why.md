@@ -69,9 +69,9 @@ Every `Skpath` stores three paths:
 
 - `platform` — absolute path with the correct separators for the current platform
 
-`rp` is the same on every machine, every OS, as long as the project structure is the same. Which it should be! Make sure to pull guys! Haha! Resolve those merge conflicts!
+`rp` is the same on every machine, every OS, as long as the project structure is the same.
 
-On a serious note, this changes everything -- and is a huge jump in path standardization.
+This changes everything -- and is a huge jump in path standardization.
 
 ## `@autopath` — make any function path-safe
 

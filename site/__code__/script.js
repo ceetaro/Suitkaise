@@ -26,83 +26,72 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================
     
     const loadingScreen = document.getElementById('loadingScreen');
-    const loadingImg = document.getElementById('loadingImg');
-    
-    const loadingImages = [
-        { src: assetPath('briefcase-laptop-closed.png'), class: '' },
-        { src: assetPath('briefcase-laptop-half-open.png'), class: 'half-open' },
-        { src: assetPath('briefcase-laptop-fully-open.png'), class: 'fully-open' }
+    const loadingFrames = [
+        document.getElementById('loadingFrame0'),
+        document.getElementById('loadingFrame1'),
+        document.getElementById('loadingFrame2')
     ];
     
-    let loadingFrame = 0;
-    let loadingInterval = null;
-    let loadingDelayTimeout = null;
     let loadingComplete = false;
+    let animationId = 0;
+    
+    function showLoadingFrame(idx) {
+        for (let i = 0; i < loadingFrames.length; i++) {
+            loadingFrames[i].style.display = i === idx ? '' : 'none';
+        }
+    }
     
     function hideLoadingScreen() {
+        loadingScreen.style.opacity = '';
+        loadingScreen.style.visibility = '';
         loadingScreen.style.transition = '';
         loadingScreen.classList.add('hidden');
+        showLoadingFrame(0);
     }
     
     function stopLoadingAnimation() {
         loadingComplete = true;
-        
-        if (!loadingInterval && !loadingDelayTimeout) {
+        if (animationId === 0) {
             hideLoadingScreen();
-            return;
         }
     }
     
     function startLoadingAnimation() {
-        loadingFrame = 0;
         loadingComplete = false;
-        loadingImg.src = loadingImages[0].src;
-        loadingImg.className = 'loading-img';
+        const id = ++animationId;
         
+        showLoadingFrame(0);
         loadingScreen.style.transition = 'none';
+        loadingScreen.offsetHeight;
         loadingScreen.classList.remove('hidden');
+        loadingScreen.style.opacity = '1';
+        loadingScreen.style.visibility = 'visible';
         
-        if (loadingInterval) {
-            clearInterval(loadingInterval);
-            loadingInterval = null;
-        }
-        if (loadingDelayTimeout) {
-            clearTimeout(loadingDelayTimeout);
-            loadingDelayTimeout = null;
-        }
+        setTimeout(() => {
+            if (id !== animationId) return;
+            showLoadingFrame(1);
+        }, 250);
         
-        // Hold on the closed briefcase before cycling, matching the natural
-        // pause the user sees on a full page refresh (where the static HTML
-        // image is visible while resources load).  If content arrives during
-        // this window we skip the cycling animation entirely.
-        loadingDelayTimeout = setTimeout(() => {
-            loadingDelayTimeout = null;
-            
+        setTimeout(() => {
+            if (id !== animationId) return;
+            showLoadingFrame(2);
+        }, 500);
+        
+        setTimeout(() => {
+            if (id !== animationId) return;
             if (loadingComplete) {
                 hideLoadingScreen();
-                return;
+            } else {
+                const waitId = setInterval(() => {
+                    if (id !== animationId) { clearInterval(waitId); return; }
+                    if (loadingComplete) {
+                        clearInterval(waitId);
+                        hideLoadingScreen();
+                    }
+                }, 50);
             }
-            
-            loadingInterval = setInterval(() => {
-                loadingFrame = (loadingFrame + 1) % loadingImages.length;
-                const frame = loadingImages[loadingFrame];
-                loadingImg.src = frame.src;
-                loadingImg.className = 'loading-img ' + frame.class;
-                
-                if (loadingComplete && loadingFrame === 0) {
-                    clearInterval(loadingInterval);
-                    loadingInterval = null;
-                    hideLoadingScreen();
-                }
-            }, 250);
-        }, 400);
+        }, 750);
     }
-
-    // Preload loading images for smooth animation
-    loadingImages.forEach(img => {
-        const preload = new Image();
-        preload.src = img.src;
-    });
 
     // ============================================
     // Decorator Line Styling
@@ -367,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global state for API highlight toggle
     let apiHighlightEnabled = true;
     const API_FLICKER_BASE_CHANCE = 0.03;
-    const SKAPI_PLACEHOLDER_PATTERN = /__SKAPI_TOKEN_(\d+)__/g;
+    const SKAPI_PLACEHOLDER_PATTERN = /__SKAPI_(?:TOKEN|AUTO)_(\d+)__/g;
     const skapiManualTokenMap = new Map();
     function isWithoutComparisonContext(node) {
         const details = node?.closest?.('details');
@@ -389,19 +378,19 @@ document.addEventListener('DOMContentLoaded', () => {
         'ResultError', 'ErrorHandlerError', 'ProcessTimeoutError', 'ResultTimeoutError',
         'AsyncSkfunction', 'SkModifierError', 'FunctionTimeoutError',
         // functions / helpers
-        'elapsed', 'timethis', 'clear_global_timers', 'autopath',
+        'timethis', 'clear_global_timers', 'autopath',
         'get_project_root', 'set_custom_root', 'get_custom_root', 'clear_custom_root',
         'get_caller_path', 'get_current_dir', 'get_cwd', 'get_module_path', 'get_id',
         'get_project_paths', 'get_project_structure', 'get_formatted_project_tree',
         'is_valid_filename', 'streamline_path', 'streamline_path_quick',
         'serialize', 'serialize_ir', 'deserialize_ir', 'deserialize', 'reconnect_all',
         'ir_to_jsonable', 'ir_to_json', 'to_jsonable', 'to_json',
-        'autoreconnect', 'sk', 'blocking',
+        'autoreconnect', 'Reconnector', 'sk', 'blocking',
         // NOTE:
         // Keep auto-tagging conservative. Generic member/property names (result, run,
         // error, times, etc.) are intentionally excluded here and handled by the
         // context-aware highlighter below to avoid false positives in local variables.
-        'asynced', 'retry', 'timeout', 'background', 'rate_limit',
+        'asynced', 'background', 'rate_limit',
         'has_blocking_calls', 'blocking_calls',
         // Skprocess lifecycle dunders
         '__prerun__', '__run__', '__postrun__', '__onfinish__', '__result__', '__error__',
@@ -451,6 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
                     }
                     const tag = document.createElement('suitkaise-api');
+                    tag.setAttribute('data-auto', '');
                     tag.textContent = match[1];
                     frag.appendChild(tag);
                     lastIndex = tokenRegex.lastIndex;
@@ -467,6 +457,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function preprocessManualAPITags() {
         skapiManualTokenMap.clear();
         let tokenIndex = 0;
+        const isHowItWorksPage = /\-how-it-works\b/.test(window.location.hash || '');
+        const genericInternalMethodTokens = new Set([
+            'start', 'stop', 'pause', 'resume', 'lap', 'discard'
+        ]);
 
         const manualTags = document.querySelectorAll('suitkaise-api');
         manualTags.forEach((tag) => {
@@ -484,8 +478,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // In fenced code blocks, Prism would strip unknown tags. Replace with
             // a stable placeholder, then restore to .api-highlight after highlighting.
-            if (tag.closest('pre code')) {
-                const placeholder = `__SKAPI_TOKEN_${tokenIndex++}__`;
+            // Exception: language-text blocks aren't processed by Prism or
+            // styleAPIHighlights, so convert directly to a span there.
+            const closestCode = tag.closest('pre code');
+            if (closestCode) {
+                // In "*-how-it-works" pages, keep internal implementation calls like
+                // `sess.start()` plain (they are implementation details, not API docs).
+                if (
+                    isHowItWorksPage &&
+                    closestCode.classList.contains('language-python') &&
+                    genericInternalMethodTokens.has(tokenText)
+                ) {
+                    tag.replaceWith(document.createTextNode(tokenText));
+                    return;
+                }
+                if (closestCode.classList.contains('language-text')) {
+                    const span = document.createElement('span');
+                    span.className = 'api-highlight api-highlight-manual';
+                    span.textContent = tokenText;
+                    tag.replaceWith(span);
+                    return;
+                }
+                const isAuto = tag.hasAttribute('data-auto');
+                const prefix = isAuto ? '__SKAPI_AUTO_' : '__SKAPI_TOKEN_';
+                const placeholder = `${prefix}${tokenIndex++}__`;
                 skapiManualTokenMap.set(placeholder, tokenText);
                 tag.replaceWith(document.createTextNode(placeholder));
                 return;
@@ -604,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // circuits
             'Circuit', 'BreakingCircuit',
             // cucumber
-            'SerializationError', 'DeserializationError',
+            'Reconnector', 'SerializationError', 'DeserializationError',
             // processing
             'Skprocess', 'Pool', 'Share', 'Pipe', 'ProcessTimers',
             'ProcessError', 'PreRunError', 'RunError', 'PostRunError', 'OnFinishError',
@@ -652,8 +668,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // sk / wrapped functions
             'asynced', 'retry', 'timeout', 'background', 'rate_limit', 'has_blocking_calls',
             'blocking_calls', 'timer',
+            // cucumber / reconnector
+            'reconnect',
             // paths / skpath-ish usage
-            'id', 'root', 'parent',
+            'ap', 'rp', 'id', 'root', 'parent',
         ]);
         
         // Overrides: properties that should highlight word.property.chain patterns
@@ -706,12 +724,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Track variables assigned to API objects in this block
             const apiVariables = new Set();
+            // API variables discovered from explicit syntax (imports/assignments/inheritance).
+            // Used to prevent inferred-root cleanup from unwrapping real API vars.
+            const explicitApiVariables = new Set();
             // Roots inferred from member-chain usage (no import/assignment context)
             // should only be highlighted when actually connected to a chain.
             const inferredApiRoots = new Set();
             
-            // Get the text content to analyze for variable assignments
-            const textContent = codeBlock.textContent;
+            // Get the text content to analyze for variable assignments.
+            // <suitkaise-api> tags have been replaced with __SKAPI_TOKEN_n__ (manual)
+            // or __SKAPI_AUTO_n__ (auto) placeholders by preprocessManualAPITags().
+            // Restore them so patterns like `share = Share(` match correctly.
+            let textContent = codeBlock.textContent;
+            for (const [placeholder, original] of skapiManualTokenMap) {
+                while (textContent.includes(placeholder)) {
+                    textContent = textContent.replace(placeholder, original);
+                }
+            }
             
             // Determine which overrides are active based on decorators found in code block
             const activeOverrides = new Set();
@@ -735,6 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let importMatch;
             while ((importMatch = importAsPattern.exec(textContent)) !== null) {
                 apiVariables.add(importMatch[1]);
+                explicitApiVariables.add(importMatch[1]);
             }
             
             const fromSuitkaiseImportPattern = /\bfrom\s+suitkaise(?:\.\w+)?\s+import\s+([^\n#]+)/g;
@@ -748,6 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const localName = aliasMatch ? aliasMatch[2] : importedName;
                     if (apiModules.has(importedName) || apiClasses.has(importedName) || apiMethods.has(importedName)) {
                         apiVariables.add(localName);
+                        explicitApiVariables.add(localName);
                     }
                 });
             }
@@ -759,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // high-signal processing chains
                 'map', 'imap', 'unordered_map', 'unordered_imap', 'star',
                 // high-signal sk/timing chains
-                'asynced', 'background', 'retry', 'timethis',
+                'asynced', 'background', 'timethis',
                 // high-signal module-specific helpers
                 'autopath', 'serialize_ir', 'reconnect_all',
                 // high-signal timer/circuit properties
@@ -771,9 +802,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 'broken', 'result', 'wait', 'start', 'stop', 'mean', 'stdev', 'variance', 'timer',
             ]);
             const memberChainPattern = /\b([A-Za-z_]\w*)((?:\.[A-Za-z_]\w*)+)\s*(?:\(|$)/g;
+            const instanceKeywords = new Set(['self', 'cls']);
             let chainMatch;
             while ((chainMatch = memberChainPattern.exec(textContent)) !== null) {
                 const root = chainMatch[1];
+                if (instanceKeywords.has(root)) continue;
                 const segments = chainMatch[2]
                     .split('.')
                     .filter(Boolean);
@@ -820,28 +853,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     apiDerivedClasses.add(className);
                     // Treat subclasses of API types as API roots for chain highlighting.
                     apiVariables.add(className);
+                    explicitApiVariables.add(className);
                 }
             }
             
             const knownClassesPattern = [...apiClasses, ...apiDerivedClasses].join('|');
             
-            // Find variable assignments like: varname = timing.Sktimer()
-            const assignmentPatterns = [
-                new RegExp(`(\\w+)\\s*=\\s*(?:${modulesPattern})\\.\\w+`, 'g'),
-                new RegExp(`(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${modulesPattern})\\.\\w+`, 'g'),
-                new RegExp(`(\\w+)\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
-                new RegExp(`(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
-                new RegExp(`(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
-                new RegExp(`with\\s+(?:${modulesPattern}|\\w+)\\.\\w+[^:]*\\s+as\\s+(\\w+)`, 'g'),
-                new RegExp(`with\\s+(?:${knownClassesPattern}|${methodsPattern})[^:]*\\s+as\\s+(\\w+)`, 'g'),
-            ];
-            
-            assignmentPatterns.forEach(pattern => {
-                let match;
-                while ((match = pattern.exec(textContent)) !== null) {
-                    if (match[1]) apiVariables.add(match[1]);
-                }
-            });
+            // Find variable assignments iteratively. Chain calls like
+            // elapsed = timer.stop() require timer to be detected first,
+            // so we loop until no new variables are discovered.
+            let prevApiVarSize;
+            do {
+                prevApiVarSize = apiVariables.size;
+                const knownWithRoots = [...apiModules, ...apiVariables]
+                    .filter(Boolean)
+                    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                    .sort((a, b) => b.length - a.length)
+                    .join('|');
+                const assignmentPatterns = [
+                    new RegExp(`(?<!\\.)\\b(\\w+)\\s*=\\s*(?:${knownWithRoots})\\.\\w+`, 'g'),
+                    new RegExp(`(?<!\\.)\\b(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${knownWithRoots})\\.\\w+`, 'g'),
+                    new RegExp(`(?<!\\.)\\b(\\w+)\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
+                    new RegExp(`(?<!\\.)\\b(\\w+)\\s*:\\s*[\\w\\[\\],\\s|]+\\s*=\\s*(?:${knownClassesPattern})\\s*\\(`, 'g'),
+                    new RegExp(`(?<!\\.)\\b(\\w+)\\s*=\\s*(?:${methodsPattern})\\s*\\(`, 'g'),
+                    ...(knownWithRoots ? [new RegExp(`with\\s+(?:${knownWithRoots})\\.\\w+[^:]*\\s+as\\s+(\\w+)`, 'g')] : []),
+                    new RegExp(`with\\s+(?:${knownClassesPattern}|${methodsPattern})[^:]*\\s+as\\s+(\\w+)`, 'g'),
+                ];
+                
+                assignmentPatterns.forEach(pattern => {
+                    let match;
+                    while ((match = pattern.exec(textContent)) !== null) {
+                        if (match[1] && !instanceKeywords.has(match[1])) {
+                            apiVariables.add(match[1]);
+                            explicitApiVariables.add(match[1]);
+                        }
+                    }
+                });
+            } while (apiVariables.size > prevApiVarSize);
+            if (apiVariables.size > 0) console.debug('[SK-API] apiVariables:', [...apiVariables], 'textContent sample:', textContent.slice(0, 200));
             
             // Note: We don't add function names to apiVariables just because they use .timer
             // The word before .timer (like my_function) is NOT an API identifier
@@ -858,40 +907,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const nodesToProcess = [];
             let node;
             while (node = walker.nextNode()) {
-                // Skip if inside a comment span
+                // Skip if inside a comment or string span
                 let parent = node.parentElement;
-                let isComment = false;
+                let isCommentOrString = false;
                 while (parent && parent !== codeBlock) {
-                    if (parent.classList && parent.classList.contains('comment')) {
-                        isComment = true;
+                    if (parent.classList && (parent.classList.contains('comment') || parent.classList.contains('string'))) {
+                        isCommentOrString = true;
                         break;
                     }
                     parent = parent.parentElement;
                 }
-                const hasManualPlaceholder = node.textContent && node.textContent.includes('__SKAPI_TOKEN_');
-                if (((!isComment && node.textContent.trim()) || hasManualPlaceholder)) {
+                const hasPlaceholder = node.textContent && (node.textContent.includes('__SKAPI_TOKEN_') || node.textContent.includes('__SKAPI_AUTO_'));
+                if (((!isCommentOrString && node.textContent.trim()) || hasPlaceholder)) {
                     nodesToProcess.push(node);
                 }
             }
             
+            // === PASS 1: Restore placeholders ===
+            // Manual tags (__SKAPI_TOKEN_) always highlight (even in strings/comments).
+            // Auto tags (__SKAPI_AUTO_) revert to plain text inside comments/strings.
             nodesToProcess.forEach(textNode => {
                 const text = textNode.textContent;
-
-                // Manual placeholders (from <suitkaise-api> in code blocks):
-                // convert "__SKAPI_TOKEN_n__" back into forced api-highlight spans.
-                // If inside a comment span (from Prism), restore as plain text instead.
-                if (text && text.includes('__SKAPI_TOKEN_')) {
-                    let inComment = false;
-                    let ancestor = textNode.parentElement;
-                    while (ancestor && ancestor !== codeBlock) {
-                        if (ancestor.classList && (ancestor.classList.contains('comment') || ancestor.classList.contains('string'))) {
-                            inComment = true;
-                            break;
-                        }
-                        ancestor = ancestor.parentElement;
-                    }
+                if (text && (text.includes('__SKAPI_TOKEN_') || text.includes('__SKAPI_AUTO_'))) {
                     SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
                     if (SKAPI_PLACEHOLDER_PATTERN.test(text)) {
+                        let inCommentOrString = false;
+                        let ancestor = textNode.parentElement;
+                        while (ancestor && ancestor !== codeBlock) {
+                            if (ancestor.classList && (ancestor.classList.contains('comment') || ancestor.classList.contains('string'))) {
+                                inCommentOrString = true;
+                                break;
+                            }
+                            ancestor = ancestor.parentElement;
+                        }
                         SKAPI_PLACEHOLDER_PATTERN.lastIndex = 0;
                         const parts = [];
                         let lastIdx = 0;
@@ -903,7 +951,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 parts.push(document.createTextNode(text.slice(lastIdx, matchStart)));
                             }
                             const replacementText = skapiManualTokenMap.get(fullMatch) || fullMatch;
-                            if (inComment) {
+                            const isAuto = fullMatch.startsWith('__SKAPI_AUTO_');
+                            if (isAuto && inCommentOrString) {
                                 parts.push(document.createTextNode(replacementText));
                             } else {
                                 const span = document.createElement('span');
@@ -920,75 +969,61 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (parent && parts.length > 0) {
                             parts.forEach(part => parent.insertBefore(part, textNode));
                             parent.removeChild(textNode);
-                            return;
                         }
                     }
                 }
-                if (manualOnly) return;
+            });
+            
+            // === PASS 2: Auto-highlight API identifiers ===
+            // Re-walk the DOM so text nodes created during placeholder restoration
+            // (e.g. "timer " split from " __SKAPI_AUTO_1__\n\ntimer ") are included.
+            if (!manualOnly) {
+                const autoWalker = document.createTreeWalker(
+                    codeBlock,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                const autoNodesToProcess = [];
+                let autoNode;
+                while (autoNode = autoWalker.nextNode()) {
+                    let parent = autoNode.parentElement;
+                    let skip = false;
+                    while (parent && parent !== codeBlock) {
+                        if (parent.classList && (
+                            parent.classList.contains('comment') ||
+                            parent.classList.contains('string') ||
+                            parent.classList.contains('api-highlight') ||
+                            parent.classList.contains('api-highlight-manual')
+                        )) {
+                            skip = true;
+                            break;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    if (!skip && autoNode.textContent.trim()) {
+                        autoNodesToProcess.push(autoNode);
+                    }
+                }
                 
-                // Build regex pattern for all API identifiers
                 const allIdentifiers = [
                     ...apiModules,
                     ...apiClasses, 
                     ...apiDerivedClasses,
                     ...apiMethods,
                     ...apiVariables,
-                    ...activeOverrides, // Add active override properties (like 'timer') as identifiers
-                    ...manualApiExtra,  // Manual forced API tokens for this scope
+                    ...activeOverrides,
+                    ...manualApiExtra,
                 ].filter(id => !manualApiIgnore.has(id));
-                // Always-on chain roots that should match after any identifier.
-                // Example: self.process_config.runs
                 const alwaysChainRoots = [
                     'process_config',
                     ...manualChainRoots
                 ].filter(id => !manualApiIgnore.has(id));
                 
-                // Check if this text contains any API identifiers
-                let hasMatch = false;
-                for (const id of allIdentifiers) {
-                    if (text.includes(id)) {
-                        hasMatch = true;
-                        break;
-                    }
-                }
-                // Check for inferred API roots only when used as chains (e.g., pool.star)
-                if (!hasMatch && apiVariables.size > 0) {
-                    for (const variable of apiVariables) {
-                        if (text.includes(variable + '.')) {
-                            hasMatch = true;
-                            break;
-                        }
-                    }
-                }
-                // Also check for @ decorator
-                if (text.includes('@')) hasMatch = true;
-                // Also check for active override patterns (e.g., "timer" only if @sktime.timethis was found)
-                for (const id of activeOverrides) {
-                    if (text.toLowerCase().includes(id)) {
-                        hasMatch = true;
-                        break;
-                    }
-                }
-                // Ensure always-on chain roots can trigger matching.
-                if (!hasMatch) {
-                    for (const root of alwaysChainRoots) {
-                        if (text.includes(`.${root}`) || text.startsWith(`${root}.`) || text.includes(` ${root}.`)) {
-                            hasMatch = true;
-                            break;
-                        }
-                    }
-                }
-                
-                if (!hasMatch) return;
-                
-                // Create pattern to match identifiers
                 const identifierPattern = allIdentifiers
                     .sort((a, b) => b.length - a.length)
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
-                
-                // Only allow chain segments that we know are part of Suitkaise API.
-                // This guards against over-highlighting arbitrary properties/methods.
                 const chainSegmentPattern = [
                     ...apiMembers,
                     ...apiMethods,
@@ -1002,40 +1037,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     .sort((a, b) => b.length - a.length)
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
-                
                 const variablePattern = [...apiVariables]
                     .sort((a, b) => b.length - a.length)
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
-                
-                // Build overrides pattern for active overrides only
                 const overridesPattern = [...activeOverrides]
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
-                
                 const alwaysChainRootsPattern = alwaysChainRoots
                     .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
                     .join('|');
                 
-                // Match patterns:
-                // 1. Decorators: @identifier.method()
-                // 2. Module.something chains: timing.Sktimer(), paths.get_project_root()
-                // 3. Standalone classes/functions: Skpath(), timethis()
-                // 4. Variables with chains: t.mean, timer.stdev, circ.flowing
-                // 5. Override patterns: word.timer.chain... / word.process_config.chain...
                 let regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
                     `\\b(${identifierPattern})\\b(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                 if (alwaysChainRootsPattern) {
                     regexPattern += `|(\\b\\w+)\\.(${alwaysChainRootsPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?`;
                 }
-                
-                // Inferred variables (like pool, timer, breaker) only highlight when
-                // connected to known API chain segments.
                 if (variablePattern) {
                     regexPattern += `|\\b(${variablePattern})\\b(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
                 }
-                
-                // Add override pattern only if there are active overrides
                 if (activeOverrides.size > 0) {
                     regexPattern = `(@(?:${identifierPattern})(?:\\.(?:${chainSegmentPattern}))*(?:\\(\\))?)|` +
                         `(\\b\\w+)\\.(${overridesPattern})(?:\\.(?:${chainSegmentPattern}))*(\\(\\))?|` +
@@ -1047,63 +1067,90 @@ document.addEventListener('DOMContentLoaded', () => {
                         regexPattern += `|\\b(${variablePattern})\\b(?:\\.(?:${chainSegmentPattern}))+((?:\\(\\))?)`;
                     }
                 }
-                
-                // Case-sensitive matching prevents lowercase `sk` from
-                // consuming the `Sk` prefix in class names (e.g. Skprocess).
                 const regex = new RegExp(regexPattern, 'g');
                 
-                const parts = [];
-                let lastIndex = 0;
-                let match;
-                
-                while ((match = regex.exec(text)) !== null) {
-                    const matchedText = match[0];
-                    const matchStart = match.index;
-                    const matchEnd = matchStart + matchedText.length;
+                autoNodesToProcess.forEach(textNode => {
+                    const text = textNode.textContent;
                     
-                    // Skip keyword-argument names inside calls:
-                    // e.g. connect(host=..., database=...) -> do not highlight host/database.
-                    // Heuristic: token is immediately followed by "=" and appears after
-                    // "(" or "," (ignoring whitespace) in the same expression.
-                    let nextIdx = matchEnd;
-                    while (nextIdx < text.length && /\s/.test(text[nextIdx])) nextIdx++;
-                    const hasEqualsAfter = nextIdx < text.length && text[nextIdx] === '=';
-                    if (hasEqualsAfter) {
-                        let prevIdx = matchStart - 1;
-                        while (prevIdx >= 0 && /\s/.test(text[prevIdx])) prevIdx--;
-                        const prevChar = prevIdx >= 0 ? text[prevIdx] : '';
-                        if (prevChar === '(' || prevChar === ',') {
-                            lastIndex = regex.lastIndex;
-                            continue;
+                    let hasMatch = false;
+                    for (const id of allIdentifiers) {
+                        if (text.includes(id)) {
+                            hasMatch = true;
+                            break;
+                        }
+                    }
+                    if (!hasMatch && apiVariables.size > 0) {
+                        for (const variable of apiVariables) {
+                            if (text.includes(variable + '.')) {
+                                hasMatch = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (text.includes('@')) hasMatch = true;
+                    for (const id of activeOverrides) {
+                        if (text.toLowerCase().includes(id)) {
+                            hasMatch = true;
+                            break;
+                        }
+                    }
+                    if (!hasMatch) {
+                        for (const root of alwaysChainRoots) {
+                            if (text.includes(`.${root}`) || text.startsWith(`${root}.`) || text.includes(` ${root}.`)) {
+                                hasMatch = true;
+                                break;
+                            }
                         }
                     }
                     
-                    // Add text before match
-                    if (match.index > lastIndex) {
-                        parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
+                    if (!hasMatch) return;
+                    
+                    regex.lastIndex = 0;
+                    const parts = [];
+                    let lastIndex = 0;
+                    let match;
+                    
+                    while ((match = regex.exec(text)) !== null) {
+                        const matchedText = match[0];
+                        const matchStart = match.index;
+                        const matchEnd = matchStart + matchedText.length;
+                        
+                        let nextIdx = matchEnd;
+                        while (nextIdx < text.length && /\s/.test(text[nextIdx])) nextIdx++;
+                        const hasEqualsAfter = nextIdx < text.length && text[nextIdx] === '=';
+                        if (hasEqualsAfter) {
+                            let prevIdx = matchStart - 1;
+                            while (prevIdx >= 0 && /\s/.test(text[prevIdx])) prevIdx--;
+                            const prevChar = prevIdx >= 0 ? text[prevIdx] : '';
+                            if (prevChar === '(' || prevChar === ',') {
+                                lastIndex = regex.lastIndex;
+                                continue;
+                            }
+                        }
+                        
+                        if (match.index > lastIndex) {
+                            parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
+                        }
+                        
+                        const span = document.createElement('span');
+                        span.className = 'api-highlight';
+                        span.textContent = match[0];
+                        parts.push(span);
+                        
+                        lastIndex = regex.lastIndex;
                     }
                     
-                    // Create highlighted span for match
-                    const span = document.createElement('span');
-                    span.className = 'api-highlight';
-                    span.textContent = match[0];
-                    parts.push(span);
+                    if (lastIndex < text.length) {
+                        parts.push(document.createTextNode(text.slice(lastIndex)));
+                    }
                     
-                    lastIndex = regex.lastIndex;
-                }
-                
-                // Add remaining text
-                if (lastIndex < text.length) {
-                    parts.push(document.createTextNode(text.slice(lastIndex)));
-                }
-                
-                // Replace text node with parts if we found matches
-                if (parts.length > 0 && lastIndex > 0) {
-                    const parent = textNode.parentNode;
-                    parts.forEach(part => parent.insertBefore(part, textNode));
-                    parent.removeChild(textNode);
-                }
-            });
+                    if (parts.length > 0 && lastIndex > 0) {
+                        const parent = textNode.parentNode;
+                        parts.forEach(part => parent.insertBefore(part, textNode));
+                        parent.removeChild(textNode);
+                    }
+                });
+            }
             
             // Second pass: extend api-highlight to include adjacent "()"
             // This handles cases where Prism split parens into separate tokens.
@@ -1252,7 +1299,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (mergeAdjacentApiDotChains()) punctuationChanged = true;
             }
-            
+
+            // Highlight call parens for API calls WITH arguments.
+            // After the punctuation pass, any api-highlight that already ends
+            // with "()" was a no-arg call and is complete.  For the rest, check
+            // if the next token is "(" (with args), absorb it, then find and
+            // highlight the matching ")".
+            codeBlock.querySelectorAll('.api-highlight').forEach(highlight => {
+                if (highlight.textContent.endsWith('()')) return;
+
+                let needsCloseParen = highlight.textContent.endsWith('(');
+
+                if (!needsCloseParen) {
+                    let next = highlight.nextSibling;
+                    while (next && next.nodeType === Node.TEXT_NODE && !next.textContent.trim()) {
+                        next = next.nextSibling;
+                    }
+                    if (!next) return;
+
+                    // Detect opening paren in the next node (text or Prism element).
+                    if (next.nodeType === Node.TEXT_NODE && next.textContent.startsWith('(')) {
+                        highlight.textContent += '(';
+                        if (next.textContent.length === 1) {
+                            next.parentNode.removeChild(next);
+                        } else {
+                            next.textContent = next.textContent.slice(1);
+                        }
+                        needsCloseParen = true;
+                    } else if (next.nodeType === Node.ELEMENT_NODE && (next.textContent || '') === '(') {
+                        highlight.textContent += '(';
+                        next.parentNode.removeChild(next);
+                        needsCloseParen = true;
+                    }
+                }
+                if (!needsCloseParen) return;
+
+                // Walk forward through siblings to find the matching ")".
+                let depth = 1;
+                let node = highlight.nextSibling;
+                while (node && depth > 0) {
+                    const txt = node.textContent || '';
+                    for (let ci = 0; ci < txt.length; ci++) {
+                        if (txt[ci] === '(') depth++;
+                        else if (txt[ci] === ')') {
+                            depth--;
+                            if (depth === 0) {
+                                // Highlight this closing paren.
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    const before = txt.slice(0, ci);
+                                    const after = txt.slice(ci + 1);
+                                    const parent = node.parentNode;
+                                    if (before) parent.insertBefore(document.createTextNode(before), node);
+                                    const closeSpan = document.createElement('span');
+                                    closeSpan.className = 'api-highlight';
+                                    closeSpan.textContent = ')';
+                                    parent.insertBefore(closeSpan, node);
+                                    if (after) parent.insertBefore(document.createTextNode(after), node);
+                                    parent.removeChild(node);
+                                } else if (node.nodeType === Node.ELEMENT_NODE && txt === ')') {
+                                    const closeSpan = document.createElement('span');
+                                    closeSpan.className = 'api-highlight';
+                                    closeSpan.textContent = ')';
+                                    node.parentNode.insertBefore(closeSpan, node);
+                                    node.parentNode.removeChild(node);
+                                }
+                                node = null;
+                                break;
+                            }
+                        }
+                    }
+                    if (node) node = node.nextSibling;
+                }
+            });
+
             // Third pass: merge api-highlight chains connected by dots
             // This handles cases like my_function.timer.mean where Prism splits them
             // Only merges if the chain contains 'timer' (when activeOverrides has 'timer')
@@ -1555,6 +1674,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inferredHighlights.forEach(highlight => {
                     const text = highlight.textContent;
                     if (!inferredApiRoots.has(text)) return;
+                    if (explicitApiVariables.has(text)) return;
                     // If already part of a merged chain, keep it.
                     if (text.includes('.')) return;
                     
@@ -1702,6 +1822,60 @@ document.addEventListener('DOMContentLoaded', () => {
             pre.dataset.benchmarkTransformed = 'true';
             pre.replaceWith(wrap);
         });
+    }
+
+    let mermaidInitialized = false;
+    async function renderMermaidDiagrams() {
+        if (typeof mermaid === 'undefined') return;
+        if (!mermaidInitialized) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: 'base',
+                securityLevel: 'loose',
+                fontFamily: 'Inter, system-ui, sans-serif',
+                flowchart: {
+                    useMaxWidth: false,
+                    htmlLabels: true,
+                    curve: 'basis',
+                    nodeSpacing: 38,
+                    rankSpacing: 52,
+                    wrappingWidth: 180
+                },
+                themeVariables: {
+                    background: '#090d0b',
+                    primaryColor: '#0f1f15',
+                    primaryBorderColor: '#2f7c4a',
+                    primaryTextColor: '#bfffd3',
+                    secondaryColor: '#0f1a13',
+                    secondaryBorderColor: '#2f7c4a',
+                    tertiaryColor: '#0b1410',
+                    tertiaryBorderColor: '#2f7c4a',
+                    lineColor: '#6de995',
+                    textColor: '#c6f8d7',
+                    nodeTextColor: '#c6f8d7',
+                    clusterBkg: '#0c1611',
+                    clusterBorder: '#2f7c4a',
+                    edgeLabelBackground: '#09130f',
+                    mainBkg: '#0f1f15',
+                    fontSize: '16px'
+                }
+            });
+            mermaidInitialized = true;
+        }
+
+        const nodes = Array.from(document.querySelectorAll('pre.mermaid, div.mermaid'))
+            .filter((el) => !el.dataset.mermaidRendered);
+        if (!nodes.length) return;
+
+        nodes.forEach((el) => {
+            el.dataset.mermaidRendered = 'true';
+        });
+
+        try {
+            await mermaid.run({ nodes });
+        } catch (error) {
+            console.error('Mermaid render failed:', error);
+        }
     }
 
     // ============================================
@@ -2183,8 +2357,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Module names for scroll position memory
     const moduleNames = ['sk', 'paths', 'timing', 'circuits', 'cucumber', 'processing'];
     
-    // Store scroll positions per module
-    const moduleScrollPositions = {};
+    // Store scroll positions per page (persisted across refreshes via sessionStorage)
+    function getScrollPositions() {
+        try {
+            return JSON.parse(sessionStorage.getItem('sk_scrollPositions') || '{}');
+        } catch { return {}; }
+    }
+    function saveScrollPosition(page, y) {
+        const positions = getScrollPositions();
+        positions[page] = y;
+        sessionStorage.setItem('sk_scrollPositions', JSON.stringify(positions));
+    }
+    function getSavedScrollPosition(page) {
+        return getScrollPositions()[page];
+    }
     
     // Extract module name from page name
     function getModuleName(pageName) {
@@ -2199,10 +2385,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function navigateTo(pageName, force = false) {
         if (!force && pageName === currentPage) return;
         
-        // Save scroll position for current module before navigating
-        const currentModule = getModuleName(currentPage);
-        if (currentModule) {
-            moduleScrollPositions[currentModule] = window.scrollY;
+        // Save scroll position for current page before navigating
+        if (currentPage) {
+            saveScrollPosition(currentPage, window.scrollY);
         }
         
         // Check if page content is already available
@@ -2236,10 +2421,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update URL hash
             window.location.hash = pageName === 'home' ? '' : pageName;
             
-            // Restore scroll position if navigating within same module, otherwise scroll to top
-            const newModule = getModuleName(pageName);
-            if (newModule && newModule === currentModule && moduleScrollPositions[newModule] !== undefined) {
-                window.scrollTo(0, moduleScrollPositions[newModule]);
+            // Restore scroll position if page was visited before, otherwise start at top
+            const savedScroll = getSavedScrollPosition(pageName);
+            if (savedScroll !== undefined) {
+                window.scrollTo(0, savedScroll);
             } else {
                 window.scrollTo(0, 0);
             }
@@ -2267,6 +2452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoTagKnownAPIInCode();
         // Convert manual <suitkaise-api> tags before Prism tokenization.
         preprocessManualAPITags();
+        await renderMermaidDiagrams();
 
         // Run syntax highlighting on code blocks
         if (typeof Prism !== 'undefined') {
@@ -2370,6 +2556,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const hash = window.location.hash.slice(1) || 'home';
         if (hash !== currentPage && pageExists(hash)) {
             navigateTo(hash);
+        }
+    });
+
+    // Save scroll position before unload (refresh / tab close)
+    window.addEventListener('beforeunload', () => {
+        if (currentPage) {
+            saveScrollPosition(currentPage, window.scrollY);
         }
     });
 

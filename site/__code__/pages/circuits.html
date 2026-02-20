@@ -215,7 +215,7 @@ from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCirc
 <suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 <suitkaise-api>share.circuit</suitkaise-api> = <suitkaise-api>BreakingCircuit(</suitkaise-api>num_shorts_to_trip=3, sleep_time_after_trip=1.0)
 
-class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>Worker</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
 
@@ -230,8 +230,8 @@ class Worker(<suitkaise-api>Skprocess</suitkaise-api>):
             self.share.<suitkaise-api>circuit.short()</suitkaise-api>
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
-<suitkaise-api>pool.map(</suitkaise-api>Worker, [share] * 4)</code></pre>
-    <p>When any process trips the circuit, all other processes see <code>share.<suitkaise-api>circuit.broken</suitkaise-api> == True</code> on their next check. This gives you cross-process coordinated failure handling with zero infrastructure.</p>
+<suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>Worker</suitkaise-api>, [share] * 4)</code></pre>
+    <p>When any process trips the circuit, all other processes see <code><suitkaise-api>share.circuit.broken == True</suitkaise-api></code> on their next check. This gives you cross-process coordinated failure handling with zero infrastructure.</p>
     <hr>
     <h2>Choosing Between <code><suitkaise-api>Circuit</suitkaise-api></code> and <code><suitkaise-api>BreakingCircuit</suitkaise-api></code></h2>
     <div class="benchmark-table-wrap">

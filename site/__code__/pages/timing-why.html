@@ -14,7 +14,7 @@
     <h1>Why you should use <code><suitkaise-api>timing</suitkaise-api></code></h1>
     <h2>TLDR</h2>
     <ul>
-        <li><strong>1-line setup</strong> - <code><suitkaise-api>@timethis()</suitkaise-api></code> or <code><suitkaise-api>with TimeThis()</suitkaise-api></code>, done</li>
+        <li><strong>1-line setup</strong> - <code><suitkaise-api>@timethis</suitkaise-api></code>: 1 line. <code><suitkaise-api>with TimeThis()</suitkaise-api></code>: also 1 line.</li>
         <li><strong>Deep statistics</strong> - <code>mean</code>, <code>median</code>, <code>stdev</code>, <code>variance</code>, <code>percentiles</code> (way better than <code>timeit</code>)</li>
         <li><strong>Pause/resume</strong> - exclude user input or delays from measurements</li>
         <li><strong>Thread-safe</strong> - time concurrent operations without race conditions</li>
@@ -315,12 +315,12 @@ def handle_request():
 <suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
 <suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
 def db_read():
-    ...
+    # your code here
 
 <suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()             # per-function timer
 <suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(perf_timer)   # shared timer
 def db_write():
-    ...
+    # your code here
 
 # combined stats
 print(perf_timer.mean)
@@ -384,7 +384,7 @@ from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-a
 <suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 <suitkaise-api>share.timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
 
-class TimedWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>TimedWorker</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share, data):
         self.share = share
         self.data = data
@@ -396,7 +396,7 @@ class TimedWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.<suitkaise-api>share.timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
-<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(TimedWorker, [(share, item) for item in work_items])
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(<suitkaise-api>TimedWorker</suitkaise-api>, [(share, item) for item in work_items])
 
 # all 4 processes contributed to the same timer
 print(f&quot;Mean across all workers: {share.timer.mean:.3f}s&quot;)

@@ -277,7 +277,7 @@ if <suitkaise-api>circuit.broken</suitkaise-api>:
     <suitkaise-api>circuit.reset()</suitkaise-api>
 else:
     print(f&quot;All items processed: {len(results)} results&quot;)</code></pre>
-    <p>When any worker calls <code><suitkaise-api>circuit.trip()</suitkaise-api></code> or <code><suitkaise-api>circuit.short()</suitkaise-api></code> enough times, all workers see <code><suitkaise-api>circuit.broken</suitkaise-api> == True</code> and exit their loops. This provides coordinated shutdown across threads.</p>
+    <p>When any worker calls <code><suitkaise-api>circuit.trip()</suitkaise-api></code> or <code><suitkaise-api>circuit.short()</suitkaise-api></code> enough times, all workers see <code><suitkaise-api>circuit.broken == True</suitkaise-api></code> and exit their loops. This provides coordinated shutdown across threads.</p>
         </div>
     </details>
         </div>

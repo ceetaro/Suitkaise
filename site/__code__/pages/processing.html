@@ -77,7 +77,7 @@
     <p>Base class for subprocess execution. Inherit from this class and implement lifecycle methods.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
 
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
         self.counter = 0
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
@@ -88,7 +88,7 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
     def <suitkaise-api>__result__</suitkaise-api>(self):
         return self.counter
 
-process = MyProcess()
+process = <suitkaise-api>MyProcess</suitkaise-api>()
 <suitkaise-api>process.start()</suitkaise-api>
 <suitkaise-api>process.wait()</suitkaise-api>
 result = <suitkaise-api>process.result()</suitkaise-api>  # 10</code></pre>
@@ -228,7 +228,7 @@ result = <suitkaise-api>process.result()</suitkaise-api>  # 10</code></pre>
     <p>These are all of the methods you use to actually run and control <code><suitkaise-api>Skprocess</suitkaise-api></code> made subprocesses.</p>
     <h4><code><suitkaise-api>start</suitkaise-api>()</code></h4>
     <p>Start the process in a new subprocess.</p>
-    <pre><code class="language-python">process = MyProcess()
+    <pre><code class="language-python">process = <suitkaise-api>MyProcess</suitkaise-api>()
 <suitkaise-api>process.start()</suitkaise-api></code></pre>
     <ul>
         <li>Serializes the <code><suitkaise-api>Skprocess</suitkaise-api></code> object</li>
@@ -552,7 +552,7 @@ results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unorde
     <pre><code class="language-python"><suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
 await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
     <h3>Using <code><suitkaise-api>Skprocess</suitkaise-api></code> with <code><suitkaise-api>Pool</suitkaise-api></code></h3>
-    <pre><code class="language-python">class ProcessItem(<suitkaise-api>Skprocess</suitkaise-api>):
+    <pre><code class="language-python">class <suitkaise-api>ProcessItem</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, item):
         self.item = item
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
@@ -564,10 +564,10 @@ await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-
         return self.result_data
 
 # Pool creates instances and runs them
-results = <suitkaise-api>pool.map(</suitkaise-api>ProcessItem, items)</code></pre>
+results = <suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>ProcessItem</suitkaise-api>, items)</code></pre>
     <p>The pool:</p>
     <ol>
-        <li>Creates a <code>ProcessItem</code> instance for each item</li>
+        <li>Creates a <code><suitkaise-api>ProcessItem</suitkaise-api></code> instance for each item</li>
         <li>Runs each instance in a subprocess</li>
         <li>Collects and returns the results</li>
     </ol>
@@ -598,7 +598,7 @@ share.counter = 0</code></pre>
     <pre><code class="language-python"><suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
 share.counter = 0
 
-class IncrementProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>IncrementProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, share):
         self.share = share
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
@@ -607,7 +607,7 @@ class IncrementProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         self.share.counter += 1
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
-<suitkaise-api>pool.map(</suitkaise-api>IncrementProcess, [share] * 10)
+<suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>IncrementProcess</suitkaise-api>, [share] * 10)
 
 print(share.counter)  # 100 (10 processes × 10 runs each)</code></pre>
     <h3>How It Works</h3>
@@ -744,7 +744,7 @@ point.send({&quot;status&quot;: &quot;received&quot;})</code></pre>
     </ul>
     <p><code>close()</code>: Close the connection.</p>
     <h3>Usage with Skprocess</h3>
-    <pre><code class="language-python">class PipeProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+    <pre><code class="language-python">class <suitkaise-api>PipeProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, pipe_point):
         self.pipe = pipe_point
         self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
@@ -762,7 +762,7 @@ point.send({&quot;status&quot;: &quot;received&quot;})</code></pre>
 # parent
 anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
 
-process = PipeProcess(point)
+process = <suitkaise-api>PipeProcess</suitkaise-api>(point)
 <suitkaise-api>process.start()</suitkaise-api>
 
 anchor.send({&quot;action&quot;: &quot;compute&quot;, &quot;value&quot;: 42})
@@ -794,7 +794,7 @@ anchor.unlock() # raises PipeEndpointError</code></pre>
         &quot;redis.Redis&quot;: {&quot;*&quot;: &quot;redis_pass&quot;},
     }
 )
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self, db_connection, cache_connection):
         self.db = db_connection
         self.cache = cache_connection
@@ -826,7 +826,7 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
         &quot;analytics_db&quot;: &quot;analytics_secret&quot;, # specific override for analytics_db attr
     },
 })
-class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
     def __init__(self):
         self.main_db = psycopg2.connect(...)      # uses &quot;*&quot; auth
         self.analytics_db = psycopg2.connect(...) # uses &quot;analytics_db&quot; auth</code></pre>
