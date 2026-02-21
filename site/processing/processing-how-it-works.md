@@ -744,14 +744,14 @@ class <suitkaise-api>Pool</suitkaise-api>:
     def __init__(self, workers=None):
         self._workers = workers or multiprocessing.cpu_count()
         self._active_processes = []
-        self._mp_pool = multiprocessing.Pool(processes=self._workers)
+        self._mp_pool = multiprocessing.<not-api>Pool</not-api>(processes=self._workers)
 ```
 
 ### Map Implementation
 
 #### Two execution paths
 
-1. **Fast path (no timeout)** - Use built-in `multiprocessing.Pool.<suitkaise-api>map</suitkaise-api>()` for efficiency
+1. **Fast path (no timeout)** - Use built-in `multiprocessing.<not-api>Pool</not-api>.map()` for efficiency
 2. **Timeout path** - Manual worker management with individual timeouts
 
 #### Fast path
@@ -760,7 +760,7 @@ class <suitkaise-api>Pool</suitkaise-api>:
 2. Return early if empty
 3. Serialize the function/Skprocess once (reused for all items)
 4. Build argument tuples: `(serialized_fn, serialized_item, is_star)`
-5. Use `multiprocessing.Pool.<suitkaise-api>map</suitkaise-api>()` to distribute work
+5. Use `multiprocessing.<not-api>Pool</not-api>.map()` to distribute work
 6. Deserialize results, raise if any worker returned an error
 7. Return results in input order
 
@@ -786,7 +786,7 @@ def _map_impl(self, fn_or_process, iterable, is_star, timeout=None):
     # serialize function once
     serialized_fn = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(fn_or_process)
     
-    # use built-in multiprocessing.Pool for efficiency when no timeout
+    # use built-in multiprocessing.<not-api>Pool</not-api> for efficiency when no timeout
     if timeout is None and self._mp_pool is not None:
         args = [
             (serialized_fn, <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(item), is_star)
@@ -1347,7 +1347,7 @@ def _read_property(self, name):
 
 #### What a pipe endpoint does
 
-1. **Holds connection** - `_conn` is a `multiprocessing.Pipe` connection object
+1. **Holds connection** - `_conn` is a `multiprocessing.<not-api>Pipe</not-api>` connection object
 2. **Tracks lock state** - `_locked` prevents serialization (transfer to subprocess)
 3. **Tracks role** - `"anchor"` (parent side) or `"point"` (transferable side)
 
@@ -1413,7 +1413,7 @@ class _PipeEndpoint:
 
 #### How `pair()` works
 
-1. Create a `multiprocessing.Pipe` with two connection objects
+1. Create a `multiprocessing.<not-api>Pipe</not-api>` with two connection objects
 2. If `one_way=True`, ensure anchor is the send-only end and point is the recv-only end
 3. Wrap one in `Anchor` (automatically locked)
 4. Wrap other in `Point` (unlocked, ready to transfer)
@@ -1433,7 +1433,7 @@ class <suitkaise-api>Pipe</suitkaise-api>:
     
     @staticmethod
     def pair(one_way=False):
-        conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
+        conn1, conn2 = multiprocessing.<not-api>Pipe</not-api>(duplex=not one_way)
         if one_way:
             # conn1 is recv-only, conn2 is send-only
             <suitkaise-api>anchor</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.Anchor(conn2)
@@ -1628,7 +1628,7 @@ Within the subprocess:
 ### `<suitkaise-api>Pool</suitkaise-api>`
 
 `<suitkaise-api>Pool</suitkaise-api>` thread safety
-- **Built-in pool** - Uses `multiprocessing.Pool` which handles worker management internally
+- **Built-in pool** - Uses `multiprocessing.<not-api>Pool</not-api>` which handles worker management internally
 - **Manual mode** - For timeout scenarios, tracks workers in `_active_processes` list
 - **Result isolation** - Each worker writes to its own result queue
 

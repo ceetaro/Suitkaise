@@ -44,7 +44,7 @@ text = "
 - Access and update the objects normally
 - Everything remains in sync
 
-`<suitkaise-api>Pipe</suitkaise-api>`: upgraded `multiprocessing.Pipe`
+`<suitkaise-api>Pipe</suitkaise-api>`: upgraded `multiprocessing.<not-api>Pipe</not-api>`
 - Super fast cross process communication
 - Uses `<suitkaise-api>cucumber</suitkaise-api>` for serialization
 - Ensures one pipe endpoint remains locked in the parent process
@@ -903,7 +903,7 @@ with <suitkaise-api>Share(</suitkaise-api>) as share:
 (start of dropdown "`<suitkaise-api>Pipe</suitkaise-api>`")
 ## `<suitkaise-api>Pipe</suitkaise-api>`
 
-Fast, direct parent/child communication using `multiprocessing.Pipe`.
+Fast, direct parent/child communication using `multiprocessing.<not-api>Pipe</not-api>`.
 
 This is the fastest way to communicate between processes.
 

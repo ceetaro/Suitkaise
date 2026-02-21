@@ -157,7 +157,7 @@ If a 2nd place speed is less than 1.33x faster than `<suitkaise-api>cucumber</su
   Type                                  speed with `cloudpickle`         How much faster than 2nd place?
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
   `Skclass`                             9.8µs                            5.24x (`<suitkaise-api>cucumber</suitkaise-api>`)
-  `multiprocessing.Pipe`                6.6µs                            4.77x (`dill`)
+  `multiprocessing.<not-api>Pipe</not-api>`                6.6µs                            4.77x (`dill`)
   `SQLiteReconnector`                   5.1µs                            4.06x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `CodeType`                            9.4µs                            3.82x (`<suitkaise-api>cucumber</suitkaise-api>`)
   `PurePath`                            3.8µs                            3.82x (`dill`)
@@ -289,7 +289,7 @@ If a 2nd place speed is less than 1.33x faster than `<suitkaise-api>cucumber</su
   threading.local                17.0µs             fail               fail               fail              
   multiprocessing.Queue          14.0µs             fail               fail               fail              
   multiprocessing.Event          35.1µs             fail               fail               fail              
-  multiprocessing.Pipe           44.6µs             3.4µs              31.5µs             6.6µs             
+  multiprocessing.<not-api>Pipe</not-api>           44.6µs             3.4µs              31.5µs             6.6µs             
   multiprocessing.Manager        190.5µs            fail               fail               fail              
   SharedMemory                   52.8µs             5.9µs              43.3µs             12.0µs            
   queue.Queue                    23.2µs             fail               133.7µs            fail              

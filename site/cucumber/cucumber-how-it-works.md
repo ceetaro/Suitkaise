@@ -1390,9 +1390,9 @@ class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
 **Limitations:**
 - Original execution state is not preserved
 
-### `PipeReconnector` --> `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>` / OS pipes
+### `PipeReconnector` --> `multiprocessing.<not-api>Pipe</not-api>` / OS pipes
 
-Created from OS pipe file objects and `multiprocessing.<suitkaise-api>Pipe</suitkaise-api>` endpoints.
+Created from OS pipe file objects and `multiprocessing.<not-api>Pipe</not-api>` endpoints.
 
 Pipes are OS level handles tied to a specific process. The file descriptors or connection handles are not valid outside the original process boundary unless one side of the pipe is explicitly passed to a new process as it is being created.
 

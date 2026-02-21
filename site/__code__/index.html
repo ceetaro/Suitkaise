@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suitkaise</title>
-    <link rel="stylesheet" href="styles.css?v=20260220-36">
+    <link rel="stylesheet" href="styles.css?v=20260221-70">
     <!-- Prism.js syntax highlighting (Tomorrow Night theme) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 </head>
@@ -42,7 +42,10 @@
             <span class="hamburger-line"></span>
         </button>
         <div class="nav-right">
+            <a href="#quick-start" class="nav-btn nav-link" data-page="quick-start" id="navQuickStart">Quick Start</a>
             <a href="#about" class="nav-btn nav-link" data-page="about">About</a>
+            <a href="#feedback" class="nav-btn nav-link" data-page="feedback">Feedback</a>
+            <a href="#technical-info" class="nav-btn nav-link" data-page="technical-info">Technical Info</a>
             <a href="#error" class="nav-btn nav-link" data-page="error">Donate</a>
             <a href="#home" class="nav-btn home-btn nav-link" id="homeBtn" data-page="home">
                 <img src="../__assets__/briefcase-laptop-closed.png" alt="Home" class="home-icon" id="homeIcon">
@@ -51,89 +54,13 @@
     </header>
 
     <!-- Main Page Content Container -->
-    <main class="page-content" id="pageContent">
-        <!-- Module Section -->
-        <section class="module-section">
-            <!-- Row 1: Processing (text left, image right) -->
-            <div class="module-row" id="processing">
-                <div class="module-text">
-                    <pre class="code-block"><code>easy_multiprocessing = <suitkaise-api>processing</suitkaise-api>.Process()
-
-<span class="comment"># start the process</span>
-easy_multiprocessing.<suitkaise-api>start</suitkaise-api>()</code></pre>
-                    <a href="#processing-why" class="learn-more-link arrow-left nav-link" data-page="processing-why">
-                        <span class="arrow">⟵</span> learn more
-                    </a>
-                </div>
-                <div class="module-image">
-                    <img src="../__assets__/processing-text-with-branch-neon.png" alt="Processing">
-                </div>
-            </div>
-
-            <!-- Row 2: Cucumber (image left, text right) -->
-            <div class="module-row" id="cucumber">
-                <div class="module-image">
-                    <img src="../__assets__/cucumber-text-with-cerealbowl-neon.png" alt="Cucumber">
-                </div>
-                <div class="module-text">
-                    <p class="module-tagline">Serialize anything.</p>
-                    <a href="#cucumber-why" class="learn-more-link arrow-right nav-link" data-page="cucumber-why">
-                        learn more <span class="arrow">⟶</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Row 3: Timing (text left, image right) -->
-            <div class="module-row" id="timing">
-                <div class="module-text">
-                    <p class="module-tagline">Time a function every time it runs with 1 line of code.</p>
-                    <a href="#timing-why" class="learn-more-link arrow-left nav-link" data-page="timing-why">
-                        <span class="arrow">⟵</span> learn more
-                    </a>
-                </div>
-                <div class="module-image">
-                    <img src="../__assets__/sktime-text-with-clock-neon.png" alt="Timing">
-                </div>
-            </div>
-
-            <!-- Row 4: Paths (image left, text right) -->
-            <div class="module-row" id="paths">
-                <div class="module-image">
-                    <img src="../__assets__/skpath-text-with-trail-neon.png" alt="Paths">
-                </div>
-                <div class="module-text">
-                    <p class="module-tagline">File path management + skpath == big win for you.</p>
-                    <a href="#paths-why" class="learn-more-link arrow-right nav-link" data-page="paths-why">
-                        learn more <span class="arrow">⟶</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Row 5: Circuits (text left, image right) -->
-            <div class="module-row" id="circuits">
-                <div class="module-text">
-                    <p class="module-tagline">Simple, readable code to manage resources and control flow.</p>
-                    <a href="#circuits-why" class="learn-more-link arrow-left nav-link" data-page="circuits-why">
-                        <span class="arrow">⟵</span> learn more
-                    </a>
-                </div>
-                <div class="module-image">
-                    <img src="../__assets__/circuit-text-neon.png" alt="Circuits">
-                </div>
-            </div>
-        </section>
-
-        <!-- Footer Section (for testing) -->
-        <footer class="footer-section">
-            <a href="#password" class="nav-link test-btn" data-page="password">Test Password Page</a>
-        </footer>
-    </main>
+    <main class="page-content" id="pageContent"></main>
 
     <!-- Prism.js for syntax highlighting -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
     
-    <script src="script.js?v=20260220-9"></script>
+    <script src="script.js?v=20260221-35"></script>
 </body>
 </html>

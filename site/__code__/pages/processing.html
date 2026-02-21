@@ -29,10 +29,10 @@
     </ul>
     <p><code><suitkaise-api>Pool</suitkaise-api></code>: Parallel batch processing.</p>
     <ul>
-        <li><code>map</code>: returns a list, ordered by input</li>
-        <li><code>unordered_map</code>: returns an unordered list, fastest items first</li>
-        <li><code>imap</code>: returns an iterator, ordered by input</li>
-        <li><code>unordered_imap</code>: returns an iterator, unordered</li>
+        <li><code><suitkaise-api>map</suitkaise-api></code>: returns a list, ordered by input</li>
+        <li><code><suitkaise-api>unordered_map</suitkaise-api></code>: returns an unordered list, fastest items first</li>
+        <li><code><suitkaise-api>imap</suitkaise-api></code>: returns an iterator, ordered by input</li>
+        <li><code><suitkaise-api>unordered_imap</suitkaise-api></code>: returns an iterator, unordered</li>
         <li><code>.<suitkaise-api>star</suitkaise-api>()</code> modifier: unpacks tuples as function arguments</li>
         <li>Supports <code><suitkaise-api>sk</suitkaise-api></code> modifiers: <code>.<suitkaise-api>timeout</suitkaise-api>()</code>, <code>.<suitkaise-api>background</suitkaise-api>()</code>, <code>.<suitkaise-api>asynced</suitkaise-api>()</code></li>
     </ul>
@@ -44,7 +44,7 @@
         <li>Access and update the objects normally</li>
         <li>Everything remains in sync</li>
     </ul>
-    <p><code><suitkaise-api>Pipe</suitkaise-api></code>: upgraded <code>multiprocessing.Pipe</code></p>
+    <p><code><suitkaise-api>Pipe</suitkaise-api></code>: upgraded <code>multiprocessing.<not-api>Pipe</not-api></code></p>
     <ul>
         <li>Super fast cross process communication</li>
         <li>Uses <code><suitkaise-api>cucumber</suitkaise-api></code> for serialization</li>
@@ -700,7 +700,7 @@ conn = reconnected[&quot;db&quot;]</code></pre>
     <details>
         <summary><code><suitkaise-api>Pipe</suitkaise-api></code></summary>
         <div class="dropdown-content">
-    <p>Fast, direct parent/child communication using <code>multiprocessing.Pipe</code>.</p>
+    <p>Fast, direct parent/child communication using <code>multiprocessing.<not-api>Pipe</not-api></code>.</p>
     <p>This is the fastest way to communicate between processes.</p>
     <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>
 

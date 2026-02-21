@@ -166,7 +166,7 @@
             </thead>
             <tbody>
                 <tr><td><code>Skclass</code></td><td>9.8µs</td><td>5.24x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
-                <tr><td><code>multiprocessing.Pipe</code></td><td>6.6µs</td><td>4.77x (<code>dill</code>)</td></tr>
+                <tr><td><code>multiprocessing.<not-api>Pipe</not-api></code></td><td>6.6µs</td><td>4.77x (<code>dill</code>)</td></tr>
                 <tr><td><code>SQLiteReconnector</code></td><td>5.1µs</td><td>4.06x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
                 <tr><td><code>CodeType</code></td><td>9.4µs</td><td>3.82x (<code><suitkaise-api>cucumber</suitkaise-api></code>)</td></tr>
                 <tr><td><code>PurePath</code></td><td>3.8µs</td><td>3.82x (<code>dill</code>)</td></tr>
@@ -305,7 +305,7 @@
   threading.local                17.0µs             fail               fail               fail              
   multiprocessing.Queue          14.0µs             fail               fail               fail              
   multiprocessing.Event          35.1µs             fail               fail               fail              
-  multiprocessing.Pipe           44.6µs             3.4µs              31.5µs             6.6µs             
+  multiprocessing.<not-api>Pipe</not-api>           44.6µs             3.4µs              31.5µs             6.6µs             
   multiprocessing.Manager        190.5µs            fail               fail               fail              
   SharedMemory                   52.8µs             5.9µs              43.3µs             12.0µs            
   queue.Queue                    23.2µs             fail               133.7µs            fail              

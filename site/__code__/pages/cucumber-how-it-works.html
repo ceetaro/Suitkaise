@@ -1150,8 +1150,8 @@ class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkai
     <ul>
         <li>Original execution state is not preserved</li>
     </ul>
-    <h3><code>PipeReconnector</code> --&gt; <code>multiprocessing.<suitkaise-api>Pipe</suitkaise-api></code> / OS pipes</h3>
-    <p>Created from OS pipe file objects and <code>multiprocessing.Pipe</code> endpoints.</p>
+    <h3><code>PipeReconnector</code> --&gt; <code>multiprocessing.<not-api>Pipe</not-api></code> / OS pipes</h3>
+    <p>Created from OS pipe file objects and <code>multiprocessing.<not-api>Pipe</not-api></code> endpoints.</p>
     <p>Pipes are OS level handles tied to a specific process. The file descriptors or connection handles are not valid outside the original process boundary unless one side of the pipe is explicitly passed to a new process as it is being created.</p>
     <p>Since pipes are actually OS handles, they cannot be converted down to bytes and then passed. When going through <code><suitkaise-api>cucumber</suitkaise-api></code> without using the <code><suitkaise-api>Skprocess</suitkaise-api></code> class, OS handles get lost because of this, meaning pipes won't actually work correctly.</p>
     <p>If you want to use pipes with <code><suitkaise-api>cucumber</suitkaise-api></code>, use the <code><suitkaise-api>Pipe</suitkaise-api></code> class from <code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api></code> instead of relying on the <code>PipeReconnector</code>.</p>

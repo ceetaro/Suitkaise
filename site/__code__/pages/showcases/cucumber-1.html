@@ -1,0 +1,79 @@
+<div class="wpo-showcase" id="wpoShowcase">
+
+    <!-- Stage (persistent through all pre-battle phases) -->
+    <div class="wpo-stage" id="wpoStage">
+
+        <div class="wpo-stage-overlay" id="wpoOverlay"></div>
+
+        <div class="wpo-black-screen" id="wpoBlackScreen"></div>
+
+        <div class="wpo-intro-text" id="wpoIntro"><span class="api-highlight">cucumber</span> needs to prove that it can truly serialize anything.</div>
+        <div class="wpo-intro-text" id="wpoIntro2">So I created an object designed to break it.</div>
+        <div class="wpo-intro-text" id="wpoIntro3">Welcome to the battle against the Worst Possible Object.</div>
+
+        <div class="wpo-title" id="wpoTitle">WORST POSSIBLE OBJECT</div>
+
+        <div class="wpo-zoom-wrap" id="wpoZoomWrap">
+            <img class="wpo-monster" id="wpoMonster"
+                 src="__assets__/worst-possible-object-monster.png"
+                 alt="The Worst Possible Object">
+        </div>
+
+        <div class="wpo-subtitle" id="wpoSubtitle">vs <span class="api-highlight">cucumber</span></div>
+
+        <canvas class="wpo-snow" id="wpoStageSnow"></canvas>
+
+        <div class="wpo-challenge" id="wpoChallenge">
+            <p class="wpo-challenge-line wpo-challenge-hero" id="wpoChal0">All of those types, added to one single object.</p>
+            <p class="wpo-challenge-line" id="wpoChal1">Circular references and randomly generated nested collections.</p>
+            <p class="wpo-challenge-line" id="wpoChal2">Objects that pickle, cloudpickle, and dill can't handle at all.</p>
+            <p class="wpo-challenge-line wpo-challenge-hero" id="wpoChal3">Worst of all? Every Worst Possible Object created is different from the last.</p>
+            <p class="wpo-challenge-line wpo-challenge-hero" id="wpoChal4">But <span class="api-highlight">cucumber</span> can handle it.</p>
+            <p class="wpo-challenge-line wpo-challenge-hero" id="wpoChal5">Our hero is ready to take on the challenge. And it won't just battle one of them.</p>
+        </div>
+
+        <div class="wpo-suitcase" id="wpoSuitcase">
+            <img class="wpo-suitcase-img" id="wpoSuitcaseImg"
+                 src="__assets__/briefcase-laptop-closed.png" alt="">
+        </div>
+
+        <div class="wpo-codetype" id="wpoCodeType">
+            <pre class="wpo-codetype-text" id="wpoCodeTypeText"></pre>
+        </div>
+
+        <div class="wpo-ssj" id="wpoSSJ"></div>
+        <canvas class="wpo-powerup-canvas" id="wpoPowerupCanvas"></canvas>
+    </div>
+
+    <!-- Battle (split-screen) -->
+    <div class="wpo-battle" id="wpoBattle">
+        <div class="wpo-battle-left">
+            <div class="wpo-battle-img-wrap">
+                <img class="wpo-battle-monster"
+                     src="__assets__/worst-possible-object-monster.png" alt="">
+            </div>
+        </div>
+        <div class="wpo-battle-right">
+            <video class="wpo-video" id="wpoVideo" muted playsinline>
+                <source src="__assets__/worst-possible-object-fight.mp4" type="video/mp4">
+            </video>
+            <div class="wpo-video-effects"></div>
+            <div class="wpo-count-container" id="wpoCountContainer"></div>
+        </div>
+        <canvas class="wpo-snow" id="wpoSnow"></canvas>
+    </div>
+
+    <!-- Results -->
+    <div class="wpo-result" id="wpoResult">
+        <div class="wpo-result-text">
+            <p class="wpo-result-line" id="wpoResultLine1">
+                <span class="wpo-result-part" id="wpoResultPre">It'll beat</span>
+                <span class="wpo-result-num" id="wpoResultNum"></span>
+                <span class="wpo-result-part" id="wpoResultPost">of them. And every one that comes after too.</span>
+            </p>
+            <p class="wpo-result-line wpo-result-sub" id="wpoResultLine2"><span class="api-highlight">cucumber</span> can do the same for you. Never get a PicklingError again.</p>
+        </div>
+        <button class="wpo-replay-btn" id="wpoReplay">replay</button>
+    </div>
+
+</div>

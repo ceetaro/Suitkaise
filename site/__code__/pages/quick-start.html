@@ -1,0 +1,181 @@
+<section class="module-page about-page">
+    <h1>Quick Start</h1>
+
+    <p>Install <code><suitkaise-api>suitkaise</suitkaise-api></code>:</p>
+
+<pre><code class="language-bash">pip install <suitkaise-api>suitkaise</suitkaise-api></code></pre>
+
+    <p>Requires Python 3.11+.</p>
+
+    <h2>1. Share state across processes</h2>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+share.counter = 0
+
+class Counter(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, share):
+        self.share = share
+        self.<suitkaise-api>process_config</suitkaise-api>.runs = 5
+
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        self.share.counter += 1
+
+<suitkaise-api>Pool(</suitkaise-api>workers=4).<suitkaise-api>map</suitkaise-api>(Counter, [share] * 4)
+print(share.counter)  # 20 (4 processes × 5 runs)</code></pre>
+
+    <p><code><suitkaise-api>Share</suitkaise-api></code> works with any object. <code><suitkaise-api>Skprocess</suitkaise-api></code> gives you lifecycle hooks. <code><suitkaise-api>Pool</suitkaise-api></code> runs them in parallel. That's it.</p>
+
+    <h2>2. Serialize anything</h2>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>cucumber</suitkaise-api>
+
+# serialize
+data = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(any_object)
+
+# deserialize
+restored = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>deserialize</suitkaise-api>(data)</code></pre>
+
+    <p>No <code>PicklingError</code>. Works with lambdas, closures, threads, database connections, generators, and more.</p>
+
+    <p>If the object has live resources (connections, threads), they become <code>Reconnector</code> objects:</p>
+
+<pre><code class="language-python"><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>(restored, password='secret')</code></pre>
+
+    <h2>3. Time anything</h2>
+
+    <p>Decorator:</p>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api>
+
+@<suitkaise-api>timethis(</suitkaise-api>)
+def process_data():
+    do_work()
+
+for _ in range(100):
+    process_data()
+
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(process_data.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))</code></pre>
+
+    <p>Context manager:</p>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>TimeThis</suitkaise-api>
+
+with <suitkaise-api>TimeThis(</suitkaise-api>) as timer:
+    do_work()
+
+print(timer.<suitkaise-api>most_recent</suitkaise-api>)</code></pre>
+
+    <h2>4. Add modifiers to any function</h2>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+
+@<suitkaise-api>sk</suitkaise-api>
+def fetch(url):
+    return requests.get(url).json()
+
+# normal call
+data = fetch("https://api.example.com")
+
+# retry 3 times
+data = fetch.<suitkaise-api>retry</suitkaise-api>(times=3)("https://api.example.com")
+
+# timeout after 5 seconds
+data = fetch.<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com")
+
+# chain them
+data = fetch.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)("https://api.example.com")
+
+# run in background
+future = fetch.<suitkaise-api>background()</suitkaise-api>("https://api.example.com")
+
+# async
+data = await fetch.<suitkaise-api>asynced()</suitkaise-api>("https://api.example.com")</code></pre>
+
+    <h2>5. Circuit breakers</h2>
+
+    <p>Auto-resetting:</p>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+
+<suitkaise-api>circuit</suitkaise-api> = <suitkaise-api>Circuit(</suitkaise-api>num_shorts_to_trip=5, sleep_time_after_trip=1.0)
+
+for request in incoming_requests:
+    try:
+        process(request)
+    except ServiceError:
+        <suitkaise-api>circuit</suitkaise-api>.<suitkaise-api>short()</suitkaise-api>  # after 5 failures, sleeps 1s, then resets</code></pre>
+
+    <p>Manual reset:</p>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>BreakingCircuit</suitkaise-api>
+
+<suitkaise-api>breaker</suitkaise-api> = <suitkaise-api>BreakingCircuit(</suitkaise-api>num_shorts_to_trip=3, sleep_time_after_trip=1.0)
+
+while not <suitkaise-api>breaker</suitkaise-api>.<suitkaise-api>broken</suitkaise-api>:
+    try:
+        result = risky_operation()
+        break
+    except OperationError:
+        <suitkaise-api>breaker</suitkaise-api>.<suitkaise-api>short()</suitkaise-api>
+
+if <suitkaise-api>breaker</suitkaise-api>.<suitkaise-api>broken</suitkaise-api>:
+    handle_failure()
+    <suitkaise-api>breaker</suitkaise-api>.<suitkaise-api>reset()</suitkaise-api></code></pre>
+
+    <h2>6. Cross-platform paths</h2>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>paths</suitkaise-api> import <suitkaise-api>Skpath</suitkaise-api>, <suitkaise-api>autopath</suitkaise-api>, <suitkaise-api>AnyPath</suitkaise-api>
+
+# project-relative path — same on every machine
+path = <suitkaise-api>Skpath(</suitkaise-api>"data/file.txt")
+print(path.<suitkaise-api>rp</suitkaise-api>)   # "data/file.txt"
+print(path.<suitkaise-api>ap</suitkaise-api>)   # "/Users/me/project/data/file.txt"
+print(path.<suitkaise-api>id</suitkaise-api>)   # reversible base64 ID for database storage
+
+# auto-convert path types
+@<suitkaise-api>autopath()</suitkaise-api>
+def process(path: <suitkaise-api>AnyPath</suitkaise-api>):
+    print(path.<suitkaise-api>rp</suitkaise-api>)  # always an Skpath, no matter what was passed in
+
+process("data/file.txt")        # str → Skpath
+process(Path("data/file.txt"))  # Path → Skpath</code></pre>
+
+    <h2>Putting it together</h2>
+
+    <p>The modules are designed to work together:</p>
+
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
+
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+share.timer = <suitkaise-api>Sktimer(</suitkaise-api>)
+share.circuit = <suitkaise-api>Circuit(</suitkaise-api>num_shorts_to_trip=5, sleep_time_after_trip=2.0)
+
+class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, share, url):
+        self.share = share
+        self.url = url
+
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        self.share.timer.<suitkaise-api>start()</suitkaise-api>
+        try:
+            result = fetch(self.url)
+        except ServiceError:
+            self.share.circuit.<suitkaise-api>short()</suitkaise-api>
+        self.share.timer.<suitkaise-api>stop()</suitkaise-api>
+
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+pool.<suitkaise-api>star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(ResilientWorker, [(share, url) for url in urls])
+
+print(f"Mean response time: {share.timer.<suitkaise-api>mean</suitkaise-api>:.3f}s")
+print(f"Circuit tripped {share.circuit.total_trips} times")</code></pre>
+
+    <p>Shared timers, shared circuit breakers, parallel workers — all synced automatically.</p>
+
+    <p>For full documentation on each module, see the respective module pages. Navigate using the sidebar menu (&#9776;) in the top left of the page.</p>
+
+</section>

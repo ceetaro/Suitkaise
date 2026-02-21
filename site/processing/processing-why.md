@@ -124,8 +124,8 @@ def process_data(items):
     return results
 
     
-with <suitkaise-api>Pool(</suitkaise-api>4) as pool:
-    return <suitkaise-api>pool.map(</suitkaise-api>transform, lists_of_items)
+with <not-api>Pool</not-api>(4) as pool:
+    return pool.map(transform, lists_of_items)
 ```
 
 This looks like it should work. But it doesn't, because you put a locally-defined function in the pool.
@@ -149,7 +149,7 @@ Figuring out what works and what doesn't is a nightmare.
 
 However: Python's `multiprocessing` doesn't use them by default.
 
-The standard library's `multiprocessing.Pool` is hardcoded to use `pickle`. To use `cloudpickle` or `dill`, you have to:
+The standard library's `multiprocessing.<not-api>Pool</not-api>` is hardcoded to use `pickle`. To use `cloudpickle` or `dill`, you have to:
 
 ```python
 # option 1: monkey-patch the serializer (risky, affects entire process)
@@ -167,8 +167,8 @@ multiprocessing.reduction.ForkingPickler.loads = cloudpickle.loads
 # pip install multiprocess
 import multiprocess as mp 
 
-with mp.Pool(4) as pool:
-    results = <suitkaise-api>pool.map(</suitkaise-api>my_function, items)
+with mp.<not-api>Pool</not-api>(4) as pool:
+    results = pool.map(my_function, items)
 
 # dill is slow
 # 2 libraries to keep track of
@@ -216,10 +216,10 @@ By default, `<suitkaise-api>processing</suitkaise-api>` uses `<suitkaise-api>cuc
 
 With `multiprocessing`:
 ```python
-from multiprocessing import Pool as MPPool
+from multiprocessing import <not-api>Pool</not-api> as MPPool
 
 with MPPool(4) as pool:
-    results = <suitkaise-api>pool.map(</suitkaise-api>my_function, items)
+    results = pool.map(my_function, items)
     # PicklingError if my_function uses closures, lambdas, or local classes
 ```
 
@@ -302,14 +302,14 @@ class ProcessData(multiprocessing.Process):
         self.result_queue = result_queue  # need a Queue to communicate
         super().__init__()
     
-    def <suitkaise-api>run</suitkaise-api>(self):
+    def run(self):
         # do work
         result = process_items(self.items)
-        self.result_queue.put(<suitkaise-api>result</suitkaise-api>)  # send back via queue
+        self.result_queue.put(result)  # send back via queue
 
 queue = multiprocessing.Queue()
 process = ProcessData(items, queue)
-<suitkaise-api>process.start()</suitkaise-api>
+process.start()
 process.join()
 result = queue.get()  # retrieve from queue, not process.result
 ```
@@ -853,7 +853,7 @@ But if you still need speed, or want more manual control, use `<suitkaise-api>Pi
 
 Throughout this page, you might have seen something called `<suitkaise-api>Pool</suitkaise-api>`.
 
-`<suitkaise-api>Pool</suitkaise-api>` is an upgraded wrapper around `multiprocessing.Pool` used for parallel batch processing.
+`<suitkaise-api>Pool</suitkaise-api>` is an upgraded wrapper around `multiprocessing.<not-api>Pool</not-api>` used for parallel batch processing.
 
 What this enables:
 - Process pools support `<suitkaise-api>Share</suitkaise-api>`
@@ -861,7 +861,7 @@ What this enables:
 - Process pools using `<suitkaise-api>Skprocess</suitkaise-api>` class objects
 - Process pools get access to `<suitkaise-api>sk</suitkaise-api>` modifiers
 
-So, already, `<suitkaise-api>Pool</suitkaise-api>` is vastly more powerful than `multiprocessing.Pool`. especially because you can use `<suitkaise-api>Share</suitkaise-api>`.
+So, already, `<suitkaise-api>Pool</suitkaise-api>` is vastly more powerful than `multiprocessing.<not-api>Pool</not-api>`. especially because you can use `<suitkaise-api>Share</suitkaise-api>`.
 
 ### `<suitkaise-api>Pool</suitkaise-api>` is better, but still familiar to users
 

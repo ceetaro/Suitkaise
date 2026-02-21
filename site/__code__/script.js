@@ -357,7 +357,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let apiHighlightEnabled = true;
     const API_FLICKER_BASE_CHANCE = 0.03;
     const SKAPI_PLACEHOLDER_PATTERN = /__SKAPI_(?:TOKEN|AUTO)_(\d+)__/g;
+    const NOT_API_PLACEHOLDER_PATTERN = /__NOT_API_(\d+)__/g;
     const skapiManualTokenMap = new Map();
+    const notApiTokenMap = new Map();
     function isWithoutComparisonContext(node) {
         const details = node?.closest?.('details');
         if (!details) return false;
@@ -397,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ]));
 
     function autoTagKnownAPIInCode() {
-        const scope = document.querySelector('.module-page, .about-page, .why-page');
+        const scope = document.querySelector('.module-page, .about-page, .why-page, .home-page');
         if (!scope) return;
 
         const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -413,6 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
         codeEls.forEach((codeEl) => {
             if (codeEl.classList.contains('language-text')) return;
             if (codeEl.closest('suitkaise-api')) return;
+            if (codeEl.closest('not-api')) return;
             if (isWithoutComparisonContext(codeEl)) return;
 
             const walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null, false);
@@ -422,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parent = node.parentElement;
                 if (!parent) continue;
                 if (parent.closest('suitkaise-api')) continue;
+                if (parent.closest('not-api')) continue;
                 if (!node.textContent || !node.textContent.trim()) continue;
                 textNodes.push(node);
             }
@@ -436,6 +440,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 let lastIndex = 0;
                 let match;
                 while ((match = tokenRegex.exec(text)) !== null) {
+                    if (match.index > 0 && text[match.index - 1] === '.') {
+                        const before = text.slice(0, match.index - 1);
+                        const prevWord = before.match(/(\w+)$/);
+                        if (prevWord && !KNOWN_SKAPI_TOKENS.includes(prevWord[1])) {
+                            continue;
+                        }
+                    }
                     if (match.index > lastIndex) {
                         frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
                     }
@@ -461,6 +472,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const genericInternalMethodTokens = new Set([
             'start', 'stop', 'pause', 'resume', 'lap', 'discard'
         ]);
+
+        notApiTokenMap.clear();
+        let notApiIndex = 0;
+        const notApiTags = document.querySelectorAll('not-api');
+        notApiTags.forEach((tag) => {
+            const text = tag.textContent || '';
+            const placeholder = `__NOT_API_${notApiIndex++}__`;
+            notApiTokenMap.set(placeholder, text);
+            tag.replaceWith(document.createTextNode(placeholder));
+        });
 
         const manualTags = document.querySelectorAll('suitkaise-api');
         manualTags.forEach((tag) => {
@@ -529,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function triggerAPIFlickerOnActivate() {
-        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page, .home-page');
         if (!modulePage || !modulePage.classList.contains('highlight-active')) return;
 
         const apiTokens = Array.from(modulePage.querySelectorAll('.api-highlight'));
@@ -565,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Update module page content
-        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page, .home-page');
         if (modulePage) {
             if (apiHighlightEnabled) {
                 modulePage.classList.add('highlight-active');
@@ -593,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Set initial state on module page
-        const modulePage = document.querySelector('.module-page, .about-page, .why-page');
+        const modulePage = document.querySelector('.module-page, .about-page, .why-page, .home-page');
         if (modulePage && apiHighlightEnabled) {
             modulePage.classList.add('highlight-active');
         }
@@ -681,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         // Find all code elements (inline + block). Inline code needs API highlighting too.
-        const codeBlocks = document.querySelectorAll('.module-page code, .about-page code, .why-page code');
+        const codeBlocks = document.querySelectorAll('.module-page code, .about-page code, .why-page code, .home-page code');
         
         codeBlocks.forEach(codeBlock => {
             // Plain text blocks (tracebacks, logs, ASCII diagrams) should not get API highlight.
@@ -698,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // - data-skapi-roots="token1,token2"  -> allow anyRoot.token.chain highlighting
             // Attributes can be set on <code>, enclosing <pre>, or page <section>.
             const preEl = codeBlock.closest('pre');
-            const pageSection = codeBlock.closest('.module-page, .about-page, .why-page');
+            const pageSection = codeBlock.closest('.module-page, .about-page, .why-page, .home-page');
             const readSkapiSet = (attrName) => {
                 const raw =
                     codeBlock.getAttribute(attrName) ||
@@ -737,6 +758,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Restore them so patterns like `share = Share(` match correctly.
             let textContent = codeBlock.textContent;
             for (const [placeholder, original] of skapiManualTokenMap) {
+                while (textContent.includes(placeholder)) {
+                    textContent = textContent.replace(placeholder, original);
+                }
+            }
+            for (const [placeholder, original] of notApiTokenMap) {
                 while (textContent.includes(placeholder)) {
                     textContent = textContent.replace(placeholder, original);
                 }
@@ -917,7 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     parent = parent.parentElement;
                 }
-                const hasPlaceholder = node.textContent && (node.textContent.includes('__SKAPI_TOKEN_') || node.textContent.includes('__SKAPI_AUTO_'));
+                const hasPlaceholder = node.textContent && (node.textContent.includes('__SKAPI_TOKEN_') || node.textContent.includes('__SKAPI_AUTO_') || node.textContent.includes('__NOT_API_'));
                 if (((!isCommentOrString && node.textContent.trim()) || hasPlaceholder)) {
                     nodesToProcess.push(node);
                 }
@@ -1707,11 +1733,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
+
+            // Final: restore NOT_API placeholders to plain text.
+            if (notApiTokenMap.size > 0) {
+                const finalWalker = document.createTreeWalker(codeBlock, NodeFilter.SHOW_TEXT, null, false);
+                const finalNodes = [];
+                let fn;
+                while (fn = finalWalker.nextNode()) {
+                    if (fn.textContent && fn.textContent.includes('__NOT_API_')) {
+                        finalNodes.push(fn);
+                    }
+                }
+                finalNodes.forEach(textNode => {
+                    NOT_API_PLACEHOLDER_PATTERN.lastIndex = 0;
+                    textNode.textContent = textNode.textContent.replace(NOT_API_PLACEHOLDER_PATTERN, (match) => {
+                        return notApiTokenMap.get(match) || match;
+                    });
+                });
+            }
         });
     }
 
     function tagInlineCodeVariants() {
-        const codeEls = document.querySelectorAll('.module-page code, .about-page code, .why-page code');
+        const codeEls = document.querySelectorAll('.module-page code, .about-page code, .why-page code, .home-page code');
         codeEls.forEach((codeEl) => {
             // Skip fenced/code-block content; inline rules only.
             if (codeEl.closest('pre')) return;
@@ -1887,7 +1931,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Core pages that are always inline (small, essential)
     const corePages = {
-        home: document.getElementById('pageContent').innerHTML,
         donate: `
             <section class="page-section">
                 <div class="page-header">
@@ -1924,7 +1967,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Module pages to fetch at startup (stored in pages/ folder)
     const modulePagesList = [
         // Site pages
-        'about',
+        'home', 'about', 'quick-start', 'feedback', 'technical-info',
         // Processing
         'processing', 'processing-quick-start', 'processing-how-it-works', 'processing-examples', 'processing-why', 'processing-learn',
         // Cucumber
@@ -2353,6 +2396,44 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Pages that should hide the nav bar
     const noNavPages = ['password', 'error'];
+    const noFooterPages = ['password', 'error'];
+
+    const footerHTML = `
+        <footer class="site-footer">
+            <div class="footer-social-row">
+                <a href="https://www.instagram.com/__suitkaise__?igsh=NTc4MTIwNjQ2YQ%3D%3D&utm_source=qr" target="_blank" rel="noopener" class="social-link" title="Instagram">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="Discord (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="YouTube (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19.13C5.12 19.56 12 19.56 12 19.56s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.43z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="Reddit (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="Twitter / X (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="TikTok (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15.2a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.73a8.19 8.19 0 0 0 4.76 1.52V6.69h-1z"/></svg>
+                </a>
+                <a href="#" class="social-link disabled" title="GitHub (coming soon)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                </a>
+                <button class="social-link copy-email-btn" title="Copy email address" data-email="suitkaise@suitkaise.info">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </button>
+            </div>
+            <div class="footer-feedback-row">
+                <a href="#feedback" class="nav-link footer-feedback-link" data-page="feedback">Feedback &amp; Suggestions</a>
+            </div>
+            <div class="footer-copyright">
+                <p>&copy; 2025-2026 Casey Eddings &middot; Apache License 2.0</p>
+            </div>
+        </footer>
+    `;
     
     // Module names for scroll position memory
     const moduleNames = ['sk', 'paths', 'timing', 'circuits', 'cucumber', 'processing'];
@@ -2382,6 +2463,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
+    // WPO showcase state (declared early so navigateTo can call cleanupWPO)
+    var wpoTimers = [];
+    var wpoSnowRAF = null;
+    var wpoCountRAF = null;
+    var wpoPowerupRAF = null;
+    var wpoOutroHandler = null;
+
+    function cleanupWPO() {
+        wpoTimers.forEach(clearTimeout);
+        wpoTimers = [];
+        if (wpoSnowRAF) { cancelAnimationFrame(wpoSnowRAF); wpoSnowRAF = null; }
+        if (wpoCountRAF) { cancelAnimationFrame(wpoCountRAF); wpoCountRAF = null; }
+        if (wpoPowerupRAF) { cancelAnimationFrame(wpoPowerupRAF); wpoPowerupRAF = null; }
+    }
+
     async function navigateTo(pageName, force = false) {
         if (!force && pageName === currentPage) return;
         
@@ -2389,6 +2485,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentPage) {
             saveScrollPosition(currentPage, window.scrollY);
         }
+
+        cleanupWPO();
         
         // Check if page content is already available
         const isReady = isPageReady(pageName);
@@ -2408,6 +2506,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update content
             pageContent.innerHTML = content;
             currentPage = pageName;
+
+            // Normalize asset paths for dynamically loaded images
+            pageContent.querySelectorAll('img[src*="__assets__/"]').forEach((img) => {
+                const fileName = (img.getAttribute('src') || '').split('/').pop();
+                if (fileName) img.src = assetPath(fileName);
+            });
+            
+            // Inject footer on non-excluded pages
+            if (!noFooterPages.includes(pageName)) {
+                pageContent.insertAdjacentHTML('beforeend', footerHTML);
+            }
             
             // Show/hide nav bar based on page
             if (noNavPages.includes(pageName)) {
@@ -2442,7 +2551,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (pageName === 'password') {
             setupPasswordPage();
         } else if (pageName === 'home') {
+            await loadShowcases();
+            setupShowcaseCarousel();
             setupFadeInAnimations();
+            setupWPOShowcase();
+            pulseQuickStart();
         }
 
         // If summary title already labels the dropdown, remove duplicated first heading.
@@ -2541,14 +2654,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle nav link clicks
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
+    // Handle nav link clicks (event delegation for dynamic content like footer)
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('.nav-link');
+        if (link && link.dataset.page) {
             e.preventDefault();
-            const pageName = link.dataset.page;
-            navigateTo(pageName);
-        });
+            navigateTo(link.dataset.page);
+        }
+
+        const copyBtn = e.target.closest('.copy-email-btn');
+        if (copyBtn) {
+            e.preventDefault();
+            const email = copyBtn.dataset.email;
+            navigator.clipboard.writeText(email).then(() => {
+                const toast = document.createElement('div');
+                toast.className = 'copy-toast';
+                toast.textContent = 'Email copied';
+                document.body.appendChild(toast);
+                requestAnimationFrame(() => toast.classList.add('show'));
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+                }, 1800);
+            });
+        }
     });
 
     // Handle browser back/forward
@@ -2571,16 +2700,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Check URL hash on initial load and navigate to that page
     (async function handleInitialHash() {
-        const initialHash = window.location.hash.slice(1);
-        
-        if (initialHash && pageExists(initialHash)) {
-            // Force navigate to the page specified in the URL hash
-            currentPage = ''; // Reset so navigateTo doesn't skip
-            await navigateTo(initialHash, true);
-        } else {
-            // On home page, setup fade-in animations
-            setupFadeInAnimations();
-        }
+        const initialHash = window.location.hash.slice(1) || 'home';
+        currentPage = '';
+        await navigateTo(initialHash, true);
     })();
     
     // ============================================
@@ -2907,36 +3029,938 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fade-in Animation on Scroll
     // ============================================
     
+    // ============================================
+    // WPO Showcase (Cucumber Boss Battle)
+    // ============================================
+
+    function setupWPOShowcase() {
+        const showcase = document.getElementById('wpoShowcase');
+        if (!showcase) return;
+
+        const stage       = document.getElementById('wpoStage');
+        const overlay     = document.getElementById('wpoOverlay');
+        const intro       = document.getElementById('wpoIntro');
+        const intro2      = document.getElementById('wpoIntro2');
+        const intro3      = document.getElementById('wpoIntro3');
+        const blackScreen = document.getElementById('wpoBlackScreen');
+        const title       = document.getElementById('wpoTitle');
+        const zoomWrap    = document.getElementById('wpoZoomWrap');
+        const monster     = document.getElementById('wpoMonster');
+        const subtitle    = document.getElementById('wpoSubtitle');
+        const phrases     = document.getElementById('wpoPhrases');
+        const codeScroll  = document.getElementById('wpoCodeScroll');
+        const challenge   = document.getElementById('wpoChallenge');
+        const chal0       = document.getElementById('wpoChal0');
+        const chal1       = document.getElementById('wpoChal1');
+        const chal2       = document.getElementById('wpoChal2');
+        const chal3       = document.getElementById('wpoChal3');
+        const chal4       = document.getElementById('wpoChal4');
+        const chal5       = document.getElementById('wpoChal5');
+        const codeType    = document.getElementById('wpoCodeType');
+        const codeTypeTxt = document.getElementById('wpoCodeTypeText');
+        const suitcase    = document.getElementById('wpoSuitcase');
+        const suitcaseImg = document.getElementById('wpoSuitcaseImg');
+        const ssj         = document.getElementById('wpoSSJ');
+        const powerupCanvas = document.getElementById('wpoPowerupCanvas');
+        const battle      = document.getElementById('wpoBattle');
+        const video       = document.getElementById('wpoVideo');
+        const snow        = document.getElementById('wpoSnow');
+        const stageSnow   = document.getElementById('wpoStageSnow');
+        const countContainer = document.getElementById('wpoCountContainer');
+        const result      = document.getElementById('wpoResult');
+        const resultLine2 = document.getElementById('wpoResultLine2');
+        const replayBtn   = document.getElementById('wpoReplay');
+
+        if (!monster || !video) return;
+
+        var videoSource = video.querySelector('source');
+        if (videoSource) {
+            var vf = (videoSource.getAttribute('src') || '').split('/').pop();
+            if (vf) { videoSource.src = assetPath(vf); video.load(); }
+        }
+
+        function reset() {
+            cleanupWPO();
+            overlay.className = 'wpo-stage-overlay';
+            overlay.style.opacity = '';
+            blackScreen.className = 'wpo-black-screen';
+            blackScreen.style.display = '';
+            intro.classList.remove('visible');
+            if (intro2) intro2.classList.remove('visible');
+            if (intro3) intro3.classList.remove('visible');
+            title.classList.remove('visible');
+            monster.classList.remove('visible', 'faded', 'very-dim', 'powering-up', 'brightening', 'full');
+            zoomWrap.classList.remove('zoomed-out', 'zoomed-character');
+            zoomWrap.style.transformOrigin = '';
+            zoomWrap.style.transform = '';
+            subtitle.classList.remove('visible');
+            if (phrases) phrases.querySelectorAll('.wpo-phrase').forEach(function(p) { p.classList.remove('pop'); });
+            if (codeScroll) codeScroll.classList.remove('active');
+            var absorbEl = document.getElementById('wpoAbsorbContainer');
+            if (absorbEl) absorbEl.remove();
+            challenge.classList.remove('active');
+            [chal0, chal1, chal2, chal3, chal4, chal5].forEach(function(c) { if (c) c.classList.remove('shown'); });
+            codeType.classList.remove('active', 'fading');
+            codeTypeTxt.innerHTML = '';
+            codeTypeTxt.classList.remove('done');
+            suitcase.classList.remove('active');
+            suitcaseImg.src = '../__assets__/briefcase-laptop-closed.png';
+            suitcaseImg.classList.remove('lowered');
+            suitcaseImg.style.opacity = '';
+            ssj.classList.remove('active', 'intensifying');
+            battle.classList.remove('active', 'split');
+            battle.style.opacity = '';
+            if (wpoOutroHandler) {
+                video.removeEventListener('ended', wpoOutroHandler);
+                wpoOutroHandler = null;
+            }
+            video.pause();
+            video.currentTime = 0;
+            video.style.opacity = '';
+            countContainer.innerHTML = '';
+            stage.style.display = '';
+            stage.style.opacity = '';
+            stage.style.transition = '';
+            stage.style.position = '';
+            stage.style.top = '';
+            stage.style.left = '';
+            stage.style.width = '';
+            stage.style.height = '';
+            stage.style.zIndex = '';
+            battle.style.transition = '';
+            var ctx = snow.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, snow.width, snow.height);
+            var stgCtx = stageSnow.getContext('2d');
+            if (stgCtx) stgCtx.clearRect(0, 0, stageSnow.width, stageSnow.height);
+            stageSnow.style.opacity = '';
+            stageSnow.style.transition = '';
+            stopPowerup();
+            result.classList.remove('active');
+            result.style.display = '';
+            var resultNum = document.getElementById('wpoResultNum');
+            if (resultNum) resultNum.textContent = '';
+            var prePart = document.getElementById('wpoResultPre');
+            var postPart = document.getElementById('wpoResultPost');
+            if (prePart) prePart.classList.remove('visible');
+            if (postPart) postPart.classList.remove('visible');
+            if (resultLine2) resultLine2.classList.remove('visible');
+            replayBtn.classList.remove('visible');
+        }
+
+        function typeCode(segments, cb) {
+            var segIdx = 0, charIdx = 0;
+            var html = '';
+            function next() {
+                if (segIdx >= segments.length) {
+                    codeTypeTxt.classList.add('done');
+                    if (cb) cb();
+                    return;
+                }
+                var seg = segments[segIdx];
+                var ch = seg.text[charIdx];
+                if (seg.api) {
+                    var built = seg.text.substring(0, charIdx + 1);
+                    codeTypeTxt.innerHTML = html + '<span class="wpo-type-api">' + built + '</span>';
+                } else {
+                    html += ch;
+                    codeTypeTxt.innerHTML = html;
+                }
+                charIdx++;
+                if (charIdx >= seg.text.length) {
+                    if (seg.api) html += '<span class="wpo-type-api">' + seg.text + '</span>';
+                    segIdx++;
+                    charIdx = 0;
+                }
+                var delay = ch === '\n' ? 300 : 35;
+                wpoTimers.push(setTimeout(next, delay));
+            }
+            next();
+        }
+
+        function runCount(durationMs, onDone) {
+            var counterEl = document.createElement('span');
+            counterEl.className = 'wpo-count-num';
+            counterEl.textContent = '0';
+            countContainer.appendChild(counterEl);
+
+            var startTime = performance.now();
+            var lastShown = 0;
+
+            function tick(now) {
+                var elapsed = now - startTime;
+                var progress = Math.min(elapsed / durationMs, 1);
+                var num = Math.max(1, Math.ceil(progress * 1000));
+                if (num !== lastShown) {
+                    counterEl.textContent = num >= 1000 ? '1,000' : String(num);
+                    lastShown = num;
+                }
+                if (progress < 1) {
+                    wpoCountRAF = requestAnimationFrame(tick);
+                } else {
+                    if (onDone) onDone();
+                }
+            }
+            wpoCountRAF = requestAnimationFrame(tick);
+        }
+
+        function startPowerup(canvas) {
+            if (wpoPowerupRAF) { cancelAnimationFrame(wpoPowerupRAF); wpoPowerupRAF = null; }
+            var ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            var dpr = window.devicePixelRatio || 1;
+            canvas.width = canvas.offsetWidth * dpr;
+            canvas.height = canvas.offsetHeight * dpr;
+            ctx.scale(dpr, dpr);
+            var w = canvas.offsetWidth;
+            var h = canvas.offsetHeight;
+            var startTime = performance.now();
+            var cx = w * 0.5;
+            var baseY = h * 0.92;
+
+            var particles = [];
+            for (var i = 0; i < 200; i++) {
+                particles.push({
+                    x: cx + (Math.random() - 0.5) * w * 0.12,
+                    y: baseY + Math.random() * 20,
+                    vx: (Math.random() - 0.5) * 0.6,
+                    vy: -(Math.random() * 1.5 + 0.3),
+                    r: Math.random() * 2.5 + 0.5,
+                    life: 0,
+                    maxLife: 3000 + Math.random() * 4000,
+                    delay: Math.random() * 8000,
+                    hue: 140 + Math.random() * 30
+                });
+            }
+
+            var sparks = [];
+            for (var j = 0; j < 40; j++) {
+                var angle = Math.random() * Math.PI * 0.8 + Math.PI * 0.1;
+                sparks.push({
+                    x: cx, y: baseY,
+                    vx: Math.cos(angle) * (Math.random() * 2 + 0.8) * (Math.random() < 0.5 ? 1 : -1),
+                    vy: -Math.sin(angle) * (Math.random() * 2.5 + 1),
+                    r: Math.random() * 1.8 + 0.4,
+                    life: 0,
+                    maxLife: 1500 + Math.random() * 2000,
+                    delay: 2000 + Math.random() * 8000,
+                    hue: 130 + Math.random() * 40
+                });
+            }
+
+            function draw(now) {
+                var elapsed = now - startTime;
+                var intensity = Math.min(elapsed / 10000, 1);
+                ctx.clearRect(0, 0, w, h);
+
+                var glowR = w * 0.08 + intensity * w * 0.06;
+                var glowAlpha = 0.1 + intensity * 0.2;
+                var grd = ctx.createRadialGradient(cx, baseY, 0, cx, baseY, glowR);
+                grd.addColorStop(0, 'rgba(109, 233, 149, ' + glowAlpha + ')');
+                grd.addColorStop(0.5, 'rgba(109, 233, 149, ' + (glowAlpha * 0.3) + ')');
+                grd.addColorStop(1, 'transparent');
+                ctx.fillStyle = grd;
+                ctx.fillRect(cx - glowR, baseY - glowR, glowR * 2, glowR * 2);
+
+                for (var p = 0; p < particles.length; p++) {
+                    var pt = particles[p];
+                    if (elapsed < pt.delay) continue;
+                    var age = elapsed - pt.delay;
+                    if (age > pt.maxLife) {
+                        pt.x = cx + (Math.random() - 0.5) * w * (0.12 + intensity * 0.08);
+                        pt.y = baseY + Math.random() * 20;
+                        pt.vx = (Math.random() - 0.5) * (0.6 + intensity * 0.4);
+                        pt.vy = -(Math.random() * (1.5 + intensity * 1.5) + 0.3);
+                        pt.delay = elapsed;
+                        pt.maxLife = 2500 + Math.random() * 3000;
+                        continue;
+                    }
+                    var prog = age / pt.maxLife;
+                    var px = pt.x + pt.vx * age * 0.02 + Math.sin(age * 0.003 + p) * 3;
+                    var py = pt.y + pt.vy * age * 0.025;
+                    var alpha = prog < 0.15 ? prog / 0.15 : (1 - prog) * 0.9;
+                    alpha *= (0.4 + intensity * 0.6);
+                    ctx.beginPath();
+                    ctx.arc(px, py, pt.r * (0.8 + intensity * 0.5), 0, Math.PI * 2);
+                    ctx.fillStyle = 'hsla(' + pt.hue + ', 80%, 65%, ' + alpha + ')';
+                    ctx.fill();
+                }
+
+                for (var s = 0; s < sparks.length; s++) {
+                    var sp = sparks[s];
+                    if (elapsed < sp.delay) continue;
+                    var sAge = elapsed - sp.delay;
+                    if (sAge > sp.maxLife) {
+                        var sAngle = Math.random() * Math.PI * 0.8 + Math.PI * 0.1;
+                        sp.x = cx + (Math.random() - 0.5) * w * 0.06;
+                        sp.y = baseY;
+                        sp.vx = Math.cos(sAngle) * (Math.random() * 2 + 0.8) * (Math.random() < 0.5 ? 1 : -1);
+                        sp.vy = -Math.sin(sAngle) * (Math.random() * (2.5 + intensity * 2) + 1);
+                        sp.delay = elapsed;
+                        sp.maxLife = 1200 + Math.random() * 1500;
+                        continue;
+                    }
+                    var sProg = sAge / sp.maxLife;
+                    var sx = sp.x + sp.vx * sAge * 0.04;
+                    var sy = sp.y + sp.vy * sAge * 0.04 + 0.001 * sAge;
+                    var sAlpha = (1 - sProg) * (0.5 + intensity * 0.5);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sp.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'hsla(' + sp.hue + ', 90%, 75%, ' + sAlpha + ')';
+                    ctx.fill();
+                    if (sProg < 0.5) {
+                        ctx.beginPath();
+                        ctx.moveTo(sx, sy);
+                        ctx.lineTo(sx - sp.vx * 4, sy - sp.vy * 4);
+                        ctx.strokeStyle = 'hsla(' + sp.hue + ', 80%, 65%, ' + (sAlpha * 0.3) + ')';
+                        ctx.lineWidth = sp.r * 0.6;
+                        ctx.stroke();
+                    }
+                }
+
+                wpoPowerupRAF = requestAnimationFrame(draw);
+            }
+            wpoPowerupRAF = requestAnimationFrame(draw);
+        }
+
+        function stopPowerup(fadeMs) {
+            if (!fadeMs) {
+                if (wpoPowerupRAF) { cancelAnimationFrame(wpoPowerupRAF); wpoPowerupRAF = null; }
+                if (powerupCanvas) {
+                    var ctx = powerupCanvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, powerupCanvas.width, powerupCanvas.height);
+                    powerupCanvas.style.opacity = '';
+                    powerupCanvas.style.transition = '';
+                }
+                return;
+            }
+            if (powerupCanvas) {
+                powerupCanvas.style.transition = 'opacity ' + fadeMs + 'ms ease-out';
+                powerupCanvas.style.opacity = '0';
+            }
+            wpoTimers.push(setTimeout(function() {
+                if (wpoPowerupRAF) { cancelAnimationFrame(wpoPowerupRAF); wpoPowerupRAF = null; }
+                if (powerupCanvas) {
+                    var ctx = powerupCanvas.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, powerupCanvas.width, powerupCanvas.height);
+                    powerupCanvas.style.opacity = '';
+                    powerupCanvas.style.transition = '';
+                }
+            }, fadeMs + 100));
+        }
+
+        function startBattle() {
+            // Stage becomes the left panel — same image, no duplicate
+            stage.style.position = 'absolute';
+            stage.style.top = '0';
+            stage.style.left = '0';
+            stage.style.width = '100%';
+            stage.style.height = '75vh';
+            stage.style.zIndex = '5';
+
+            // Show the battle container (for the right panel only)
+            battle.classList.add('active');
+
+            // Animate both in the same frame — stage shrinks left, video expands right
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    stage.style.transition = 'width 2.5s cubic-bezier(0.25, 0.1, 0.25, 1)';
+                    stage.style.width = '50%';
+                    battle.classList.add('split');
+                });
+            });
+
+            // Start video immediately
+            video.play();
+            video.style.opacity = '0.9';
+
+            // Count 1-1000 (starts 1.5s into video)
+            wpoTimers.push(setTimeout(function() {
+                runCount(26000, function() {});
+            }, 1500));
+
+            // After video finishes, fade everything out and show result
+            wpoOutroHandler = function beginOutro() {
+                stage.style.transition = 'opacity 2s ease';
+                stage.style.opacity = '0';
+                battle.style.transition = 'opacity 2s ease';
+                battle.style.opacity = '0';
+
+                wpoTimers.push(setTimeout(function() {
+                    stage.style.display = 'none';
+                    stage.style.position = '';
+                    stage.style.top = '';
+                    stage.style.left = '';
+                    stage.style.width = '';
+                    stage.style.height = '';
+                    stage.style.zIndex = '';
+                    stage.style.overflow = '';
+                    stage.style.transition = '';
+                    stage.style.opacity = '';
+                    battle.classList.remove('active', 'split');
+                    battle.style.opacity = '';
+                    battle.style.transition = '';
+                    video.pause();
+
+                    // Set the result number text
+                    var resultNum = document.getElementById('wpoResultNum');
+                    if (resultNum) resultNum.textContent = '1,000';
+
+                    // Show result screen
+                    result.classList.add('active');
+
+                    var prePart = document.getElementById('wpoResultPre');
+                    var postPart = document.getElementById('wpoResultPost');
+                    requestAnimationFrame(function() {
+                        if (prePart) prePart.classList.add('visible');
+                        if (postPart) postPart.classList.add('visible');
+                    });
+
+                    wpoTimers.push(setTimeout(function() {
+                        if (resultLine2) resultLine2.classList.add('visible');
+                    }, 2500));
+
+                    wpoTimers.push(setTimeout(function() {
+                        replayBtn.classList.add('visible');
+                    }, 4000));
+                }, 2200));
+            }
+            video.addEventListener('ended', wpoOutroHandler, { once: true });
+        }
+
+        function runAbsorption() {
+            var old = document.getElementById('wpoAbsorbContainer');
+            if (old) old.remove();
+
+            var container = document.createElement('div');
+            container.id = 'wpoAbsorbContainer';
+            container.style.cssText = 'position:absolute;inset:0;z-index:6;overflow:hidden;pointer-events:none;';
+            stage.appendChild(container);
+
+            var w = container.offsetWidth;
+            var h = container.offsetHeight;
+            var tx = w * 0.42;
+            var ty = h * 0.25;
+
+            var types = [
+                'int','float','str','bool','bytes','None',
+                'list','tuple','set','frozenset','dict',
+                'datetime.datetime','datetime.date','datetime.time',
+                'datetime.timedelta','datetime.timezone',
+                'decimal.Decimal','fractions.Fraction','uuid.UUID',
+                'pathlib.Path','pathlib.PurePath','pathlib.PosixPath',
+                'FunctionType','functools.partial','MethodType',
+                'staticmethod','classmethod','type','property',
+                'logging.Logger','logging.StreamHandler',
+                'logging.FileHandler','logging.Formatter',
+                'threading.Lock','threading.RLock','threading.Semaphore',
+                'threading.BoundedSemaphore','threading.Barrier',
+                'threading.Condition','threading.Event','threading.Thread',
+                'io.TextIOBase','io.StringIO','io.BytesIO','io.FileIO',
+                'tempfile.NamedTemporaryFile',
+                'queue.Queue','multiprocessing.Queue',
+                'multiprocessing.Event','multiprocessing.SharedMemory',
+                're.Pattern','re.Match',
+                'sqlite3.Connection','sqlite3.Cursor',
+                'contextvars.ContextVar','contextvars.Token',
+                'requests.Session','socket.socket',
+                'psycopg2.Connection','pymysql.Connection',
+                'pymongo.MongoClient','redis.Redis',
+                'sqlalchemy.Engine','cassandra.Cluster',
+                'elasticsearch.Elasticsearch','neo4j.Driver',
+                'influxdb_client.InfluxDBClient','pyodbc.Connection',
+                'clickhouse_driver.Client','duckdb.Connection',
+                'snowflake.Connection','oracledb.Connection',
+                'Iterator','range','enumerate','zip',
+                'mmap.mmap','memoryview',
+                'ThreadPoolExecutor','ProcessPoolExecutor',
+                'threading.local','types.CodeType','types.FrameType',
+                'GeneratorType','CoroutineType','AsyncGeneratorType',
+                'weakref.ref','WeakValueDictionary','WeakKeyDictionary',
+                'enum.Enum','enum.EnumMeta',
+                'subprocess.Popen','subprocess.CompletedProcess',
+                'asyncio.Task','asyncio.Future',
+                'types.ModuleType','collections.namedtuple',
+                'typing.NamedTuple','typing.TypedDict'
+            ];
+
+            for (var s = types.length - 1; s > 0; s--) {
+                var r = Math.floor(Math.random() * (s + 1));
+                var tmp = types[s]; types[s] = types[r]; types[r] = tmp;
+            }
+
+            var numTypes = types.length;
+            var stagger = Math.floor(5500 / numTypes);
+            var occupied = [];
+            var charW = 9;
+            var lineH = 22;
+            var pad = 6;
+
+            function overlaps(x, y, tw, th) {
+                for (var o = 0; o < occupied.length; o++) {
+                    var r = occupied[o];
+                    if (x < r.x + r.w + pad && x + tw + pad > r.x &&
+                        y < r.y + r.h + pad && y + th + pad > r.y) return true;
+                }
+                return false;
+            }
+
+            function findSpot(tw, th) {
+                var minX = w * 0.03, maxX = w * 0.95 - tw;
+                var minY = h * 0.03, maxY = h * 0.95 - th;
+                for (var attempt = 0; attempt < 60; attempt++) {
+                    var cx = minX + Math.random() * (maxX - minX);
+                    var cy = minY + Math.random() * (maxY - minY);
+                    if (!overlaps(cx, cy, tw, th)) return { x: cx, y: cy };
+                }
+                return { x: minX + Math.random() * (maxX - minX),
+                         y: minY + Math.random() * (maxY - minY) };
+            }
+
+            for (var i = 0; i < numTypes; i++) {
+                (function(idx) {
+                    var delay = idx * stagger;
+                    wpoTimers.push(setTimeout(function() {
+                        var text = types[idx];
+                        var elW = text.length * charW;
+                        var elH = lineH;
+                        var spot = findSpot(elW, elH);
+                        var ex = spot.x, ey = spot.y;
+
+                        var rect = { x: ex, y: ey, w: elW, h: elH };
+                        occupied.push(rect);
+
+                        var el = document.createElement('span');
+                        el.textContent = text;
+                        el.style.cssText =
+                            'position:absolute;left:' + ex + 'px;top:' + ey + 'px;' +
+                            'font-weight:700;font-size:1.1rem;' +
+                            'color:rgba(109,233,149,0.9);' +
+                            'text-shadow:0 0 15px rgba(109,233,149,0.4);' +
+                            'white-space:nowrap;pointer-events:none;letter-spacing:0.03em;';
+                        container.appendChild(el);
+
+                        wpoTimers.push(setTimeout(function() {
+                            var oi = occupied.indexOf(rect);
+                            if (oi !== -1) occupied.splice(oi, 1);
+
+                            var dx = tx - ex;
+                            var dy = ty - ey;
+                            el.animate([
+                                { transform: 'translate(0,0) scale(1,1)', opacity: 1, offset: 0 },
+                                { transform: 'translate(' + (dx * 0.2) + 'px,' + (dy * 0.2) + 'px) scale(0.8,0.55)', opacity: 0.5, offset: 0.3 },
+                                { transform: 'translate(' + (dx * 0.6) + 'px,' + (dy * 0.6) + 'px) scale(0.4,0.1)', opacity: 0.1, offset: 0.65 },
+                                { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.05,0.01)', opacity: 0, offset: 1 }
+                            ], { duration: 1200, easing: 'ease-in', fill: 'forwards' })
+                            .onfinish = function() { if (el.parentNode) el.remove(); };
+                        }, 1500));
+                    }, delay));
+                })(i);
+            }
+
+            wpoTimers.push(setTimeout(function() {
+                if (container.parentNode) container.remove();
+            }, 9500));
+        }
+
+        function runSequence() {
+            reset();
+            var t = 0;
+
+            // Step 1: Black screen (set by reset — blackScreen is opaque)
+
+            // Step 2: First intro line — then fade out
+            wpoTimers.push(setTimeout(function() {
+                intro.classList.add('visible');
+            }, t += 1500));
+
+            wpoTimers.push(setTimeout(function() {
+                intro.classList.remove('visible');
+            }, t += 3000));
+
+            // Step 3: Second intro line
+            wpoTimers.push(setTimeout(function() {
+                if (intro2) intro2.classList.add('visible');
+            }, t += 1200));
+
+            wpoTimers.push(setTimeout(function() {
+                if (intro2) intro2.classList.remove('visible');
+            }, t += 3000));
+
+            // Step 3b: Third intro line
+            wpoTimers.push(setTimeout(function() {
+                if (intro3) intro3.classList.add('visible');
+            }, t += 1200));
+
+            wpoTimers.push(setTimeout(function() {
+                if (intro3) intro3.classList.remove('visible');
+            }, t += 3000));
+
+            // Step 4: Fade in monster and zoom out simultaneously
+            wpoTimers.push(setTimeout(function() {
+                monster.classList.add('visible');
+                blackScreen.classList.add('hidden');
+                zoomWrap.classList.add('zoomed-out');
+            }, t += 600));
+
+            // Step 6: Title appears
+            wpoTimers.push(setTimeout(function() {
+                title.classList.add('visible');
+            }, t += 3500));
+
+            wpoTimers.push(setTimeout(function() {
+                subtitle.classList.add('visible');
+            }, t += 1000));
+
+            // Steps 7-9: Code and phrases absorbed by monster (7s)
+            wpoTimers.push(setTimeout(function() {
+                title.classList.remove('visible');
+                subtitle.classList.remove('visible');
+                overlay.classList.add('dim');
+                monster.classList.add('faded');
+                blackScreen.style.display = 'none';
+                runAbsorption();
+            }, t += 2000));
+
+            // Step 10: Fade to black after 7s absorption
+            wpoTimers.push(setTimeout(function() {
+                monster.classList.remove('faded');
+                monster.classList.add('very-dim');
+                overlay.classList.remove('dim');
+                overlay.classList.add('very-dark');
+            }, t += 7500));
+
+            // "All of those types added to one single object."
+            wpoTimers.push(setTimeout(function() {
+                challenge.classList.add('active');
+                chal0.classList.add('shown');
+            }, t += 2000));
+
+            wpoTimers.push(setTimeout(function() {
+                challenge.classList.remove('active');
+                chal0.classList.remove('shown');
+            }, t += 3500));
+
+            // Steps 11-13: "X can't handle it"
+            wpoTimers.push(setTimeout(function() {
+                challenge.classList.add('active');
+                wpoTimers.push(setTimeout(function() { chal1.classList.add('shown'); }, 400));
+                wpoTimers.push(setTimeout(function() { chal2.classList.add('shown'); }, 2000));
+                wpoTimers.push(setTimeout(function() { chal3.classList.add('shown'); }, 3600));
+
+                // Step 14: Fade out "can't handle it" text to black
+                wpoTimers.push(setTimeout(function() {
+                    challenge.classList.remove('active');
+                    [chal1, chal2, chal3].forEach(function(c) { if (c) c.classList.remove('shown'); });
+                }, 9200));
+
+                // Step 15: Fade in "But with cucumber?" on black screen
+                wpoTimers.push(setTimeout(function() {
+                    challenge.classList.add('active');
+                    chal4.classList.add('shown');
+                }, 10400));
+
+                // Fade out cucumber line
+                wpoTimers.push(setTimeout(function() {
+                    challenge.classList.remove('active');
+                    chal4.classList.remove('shown');
+                }, 13400));
+            }, t += 2000));
+
+            // Step 16: Suitcase opens in center, then moves down
+            wpoTimers.push(setTimeout(function() {
+                [chal0, chal1, chal2, chal3, chal4, chal5].forEach(function(c) { if (c) c.classList.remove('shown'); });
+
+                suitcase.classList.add('active');
+                wpoTimers.push(setTimeout(function() {
+                    suitcaseImg.src = '../__assets__/briefcase-laptop-half-open.png';
+                }, 200));
+                wpoTimers.push(setTimeout(function() {
+                    suitcaseImg.src = '../__assets__/briefcase-laptop-fully-open.png';
+                }, 400));
+                wpoTimers.push(setTimeout(function() {
+                    suitcaseImg.classList.add('lowered');
+                }, 800));
+            }, t += 14000));
+
+            // Step 17: Typing animation on black screen
+            wpoTimers.push(setTimeout(function() {
+                codeType.classList.add('active');
+                typeCode([
+                    {text: 'from suitkaise import '},
+                    {text: 'cucumber', api: true},
+                    {text: '\n\n'},
+                    {text: 'cucumber', api: true},
+                    {text: '.serialize(WorstPossibleObject)'}
+                ], function() {
+                    // Step 18: Typing done — hold so it's readable
+                    wpoTimers.push(setTimeout(function() {
+                        codeType.classList.add('fading');
+                        suitcase.classList.remove('active');
+                    }, 2500));
+
+                    wpoTimers.push(setTimeout(function() {
+                        codeType.classList.remove('active', 'fading');
+                        suitcaseImg.classList.remove('lowered');
+                    }, 4000));
+
+                    // Step 19-20: After black pause, character-focused gradient + canvas powerup
+                    wpoTimers.push(setTimeout(function() {
+                        overlay.classList.remove('very-dark');
+                        overlay.classList.add('character-focus');
+                        monster.classList.remove('very-dim');
+                        monster.classList.add('powering-up');
+
+                        powerupCanvas.style.opacity = '0';
+                        powerupCanvas.style.transition = 'none';
+                        startPowerup(powerupCanvas);
+                        requestAnimationFrame(function() {
+                            requestAnimationFrame(function() {
+                                powerupCanvas.style.transition = 'opacity 3s ease-in';
+                                powerupCanvas.style.opacity = '1';
+                            });
+                        });
+
+                        // Intensify
+                        wpoTimers.push(setTimeout(function() {
+                            monster.classList.remove('powering-up');
+                            monster.classList.add('brightening');
+                        }, 4000));
+
+                        // Step 21: Full power — fade out focus gradient smoothly
+                        wpoTimers.push(setTimeout(function() {
+                            monster.classList.remove('brightening');
+                            monster.classList.add('full');
+                            overlay.classList.add('widening');
+                        }, 7000));
+
+                        wpoTimers.push(setTimeout(function() {
+                            stopPowerup(2000);
+                        }, 9000));
+
+                        wpoTimers.push(setTimeout(function() {
+                            overlay.classList.remove('character-focus', 'widening');
+                            overlay.classList.add('clear');
+                        }, 11000));
+
+                        // "Let the battle begin."
+                        wpoTimers.push(setTimeout(function() {
+                            challenge.classList.add('active');
+                            chal5.classList.add('shown');
+                        }, 12000));
+
+                        wpoTimers.push(setTimeout(function() {
+                            challenge.classList.remove('active');
+                            chal5.classList.remove('shown');
+                        }, 16000));
+
+                        // Transition to battle
+                        wpoTimers.push(setTimeout(function() {
+                            startBattle();
+                        }, 17000));
+                    }, 5500));
+                });
+            }, t += 2000));
+        }
+
+        replayBtn.addEventListener('click', runSequence);
+
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    runSequence();
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.3 });
+        observer.observe(showcase);
+    }
+
+    function startBlizzard(canvas) {
+        if (wpoSnowRAF) { cancelAnimationFrame(wpoSnowRAF); wpoSnowRAF = null; }
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        var dpr = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * dpr;
+        canvas.height = canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+        var w = canvas.offsetWidth;
+        var h = canvas.offsetHeight;
+        var startTime = performance.now();
+
+        var gustWind = 0, gustTarget = 0, nextGust = 2000;
+
+        var flakes = [];
+        for (var i = 0; i < 900; i++) {
+            flakes.push({
+                x: Math.random() * (w + 80) - 40,
+                y: Math.random() * h * 2 - h,
+                r: Math.random() * 3.5 + 0.3,
+                speed: Math.random() * 5 + 1.5,
+                drift: Math.random() * 2 - 1,
+                wobble: Math.random() * Math.PI * 2,
+                wobbleSpd: Math.random() * 0.05 + 0.01,
+                opacity: Math.random() * 0.7 + 0.15
+            });
+        }
+
+        var streaks = [];
+        for (var j = 0; j < 140; j++) {
+            streaks.push({
+                x: Math.random() * (w + 200) - 100,
+                y: Math.random() * h * 2 - h,
+                len: Math.random() * 28 + 8,
+                speed: Math.random() * 14 + 6,
+                windMult: Math.random() * 1.6 + 0.6,
+                opacity: Math.random() * 0.16 + 0.04
+            });
+        }
+
+        function draw() {
+            var now = performance.now();
+            var elapsed = (now - startTime) / 1000;
+            var ramp = Math.min(elapsed / 3, 1);
+
+            if (now > nextGust) {
+                gustTarget = (Math.random() * 14 - 3) * ramp;
+                nextGust = now + 1200 + Math.random() * 2500;
+            }
+            gustWind += (gustTarget - gustWind) * 0.025;
+            var wind = (3 + gustWind) * ramp;
+
+            ctx.clearRect(0, 0, w, h);
+
+            if (ramp > 0.5) {
+                ctx.fillStyle = 'rgba(190,205,230,' + ((ramp - 0.5) * 0.1) + ')';
+                ctx.fillRect(0, 0, w, h);
+            }
+
+            for (var i = 0; i < flakes.length; i++) {
+                var f = flakes[i];
+                f.y += f.speed * ramp;
+                f.x += (wind + f.drift + Math.sin(f.wobble) * 0.9) * ramp;
+                f.wobble += f.wobbleSpd;
+                if (f.y > h + 15) { f.y = -15; f.x = Math.random() * w; }
+                if (f.x > w + 40) f.x = -40;
+                if (f.x < -40) f.x = w + 40;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(220,235,255,' + (f.opacity * ramp) + ')';
+                ctx.fill();
+            }
+
+            for (var j = 0; j < streaks.length; j++) {
+                var s = streaks[j];
+                var ss = s.speed * ramp;
+                var sw = wind * s.windMult;
+                s.y += ss;
+                s.x += sw;
+                if (s.y > h + 40) { s.y = -40; s.x = Math.random() * w; }
+                if (s.x > w + 60) s.x = -60;
+                if (s.x < -60) s.x = w + 60;
+                var a = Math.atan2(ss, sw);
+                ctx.beginPath();
+                ctx.moveTo(s.x, s.y);
+                ctx.lineTo(s.x + Math.cos(a) * s.len, s.y + Math.sin(a) * s.len);
+                ctx.strokeStyle = 'rgba(200,218,255,' + (s.opacity * ramp) + ')';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            wpoSnowRAF = requestAnimationFrame(draw);
+        }
+        draw();
+    }
+
+    function pulseQuickStart() {
+        if (sessionStorage.getItem('qs_pulsed')) return;
+        const btn = document.getElementById('navQuickStart');
+        if (!btn) return;
+        sessionStorage.setItem('qs_pulsed', '1');
+        btn.classList.add('pulse');
+        btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
+    }
+
+    async function loadShowcases() {
+        const slides = document.querySelectorAll('.carousel-slide[data-showcase]');
+        const promises = Array.from(slides).map(async (slide) => {
+            const name = slide.dataset.showcase;
+            const contentDiv = slide.querySelector('.slide-content');
+            if (!name || !contentDiv) return;
+            try {
+                const cb = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                const resp = await fetch(`pages/showcases/${name}.html?cb=${cb}`, { cache: 'no-store' });
+                if (resp.ok) {
+                    contentDiv.innerHTML = await resp.text();
+                    contentDiv.querySelectorAll('img[src*="__assets__/"]').forEach((img) => {
+                        const fileName = (img.getAttribute('src') || '').split('/').pop();
+                        if (fileName) img.src = assetPath(fileName);
+                    });
+                }
+            } catch (e) {
+                console.warn(`Failed to load showcase ${name}:`, e);
+            }
+        });
+        await Promise.all(promises);
+    }
+
+    function setupShowcaseCarousel() {
+        const track = document.querySelector('.carousel-track');
+        if (!track) return;
+
+        const slides = Array.from(track.querySelectorAll('.carousel-slide'));
+        const prevBtn = document.querySelector('.carousel-prev');
+        const nextBtn = document.querySelector('.carousel-next');
+        const dotsContainer = document.querySelector('.carousel-dots');
+        if (!slides.length) return;
+
+        let current = 0;
+
+        dotsContainer.innerHTML = '';
+        slides.forEach((_, i) => {
+            const dot = document.createElement('button');
+            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+            dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+            dot.addEventListener('click', () => goTo(i));
+            dotsContainer.appendChild(dot);
+        });
+
+        function goTo(index) {
+            current = Math.max(0, Math.min(index, slides.length - 1));
+            track.style.transform = `translateX(-${current * 100}%)`;
+            prevBtn.disabled = current === 0;
+            nextBtn.disabled = current === slides.length - 1;
+            dotsContainer.querySelectorAll('.carousel-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === current);
+            });
+        }
+
+        prevBtn.addEventListener('click', () => goTo(current - 1));
+        nextBtn.addEventListener('click', () => goTo(current + 1));
+        goTo(0);
+    }
+
     function setupFadeInAnimations() {
-        const fadeElements = document.querySelectorAll('.module-row .module-text, .module-row .module-image');
+        const fadeElements = document.querySelectorAll('.fade-in');
         
         if (fadeElements.length === 0) return;
         
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const element = entry.target;
-                    
-                    // 1/10 chance for flicker effect on images
-                    if (element.classList.contains('module-image') && Math.random() < 0.1) {
-                        element.classList.add('flicker');
-                    } else {
-                        element.classList.add('visible');
-                    }
-                    
-                    // Stop observing once animated
-                    observer.unobserve(element);
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
                 }
             });
         }, {
-            threshold: 0.2, // Trigger when 20% visible
-            rootMargin: '0px 0px -50px 0px' // Slightly before fully in view
+            threshold: 0.15,
+            rootMargin: '0px 0px -40px 0px'
         });
         
         fadeElements.forEach(el => observer.observe(el));
     }
     
     // Run on initial load
+    setupShowcaseCarousel();
     setupFadeInAnimations();
 
     // ============================================

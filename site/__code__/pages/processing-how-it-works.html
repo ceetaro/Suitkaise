@@ -668,11 +668,11 @@ def _drain_result_queue(self):
     def __init__(self, workers=None):
         self._workers = workers or multiprocessing.cpu_count()
         self._active_processes = []
-        self._mp_pool = multiprocessing.Pool(processes=self._workers)</code></pre>
+        self._mp_pool = multiprocessing.<not-api>Pool</not-api>(processes=self._workers)</code></pre>
     <h3>Map Implementation</h3>
     <h4>Two execution paths</h4>
     <ol>
-        <li><strong>Fast path (no timeout)</strong> - Use built-in <code>multiprocessing.Pool.<suitkaise-api>map</suitkaise-api>()</code> for efficiency</li>
+        <li><strong>Fast path (no timeout)</strong> - Use built-in <code>multiprocessing.<not-api>Pool</not-api>.map()</code> for efficiency</li>
         <li><strong>Timeout path</strong> - Manual worker management with individual timeouts</li>
     </ol>
     <h4>Fast path</h4>
@@ -681,7 +681,7 @@ def _drain_result_queue(self):
         <li>Return early if empty</li>
         <li>Serialize the function/Skprocess once (reused for all items)</li>
         <li>Build argument tuples: <code>(serialized_fn, serialized_item, is_star)</code></li>
-        <li>Use <code>multiprocessing.Pool.<suitkaise-api>map</suitkaise-api>()</code> to distribute work</li>
+        <li>Use <code>multiprocessing.<not-api>Pool</not-api>.map()</code> to distribute work</li>
         <li>Deserialize results, raise if any worker returned an error</li>
         <li>Return results in input order</li>
     </ol>
@@ -710,7 +710,7 @@ def _drain_result_queue(self):
     # serialize function once
     serialized_fn = <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(fn_or_process)
     
-    # use built-in multiprocessing.Pool for efficiency when no timeout
+    # use built-in multiprocessing.<not-api>Pool</not-api> for efficiency when no timeout
     if timeout is None and self._mp_pool is not None:
         args = [
             (serialized_fn, <suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>serialize</suitkaise-api>(item), is_star)
@@ -1197,7 +1197,7 @@ def wait_for_read(self, keys, timeout=1.0):
     <h3>Endpoint Structure</h3>
     <h4>What a pipe endpoint does</h4>
     <ol>
-        <li><strong>Holds connection</strong> - <code>_conn</code> is a <code>multiprocessing.Pipe</code> connection object</li>
+        <li><strong>Holds connection</strong> - <code>_conn</code> is a <code>multiprocessing.<not-api>Pipe</not-api></code> connection object</li>
         <li><strong>Tracks lock state</strong> - <code>_locked</code> prevents serialization (transfer to subprocess)</li>
         <li><strong>Tracks role</strong> - <code>&quot;anchor&quot;</code> (parent side) or <code>&quot;point&quot;</code> (transferable side)</li>
     </ol>
@@ -1259,7 +1259,7 @@ class _PipeEndpoint:
     </ol>
     <h4>How <code>pair()</code> works</h4>
     <ol>
-        <li>Create a <code>multiprocessing.Pipe</code> with two connection objects</li>
+        <li>Create a <code>multiprocessing.<not-api>Pipe</not-api></code> with two connection objects</li>
         <li>If <code>one_way=True</code>, ensure anchor is the send-only end and point is the recv-only end</li>
         <li>Wrap one in <code>Anchor</code> (automatically locked)</li>
         <li>Wrap other in <code>Point</code> (unlocked, ready to transfer)</li>
@@ -1278,7 +1278,7 @@ class _PipeEndpoint:
     
     @staticmethod
     def pair(one_way=False):
-        conn1, conn2 = multiprocessing.Pipe(duplex=not one_way)
+        conn1, conn2 = multiprocessing.<not-api>Pipe</not-api>(duplex=not one_way)
         if one_way:
             # conn1 is recv-only, conn2 is send-only
             <suitkaise-api>anchor</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.Anchor(conn2)
@@ -1437,7 +1437,7 @@ class <suitkaise-api>ProcessTimeoutError</suitkaise-api>(<suitkaise-api>ProcessE
     <h3><code><suitkaise-api>Pool</suitkaise-api></code></h3>
     <p><code><suitkaise-api>Pool</suitkaise-api></code> thread safety</p>
     <ul>
-        <li><strong>Built-in pool</strong> - Uses <code>multiprocessing.Pool</code> which handles worker management internally</li>
+        <li><strong>Built-in pool</strong> - Uses <code>multiprocessing.<not-api>Pool</not-api></code> which handles worker management internally</li>
         <li><strong>Manual mode</strong> - For timeout scenarios, tracks workers in <code>_active_processes</code> list</li>
         <li><strong>Result isolation</strong> - Each worker writes to its own result queue</li>
     </ul>
