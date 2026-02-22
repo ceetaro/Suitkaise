@@ -1,6 +1,6 @@
 # Technical Info
 
-Currently, `suitkaise` is version `0.4.8 beta`.
+Currently, `suitkaise` is version `0.4.11 beta`.
 
 `suitkaise` supports Python 3.11 and above.
 
@@ -11,7 +11,7 @@ It has no dependencies outside of the Python standard library.
 
 ### Suitkaise
 
-Making things easier for developers of all skill levels to develop complex Python programs.
+Write Python at hacker-level speeds.
 
 (pronounced exactly like the word suitcase)
 
@@ -34,7 +34,7 @@ pip install suitkaise
 
 Explicitly supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.4.8 beta`.
+Currently, `suitkaise` is version `0.4.11 beta`.
 
 `suitkaise` contains the following modules:
 
@@ -397,7 +397,7 @@ For more, see the full documentation at [suitkaise.info](https://suitkaise.info)
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2025 Casey Eddings
+   Copyright 2025-2026 Casey Eddings
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -623,7 +623,7 @@ Print the current version of `suitkaise`.
 
 ```
 $ suitkaise --version
-0.4.8b0
+0.4.11b0
 ```
 
 ### `suitkaise info`
@@ -632,9 +632,12 @@ Print version, module list, and supported Python versions.
 
 ```
 $ suitkaise info
-Suitkaise 0.4.8b0
-Modules: timing, paths, circuits, cucumber, processing, sk
-Python: 3.11+
+
+  suitkaise 0.4.11 beta
+
+  Website:         https://suitkaise.info
+  Download docs:   suitkaise docs
+
 ```
 
 ### `suitkaise modules`

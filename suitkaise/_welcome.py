@@ -28,7 +28,7 @@ def _show_welcome(version: str) -> None:
 
         msg = (
             f"\n"
-            f"  suitkaise {_version}\n"
+            f"  {_version}\n"
             f"\n"
             f"  Website:         https://suitkaise.info\n"
             f"  Download docs:   suitkaise docs\n"

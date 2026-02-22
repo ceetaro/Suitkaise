@@ -1,6 +1,6 @@
 # Suitkaise
 
-Making things easier for developers of all skill levels to develop complex Python programs.
+Write Python at hacker-level speeds.
 
 (pronounced exactly like the word suitcase)
 
@@ -23,7 +23,7 @@ pip install suitkaise
 
 Explicitly supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.4.0 beta`.
+Currently, `suitkaise` is version `0.4.11 beta`.
 
 `suitkaise` contains the following modules:
 

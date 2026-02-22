@@ -1,0 +1,84 @@
+<div class="tm1-showcase" id="tm1Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="tm1Nav">
+        <button class="sc-nav-btn" id="tm1Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="tm1Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: The ugly way -->
+    <div class="tm1-phase tm1-before" id="tm1Before">
+        <div class="tm1-title" id="tm1BeforeTitle">You've written this before.</div>
+        <pre class="tm1-codeblock" id="tm1BeforeCode"></pre>
+        <div class="tm1-line-count" id="tm1BeforeCount">*15 lines</div>
+    </div>
+
+    <!-- Step 1: The one-liner -->
+    <div class="tm1-phase tm1-after" id="tm1After">
+        <div class="tm1-title" id="tm1AfterTitle">But it's easier to write this.</div>
+        <pre class="tm1-codeblock" id="tm1AfterCode"></pre>
+        <div class="tm1-after-note" id="tm1AfterNote">1 line. Every call is timed automatically.</div>
+    </div>
+
+    <!-- Step 2: Stats for free -->
+    <div class="tm1-phase tm1-stats" id="tm1Stats">
+        <div class="tm1-title" id="tm1StatsTitle">And you get all of this and more. For free.</div>
+        <div class="tm1-stats-grid" id="tm1StatsGrid">
+            <div class="tm1-stat" id="tm1Stat0">
+                <div class="tm1-stat-label">mean</div>
+                <div class="tm1-stat-value">0.042s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat1">
+                <div class="tm1-stat-label">median</div>
+                <div class="tm1-stat-value">0.038s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat2">
+                <div class="tm1-stat-label">stdev</div>
+                <div class="tm1-stat-value">0.012s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat3">
+                <div class="tm1-stat-label">p95</div>
+                <div class="tm1-stat-value">0.067s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat4">
+                <div class="tm1-stat-label">p99</div>
+                <div class="tm1-stat-value">0.091s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat5">
+                <div class="tm1-stat-label">min</div>
+                <div class="tm1-stat-value">0.021s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat6">
+                <div class="tm1-stat-label">max</div>
+                <div class="tm1-stat-value">0.134s</div>
+            </div>
+            <div class="tm1-stat" id="tm1Stat7">
+                <div class="tm1-stat-label">variance</div>
+                <div class="tm1-stat-value">0.00014</div>
+            </div>
+        </div>
+        <div class="tm1-stats-note" id="tm1StatsNote">timeit gives you one number. @timethis gives you all of this and more.</div>
+    </div>
+
+    <!-- Step 3: Punchline -->
+    <div class="tm1-phase tm1-punchline" id="tm1Punchline">
+        <div class="tm1-punch-title" id="tm1PunchTitle">1 line. 2 ways.</div>
+        <div class="tm1-punch-panels">
+            <div class="tm1-punch-panel" id="tm1PanelDec">
+                <div class="tm1-panel-label">Decorator</div>
+                <pre class="tm1-codeblock tm1-codeblock-small" id="tm1PunchCode"></pre>
+            </div>
+            <div class="tm1-punch-panel" id="tm1PanelCtx">
+                <div class="tm1-panel-label">Context Manager</div>
+                <pre class="tm1-codeblock tm1-codeblock-small" id="tm1CtxCode"></pre>
+            </div>
+        </div>
+        <div class="tm1-tagline" id="tm1Tagline">With these 2 patterns, you can time anything.</div>
+        <button class="tm1-replay-btn" id="tm1Replay">replay</button>
+    </div>
+
+</div>

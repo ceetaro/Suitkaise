@@ -2463,6 +2463,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
+    var showcaseCallbacks = {};
+
     // WPO showcase state (declared early so navigateTo can call cleanupWPO)
     var wpoTimers = [];
     var wpoSnowRAF = null;
@@ -2478,6 +2480,52 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wpoPowerupRAF) { cancelAnimationFrame(wpoPowerupRAF); wpoPowerupRAF = null; }
     }
 
+    // Showcase state
+    var cuke2Timers = [];
+    var sh1Timers = [];
+    var sh1CounterInterval = null;
+    var sk1Timers = [];
+    var tm1Timers = [];
+    var pt1Timers = [];
+    var pt2Timers = [];
+    var ci1Timers = [];
+
+    function cleanupCuke2() {
+        cuke2Timers.forEach(clearTimeout);
+        cuke2Timers = [];
+    }
+
+    function cleanupSh1() {
+        sh1Timers.forEach(clearTimeout);
+        sh1Timers = [];
+        if (sh1CounterInterval) { clearInterval(sh1CounterInterval); sh1CounterInterval = null; }
+    }
+
+    function cleanupSk1() {
+        sk1Timers.forEach(clearTimeout);
+        sk1Timers = [];
+    }
+
+    function cleanupTm1() {
+        tm1Timers.forEach(clearTimeout);
+        tm1Timers = [];
+    }
+
+    function cleanupPt1() {
+        pt1Timers.forEach(clearTimeout);
+        pt1Timers = [];
+    }
+
+    function cleanupPt2() {
+        pt2Timers.forEach(clearTimeout);
+        pt2Timers = [];
+    }
+
+    function cleanupCi1() {
+        ci1Timers.forEach(clearTimeout);
+        ci1Timers = [];
+    }
+
     async function navigateTo(pageName, force = false) {
         if (!force && pageName === currentPage) return;
         
@@ -2487,6 +2535,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         cleanupWPO();
+        cleanupCuke2();
+        cleanupSh1();
+        cleanupSk1();
+        cleanupTm1();
+        cleanupPt1();
+        cleanupPt2();
+        cleanupCi1();
         
         // Check if page content is already available
         const isReady = isPageReady(pageName);
@@ -2552,9 +2607,17 @@ document.addEventListener('DOMContentLoaded', () => {
             setupPasswordPage();
         } else if (pageName === 'home') {
             await loadShowcases();
-            setupShowcaseCarousel();
             setupFadeInAnimations();
             setupWPOShowcase();
+            setupProcessingShowcase();
+            setupCucumber2Showcase();
+            setupShare1Showcase();
+            setupSk1Showcase();
+            setupTiming1Showcase();
+            setupPaths1Showcase();
+            setupPaths2Showcase();
+            setupCircuits1Showcase();
+            setupShowcaseCarousel();
             pulseQuickStart();
         }
 
@@ -3764,15 +3827,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         replayBtn.addEventListener('click', runSequence);
 
-        var observer = new IntersectionObserver(function(entries) {
-            entries.forEach(function(entry) {
-                if (entry.isIntersecting) {
-                    runSequence();
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.3 });
-        observer.observe(showcase);
+        showcaseCallbacks['cucumber-1'] = {
+            start: runSequence,
+            stop: reset
+        };
     }
 
     function startBlizzard(canvas) {
@@ -3871,6 +3929,2178 @@ document.addEventListener('DOMContentLoaded', () => {
         draw();
     }
 
+    // ============================================
+    // Processing Showcase (Code Comparison)
+    // ============================================
+
+    var procTimers = [];
+
+    function cleanupProcessing() {
+        procTimers.forEach(function(id) { clearTimeout(id); });
+        procTimers = [];
+    }
+
+    function setupProcessingShowcase() {
+        var showcase = document.getElementById('procShowcase');
+        if (!showcase) return;
+
+        var intro     = document.getElementById('procIntro');
+        var scenario  = document.getElementById('procScenario');
+        var battle    = document.getElementById('procBattle');
+        var codeLeft  = document.getElementById('procCodeLeft');
+        var codeRight = document.getElementById('procCodeRight');
+
+        var reqs = [];
+        for (var i = 0; i < 7; i++) {
+            reqs.push(document.getElementById('procReq' + i));
+        }
+
+        var leftCode = [
+            {t:'cm', v:'# comments and whitespace excluded from line count\n'},
+            {t:'kw', v:'from'}, ' ', {t:'api-hl', v:'suitkaise.processing'}, ' ', {t:'kw', v:'import'}, ' Skprocess, autoreconnect\n',
+            {t:'kw', v:'import'}, ' psycopg2\n',
+            '\n',
+            {t:'dc', v:'@autoreconnect'}, '(', {t:'op', v:'**'}, '{', {t:'st', v:'"psycopg2.Connection"'}, ': {', {t:'st', v:'"*"'}, ': ', {t:'st', v:'"password"'}, '}})\n',
+            {t:'kw', v:'class'}, ' ', {t:'fn', v:'DatabaseWorker'}, '(Skprocess):\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__init__'}, '(', {t:'bi', v:'self'}, ', db_connection):\n',
+            '        ', {t:'bi', v:'self'}, '.db = db_connection\n',
+            '        ', {t:'bi', v:'self'}, '.process_config.lives = ', {t:'nr', v:'3'}, '\n',
+            '        ', {t:'bi', v:'self'}, '.process_config.timeouts.run = ', {t:'nr', v:'30.0'}, '\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__prerun__'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        msg = ', {t:'bi', v:'self'}, '.listen(timeout=', {t:'nr', v:'0.1'}, ')\n',
+            '        ', {t:'bi', v:'self'}, '.query = msg ', {t:'kw', v:'if'}, ' msg ', {t:'kw', v:'else'}, ' ', {t:'kw', v:'None'}, '\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__run__'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        ', {t:'kw', v:'if'}, ' ', {t:'kw', v:'not'}, ' ', {t:'bi', v:'self'}, '.query:\n',
+            '            ', {t:'kw', v:'return'}, '\n',
+            '        cursor = ', {t:'bi', v:'self'}, '.db.cursor()\n',
+            '        cursor.execute(', {t:'bi', v:'self'}, '.query[', {t:'st', v:"'sql'"}, '], ', {t:'bi', v:'self'}, '.query.get(', {t:'st', v:"'params'"}, '))\n',
+            '        ', {t:'bi', v:'self'}, '.results = cursor.fetchall()\n',
+            '        cursor.close()\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__postrun__'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        ', {t:'kw', v:'if'}, ' ', {t:'bi', v:'self'}, '.query:\n',
+            '            ', {t:'kw', v:'if'}, ' ', {t:'kw', v:'not'}, ' ', {t:'bi', v:'self'}, '.results:\n',
+            '                ', {t:'bi', v:'self'}, '.tell({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'error'"}, ', ', {t:'st', v:"'data'"}, ': ', {t:'kw', v:'None'}, '})\n',
+            '            ', {t:'kw', v:'else'}, ':\n',
+            '                ', {t:'bi', v:'self'}, '.tell({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'ok'"}, ', ', {t:'st', v:"'data'"}, ': ', {t:'bi', v:'self'}, '.results})\n',
+            '        ', {t:'kw', v:'else'}, ':\n',
+            '            ', {t:'bi', v:'self'}, '.tell({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'no query'"}, ', ', {t:'st', v:"'data'"}, ': ', {t:'kw', v:'None'}, '})\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__onfinish__'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        ', {t:'bi', v:'self'}, '.db.close()\n',
+            '\n',
+            {t:'cm', v:'# usage'}, '\n',
+            'db = psycopg2.connect(host=', {t:'st', v:"'localhost'"}, ', database=', {t:'st', v:"'mydb'"}, ', password=', {t:'st', v:"'secret'"}, ')\n',
+            'worker = DatabaseWorker(db)\n',
+            'worker.start()\n',
+            '\n',
+            'queries = [\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'123'}, ',)},\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'456'}, ',)},\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'789'}, ',)},\n',
+            ']\n',
+            'results = []\n',
+            '\n',
+            {t:'kw', v:'for'}, ' query ', {t:'kw', v:'in'}, ' queries:\n',
+            '    worker.tell(query)\n',
+            '    result = worker.listen(timeout=', {t:'nr', v:'30'}, ')\n',
+            '    results.append(result)\n',
+            '\n',
+            'worker.stop()\n',
+            'worker.wait()\n',
+            {t:'fn', v:'print'}, '(', {t:'kw', v:'f'}, {t:'st', v:'"Avg query time: {worker.__run__.timer.mean:.3f}s"'}, ')\n'
+        ];
+
+        var rightCode = [
+            {t:'cm', v:'# comments and whitespace excluded from line count\n'},
+            {t:'kw', v:'import'}, ' multiprocessing\n',
+            {t:'kw', v:'import'}, ' signal\n',
+            {t:'kw', v:'import'}, ' time\n',
+            {t:'kw', v:'import'}, ' psycopg2\n',
+            {t:'kw', v:'from'}, ' multiprocessing ', {t:'kw', v:'import'}, ' Queue, Event, Value\n',
+            {t:'kw', v:'from'}, ' ctypes ', {t:'kw', v:'import'}, ' c_double\n',
+            '\n',
+            {t:'kw', v:'class'}, ' ', {t:'fn', v:'DatabaseWorker'}, '(multiprocessing.Process):\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'__init__'}, '(', {t:'bi', v:'self'}, ', task_queue, result_queue, stats_lock,\n',
+            '                 total_time, query_count, stop_event, db_config):\n',
+            '        ', {t:'fn', v:'super'}, '().', {t:'fn', v:'__init__'}, '()\n',
+            '        ', {t:'bi', v:'self'}, '.task_queue = task_queue\n',
+            '        ', {t:'bi', v:'self'}, '.result_queue = result_queue\n',
+            '        ', {t:'bi', v:'self'}, '.stats_lock = stats_lock\n',
+            '        ', {t:'bi', v:'self'}, '.total_time = total_time\n',
+            '        ', {t:'bi', v:'self'}, '.query_count = query_count\n',
+            '        ', {t:'bi', v:'self'}, '.stop_event = stop_event\n',
+            '        ', {t:'bi', v:'self'}, '.db_config = db_config\n',
+            '        ', {t:'bi', v:'self'}, '.timeout = ', {t:'nr', v:'30'}, '\n',
+            '        ', {t:'bi', v:'self'}, '.max_retries = ', {t:'nr', v:'3'}, '\n',
+            '        ', {t:'bi', v:'self'}, '.conn = ', {t:'kw', v:'None'}, '\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'_connect'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        ', {t:'kw', v:'for'}, ' attempt ', {t:'kw', v:'in'}, ' ', {t:'fn', v:'range'}, '(', {t:'bi', v:'self'}, '.max_retries):\n',
+            '            ', {t:'kw', v:'try'}, ':\n',
+            '                ', {t:'bi', v:'self'}, '.conn = psycopg2.connect(', {t:'op', v:'**'}, {t:'bi', v:'self'}, '.db_config)\n',
+            '                ', {t:'kw', v:'return'}, '\n',
+            '            ', {t:'kw', v:'except'}, ' psycopg2.OperationalError:\n',
+            '                ', {t:'kw', v:'if'}, ' attempt == ', {t:'bi', v:'self'}, '.max_retries - ', {t:'nr', v:'1'}, ':\n',
+            '                    ', {t:'kw', v:'raise'}, '\n',
+            '                time.sleep(', {t:'nr', v:'2'}, ' ', {t:'op', v:'**'}, ' attempt)\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'_timeout_handler'}, '(', {t:'bi', v:'self'}, ', signum, frame):\n',
+            '        ', {t:'kw', v:'raise'}, ' ', {t:'fn', v:'TimeoutError'}, '(', {t:'st', v:'"Query timed out"'}, ')\n',
+            '\n',
+            '    ', {t:'kw', v:'def'}, ' ', {t:'fn', v:'run'}, '(', {t:'bi', v:'self'}, '):\n',
+            '        ', {t:'bi', v:'self'}, '._connect()\n',
+            '        signal.signal(signal.SIGALRM, ', {t:'bi', v:'self'}, '._timeout_handler)\n',
+            '        ', {t:'kw', v:'try'}, ':\n',
+            '            ', {t:'kw', v:'while'}, ' ', {t:'kw', v:'not'}, ' ', {t:'bi', v:'self'}, '.stop_event.is_set():\n',
+            '                ', {t:'kw', v:'try'}, ':\n',
+            '                    query_params = ', {t:'bi', v:'self'}, '.task_queue.get(timeout=', {t:'nr', v:'0.1'}, ')\n',
+            '                ', {t:'kw', v:'except'}, ':\n',
+            '                    ', {t:'bi', v:'self'}, '.result_queue.put({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'no query'"}, ', ', {t:'st', v:"'data'"}, ': ', {t:'kw', v:'None'}, '})\n',
+            '                    ', {t:'kw', v:'continue'}, '\n',
+            '                start = time.time()\n',
+            '                signal.alarm(', {t:'bi', v:'self'}, '.timeout)\n',
+            '                ', {t:'kw', v:'try'}, ':\n',
+            '                    cursor = ', {t:'bi', v:'self'}, '.conn.cursor()\n',
+            '                    cursor.execute(query_params[', {t:'st', v:"'sql'"}, '], query_params.get(', {t:'st', v:"'params'"}, '))\n',
+            '                    results = cursor.fetchall()\n',
+            '                    cursor.close()\n',
+            '                    signal.alarm(', {t:'nr', v:'0'}, ')\n',
+            '                    elapsed = time.time() - start\n',
+            '                    ', {t:'kw', v:'with'}, ' ', {t:'bi', v:'self'}, '.stats_lock:\n',
+            '                        ', {t:'bi', v:'self'}, '.total_time.value += elapsed\n',
+            '                        ', {t:'bi', v:'self'}, '.query_count.value += ', {t:'nr', v:'1'}, '\n',
+            '                    ', {t:'kw', v:'if'}, ' ', {t:'kw', v:'not'}, ' results:\n',
+            '                        ', {t:'bi', v:'self'}, '.result_queue.put({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'error'"}, ', ', {t:'st', v:"'data'"}, ': ', {t:'kw', v:'None'}, '})\n',
+            '                    ', {t:'kw', v:'else'}, ':\n',
+            '                        ', {t:'bi', v:'self'}, '.result_queue.put({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'ok'"}, ', ', {t:'st', v:"'data'"}, ': results})\n',
+            '                ', {t:'kw', v:'except'}, ' ', {t:'fn', v:'TimeoutError'}, ':\n',
+            '                    signal.alarm(', {t:'nr', v:'0'}, ')\n',
+            '                    ', {t:'bi', v:'self'}, '.result_queue.put({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'error'"}, ', ', {t:'st', v:"'error'"}, ': ', {t:'st', v:"'timeout'"}, '})\n',
+            '                ', {t:'kw', v:'except'}, ' ', {t:'fn', v:'Exception'}, ' ', {t:'kw', v:'as'}, ' e:\n',
+            '                    signal.alarm(', {t:'nr', v:'0'}, ')\n',
+            '                    ', {t:'bi', v:'self'}, '.result_queue.put({', {t:'st', v:"'status'"}, ': ', {t:'st', v:"'error'"}, ', ', {t:'st', v:"'error'"}, ': ', {t:'fn', v:'str'}, '(e)})\n',
+            '        ', {t:'kw', v:'finally'}, ':\n',
+            '            ', {t:'kw', v:'if'}, ' ', {t:'bi', v:'self'}, '.conn:\n',
+            '                ', {t:'bi', v:'self'}, '.conn.close()\n',
+            '\n',
+            {t:'cm', v:'# usage'}, '\n',
+            'db_config = {', {t:'st', v:"'host'"}, ': ', {t:'st', v:"'localhost'"}, ', ', {t:'st', v:"'database'"}, ': ', {t:'st', v:"'mydb'"}, ', ', {t:'st', v:"'password'"}, ': ', {t:'st', v:"'secret'"}, '}\n',
+            'manager = multiprocessing.Manager()\n',
+            'task_queue = Queue()\n',
+            'result_queue = Queue()\n',
+            'stats_lock = manager.Lock()\n',
+            'total_time = Value(c_double, ', {t:'nr', v:'0.0'}, ')\n',
+            'query_count = Value(', {t:'st', v:"'i'"}, ', ', {t:'nr', v:'0'}, ')\n',
+            'stop_event = Event()\n',
+            '\n',
+            'worker = DatabaseWorker(\n',
+            '    task_queue, result_queue, stats_lock, total_time,\n',
+            '    query_count, stop_event, db_config,\n',
+            '    timeout=', {t:'nr', v:'30'}, ', max_retries=', {t:'nr', v:'3'}, '\n',
+            ')\n',
+            'worker.start()\n',
+            '\n',
+            'queries = [\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'123'}, ',)},\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'456'}, ',)},\n',
+            '    {', {t:'st', v:"'sql'"}, ': ', {t:'st', v:"'SELECT * FROM users WHERE id = %s'"}, ', ', {t:'st', v:"'params'"}, ': (', {t:'nr', v:'789'}, ',)},\n',
+            ']\n',
+            'results = []\n',
+            '\n',
+            {t:'kw', v:'for'}, ' query ', {t:'kw', v:'in'}, ' queries:\n',
+            '    task_queue.put(query)\n',
+            '    result = result_queue.get(timeout=', {t:'nr', v:'30'}, ')\n',
+            '    results.append(result)\n',
+            '\n',
+            'stop_event.set()\n',
+            'worker.join()\n',
+            '\n',
+            {t:'kw', v:'if'}, ' query_count.value > ', {t:'nr', v:'0'}, ':\n',
+            '    avg_time = total_time.value / query_count.value\n',
+            '    ', {t:'fn', v:'print'}, '(', {t:'kw', v:'f'}, {t:'st', v:'"Avg query time: {avg_time:.3f}s"'}, ')\n'
+        ];
+
+        function tokenToHtml(tok) {
+            if (typeof tok === 'string') return escHtml(tok);
+            return '<span class="' + tok.t + '">' + escHtml(tok.v) + '</span>';
+        }
+
+        function escHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function flattenToText(tokens) {
+            var s = '';
+            for (var i = 0; i < tokens.length; i++) {
+                s += (typeof tokens[i] === 'string') ? tokens[i] : tokens[i].v;
+            }
+            return s;
+        }
+
+        var leftText = flattenToText(leftCode);
+        var rightText = flattenToText(rightCode);
+        var leftTotal = leftText.length;
+        var rightTotal = rightText.length;
+
+        var msPerChar = 10;
+        var totalDuration = rightTotal * msPerChar;
+
+        function renderPartial(tokens, charCount) {
+            var html = '';
+            var remaining = charCount;
+            for (var i = 0; i < tokens.length && remaining > 0; i++) {
+                var tok = tokens[i];
+                var txt = (typeof tok === 'string') ? tok : tok.v;
+                if (txt.length <= remaining) {
+                    html += tokenToHtml(tok);
+                    remaining -= txt.length;
+                } else {
+                    var partial = txt.substring(0, remaining);
+                    if (typeof tok === 'string') {
+                        html += escHtml(partial);
+                    } else {
+                        html += '<span class="' + tok.t + '">' + escHtml(partial) + '</span>';
+                    }
+                    remaining = 0;
+                }
+            }
+            return html;
+        }
+
+        var procTypingRAF = null;
+        var prevBtn = document.getElementById('procPrev');
+        var nextBtn = document.getElementById('procNext');
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 1;
+
+        function resetAllState() {
+            cleanupProcessing();
+            if (procTypingRAF) { cancelAnimationFrame(procTypingRAF); procTypingRAF = null; }
+            intro.classList.remove('active');
+            scenario.classList.remove('visible');
+            reqs.forEach(function(r) { if (r) r.classList.remove('shown'); });
+            battle.classList.remove('active');
+            codeLeft.innerHTML = '';
+            codeRight.innerHTML = '';
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            procTimers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = curStep <= 0;
+            if (nextBtn) nextBtn.disabled = curStep >= maxStep;
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupProcessing();
+            if (procTypingRAF) { cancelAnimationFrame(procTypingRAF); procTypingRAF = null; }
+
+            // Hide all scenes
+            intro.classList.remove('active');
+            battle.classList.remove('active');
+
+            curStep = step;
+            var d = 0;
+
+            switch (step) {
+                case 0: // Intro — scenario + requirements
+                    scenario.classList.remove('visible');
+                    reqs.forEach(function(r) { if (r) r.classList.remove('shown'); });
+
+            intro.classList.add('active');
+
+                    sched(function() { scenario.classList.add('visible'); }, d += 300);
+
+            reqs.forEach(function(req, idx) {
+                        sched(function() {
+                    if (req) req.classList.add('shown');
+                        }, d += 500);
+                    });
+
+                    sched(function() { stepping = false; }, d += 300);
+                    break;
+
+                case 1: // Code battle — side-by-side typing
+                    codeLeft.innerHTML = '';
+                    codeRight.innerHTML = '';
+
+                battle.classList.add('active');
+
+                    sched(function() {
+                    var startTime = performance.now();
+                    var charsPerMs = 1 / msPerChar;
+
+                    function tick(now) {
+                        var elapsed = now - startTime;
+                        var chars = Math.floor(elapsed * charsPerMs);
+                        var leftChars = Math.min(chars, leftTotal);
+                        var rightChars = Math.min(chars, rightTotal);
+
+                        codeLeft.innerHTML = renderPartial(leftCode, leftChars);
+                        codeRight.innerHTML = renderPartial(rightCode, rightChars);
+
+                        if (leftChars < leftTotal) {
+                            codeLeft.parentElement.scrollTop = codeLeft.parentElement.scrollHeight;
+                        }
+                        if (rightChars < rightTotal) {
+                            codeRight.parentElement.scrollTop = codeRight.parentElement.scrollHeight;
+                        }
+
+                        if (elapsed < totalDuration) {
+                            procTypingRAF = requestAnimationFrame(tick);
+                            } else {
+                                stepping = false;
+                        }
+                    }
+                    procTypingRAF = requestAnimationFrame(tick);
+                    }, d += 600);
+                    break;
+
+                default:
+                    stepping = false;
+                    break;
+            }
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (stepping || curStep >= maxStep) return;
+                enterStep(curStep + 1);
+                updateNav();
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (stepping || curStep <= 0) return;
+                enterStep(curStep - 1);
+                updateNav();
+            });
+        }
+
+        showcaseCallbacks['processing-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // Cucumber-2 Showcase (Reconnector / Suitcase)
+    // ============================================
+
+    function setupCucumber2Showcase() {
+        var showcase = document.getElementById('cuke2Showcase');
+        if (!showcase) return;
+
+        var prevBtn     = document.getElementById('cuke2Prev');
+        var nextBtn     = document.getElementById('cuke2Next');
+
+        var probPhase   = document.getElementById('cuke2Problem');
+        var probText1   = document.getElementById('cuke2ProbText1');
+        var probCode    = document.getElementById('cuke2ProbCode');
+        var probError   = document.getElementById('cuke2Error');
+        var probText2   = document.getElementById('cuke2ProbText2');
+
+        var packPhase   = document.getElementById('cuke2Packing');
+        var packText1   = document.getElementById('cuke2PackText1');
+        var packText2   = document.getElementById('cuke2PackText2');
+        var caseArea    = document.getElementById('cuke2CaseArea');
+        var caseImg     = document.getElementById('cuke2CaseImg');
+        var tagsWrap    = document.getElementById('cuke2Tags');
+        var secNote     = document.getElementById('cuke2SecurityNote');
+        var labelWrap   = document.getElementById('cuke2LabelWrap');
+        var labelExplain = document.getElementById('cuke2LabelExplain');
+
+        var crossPhase  = document.getElementById('cuke2Crossing');
+        var travelCase  = document.getElementById('cuke2TravelCase');
+        var crossText   = document.getElementById('cuke2CrossText');
+
+        var flavPhase   = document.getElementById('cuke2Flavors');
+        var lazyDiv     = document.getElementById('cuke2Lazy');
+        var lazyCode    = document.getElementById('cuke2LazyCode');
+        var authDiv     = document.getElementById('cuke2Auth');
+        var authCode    = document.getElementById('cuke2AuthCode');
+        var allDiv      = document.getElementById('cuke2All');
+        var allCode     = document.getElementById('cuke2AllCode');
+
+        var punchPhase  = document.getElementById('cuke2Punchline');
+        var punchText1  = document.getElementById('cuke2PunchText1');
+        var punchCode   = document.getElementById('cuke2PunchCode');
+        var punchNote   = document.getElementById('cuke2PunchNote');
+        var tagline     = document.getElementById('cuke2Tagline');
+        var replayBtn   = document.getElementById('cuke2Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var probTokens = tok([
+            {c:'fn', v:'conn'}, ' = psycopg2.', {c:'fn', v:'connect'}, '(\n',
+            '    host=', {c:'st', v:'"db.prod"'}, ',\n',
+            '    database=', {c:'st', v:'"users"'}, ',\n',
+            '    password=', {c:'st', v:'"secret"'}, '\n',
+            ')\n',
+            '\n',
+            {c:'fn', v:'worker'}, ' = ', {c:'fn', v:'MyWorker'}, '(conn)\n',
+            'worker.', {c:'fn', v:'start'}, '()'
+        ]);
+
+        var lazyTokens = tok([
+            'conn = sqlite3.', {c:'fn', v:'connect'}, '(', {c:'st', v:'"app.db"'}, ')\n',
+            'data = ', {c:'api-hl', v:'cucumber'}, '.', {c:'fn', v:'serialize'}, '(conn)\n',
+            '\n',
+            'restored = ', {c:'api-hl', v:'cucumber'}, '.', {c:'fn', v:'deserialize'}, '(data)\n',
+            {c:'glow', v:'restored.execute("SELECT * FROM users")'}, '\n',
+            {c:'cm', v:'# just use it — auto-reconnects'}
+        ]);
+
+        var authTokens = tok([
+            'conn = psycopg2.', {c:'fn', v:'connect'}, '(\n',
+            '    host=', {c:'st', v:'"db.prod"'}, ',\n',
+            '    password=', {c:'st', v:'"secret"'}, '\n',
+            ')\n',
+            'data = ', {c:'api-hl', v:'cucumber'}, '.', {c:'fn', v:'serialize'}, '(conn)\n',
+            '\n',
+            'restored = ', {c:'api-hl', v:'cucumber'}, '.', {c:'fn', v:'deserialize'}, '(data)\n',
+            {c:'glow', v:'live = restored.reconnect(auth="secret")'}
+        ]);
+
+        var allTokens = tok([
+            {c:'kw', v:'class'}, ' ', {c:'fn', v:'Pipeline'}, ':\n',
+            '  ', {c:'kw', v:'def'}, ' ', {c:'fn', v:'__init__'}, '(', {c:'bi', v:'self'}, '):\n',
+            '    ', {c:'bi', v:'self'}, '.db = psycopg2.', {c:'fn', v:'connect'}, '(', {c:'op', v:'...'}, ')\n',
+            '    ', {c:'bi', v:'self'}, '.cache = redis.', {c:'fn', v:'Redis'}, '(', {c:'op', v:'...'}, ')\n',
+            '\n',
+            {c:'api-hl', v:'cucumber'}, '.', {c:'glow', v:'reconnect_all'}, '(\n',
+            '  pipeline, ', {c:'op', v:'**'}, '{\n',
+            '    ', {c:'st', v:'"psycopg2.Connection"'}, ':\n',
+            '      {', {c:'st', v:'"*"'}, ': ', {c:'st', v:'"db_pass"'}, '},\n',
+            '    ', {c:'st', v:'"redis.Redis"'}, ':\n',
+            '      {', {c:'st', v:'"*"'}, ': ', {c:'st', v:'"redis_pass"'}, '}\n',
+            '})'
+        ]);
+
+        var punchTokens = tok([
+            {c:'dc', v:'@autoreconnect'}, '(', {c:'op', v:'**'}, '{', {c:'st', v:'"psycopg2.Connection"'}, ': {', {c:'st', v:'"*"'}, ': ', {c:'st', v:'"secret"'}, '}})\n',
+            {c:'kw', v:'class'}, ' ', {c:'fn', v:'Worker'}, '(Skprocess):\n',
+            '\n',
+            '    ', {c:'kw', v:'def'}, ' ', {c:'fn', v:'__init__'}, '(', {c:'bi', v:'self'}, ', db_connection):\n',
+            '        ', {c:'bi', v:'self'}, '.db = db_connection\n',
+            '\n',
+            '    ', {c:'kw', v:'def'}, ' ', {c:'fn', v:'__run__'}, '(', {c:'bi', v:'self'}, '):\n',
+            '        ', {c:'bi', v:'self'}, '.db.', {c:'fn', v:'execute'}, '(', {c:'op', v:'...'}, ')  ', {c:'cm', v:'# already reconnected'}
+        ]);
+
+        var tags = tagsWrap ? tagsWrap.querySelectorAll('.cuke2-tag') : [];
+        var allPhases = [probPhase, packPhase, crossPhase, flavPhase, punchPhase];
+
+        var curStep = -1;
+        var stepping = false;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupCuke2();
+            hideAllPhases();
+
+            [probText1, probText2, probCode, probError, packText1, packText2,
+             crossText, punchText1, punchCode, punchNote, labelExplain].forEach(function(el) {
+                if (el) el.classList.remove('visible');
+            });
+
+            if (caseArea) caseArea.classList.remove('visible', 'compact');
+            if (tagsWrap) tagsWrap.classList.remove('collapsed');
+            tags.forEach(function(t) { t.classList.remove('visible', 'packed'); });
+            if (secNote) secNote.classList.remove('visible');
+            if (labelWrap) labelWrap.classList.remove('visible');
+
+            if (travelCase) {
+                travelCase.classList.remove('visible', 'arrived');
+            }
+
+            [lazyDiv, authDiv, allDiv].forEach(function(f) {
+                if (f) f.classList.remove('visible');
+            });
+
+            if (lazyCode) lazyCode.innerHTML = '';
+            if (authCode) authCode.innerHTML = '';
+            if (allCode) allCode.innerHTML = '';
+            if (probCode) probCode.innerHTML = '';
+            if (punchCode) punchCode.innerHTML = '';
+
+            if (tagline) tagline.classList.remove('visible');
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            function resetCaseImg(img) {
+                if (img) img.src = img.src.replace(/briefcase-laptop-[^.]+\.png/, 'briefcase-laptop-closed.png');
+            }
+            resetCaseImg(caseImg);
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            cuke2Timers.push(setTimeout(fn, delay));
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupCuke2();
+            hideAllPhases();
+            curStep = step;
+
+            var d = 0;
+
+            switch (step) {
+                case 0: // The Problem
+                    probPhase.classList.add('active');
+                    probCode.innerHTML = probTokens;
+
+                    sched(function() { probText1.classList.add('visible'); }, d += 300);
+
+                    sched(function() {
+                        probCode.classList.add('visible');
+                    }, d += 1200);
+
+                    sched(function() {
+                        probError.classList.add('visible');
+                    }, d += 2500);
+
+                    sched(function() {
+                        probText2.classList.add('visible');
+                        stepping = false;
+                    }, d += 1200);
+                    break;
+
+                case 1: // Suitcase packing + reconnector label (one scene)
+                    // Reset sub-element state so re-entering works
+                    if (caseArea) caseArea.classList.remove('visible', 'compact');
+                    if (tagsWrap) tagsWrap.classList.remove('collapsed');
+                    tags.forEach(function(t) { t.classList.remove('visible', 'packed'); });
+                    if (secNote) secNote.classList.remove('visible');
+                    if (labelWrap) labelWrap.classList.remove('visible');
+                    if (labelExplain) labelExplain.classList.remove('visible');
+                    if (packText1) packText1.classList.remove('visible');
+                    if (packText2) packText2.classList.remove('visible');
+                    (function() {
+                        var baseSrc = (caseImg.getAttribute('src') || '').replace(/briefcase-laptop-[^.]+\.png/, '');
+                        caseImg.src = baseSrc + 'briefcase-laptop-closed.png';
+                    })();
+
+                    packPhase.classList.add('active');
+                    sched(function() { packText1.classList.add('visible'); }, d += 300);
+                    sched(function() {
+                        caseArea.classList.add('visible');
+                    }, d += 1200);
+                    sched(function() {
+                        var baseSrc = (caseImg.getAttribute('src') || '').replace(/briefcase-laptop-[^.]+\.png/, '');
+                        caseImg.src = baseSrc + 'briefcase-laptop-half-open.png';
+                    }, d += 250);
+                    sched(function() {
+                        var baseSrc = (caseImg.getAttribute('src') || '').replace(/briefcase-laptop-[^.]+\.png/, '');
+                        caseImg.src = baseSrc + 'briefcase-laptop-fully-open.png';
+                        packText1.classList.remove('visible');
+                        packText2.classList.add('visible');
+                    }, d += 250);
+
+                    for (var i = 0; i < tags.length; i++) {
+                        (function(tag) {
+                            sched(function() { tag.classList.add('visible'); }, d += 600);
+                        })(tags[i]);
+                    }
+
+                    sched(function() {
+                        secNote.classList.add('visible');
+                    }, d += 1000);
+
+                    // Tags fly into the suitcase
+                    sched(function() {
+                        secNote.classList.remove('visible');
+                        packText2.classList.remove('visible');
+                        for (var j = 0; j < tags.length; j++) {
+                            (function(tag, idx) {
+                                sched(function() { tag.classList.add('packed'); }, idx * 100);
+                            })(tags[j], j);
+                        }
+                    }, d += 1800);
+
+                    // Collapse tags + compact suitcase, then close
+                    sched(function() {
+                        tagsWrap.classList.add('collapsed');
+                        caseArea.classList.add('compact');
+                        var baseSrc = (caseImg.getAttribute('src') || '').replace(/briefcase-laptop-[^.]+\.png/, '');
+                        caseImg.src = baseSrc + 'briefcase-laptop-half-open.png';
+                    }, d += 700);
+
+                    sched(function() {
+                        var baseSrc = (caseImg.getAttribute('src') || '').replace(/briefcase-laptop-[^.]+\.png/, '');
+                        caseImg.src = baseSrc + 'briefcase-laptop-closed.png';
+                    }, d += 400);
+
+                    // Reconnector label appears below the closed suitcase
+                    sched(function() {
+                        labelWrap.classList.add('visible');
+                    }, d += 600);
+
+                    sched(function() {
+                        labelExplain.classList.add('visible');
+                        stepping = false;
+                    }, d += 800);
+                    break;
+
+                case 2: // Crossing the boundary
+                    crossPhase.classList.add('active');
+                    sched(function() {
+                        travelCase.classList.add('visible');
+                    }, d += 300);
+                    sched(function() {
+                        travelCase.classList.add('arrived');
+                    }, d += 500);
+                    sched(function() {
+                        crossText.classList.add('visible');
+                        stepping = false;
+                    }, d += 2400);
+                    break;
+
+                case 3: // Three flavors side by side
+                    flavPhase.classList.add('active');
+                    lazyCode.innerHTML = lazyTokens;
+                    authCode.innerHTML = authTokens;
+                    allCode.innerHTML = allTokens;
+
+                    sched(function() { lazyDiv.classList.add('visible'); }, d += 200);
+                    sched(function() { authDiv.classList.add('visible'); }, d += 250);
+                    sched(function() {
+                        allDiv.classList.add('visible');
+                        stepping = false;
+                    }, d += 250);
+                    break;
+
+                case 4: // Punchline
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+                    sched(function() { punchText1.classList.add('visible'); }, d += 200);
+                    sched(function() {
+                        punchCode.classList.add('visible');
+                    }, d += 600);
+                    sched(function() { punchNote.classList.add('visible'); }, d += 800);
+                    sched(function() {
+                        tagline.classList.add('visible');
+                    }, d += 1000);
+                    sched(function() {
+                        replayBtn.classList.add('visible');
+                        stepping = false;
+                    }, d += 1200);
+                    break;
+
+                default:
+                    stepping = false;
+                    break;
+            }
+        }
+
+        var maxStep = 4;
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = curStep <= 0;
+            if (nextBtn) nextBtn.disabled = curStep >= maxStep;
+        }
+
+        function advance() {
+            if (stepping) return;
+            if (curStep >= maxStep) return;
+            enterStep(curStep + 1);
+            updateNav();
+        }
+
+        function goBack() {
+            if (stepping) return;
+            if (curStep <= 0) return;
+            enterStep(curStep - 1);
+            updateNav();
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                advance();
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                goBack();
+            });
+        }
+
+        if (replayBtn) {
+            replayBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetAllState();
+                updateNav();
+                setTimeout(function() { enterStep(0); updateNav(); }, 200);
+            });
+        }
+
+        showcaseCallbacks['cucumber-2'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    function setupShare1Showcase() {
+        var showcase = document.getElementById('sh1Showcase');
+        if (!showcase) return;
+
+        var prevBtn     = document.getElementById('sh1Prev');
+        var nextBtn     = document.getElementById('sh1Next');
+
+        var setupPhase  = document.getElementById('sh1Setup');
+        var setupCode   = document.getElementById('sh1SetupCode');
+        var expandNote  = document.getElementById('sh1ExpandNote');
+
+        var revealPhase = document.getElementById('sh1Reveal');
+        var revealText  = document.getElementById('sh1RevealText');
+        var diagram     = document.getElementById('sh1Diagram');
+        var shareNode   = document.getElementById('sh1ShareNode');
+        var proc1       = document.getElementById('sh1Proc1');
+        var proc2       = document.getElementById('sh1Proc2');
+        var proc3       = document.getElementById('sh1Proc3');
+        var proc4       = document.getElementById('sh1Proc4');
+        var line1       = document.getElementById('sh1Line1');
+        var line2       = document.getElementById('sh1Line2');
+        var line3       = document.getElementById('sh1Line3');
+        var line4       = document.getElementById('sh1Line4');
+        var counterEl   = document.getElementById('sh1Counter');
+        var resultsEl   = document.getElementById('sh1Results');
+        var revealSub   = document.getElementById('sh1RevealSub');
+        var kicker      = document.getElementById('sh1Kicker');
+
+        var compPhase   = document.getElementById('sh1Compare');
+        var panelGood   = document.getElementById('sh1PanelGood');
+        var panelBad    = document.getElementById('sh1PanelBad');
+        var goodCode    = document.getElementById('sh1GoodCode');
+        var badCode     = document.getElementById('sh1BadCode');
+
+        var punchPhase  = document.getElementById('sh1Punchline');
+        var punchTitle  = document.getElementById('sh1PunchTitle');
+        var punchCode   = document.getElementById('sh1PunchCode');
+        var tagline     = document.getElementById('sh1Tagline');
+        var replayBtn   = document.getElementById('sh1Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var typed = function(inner) {
+            return '<span class="sh1-typed">' + inner + '</span>';
+        };
+        var hl = function(v) {
+            return '<span class="api-hl">' + esc(v) + '</span>';
+        };
+        var sharePrefix = typed(hl('share') + '.');
+
+        var unifiedHTML = ''
+            + '<span class="cm">' + esc('# here\'s some simple python code') + '</span>\n'
+            + typed(hl('share') + ' = ' + hl('Share') + '()\n') + '\n'
+            + sharePrefix + 'counter = <span class="nr">0</span>\n'
+            + sharePrefix + 'results = []\n'
+            + sharePrefix + 'log = logging.<span class="fn">' + esc('getLogger') + '</span>(<span class="st">' + esc('"worker"') + '</span>)\n'
+            + '\n'
+            + '<span class="kw">def</span> <span class="fn">double</span>(item):\n'
+            + '    result = item * <span class="nr">2</span>\n'
+            + '    ' + sharePrefix + 'results.<span class="fn">append</span>(result)\n'
+            + '    ' + sharePrefix + 'counter += <span class="nr">1</span>\n'
+            + '    ' + sharePrefix + 'log.<span class="fn">info</span>(<span class="st">' + esc('f"done: {result}"') + '</span>)';
+
+        var goodTokens = tok([
+            {c:'kw', v:'from'}, ' suitkaise ', {c:'kw', v:'import'}, ' ', {c:'api-hl', v:'Share'}, ', ', {c:'api-hl', v:'Pool'}, '\n',
+            '\n',
+            {c:'api-hl', v:'share'}, ' = ', {c:'fn', v:'Share'}, '()\n',
+            {c:'api-hl', v:'share'}, '.counter = ', {c:'nr', v:'0'}, '\n',
+            {c:'api-hl', v:'share'}, '.results = []\n',
+            {c:'api-hl', v:'share'}, '.log = logging.', {c:'fn', v:'getLogger'}, '(', {c:'st', v:'"worker"'}, ')\n',
+            '\n',
+            {c:'kw', v:'def'}, ' ', {c:'fn', v:'process'}, '(item):\n',
+            '    result = item * ', {c:'nr', v:'2'}, '\n',
+            '    ', {c:'api-hl', v:'share'}, '.results.', {c:'fn', v:'append'}, '(result)\n',
+            '    ', {c:'api-hl', v:'share'}, '.counter += ', {c:'nr', v:'1'}, '\n',
+            '    ', {c:'api-hl', v:'share'}, '.log.', {c:'fn', v:'info'}, '(', {c:'st', v:'f"done: {result}"'}, ')\n',
+            '\n',
+            'pool = ', {c:'api-hl', v:'Pool'}, '(workers=', {c:'nr', v:'4'}, ')\n',
+            'pool.', {c:'fn', v:'star'}, '().', {c:'fn', v:'map'}, '(process, [(x, share) ', {c:'kw', v:'for'}, ' x ', {c:'kw', v:'in'}, ' ', {c:'fn', v:'range'}, '(', {c:'nr', v:'4'}, ')])'
+        ]);
+
+        var badTokens = tok([
+            {c:'kw', v:'from'}, ' multiprocessing ', {c:'kw', v:'import'}, ' Process, Manager\n',
+            '\n',
+            'manager = ', {c:'fn', v:'Manager'}, '()\n',
+            'counter = manager.', {c:'fn', v:'Value'}, '(', {c:'st', v:"'i'"}, ', ', {c:'nr', v:'0'}, ')\n',
+            'lock = manager.', {c:'fn', v:'Lock'}, '()\n',
+            'results = manager.', {c:'fn', v:'list'}, '()\n',
+            {c:'bad', v:'# no logger support ✗'}, '\n',
+            '\n',
+            {c:'kw', v:'def'}, ' ', {c:'fn', v:'process'}, '(item):\n',
+            '    result = item * ', {c:'nr', v:'2'}, '\n',
+            '    results.', {c:'fn', v:'append'}, '(result)\n',
+            '    ', {c:'kw', v:'with'}, ' lock:\n',
+            '        counter.value += ', {c:'nr', v:'1'}, '\n',
+            '    ', {c:'bad', v:"# can't share logger ✗"}, '\n',
+            '\n',
+            'workers = []\n',
+            {c:'kw', v:'for'}, ' i ', {c:'kw', v:'in'}, ' ', {c:'fn', v:'range'}, '(', {c:'nr', v:'4'}, '):\n',
+            '    p = ', {c:'fn', v:'Process'}, '(target=process, args=(i,))\n',
+            '    p.', {c:'fn', v:'start'}, '()\n',
+            '    workers.', {c:'fn', v:'append'}, '(p)\n',
+            {c:'kw', v:'for'}, ' p ', {c:'kw', v:'in'}, ' workers:\n',
+            '    p.', {c:'fn', v:'join'}, '()'
+        ]);
+
+        var punchTokens = tok([
+            {c:'api-hl', v:'share'}, ' = ', {c:'fn', v:'Share'}, '()\n',
+            {c:'api-hl', v:'share'}, '.anything = anything\n',
+            {c:'cm', v:"# that's it."}
+        ]);
+
+        var allPhases = [setupPhase, revealPhase, compPhase, punchPhase];
+        var procs = [proc1, proc2, proc3, proc4];
+        var lines = [line1, line2, line3, line4];
+
+        var curStep = -1;
+        var stepping = false;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupSh1();
+            hideAllPhases();
+
+            [revealText, revealSub, kicker, punchTitle, punchCode, tagline].forEach(function(el) {
+                if (el) el.classList.remove('visible');
+            });
+
+            if (setupCode) {
+                setupCode.innerHTML = '';
+                setupCode.classList.remove('visible');
+                setupCode.querySelectorAll('.sh1-typed').forEach(function(el) { el.classList.remove('visible'); });
+            }
+            if (expandNote) expandNote.classList.remove('visible');
+            if (diagram) diagram.classList.remove('visible');
+            if (shareNode) shareNode.classList.remove('visible', 'receiving');
+            procs.forEach(function(p) { if (p) p.classList.remove('visible', 'sending'); });
+            lines.forEach(function(l) { if (l) l.classList.remove('active'); });
+
+            if (counterEl) counterEl.textContent = '0';
+            if (resultsEl) resultsEl.textContent = '';
+
+            if (panelGood) panelGood.classList.remove('visible');
+            if (panelBad) panelBad.classList.remove('visible');
+            if (goodCode) goodCode.innerHTML = '';
+            if (badCode) badCode.innerHTML = '';
+            if (punchCode) punchCode.innerHTML = '';
+
+            if (tagline) tagline.classList.remove('visible');
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            sh1Timers.push(setTimeout(fn, delay));
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupSh1();
+            hideAllPhases();
+            curStep = step;
+
+            var d = 0;
+
+            switch (step) {
+                case 0: // Plain code (typed spans hidden)
+                    setupPhase.classList.add('active');
+                    setupCode.innerHTML = unifiedHTML;
+                    setupCode.querySelectorAll('.sh1-typed').forEach(function(el) { el.classList.remove('visible'); });
+                    if (expandNote) expandNote.classList.remove('visible');
+
+                    sched(function() {
+                        setupCode.classList.add('visible');
+                        stepping = false;
+                    }, d += 400);
+                    break;
+
+                case 1: // Type in Share — same phase, animate typed spans
+                    setupPhase.classList.add('active');
+                    setupCode.classList.add('visible');
+
+                    var typedEls = setupCode.querySelectorAll('.sh1-typed');
+                    typedEls.forEach(function(el, i) {
+                        sched(function() { el.classList.add('visible'); }, d += 150);
+                    });
+
+                    sched(function() {
+                        if (expandNote) expandNote.classList.add('visible');
+                        stepping = false;
+                    }, d += 500);
+                    break;
+
+                case 2: // The Reveal — processes appear, send data to Share
+                    revealPhase.classList.add('active');
+                    sched(function() { revealText.classList.add('visible'); }, d += 300);
+
+                    sched(function() { diagram.classList.add('visible'); }, d += 600);
+                    sched(function() { shareNode.classList.add('visible'); }, d += 400);
+
+                    // Processes pop up one by one
+                    for (var i = 0; i < procs.length; i++) {
+                        (function(proc) {
+                            sched(function() { proc.classList.add('visible'); }, d += 300);
+                        })(procs[i]);
+                    }
+
+                    d += 500;
+
+                    // Each process sends its result to Share in order
+                    var sendResults = [2, 4, 6, 8];
+                    for (var si = 0; si < 4; si++) {
+                        (function(idx, result) {
+                            // Light up line + process glow
+                            sched(function() {
+                                procs[idx].classList.add('sending');
+                                lines[idx].classList.add('active');
+                            }, d);
+
+                            // Update Share values
+                            sched(function() {
+                                shareNode.classList.add('receiving');
+                                if (counterEl) counterEl.textContent = String(idx + 1);
+                                if (resultsEl) {
+                                    var arr = sendResults.slice(0, idx + 1);
+                                    resultsEl.textContent = arr.join(', ');
+                                }
+                            }, d += 400);
+
+                            // Clear glow
+                            sched(function() {
+                                procs[idx].classList.remove('sending');
+                                lines[idx].classList.remove('active');
+                                shareNode.classList.remove('receiving');
+                            }, d += 400);
+                        })(si, sendResults[si]);
+                    }
+
+                    sched(function() { revealSub.classList.add('visible'); }, d += 300);
+
+                    sched(function() {
+                        kicker.classList.add('visible');
+                        stepping = false;
+                    }, d += 1200);
+                    break;
+
+                case 3: // Comparison
+                    compPhase.classList.add('active');
+                    goodCode.innerHTML = goodTokens;
+                    badCode.innerHTML = badTokens;
+
+                    sched(function() { panelGood.classList.add('visible'); }, d += 200);
+                    sched(function() {
+                        panelBad.classList.add('visible');
+                        stepping = false;
+                    }, d += 350);
+                    break;
+
+                case 4: // Punchline
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+
+                    sched(function() { punchTitle.classList.add('visible'); }, d += 200);
+                    sched(function() { punchCode.classList.add('visible'); }, d += 600);
+                    sched(function() { tagline.classList.add('visible'); }, d += 1000);
+                    sched(function() {
+                        replayBtn.classList.add('visible');
+                        stepping = false;
+                    }, d += 1200);
+                    break;
+
+                default:
+                    stepping = false;
+                    break;
+            }
+        }
+
+        var maxStep = 4;
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = curStep <= 0;
+            if (nextBtn) nextBtn.disabled = curStep >= maxStep;
+        }
+
+        function advance() {
+            if (stepping) return;
+            if (curStep >= maxStep) return;
+            enterStep(curStep + 1);
+            updateNav();
+        }
+
+        function goBack() {
+            if (stepping) return;
+            if (curStep <= 0) return;
+            enterStep(curStep - 1);
+            updateNav();
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                advance();
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                goBack();
+            });
+        }
+
+        if (replayBtn) {
+            replayBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetAllState();
+                updateNav();
+                setTimeout(function() { enterStep(0); updateNav(); }, 200);
+            });
+        }
+
+        showcaseCallbacks['share-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // SK-1 Showcase (The Swiss Army Knife)
+    // ============================================
+
+    function setupSk1Showcase() {
+        var showcase = document.getElementById('sk1Showcase');
+        if (!showcase) return;
+
+        var prevBtn    = document.getElementById('sk1Prev');
+        var nextBtn    = document.getElementById('sk1Next');
+
+        var introPhase  = document.getElementById('sk1Intro');
+        var sk1Title    = document.getElementById('sk1Title');
+        var sk1Col1     = document.getElementById('sk1Collapse');
+        var sk1Col2     = document.getElementById('sk1Collapse2');
+        var introCode   = document.getElementById('sk1IntroCode');
+        var introNote   = document.getElementById('sk1IntroNote');
+
+        var modPhase   = document.getElementById('sk1Modifiers');
+        var modTitle   = document.getElementById('sk1ModTitle');
+        var mods = [];
+        for (var mi = 0; mi < 5; mi++) mods.push(document.getElementById('sk1Mod' + mi));
+
+        var demoPhase     = document.getElementById('sk1Demo');
+        var demoTitle     = document.getElementById('sk1DemoTitle');
+        var demoAsync     = document.getElementById('sk1DemoAsync');
+        var demoAsyncCode = document.getElementById('sk1DemoAsyncCode');
+        var demoBg        = document.getElementById('sk1DemoBg');
+        var demoBgCode    = document.getElementById('sk1DemoBgCode');
+        var demoNote      = document.getElementById('sk1DemoNote');
+
+        var chainPhase = document.getElementById('sk1Chain');
+        var chainLabel = document.getElementById('sk1ChainLabel');
+        var chainCode  = document.getElementById('sk1ChainCode');
+        var chainNote  = document.getElementById('sk1ChainNote');
+
+        var punchPhase = document.getElementById('sk1Punchline');
+        var punchTitle = document.getElementById('sk1PunchTitle');
+        var punchCode  = document.getElementById('sk1PunchCode');
+        var tagline    = document.getElementById('sk1Tagline');
+        var replayBtn  = document.getElementById('sk1Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var introTokens = tok([
+            {c:'kw', v:'from'}, ' suitkaise ', {c:'kw', v:'import'}, ' ', {c:'dc', v:'sk'}, '\n',
+            '\n',
+            {c:'dc', v:'@sk'}, '\n',
+            {c:'kw', v:'def'}, ' ', {c:'fn', v:'fetch_data'}, '(url):\n',
+            '    ', {c:'kw', v:'return'}, ' requests.', {c:'fn', v:'get'}, '(url).', {c:'fn', v:'json'}, '()\n',
+            '\n',
+            {c:'cm', v:'# works exactly like before'}, '\n',
+            'data = ', {c:'fn', v:'fetch_data'}, '(', {c:'st', v:'"https://api.example.com"'}, ')'
+        ]);
+
+        var asyncDemoTokens = tok([
+            {c:'cm', v:'# your sync function'}, '\n',
+            {c:'dc', v:'@sk'}, '\n',
+            {c:'kw', v:'def'}, ' ', {c:'fn', v:'fetch_data'}, '(url):\n',
+            '    ', {c:'kw', v:'return'}, ' requests.', {c:'fn', v:'get'}, '(url).', {c:'fn', v:'json'}, '()\n',
+            '\n',
+            {c:'cm', v:'# now it\'s async'}, '\n',
+            'data = ', {c:'kw', v:'await'}, ' ', {c:'fn', v:'fetch_data'}, '.', {c:'api-hl', v:'asynced'}, '()(', {c:'st', v:'"url"'}, ')'
+        ]);
+
+        var bgDemoTokens = tok([
+            {c:'cm', v:'# fire and forget'}, '\n',
+            'future = ', {c:'fn', v:'fetch_data'}, '.', {c:'api-hl', v:'background'}, '()(', {c:'st', v:'"url"'}, ')\n',
+            '\n',
+            {c:'cm', v:'# do other work...'}, '\n',
+            {c:'fn', v:'process_other_stuff'}, '()\n',
+            '\n',
+            {c:'cm', v:'# get the result when ready'}, '\n',
+            'data = future.', {c:'fn', v:'result'}, '()'
+        ]);
+
+        var chainTokens = tok([
+            {c:'cm', v:'# retry 3 times, 5s timeout per attempt, throttled'}, '\n',
+            'data = ', {c:'fn', v:'fetch_data'}, '\n',
+            '    .', {c:'api-hl', v:'retry'}, '(', {c:'nr', v:'3'}, ')\n',
+            '    .', {c:'api-hl', v:'timeout'}, '(', {c:'nr', v:'5.0'}, ')\n',
+            '    .', {c:'api-hl', v:'rate_limit'}, '(', {c:'nr', v:'2'}, ')\n',
+            '(', {c:'st', v:'"https://api.example.com"'}, ')\n',
+            '\n',
+            {c:'cm', v:'# same thing, different order — identical behavior'}, '\n',
+            'data = ', {c:'fn', v:'fetch_data'}, '.', {c:'api-hl', v:'timeout'}, '(', {c:'nr', v:'5.0'}, ').', {c:'api-hl', v:'retry'}, '(', {c:'nr', v:'3'}, ')(', {c:'st', v:'"url"'}, ')'
+        ]);
+
+        var punchTokens = tok([
+            {c:'dc', v:'@sk'}, '\n',
+            {c:'kw', v:'def'}, ' ', {c:'fn', v:'anything'}, '(...):\n',
+            '    ...\n',
+            '\n',
+            {c:'cm', v:"# that's it. you're done."}
+        ]);
+
+        var allPhases = [introPhase, modPhase, demoPhase, chainPhase, punchPhase];
+
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 4;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupSk1();
+            hideAllPhases();
+
+            if (sk1Title) sk1Title.classList.remove('visible');
+            if (sk1Col1) sk1Col1.classList.remove('hidden');
+            if (sk1Col2) sk1Col2.classList.remove('hidden');
+            if (introCode) { introCode.innerHTML = ''; introCode.classList.remove('visible'); }
+            if (introNote) introNote.classList.remove('visible');
+
+            if (modTitle) modTitle.classList.remove('visible');
+            mods.forEach(function(m) { if (m) m.classList.remove('visible', 'highlight'); });
+
+            if (demoTitle) demoTitle.classList.remove('visible');
+            if (demoAsync) demoAsync.classList.remove('visible');
+            if (demoAsyncCode) { demoAsyncCode.innerHTML = ''; demoAsyncCode.classList.remove('visible'); }
+            if (demoBg) demoBg.classList.remove('visible');
+            if (demoBgCode) { demoBgCode.innerHTML = ''; demoBgCode.classList.remove('visible'); }
+            if (demoNote) demoNote.classList.remove('visible');
+
+            if (chainLabel) chainLabel.classList.remove('visible');
+            if (chainCode) { chainCode.innerHTML = ''; chainCode.classList.remove('visible'); }
+            if (chainNote) chainNote.classList.remove('visible');
+
+            if (punchTitle) punchTitle.classList.remove('visible');
+            if (punchCode) { punchCode.innerHTML = ''; punchCode.classList.remove('visible'); }
+            if (tagline) tagline.classList.remove('visible');
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            sk1Timers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = curStep <= 0;
+            if (nextBtn) nextBtn.disabled = curStep >= maxStep;
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupSk1();
+            hideAllPhases();
+            curStep = step;
+
+            var d = 0;
+
+            switch (step) {
+                case 0: // The decorator
+                    introPhase.classList.add('active');
+                    introCode.innerHTML = introTokens;
+
+                    sched(function() { sk1Title.classList.add('visible'); }, d += 300);
+
+                    sched(function() {
+                        sk1Col1.classList.add('hidden');
+                        sk1Col2.classList.add('hidden');
+                    }, d += 2000);
+
+                    sched(function() { introCode.classList.add('visible'); }, d += 800);
+                    sched(function() {
+                        introNote.classList.add('visible');
+                        stepping = false;
+                    }, d += 800);
+                    break;
+
+                case 1: // Modifiers one by one
+                    modPhase.classList.add('active');
+                    sched(function() { modTitle.classList.add('visible'); }, d += 300);
+
+                    mods.forEach(function(mod, idx) {
+                        sched(function() { if (mod) mod.classList.add('visible'); }, d += 300);
+                    });
+
+                    sched(function() { stepping = false; }, d += 300);
+                    break;
+
+                case 2: // asynced & background demo
+                    demoPhase.classList.add('active');
+                    demoAsyncCode.innerHTML = asyncDemoTokens;
+                    demoBgCode.innerHTML = bgDemoTokens;
+
+                    sched(function() { demoTitle.classList.add('visible'); }, d += 300);
+                    sched(function() {
+                        demoAsync.classList.add('visible');
+                        demoAsyncCode.classList.add('visible');
+                    }, d += 500);
+                    sched(function() {
+                        demoBg.classList.add('visible');
+                        demoBgCode.classList.add('visible');
+                    }, d += 600);
+                    sched(function() {
+                        demoNote.classList.add('visible');
+                        stepping = false;
+                    }, d += 800);
+                    break;
+
+                case 3: // Chain
+                    chainPhase.classList.add('active');
+                    chainCode.innerHTML = chainTokens;
+
+                    sched(function() { chainLabel.classList.add('visible'); }, d += 300);
+                    sched(function() { chainCode.classList.add('visible'); }, d += 500);
+                    sched(function() {
+                        chainNote.classList.add('visible');
+                        stepping = false;
+                    }, d += 800);
+                    break;
+
+                case 4: // Punchline
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+
+                    sched(function() { punchTitle.classList.add('visible'); }, d += 300);
+                    sched(function() { punchCode.classList.add('visible'); }, d += 600);
+                    sched(function() { tagline.classList.add('visible'); }, d += 800);
+                    sched(function() {
+                        replayBtn.classList.add('visible');
+                        stepping = false;
+                    }, d += 1000);
+                    break;
+
+                default:
+                    stepping = false;
+                    break;
+            }
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (stepping || curStep >= maxStep) return;
+                enterStep(curStep + 1);
+                updateNav();
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (stepping || curStep <= 0) return;
+                enterStep(curStep - 1);
+                updateNav();
+            });
+        }
+
+        if (replayBtn) {
+            replayBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetAllState();
+                updateNav();
+                setTimeout(function() { enterStep(0); updateNav(); }, 200);
+            });
+        }
+
+        showcaseCallbacks['sk-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // Timing-1 Showcase
+    // ============================================
+
+    function setupTiming1Showcase() {
+        var showcase = document.getElementById('tm1Showcase');
+        if (!showcase) return;
+
+        var prevBtn = document.getElementById('tm1Prev');
+        var nextBtn = document.getElementById('tm1Next');
+
+        var beforePhase = document.getElementById('tm1Before');
+        var beforeTitle = document.getElementById('tm1BeforeTitle');
+        var beforeCode = document.getElementById('tm1BeforeCode');
+        var beforeCount = document.getElementById('tm1BeforeCount');
+
+        var afterPhase = document.getElementById('tm1After');
+        var afterTitle = document.getElementById('tm1AfterTitle');
+        var afterCode = document.getElementById('tm1AfterCode');
+        var afterNote = document.getElementById('tm1AfterNote');
+
+        var statsPhase = document.getElementById('tm1Stats');
+        var statsTitle = document.getElementById('tm1StatsTitle');
+        var statsGrid = document.getElementById('tm1StatsGrid');
+        var stats = statsGrid ? statsGrid.querySelectorAll('.tm1-stat') : [];
+        var statsNote = document.getElementById('tm1StatsNote');
+
+        var punchPhase = document.getElementById('tm1Punchline');
+        var punchTitle = document.getElementById('tm1PunchTitle');
+        var punchCode = document.getElementById('tm1PunchCode');
+        var panelDec = document.getElementById('tm1PanelDec');
+        var panelCtx = document.getElementById('tm1PanelCtx');
+        var ctxCode = document.getElementById('tm1CtxCode');
+        var tagline = document.getElementById('tm1Tagline');
+        var replayBtn = document.getElementById('tm1Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var beforeTokens = tok([
+            {c:'kw',v:'import'}, ' ', {c:'fn',v:'time'}, '\n',
+            {c:'kw',v:'import'}, ' ', {c:'fn',v:'statistics'}, '\n\n',
+            {c:'fn',v:'times'}, ' = []\n\n',
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'do_work'}, '():\n',
+            '    ', {c:'cm',v:'# ... your code ...'}, '\n',
+            '    ', {c:'kw',v:'pass'}, '\n\n',
+            {c:'kw',v:'for'}, ' i ', {c:'kw',v:'in'}, ' ', {c:'bi',v:'range'}, '(', {c:'nr',v:'100'}, '):\n',
+            '    start = time.perf_counter()\n',
+            '    do_work()\n',
+            '    end = time.perf_counter()\n',
+            '    times.append(end - start)\n\n',
+            'mean = statistics.mean(times)\n',
+            'median = statistics.median(times)\n',
+            'stdev = statistics.stdev(times)\n',
+            'sorted_t = ', {c:'bi',v:'sorted'}, '(times)\n',
+            'p95 = sorted_t[', {c:'bi',v:'int'}, '(', {c:'nr',v:'0.95'}, ' * ', {c:'bi',v:'len'}, '(sorted_t))]'
+        ]);
+
+        var afterTokens = tok([
+            {c:'kw',v:'from'}, ' ', {c:'fn',v:'suitkaise.timing'}, ' ', {c:'kw',v:'import'}, ' ', {c:'dc',v:'timethis'}, '\n\n',
+            {c:'api-hl',v:'@timethis()'}, '\n',
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'do_work'}, '():\n',
+            '    ', {c:'cm',v:'# ... your code ...'}, '\n',
+            '    ', {c:'kw',v:'pass'}, '\n\n',
+            {c:'kw',v:'for'}, ' i ', {c:'kw',v:'in'}, ' ', {c:'bi',v:'range'}, '(', {c:'nr',v:'100'}, '):\n',
+            '    do_work()'
+        ]);
+
+        var punchTokens = tok([
+            {c:'api-hl',v:'@timethis()'}, '\n',
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'anything'}, '():\n',
+            '    ...\n\n',
+            'anything.', {c:'dc',v:'timer'}, '.', {c:'dc',v:'mean'}, '\n',
+            'anything.', {c:'dc',v:'timer'}, '.', {c:'dc',v:'median'}, '\n',
+            'anything.', {c:'dc',v:'timer'}, '.', {c:'dc',v:'percentile'}, '(', {c:'nr',v:'99'}, ')'
+        ]);
+
+        var ctxTokens = tok([
+            {c:'kw',v:'with'}, ' ', {c:'api-hl',v:'TimeThis()'}, ' ', {c:'kw',v:'as'}, ' timer:\n',
+            '    ', {c:'cm',v:'# anything here gets timed'}, '\n',
+            '    ...\n\n',
+            'timer.', {c:'dc',v:'mean'}, '\n',
+            'timer.', {c:'dc',v:'stdev'}, '\n',
+            'timer.', {c:'dc',v:'percentile'}, '(', {c:'nr',v:'95'}, ')'
+        ]);
+
+        var allPhases = [beforePhase, afterPhase, statsPhase, punchPhase];
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 3;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupTm1();
+            hideAllPhases();
+
+            [beforeTitle, beforeCode, beforeCount,
+             afterTitle, afterCode, afterNote,
+             statsTitle, statsNote,
+             punchTitle, punchCode, ctxCode, panelDec, panelCtx, tagline].forEach(function(el) {
+                if (el) { el.classList.remove('visible'); }
+            });
+
+            stats.forEach(function(s) { s.classList.remove('visible'); });
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            tm1Timers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = (curStep <= 0);
+            if (nextBtn) nextBtn.disabled = (curStep >= maxStep);
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupTm1();
+            hideAllPhases();
+            curStep = step;
+            updateNav();
+
+            switch (step) {
+                case 0:
+                    beforePhase.classList.add('active');
+                    beforeCode.innerHTML = beforeTokens;
+                    sched(function() { beforeTitle.classList.add('visible'); }, 100);
+                    sched(function() { beforeCode.classList.add('visible'); }, 500);
+                    sched(function() { beforeCount.classList.add('visible'); stepping = false; }, 1200);
+                    break;
+
+                case 1:
+                    afterPhase.classList.add('active');
+                    afterCode.innerHTML = afterTokens;
+                    sched(function() { afterTitle.classList.add('visible'); }, 100);
+                    sched(function() { afterCode.classList.add('visible'); }, 500);
+                    sched(function() { afterNote.classList.add('visible'); stepping = false; }, 1200);
+                    break;
+
+                case 2:
+                    statsPhase.classList.add('active');
+                    sched(function() { statsTitle.classList.add('visible'); }, 100);
+                    var d = 500;
+                    for (var i = 0; i < stats.length; i++) {
+                        (function(idx, delay) {
+                            sched(function() { stats[idx].classList.add('visible'); }, delay);
+                        })(i, d);
+                        d += 120;
+                    }
+                    sched(function() { statsNote.classList.add('visible'); stepping = false; }, d + 400);
+                    break;
+
+                case 3:
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+                    ctxCode.innerHTML = ctxTokens;
+                    sched(function() { punchTitle.classList.add('visible'); }, 100);
+                    sched(function() { panelDec.classList.add('visible'); punchCode.classList.add('visible'); }, 500);
+                    sched(function() { panelCtx.classList.add('visible'); ctxCode.classList.add('visible'); }, 900);
+                    sched(function() { tagline.classList.add('visible'); }, 1500);
+                    sched(function() { replayBtn.classList.add('visible'); stepping = false; }, 2000);
+                    break;
+            }
+        }
+
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            if (curStep < maxStep) enterStep(curStep + 1);
+        });
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            if (curStep > 0) enterStep(curStep - 1);
+        });
+        if (replayBtn) replayBtn.addEventListener('click', function() {
+            resetAllState();
+            setTimeout(function() { enterStep(0); updateNav(); }, 200);
+        });
+
+        showcaseCallbacks['timing-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // Paths-1 Showcase
+    // ============================================
+
+    function setupPaths1Showcase() {
+        var showcase = document.getElementById('pt1Showcase');
+        if (!showcase) return;
+
+        var prevBtn = document.getElementById('pt1Prev');
+        var nextBtn = document.getElementById('pt1Next');
+
+        var probPhase = document.getElementById('pt1Problem');
+        var probTitle = document.getElementById('pt1ProbTitle');
+        var cardMac = document.getElementById('pt1CardMac');
+        var cardWin = document.getElementById('pt1CardWin');
+        var cardLinux = document.getElementById('pt1CardLinux');
+        var compare = document.getElementById('pt1Compare');
+        var probCards = [cardMac, cardWin, cardLinux];
+
+        var fixPhase = document.getElementById('pt1Fix');
+        var fixTitle = document.getElementById('pt1FixTitle');
+        var fixCardMac = document.getElementById('pt1FixCardMac');
+        var fixCardWin = document.getElementById('pt1FixCardWin');
+        var fixCardLinux = document.getElementById('pt1FixCardLinux');
+        var fixCompare = document.getElementById('pt1FixCompare');
+        var fixCards = [fixCardMac, fixCardWin, fixCardLinux];
+
+        var punchPhase = document.getElementById('pt1Punchline');
+        var punchTitle = document.getElementById('pt1PunchTitle');
+        var punchCode = document.getElementById('pt1PunchCode');
+        var tagline = document.getElementById('pt1Tagline');
+        var replayBtn = document.getElementById('pt1Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var punchTokens = tok([
+            {c:'kw',v:'from'}, ' ', {c:'fn',v:'suitkaise.paths'}, ' ', {c:'kw',v:'import'}, ' ', {c:'api-hl',v:'Skpath'}, '\n\n',
+            'path = ', {c:'api-hl',v:'Skpath'}, '(', {c:'st',v:'"config/settings.yaml"'}, ')\n\n',
+            'path.', {c:'dc',v:'rp'}, '        ', {c:'cm',v:'# same on every machine'}, '\n',
+            'path.', {c:'dc',v:'ap'}, '        ', {c:'cm',v:'# absolute, always forward slashes'}, '\n',
+            'path.', {c:'dc',v:'platform'}, '  ', {c:'cm',v:'# native OS separators'}
+        ]);
+
+        var allPhases = [probPhase, fixPhase, punchPhase];
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 2;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupPt1();
+            hideAllPhases();
+
+            [probTitle, compare, fixTitle, fixCompare,
+             punchTitle, punchCode, tagline].forEach(function(el) {
+                if (el) el.classList.remove('visible');
+            });
+
+            probCards.forEach(function(c) { if (c) c.classList.remove('visible', 'glow-fail'); });
+            fixCards.forEach(function(c) { if (c) c.classList.remove('visible', 'glow-pass'); });
+
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            pt1Timers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = (curStep <= 0);
+            if (nextBtn) nextBtn.disabled = (curStep >= maxStep);
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupPt1();
+            hideAllPhases();
+            curStep = step;
+            updateNav();
+
+            var d = 0;
+
+            switch (step) {
+                case 0:
+                    probPhase.classList.add('active');
+                    sched(function() { probTitle.classList.add('visible'); }, 100);
+                    sched(function() { cardMac.classList.add('visible'); }, d += 400);
+                    sched(function() { cardWin.classList.add('visible'); }, d += 400);
+                    sched(function() { cardLinux.classList.add('visible'); }, d += 400);
+                    sched(function() {
+                        probCards.forEach(function(c) { c.classList.add('glow-fail'); });
+                        compare.classList.add('visible');
+                        stepping = false;
+                    }, d += 600);
+                    break;
+
+                case 1:
+                    fixPhase.classList.add('active');
+                    sched(function() { fixTitle.classList.add('visible'); }, 100);
+                    sched(function() { fixCardMac.classList.add('visible'); }, d += 400);
+                    sched(function() { fixCardWin.classList.add('visible'); }, d += 400);
+                    sched(function() { fixCardLinux.classList.add('visible'); }, d += 400);
+                    sched(function() {
+                        fixCards.forEach(function(c) { c.classList.add('glow-pass'); });
+                        fixCompare.classList.add('visible');
+                        stepping = false;
+                    }, d += 600);
+                    break;
+
+                case 2:
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+                    sched(function() { punchTitle.classList.add('visible'); }, 100);
+                    sched(function() { punchCode.classList.add('visible'); }, 600);
+                    sched(function() { tagline.classList.add('visible'); }, 1200);
+                    sched(function() { replayBtn.classList.add('visible'); stepping = false; }, 1800);
+                    break;
+            }
+        }
+
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            if (curStep < maxStep) enterStep(curStep + 1);
+        });
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            if (curStep > 0) enterStep(curStep - 1);
+        });
+        if (replayBtn) replayBtn.addEventListener('click', function() {
+            resetAllState();
+            setTimeout(function() { enterStep(0); updateNav(); }, 200);
+        });
+
+        showcaseCallbacks['paths-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // Paths-2 Showcase (@autopath)
+    // ============================================
+
+    function setupPaths2Showcase() {
+        var showcase = document.getElementById('pt2Showcase');
+        if (!showcase) return;
+
+        var prevBtn = document.getElementById('pt2Prev');
+        var nextBtn = document.getElementById('pt2Next');
+
+        var probPhase = document.getElementById('pt2Problem');
+        var probTitle = document.getElementById('pt2ProbTitle');
+        var callers = [
+            document.getElementById('pt2Caller0'),
+            document.getElementById('pt2Caller1')
+        ];
+        var probLabel = document.getElementById('pt2ProbLabel');
+        var probCode = document.getElementById('pt2ProbCode');
+
+        var fixPhase = document.getElementById('pt2Fix');
+        var fixTitle = document.getElementById('pt2FixTitle');
+        var fixCode = document.getElementById('pt2FixCode');
+        var flow = document.getElementById('pt2Flow');
+        var flowInputs = [
+            document.getElementById('pt2In0'),
+            document.getElementById('pt2In1'),
+            document.getElementById('pt2In2')
+        ];
+        var arrow1 = document.getElementById('pt2Arrow1');
+        var middle = document.getElementById('pt2Middle');
+        var arrow2 = document.getElementById('pt2Arrow2');
+        var flowOut = document.getElementById('pt2FlowOut');
+        var flowCheck = flowOut ? flowOut.querySelector('.pt2-flow-check') : null;
+        var fixNote = document.getElementById('pt2FixNote');
+
+        var punchPhase = document.getElementById('pt2Punchline');
+        var punchTitle = document.getElementById('pt2PunchTitle');
+        var punchCode = document.getElementById('pt2PunchCode');
+        var tagline = document.getElementById('pt2Tagline');
+        var replayBtn = document.getElementById('pt2Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var probTokens = tok([
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'process_file'}, '(path):\n',
+            '    ', {c:'kw',v:'if'}, ' ', {c:'bi',v:'isinstance'}, '(path, Path):\n',
+            '        path = ', {c:'bi',v:'str'}, '(path)\n',
+            '    ', {c:'kw',v:'if'}, ' ', {c:'kw',v:'not'}, ' ', {c:'bi',v:'isinstance'}, '(path, ', {c:'bi',v:'str'}, '):\n',
+            '        ', {c:'kw',v:'raise'}, ' TypeError(...)\n',
+            '    path = os.path.normpath(path)\n',
+            '    ', {c:'cm',v:'# ... finally use it'},
+        ]);
+
+        var fixTokens = tok([
+            {c:'api-hl',v:'@autopath()'}, '\n',
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'process_file'}, '(path: ', {c:'bi',v:'str'}, '):\n',
+            '    ', {c:'cm',v:'# path is always a str, no matter what was passed.'}
+        ]);
+
+        var punchTokens = tok([
+            {c:'kw',v:'from'}, ' ', {c:'fn',v:'suitkaise.paths'}, ' ', {c:'kw',v:'import'}, ' ', {c:'api-hl',v:'autopath'}, '\n\n',
+            {c:'api-hl',v:'@autopath()'}, '\n',
+            {c:'kw',v:'def'}, ' ', {c:'fn',v:'anything'}, '(path: ', {c:'bi',v:'str'}, '):\n',
+            '    ...  ', {c:'cm',v:'# all paths that get passed become strings'}
+        ]);
+
+        var allPhases = [probPhase, fixPhase, punchPhase];
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 2;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupPt2();
+            hideAllPhases();
+
+            [probTitle, probLabel, probCode, fixTitle, fixCode, fixNote,
+             punchTitle, punchCode, tagline].forEach(function(el) {
+                if (el) el.classList.remove('visible');
+            });
+
+            callers.forEach(function(c) { if (c) c.classList.remove('visible'); });
+            flowInputs.forEach(function(fi) { if (fi) fi.classList.remove('visible'); });
+            if (flow) flow.classList.remove('visible');
+            if (arrow1) arrow1.classList.remove('visible');
+            if (middle) middle.classList.remove('visible');
+            if (arrow2) arrow2.classList.remove('visible');
+            if (flowOut) flowOut.classList.remove('visible', 'glow');
+            if (flowCheck) flowCheck.classList.remove('visible');
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            pt2Timers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = (curStep <= 0);
+            if (nextBtn) nextBtn.disabled = (curStep >= maxStep);
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupPt2();
+            hideAllPhases();
+            curStep = step;
+            updateNav();
+
+            var d = 0;
+
+            switch (step) {
+                case 0:
+                    probPhase.classList.add('active');
+                    probCode.innerHTML = probTokens;
+                    sched(function() { probTitle.classList.add('visible'); }, 100);
+                    sched(function() { callers[0].classList.add('visible'); }, d += 400);
+                    sched(function() { callers[1].classList.add('visible'); }, d += 300);
+                    sched(function() { probLabel.classList.add('visible'); }, d += 400);
+                    sched(function() { probCode.classList.add('visible'); stepping = false; }, d += 400);
+                    break;
+
+                case 1:
+                    fixPhase.classList.add('active');
+                    fixCode.innerHTML = fixTokens;
+                    sched(function() { fixTitle.classList.add('visible'); }, 100);
+                    sched(function() { fixCode.classList.add('visible'); }, d += 500);
+                    sched(function() { flow.classList.add('visible'); }, d += 500);
+                    sched(function() { flowInputs[0].classList.add('visible'); }, d += 300);
+                    sched(function() { flowInputs[1].classList.add('visible'); }, d += 250);
+                    sched(function() { flowInputs[2].classList.add('visible'); }, d += 250);
+                    sched(function() { arrow1.classList.add('visible'); }, d += 300);
+                    sched(function() { middle.classList.add('visible'); }, d += 350);
+                    sched(function() { arrow2.classList.add('visible'); }, d += 300);
+                    sched(function() { flowOut.classList.add('visible'); }, d += 350);
+                    sched(function() {
+                        flowOut.classList.add('glow');
+                        flowCheck.classList.add('visible');
+                    }, d += 400);
+                    sched(function() { fixNote.classList.add('visible'); stepping = false; }, d += 500);
+                    break;
+
+                case 2:
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+                    sched(function() { punchTitle.classList.add('visible'); }, 100);
+                    sched(function() { punchCode.classList.add('visible'); }, 600);
+                    sched(function() { tagline.classList.add('visible'); }, 1200);
+                    sched(function() { replayBtn.classList.add('visible'); stepping = false; }, 1800);
+                    break;
+            }
+        }
+
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            if (curStep < maxStep) enterStep(curStep + 1);
+        });
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            if (curStep > 0) enterStep(curStep - 1);
+        });
+        if (replayBtn) replayBtn.addEventListener('click', function() {
+            resetAllState();
+            setTimeout(function() { enterStep(0); updateNav(); }, 200);
+        });
+
+        showcaseCallbacks['paths-2'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
+    // ============================================
+    // Circuits-1 Showcase
+    // ============================================
+
+    function setupCircuits1Showcase() {
+        var showcase = document.getElementById('ci1Showcase');
+        if (!showcase) return;
+
+        var prevBtn = document.getElementById('ci1Prev');
+        var nextBtn = document.getElementById('ci1Next');
+
+        var beforePhase = document.getElementById('ci1Before');
+        var beforeTitle = document.getElementById('ci1BeforeTitle');
+        var beforeCode = document.getElementById('ci1BeforeCode');
+        var beforeNote = document.getElementById('ci1BeforeNote');
+
+        var afterPhase = document.getElementById('ci1After');
+        var afterTitle = document.getElementById('ci1AfterTitle');
+        var afterCode = document.getElementById('ci1AfterCode');
+        var ladder = document.getElementById('ci1Ladder');
+        var bars = [];
+        for (var b = 0; b < 6; b++) {
+            bars.push(document.getElementById('ci1Bar' + b));
+        }
+        var afterNote = document.getElementById('ci1AfterNote');
+
+        var coordPhase = document.getElementById('ci1Coord');
+        var coordTitle = document.getElementById('ci1CoordTitle');
+        var workers = [];
+        for (var w = 0; w < 4; w++) {
+            workers.push(document.getElementById('ci1W' + w));
+        }
+        var coordEvent = document.getElementById('ci1Event');
+        var coordNote = document.getElementById('ci1CoordNote');
+
+        var punchPhase = document.getElementById('ci1Punchline');
+        var punchTitle = document.getElementById('ci1PunchTitle');
+        var punchCode = document.getElementById('ci1PunchCode');
+        var tagline = document.getElementById('ci1Tagline');
+        var replayBtn = document.getElementById('ci1Replay');
+
+        function esc(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function tok(tokens) {
+            var html = '';
+            for (var i = 0; i < tokens.length; i++) {
+                var t = tokens[i];
+                if (typeof t === 'string') { html += esc(t); }
+                else { html += '<span class="' + t.c + '">' + esc(t.v) + '</span>'; }
+            }
+            return html;
+        }
+
+        var beforeTokens = tok([
+            {c:'kw',v:'import'}, ' time, random\n\n',
+            {c:'nr',v:'max_retries'}, ' = ', {c:'nr',v:'5'}, '\n',
+            {c:'nr',v:'base_delay'}, ' = ', {c:'nr',v:'1.0'}, '\n',
+            {c:'nr',v:'max_delay'}, ' = ', {c:'nr',v:'30.0'}, '\n\n',
+            {c:'kw',v:'for'}, ' attempt ', {c:'kw',v:'in'}, ' ', {c:'bi',v:'range'}, '(max_retries):\n',
+            '    ', {c:'kw',v:'try'}, ':\n',
+            '        result = ', {c:'fn',v:'call_service'}, '()\n',
+            '        ', {c:'kw',v:'break'}, '\n',
+            '    ', {c:'kw',v:'except'}, ' ServiceError:\n',
+            '        ', {c:'kw',v:'if'}, ' attempt == max_retries - ', {c:'nr',v:'1'}, ':\n',
+            '            ', {c:'kw',v:'raise'}, '\n',
+            '        delay = ', {c:'bi',v:'min'}, '(base_delay * (', {c:'nr',v:'2'}, ' ** attempt), max_delay)\n',
+            '        jitter = random.', {c:'fn',v:'uniform'}, '(', {c:'nr',v:'0'}, ', delay * ', {c:'nr',v:'0.1'}, ')\n',
+            '        time.', {c:'fn',v:'sleep'}, '(delay + jitter)',
+        ]);
+
+        var afterTokens = tok([
+            {c:'kw',v:'from'}, ' ', {c:'fn',v:'suitkaise'}, ' ', {c:'kw',v:'import'}, ' ', {c:'api-hl',v:'Circuit'}, '\n\n',
+            'circuit = ', {c:'api-hl',v:'Circuit'}, '(\n',
+            '    num_shorts_to_trip=', {c:'nr',v:'5'}, ',\n',
+            '    sleep_time_after_trip=', {c:'nr',v:'1.0'}, ',\n',
+            '    backoff_factor=', {c:'nr',v:'2.0'}, ',\n',
+            '    max_sleep_time=', {c:'nr',v:'30.0'}, ',\n',
+            '    jitter=', {c:'nr',v:'0.1'}, '\n',
+            ')\n\n',
+            {c:'kw',v:'while'}, ' ', {c:'bi',v:'True'}, ':\n',
+            '    ', {c:'kw',v:'try'}, ':\n',
+            '        result = ', {c:'fn',v:'call_service'}, '()\n',
+            '        ', {c:'kw',v:'break'}, '\n',
+            '    ', {c:'kw',v:'except'}, ' ServiceError:\n',
+            '        circuit.', {c:'api-hl',v:'short'}, '()  ', {c:'cm',v:'# handles everything'},
+        ]);
+
+        var punchTokens = tok([
+            {c:'kw',v:'from'}, ' ', {c:'fn',v:'suitkaise'}, ' ', {c:'kw',v:'import'}, ' ', {c:'api-hl',v:'Circuit'}, ', ', {c:'api-hl',v:'BreakingCircuit'}, '\n\n',
+            {c:'cm',v:'# auto-reset: backoff + retry'}, '\n',
+            'circuit = ', {c:'api-hl',v:'Circuit'}, '(num_shorts_to_trip=', {c:'nr',v:'5'}, ', ...)\n',
+            'circuit.', {c:'api-hl',v:'short'}, '()   ', {c:'cm',v:'# count failures, auto-sleep'}, '\n',
+            'circuit.', {c:'api-hl',v:'trip'}, '()    ', {c:'cm',v:'# skip counter, trip now'}, '\n\n',
+            {c:'cm',v:'# manual-reset: coordinated shutdown'}, '\n',
+            'breaker = ', {c:'api-hl',v:'BreakingCircuit'}, '(num_shorts_to_trip=', {c:'nr',v:'1'}, ')\n',
+            'breaker.', {c:'api-hl',v:'broken'}, '     ', {c:'cm',v:'# all workers check this'},
+        ]);
+
+        var allPhases = [beforePhase, afterPhase, coordPhase, punchPhase];
+        var curStep = -1;
+        var stepping = false;
+        var maxStep = 3;
+
+        function hideAllPhases() {
+            allPhases.forEach(function(p) { if (p) p.classList.remove('active'); });
+        }
+
+        function resetAllState() {
+            cleanupCi1();
+            hideAllPhases();
+
+            [beforeTitle, beforeCode, beforeNote, afterTitle, afterCode,
+             ladder, afterNote, coordTitle, coordEvent, coordNote,
+             punchTitle, punchCode, tagline].forEach(function(el) {
+                if (el) el.classList.remove('visible');
+            });
+
+            bars.forEach(function(bar) { if (bar) bar.classList.remove('visible'); });
+
+            workers.forEach(function(wk) {
+                if (wk) {
+                    wk.classList.remove('visible', 'running', 'error', 'stopped');
+                    var status = wk.querySelector('.ci1-worker-status');
+                    if (status) {
+                        status.textContent = 'running';
+                        status.className = 'ci1-worker-status ci1-status-running';
+                    }
+                }
+            });
+
+            if (replayBtn) replayBtn.classList.remove('visible');
+
+            curStep = -1;
+            stepping = false;
+        }
+
+        function sched(fn, delay) {
+            ci1Timers.push(setTimeout(fn, delay));
+        }
+
+        function updateNav() {
+            if (prevBtn) prevBtn.disabled = (curStep <= 0);
+            if (nextBtn) nextBtn.disabled = (curStep >= maxStep);
+        }
+
+        function enterStep(step) {
+            if (stepping) return;
+            stepping = true;
+            cleanupCi1();
+            hideAllPhases();
+            curStep = step;
+            updateNav();
+
+            var d = 0;
+
+            switch (step) {
+                case 0:
+                    beforePhase.classList.add('active');
+                    beforeCode.innerHTML = beforeTokens;
+                    sched(function() { beforeTitle.classList.add('visible'); }, 100);
+                    sched(function() { beforeCode.classList.add('visible'); }, d += 500);
+                    sched(function() { beforeNote.classList.add('visible'); stepping = false; }, d += 800);
+                    break;
+
+                case 1:
+                    afterPhase.classList.add('active');
+                    afterCode.innerHTML = afterTokens;
+                    sched(function() { afterTitle.classList.add('visible'); }, 100);
+                    sched(function() { afterCode.classList.add('visible'); }, d += 500);
+                    sched(function() { ladder.classList.add('visible'); }, d += 600);
+                    for (var i = 0; i < bars.length; i++) {
+                        (function(idx) {
+                            sched(function() { bars[idx].classList.add('visible'); }, d += 120);
+                        })(i);
+                    }
+                    sched(function() { afterNote.classList.add('visible'); stepping = false; }, d += 400);
+                    break;
+
+                case 2:
+                    coordPhase.classList.add('active');
+                    sched(function() { coordTitle.classList.add('visible'); }, 100);
+                    d = 300;
+                    for (var j = 0; j < workers.length; j++) {
+                        (function(idx) {
+                            sched(function() {
+                                workers[idx].classList.add('visible');
+                                sched(function() { workers[idx].classList.add('running'); }, 150);
+                            }, d += 200);
+                        })(j);
+                    }
+
+                    sched(function() {
+                        // Worker 3 (index 2) hits error
+                        var errWorker = workers[2];
+                        errWorker.classList.remove('running');
+                        errWorker.classList.add('error');
+                        var errStatus = errWorker.querySelector('.ci1-worker-status');
+                        if (errStatus) {
+                            errStatus.textContent = 'FATAL ERROR';
+                        }
+                    }, d += 1400);
+
+                    sched(function() { coordEvent.classList.add('visible'); }, d += 600);
+
+                    // Cascade: other workers stop one by one
+                    var stopOrder = [1, 0, 3]; // workers 2,1,4 stop after worker 3
+                    for (var k = 0; k < stopOrder.length; k++) {
+                        (function(idx) {
+                            sched(function() {
+                                var wk = workers[idx];
+                                wk.classList.remove('running');
+                                wk.classList.add('stopped');
+                                var st = wk.querySelector('.ci1-worker-status');
+                                if (st) st.textContent = '.broken → stop';
+                            }, d += 350);
+                        })(stopOrder[k]);
+                    }
+
+                    sched(function() { coordNote.classList.add('visible'); stepping = false; }, d += 600);
+                    break;
+
+                case 3:
+                    punchPhase.classList.add('active');
+                    punchCode.innerHTML = punchTokens;
+                    sched(function() { punchTitle.classList.add('visible'); }, 100);
+                    sched(function() { punchCode.classList.add('visible'); }, 600);
+                    sched(function() { tagline.classList.add('visible'); }, 1200);
+                    sched(function() { replayBtn.classList.add('visible'); stepping = false; }, 1800);
+                    break;
+            }
+        }
+
+        if (nextBtn) nextBtn.addEventListener('click', function() {
+            if (curStep < maxStep) enterStep(curStep + 1);
+        });
+        if (prevBtn) prevBtn.addEventListener('click', function() {
+            if (curStep > 0) enterStep(curStep - 1);
+        });
+        if (replayBtn) replayBtn.addEventListener('click', function() {
+            resetAllState();
+            setTimeout(function() { enterStep(0); updateNav(); }, 200);
+        });
+
+        showcaseCallbacks['circuits-1'] = {
+            start: function() { resetAllState(); setTimeout(function() { enterStep(0); updateNav(); }, 200); },
+            stop: function() { resetAllState(); }
+        };
+    }
+
     function pulseQuickStart() {
         if (sessionStorage.getItem('qs_pulsed')) return;
         const btn = document.getElementById('navQuickStart');
@@ -3910,33 +6140,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const slides = Array.from(track.querySelectorAll('.carousel-slide'));
         const prevBtn = document.querySelector('.carousel-prev');
         const nextBtn = document.querySelector('.carousel-next');
-        const dotsContainer = document.querySelector('.carousel-dots');
+        const tabsContainer = document.querySelector('.carousel-tabs');
         if (!slides.length) return;
 
-        let current = 0;
+        let current = -1;
 
-        dotsContainer.innerHTML = '';
-        slides.forEach((_, i) => {
-            const dot = document.createElement('button');
-            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
-            dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
-            dot.addEventListener('click', () => goTo(i));
-            dotsContainer.appendChild(dot);
+        tabsContainer.innerHTML = '';
+        slides.forEach((slide, i) => {
+            const tab = document.createElement('button');
+            tab.className = 'carousel-tab' + (i === 0 ? ' active' : '');
+            tab.textContent = slide.dataset.label || slide.dataset.showcase || `Slide ${i + 1}`;
+            tab.addEventListener('click', () => goTo(i));
+            tabsContainer.appendChild(tab);
         });
 
         function goTo(index) {
+            var prev = current;
             current = Math.max(0, Math.min(index, slides.length - 1));
             track.style.transform = `translateX(-${current * 100}%)`;
             prevBtn.disabled = current === 0;
             nextBtn.disabled = current === slides.length - 1;
-            dotsContainer.querySelectorAll('.carousel-dot').forEach((d, i) => {
-                d.classList.toggle('active', i === current);
+            tabsContainer.querySelectorAll('.carousel-tab').forEach((t, i) => {
+                t.classList.toggle('active', i === current);
             });
+            sessionStorage.setItem('showcase_slide', String(current));
+
+            // Stop previous showcase, start current one
+            if (prev !== current || prev === undefined) {
+                var prevName = slides[prev] && slides[prev].dataset.showcase;
+                var curName = slides[current] && slides[current].dataset.showcase;
+                if (prevName && showcaseCallbacks[prevName]) {
+                    showcaseCallbacks[prevName].stop();
+                }
+                if (curName && showcaseCallbacks[curName]) {
+                    showcaseCallbacks[curName].start();
+                }
+            }
         }
 
         prevBtn.addEventListener('click', () => goTo(current - 1));
         nextBtn.addEventListener('click', () => goTo(current + 1));
-        goTo(0);
+
+        var saved = parseInt(sessionStorage.getItem('showcase_slide'), 10);
+        goTo(!isNaN(saved) && saved >= 0 && saved < slides.length ? saved : 0);
     }
 
     function setupFadeInAnimations() {

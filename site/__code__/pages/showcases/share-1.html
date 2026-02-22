@@ -1,0 +1,83 @@
+<div class="sh1-showcase" id="sh1Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="sh1Nav">
+        <button class="sc-nav-btn" id="sh1Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="sh1Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Steps 0-1: Code with inline typing effect -->
+    <div class="sh1-phase sh1-setup" id="sh1Setup">
+        <pre class="sh1-codeblock" id="sh1SetupCode"></pre>
+        <div class="sh1-expand-note" id="sh1ExpandNote">Add <span class="api-highlight">Share</span> to what you want to share.</div>
+    </div>
+
+    <!-- Step 2: The Reveal — processes appear, send data to Share -->
+    <div class="sh1-phase sh1-reveal" id="sh1Reveal">
+        <div class="sh1-reveal-text" id="sh1RevealText">Now let's run it across <strong>4 different processes.</strong></div>
+
+        <div class="sh1-diagram" id="sh1Diagram">
+            <div class="sh1-proc sh1-proc-1" id="sh1Proc1">
+                <div class="sh1-proc-code">double(1)</div>
+            </div>
+            <div class="sh1-proc sh1-proc-2" id="sh1Proc2">
+                <div class="sh1-proc-code">double(2)</div>
+            </div>
+
+            <div class="sh1-share-node" id="sh1ShareNode">
+                <div class="sh1-share-label">Share</div>
+                <div class="sh1-share-counter">counter = <span id="sh1Counter">0</span></div>
+                <div class="sh1-share-results">results = [<span id="sh1Results"></span>]</div>
+            </div>
+
+            <div class="sh1-proc sh1-proc-3" id="sh1Proc3">
+                <div class="sh1-proc-code">double(3)</div>
+            </div>
+            <div class="sh1-proc sh1-proc-4" id="sh1Proc4">
+                <div class="sh1-proc-code">double(4)</div>
+            </div>
+
+            <svg class="sh1-lines" id="sh1Lines" viewBox="0 0 800 300" preserveAspectRatio="none">
+                <line class="sh1-line" id="sh1Line1" x1="160" y1="80" x2="350" y2="150"/>
+                <line class="sh1-line" id="sh1Line2" x1="640" y1="80" x2="450" y2="150"/>
+                <line class="sh1-line" id="sh1Line3" x1="160" y1="220" x2="350" y2="150"/>
+                <line class="sh1-line" id="sh1Line4" x1="640" y1="220" x2="450" y2="150"/>
+            </svg>
+        </div>
+
+        <div class="sh1-reveal-sub" id="sh1RevealSub">Separate memory spaces. Separate CPU cores. Same shared state.</div>
+        <div class="sh1-reveal-kicker" id="sh1Kicker">And that's all it takes.</div>
+    </div>
+
+    <!-- Step 3: The Comparison — Share vs Manager -->
+    <div class="sh1-phase sh1-compare" id="sh1Compare">
+        <div class="sh1-compare-row">
+
+            <div class="sh1-compare-panel sh1-panel-good" id="sh1PanelGood">
+                <div class="sh1-panel-header">Share</div>
+                <pre class="sh1-panel-code" id="sh1GoodCode"></pre>
+            </div>
+
+            <div class="sh1-compare-vs">vs</div>
+
+            <div class="sh1-compare-panel sh1-panel-bad" id="sh1PanelBad">
+                <div class="sh1-panel-header">multiprocessing.Manager</div>
+                <pre class="sh1-panel-code" id="sh1BadCode"></pre>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Step 4: Punchline -->
+    <div class="sh1-phase sh1-punchline" id="sh1Punchline">
+        <div class="sh1-punch-title" id="sh1PunchTitle">Nothing to learn. You already know how to use it.</div>
+        <pre class="sh1-codeblock sh1-codeblock-small" id="sh1PunchCode"></pre>
+        <div class="sh1-tagline" id="sh1Tagline">Write Python. Share state.</div>
+        <button class="sh1-replay-btn" id="sh1Replay">replay</button>
+    </div>
+
+</div>

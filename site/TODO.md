@@ -78,42 +78,110 @@ NEXT, we need to:
 
 home page showcases
 
-the worst possible object showcase is always what shows up first on the home page. other than that, order is random.
-
-processing 1: at typing speed (about 150 wpm) we showcase a modified version of the 92 vs 40 lines of code example.
-
-1. give the situation: what is getting built?
-2. then, we do a side by side. on the left, suitkaise's 40 lines. on the right, 92 lines without it.
-3. keep the code on screen so the user can scroll through it.
-
-processing 2: show off Share as the main feature. it is the most "hype" and "out there" feature.
-
-processing 3. show off modified pools with star and sk modifiers.
-
-processing 4. show off a clean skprocess inheriting class that uses @autoreconnect
-
-for cucumber showcase 1: we show a cool monster vs an adventurer. i made the art and put it in assets. this monster is worst possible object. 
-
-1. we show just the monster for a few seconds, somehow showing that that represents the worst possible object.
-
-2. then we change the opacity to about 30-50%. this is where the actual worst possible object code quickly scrolls for about 5 seconds behind the monster image. as it is scrolling, small phrases "pop out" and fall/fade. these are the descriptions of worst possible object in plain language:
-
-- worst possible object pops out first and is slow to fade
-- then, "deeply nested"
-- "every type"
-- randomly generated nested collections
-- multiple circular and cross-referenced patterns
-- and whatever else we need to get the point across.
-
-make this feel like a boss battle.
-
-then, we need to create the wpo_debug_verbose.py script that serializes and deserializes the worst possible object with debug and verbose enabled. this is so i can get a recording for the site showcase.
-
-we make a blizzard/heavy snowfall effect. as the video plays of worst possible object getting round tripped, this effect plays on top.
-
-then, we show that it did it.
-
-for cucumber showcase 2: we show off the reconnector pattern. lazy reconnect, reconnect all, and auth reconnect.
+the worst possible object showcase (cucumber-1) always shows first. other than that, order is random.
 
 
-lets start with these 2 modules.
+## cucumber-2: "The Suitcase" (reconnector pattern)
+
+The suitcase metaphor — fits the library name.
+Your database connection is like a bottle of water: you can't bring it through airport security
+(the serialization boundary). The Reconnector is like an empty bottle with a label that says
+"fill with water on the other side."
+
+Animation:
+- object goes into suitcase, crosses the process boundary
+- reconnect() is called, connection springs back to life
+- show all three flavors: lazy reconnect (water gets auto refilled) reconnect_all (you refill multiple bottles), and auth reconnect (you fill a bottle with a specific liquid like lemonade instead)
+
+
+## share-1: "It's Just Python" (ease of use)
+
+Show simple Share code — attribute assignment, list append, logging.
+It looks like a beginner exercise. Then the reveal:
+"This is running across 4 separate processes. In separate memory spaces. On separate CPU cores."
+
+- Phase 1: code appears. Label fades in: "What do you think this code does?"
+- Phase 2: zoom out. The code was inside one of four process boxes. Arrows show data flowing
+  between them and a central Share object. Counter climbing, results growing, logger logging.
+- Phase 3: side by side. Left: Share code. Right: multiprocessing.Manager equivalent —
+  Manager(), Value(), Lock(), manual .value access, no logger support. 3-4x longer and
+  doesn't even support everything the left side does.
+
+Punchline: "look how normal this is." Nothing to learn. You already know how to use it.
+
+
+## share-2: "Put Anything On It" (works with any object)
+
+The Gauntlet — increasingly "impossible" objects appear one by one.
+Each one: created, assigned to Share, used from a subprocess, green checkmark.
+
+| Object                              | Why it's hard                          |
+| ----------------------------------- | -------------------------------------- |
+| int, str                            | Baseline — even Manager can do this    |
+| list, dict                          | Manager can too (slowly)               |
+| logging.Logger                      | Manager can't. pickle can't.           |
+| Custom class with nested state      | Manager can't without proxy classes    |
+| Lambda / closure                    | pickle chokes                          |
+| re.Pattern                          | Awkward to serialize                   |
+| Database connection (psycopg2)      | Completely impossible normally         |
+| Generator with state                | Nothing handles this                   |
+| Object containing all of the above  | Game over                              |
+
+After dict: red X on "without suitkaise" side, green checkmark on Share side.
+The code never changes. Object gets more complex, code stays identical.
+
+
+## share-3: "It Just Stays In Sync" (everything syncs)
+
+4 process boxes on screen, Share object in the center with share.counter = 0.
+All 4 processes increment simultaneously. Counter climbs from 0 to 100.
+No locks. No race conditions. No Manager. Just self.share.counter += 1.
+Freeze animation, show the code.
+
+Tagline: "10 workers. 10 runs each. 100 increments. Zero bugs. Zero boilerplate."
+
+Optional escalation: swap counter for dict, logger, list — everything syncs the same way.
+
+
+## processing-3: "Power-Ups" (modified pools with .star() and sk modifiers)
+
+Show a plain pool.map() call, then power it up one modifier at a time:
+.star() to unpack args, .retry() for fault tolerance, .timeout() for safety,
+.rate_limit() for API calls, .asynced() for async, .background() for fire-and-forget.
+
+Each modifier snaps onto the call like a game power-up. You never rewrite the function,
+you just chain modifiers at the call site.
+
+
+## sk-1: "The Swiss Army Knife" (every modifier)
+
+One function, displayed as a Swiss Army knife. Each modifier is a blade that unfolds:
+.retry(3), .timeout(5), .background(), .rate_limit(10), .asynced().
+
+For each, a tiny animation of what it does (retry: attempts, timeout: clock,
+background: Future coming back, etc.).
+End with chaining: func.retry(3).timeout(5).rate_limit(10)() — all blades open at once.
+
+
+## timing-1: "The One-Liner" — DONE (combined with timing-2)
+
+4 steps: ugly vanilla (15 lines) → @timethis one-liner → stats grid → punchline.
+Shows the stats you get for free: mean, median, stdev, p95, p99, min, max, variance.
+
+
+## paths-1: "Lost in Translation" — DONE
+
+3 steps: problem (3 OS terminals, different paths, red glow) → fix (Skpath.rp, all match, green glow) → punchline.
+Tagline: "Same project, any machine, zero path bugs."
+
+
+## paths-2: "@autopath: The Pit of Success" — DONE
+
+3 steps: callers send str/Path/Skpath + ugly isinstance boilerplate → @autopath flow diagram → punchline.
+Tagline: "Once it's on, wrong paths can't get in."
+
+
+## circuits-1: "Failure Handling, Solved." — DONE
+
+4 steps: ugly manual backoff code → Circuit + backoff ladder animation → coordinated shutdown with 4 workers + .trip() → punchline.
+Tagline: "Retry smart. Fail together. Recover gracefully."

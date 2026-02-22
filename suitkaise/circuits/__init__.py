@@ -23,6 +23,6 @@ __all__ = [
 ]
 
 # Module metadata
-__version__ = "0.4.7b0"
-__author__ = "Suitkaise Development Team"
+__version__ = "0.4.11b0"
+__author__ = "Casey Eddings"
 

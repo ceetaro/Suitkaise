@@ -1,0 +1,76 @@
+<div class="pt2-showcase" id="pt2Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="pt2Nav">
+        <button class="sc-nav-btn" id="pt2Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="pt2Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: The Problem — manual validation boilerplate -->
+    <div class="pt2-phase pt2-problem" id="pt2Problem">
+        <div class="pt2-title" id="pt2ProbTitle">Some people use strings. Some people use Paths.</div>
+        <div class="pt2-callers" id="pt2Callers">
+            <div class="pt2-caller" id="pt2Caller0">
+                <span class="pt2-type-pill pt2-type-str">str</span>
+                <code>process_file(<span class="st">"data/file.txt"</span>)</code>
+            </div>
+            <div class="pt2-caller" id="pt2Caller1">
+                <span class="pt2-type-pill pt2-type-path">Path</span>
+                <code>process_file(Path(<span class="st">"data/file.txt"</span>))</code>
+            </div>
+        </div>
+        <div class="pt2-prob-label" id="pt2ProbLabel">So you write this:</div>
+        <pre class="pt2-codeblock" id="pt2ProbCode"></pre>
+    </div>
+
+    <!-- Step 1: The Fix — @autopath flow diagram -->
+    <div class="pt2-phase pt2-fix" id="pt2Fix">
+        <div class="pt2-title" id="pt2FixTitle">@autopath() handles all of this and more for you.</div>
+        <pre class="pt2-codeblock pt2-codeblock-fix" id="pt2FixCode"></pre>
+        <div class="pt2-flow" id="pt2Flow">
+            <div class="pt2-flow-inputs">
+                <div class="pt2-flow-item" id="pt2In0">
+                    <span class="pt2-type-pill pt2-type-str">str</span>
+                    <span class="pt2-flow-val">"data\file.txt"</span>
+                </div>
+                <div class="pt2-flow-item" id="pt2In1">
+                    <span class="pt2-type-pill pt2-type-path">Path</span>
+                    <span class="pt2-flow-val">Path("data/file.txt")</span>
+                </div>
+                <div class="pt2-flow-item" id="pt2In2">
+                    <span class="pt2-type-pill pt2-type-skpath">Skpath</span>
+                    <span class="pt2-flow-val">Skpath("data/file.txt")</span>
+                </div>
+            </div>
+            <div class="pt2-flow-arrow" id="pt2Arrow1">
+                <svg viewBox="0 0 40 24" fill="none"><path d="M4 12h28M26 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="pt2-flow-middle" id="pt2Middle">
+                <span class="pt2-type-pill pt2-type-skpath">Skpath</span>
+                <div class="pt2-middle-label">normalized slashes, resolved root, cross-platform compatible</div>
+            </div>
+            <div class="pt2-flow-arrow" id="pt2Arrow2">
+                <svg viewBox="0 0 40 24" fill="none"><path d="M4 12h28M26 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="pt2-flow-output" id="pt2FlowOut">
+                <span class="pt2-type-pill pt2-type-str">str</span>
+                <span class="pt2-flow-val pt2-flow-match">"data/file.txt"</span>
+                <span class="pt2-flow-check">✓</span>
+            </div>
+        </div>
+        <div class="pt2-fix-note" id="pt2FixNote">1. Normalized through Skpath.rp to become cross-platform compatible. 2. Converts to best annotated type (Skpath > Path > str).</div>
+    </div>
+
+    <!-- Step 2: Punchline -->
+    <div class="pt2-phase pt2-punchline" id="pt2Punchline">
+        <div class="pt2-punch-title" id="pt2PunchTitle">A pit of success.</div>
+        <pre class="pt2-codeblock pt2-codeblock-small" id="pt2PunchCode"></pre>
+        <div class="pt2-tagline" id="pt2Tagline">With @autopath, you can't mess up path handling even if you tried.</div>
+        <button class="pt2-replay-btn" id="pt2Replay">replay</button>
+    </div>
+
+</div>

@@ -15,11 +15,16 @@ def _module_names() -> list[str]:
 
 
 def _format_info() -> str:
-    modules = ", ".join(_module_names())
+    version = suitkaise.__version__
+    _version = f"suitkaise {version}"
+    if "b0" in version:
+        _version = _version.replace("b0", " beta")
     return (
-        f"Suitkaise {suitkaise.__version__}\n"
-        f"Modules: {modules}\n"
-        f"Python: 3.11+"
+        f"\n"
+        f"  {_version}\n"
+        f"\n"
+        f"  Website:         https://suitkaise.info\n"
+        f"  Download docs:   suitkaise docs\n"
     )
 
 

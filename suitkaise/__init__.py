@@ -156,8 +156,8 @@ from . import docs
 # ============================================================================
 # Module Metadata
 # ============================================================================
-__version__ = "0.4.7b0"
-__author__ = "Suitkaise Development Team"
+__version__ = "0.4.11b0"
+__author__ = "Casey Eddings"
 
 __all__ = [
     # Timing
@@ -237,6 +237,11 @@ __all__ = [
 # ============================================================================
 # Post-install welcome (once per version, interactive terminals only)
 # ============================================================================
-from ._welcome import _show_welcome as _show_welcome
-_show_welcome(__version__)
-del _show_welcome
+import sys as _sys, os as _os
+_is_cli = (hasattr(_sys, "argv") and _sys.argv
+           and _os.path.basename(_sys.argv[0]) in ("suitkaise", "suitkaise.exe"))
+if not _is_cli:
+    from ._welcome import _show_welcome as _show_welcome
+    _show_welcome(__version__)
+    del _show_welcome
+del _sys, _os, _is_cli

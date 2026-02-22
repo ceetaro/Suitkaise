@@ -1,0 +1,79 @@
+<div class="ci1-showcase" id="ci1Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="ci1Nav">
+        <button class="sc-nav-btn" id="ci1Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="ci1Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: The ugly way -->
+    <div class="ci1-phase ci1-before" id="ci1Before">
+        <div class="ci1-title" id="ci1BeforeTitle">You're calling a service that could fail.</div>
+        <pre class="ci1-codeblock" id="ci1BeforeCode"></pre>
+        <div class="ci1-before-note" id="ci1BeforeNote">What if there was an easier and better way to do this?</div>
+    </div>
+
+    <!-- Step 1: circuit.short() + backoff ladder -->
+    <div class="ci1-phase ci1-after" id="ci1After">
+        <div class="ci1-title" id="ci1AfterTitle">Use a Circuit instead.</div>
+        <div class="ci1-split" id="ci1Split">
+            <pre class="ci1-codeblock ci1-codeblock-sm" id="ci1AfterCode"></pre>
+            <div class="ci1-ladder" id="ci1Ladder">
+                <div class="ci1-ladder-label" id="ci1LadderLabel">Automatic exponential backoff!</div>
+                <div class="ci1-ladder-bars">
+                    <div class="ci1-bar" id="ci1Bar0"><span class="ci1-bar-fill" style="width:3%"></span><span class="ci1-bar-text">1s</span></div>
+                    <div class="ci1-bar" id="ci1Bar1"><span class="ci1-bar-fill" style="width:7%"></span><span class="ci1-bar-text">2s</span></div>
+                    <div class="ci1-bar" id="ci1Bar2"><span class="ci1-bar-fill" style="width:13%"></span><span class="ci1-bar-text">4s</span></div>
+                    <div class="ci1-bar" id="ci1Bar3"><span class="ci1-bar-fill" style="width:27%"></span><span class="ci1-bar-text">8s</span></div>
+                    <div class="ci1-bar" id="ci1Bar4"><span class="ci1-bar-fill" style="width:53%"></span><span class="ci1-bar-text">16s</span></div>
+                    <div class="ci1-bar" id="ci1Bar5"><span class="ci1-bar-fill" style="width:100%"></span><span class="ci1-bar-text">30s <span class="ci1-cap">(capped)</span></span></div>
+                </div>
+            </div>
+        </div>
+        <div class="ci1-after-note" id="ci1AfterNote">Works with Share. Thread safe. Built in backoff.</div>
+    </div>
+
+    <!-- Step 2: Coordinated shutdown -->
+    <div class="ci1-phase ci1-coord" id="ci1Coord">
+        <div class="ci1-title" id="ci1CoordTitle">If one trips, all break.</div>
+        <div class="ci1-workers" id="ci1Workers">
+            <div class="ci1-worker" id="ci1W0">
+                <div class="ci1-worker-label">Worker 1</div>
+                <div class="ci1-worker-status ci1-status-running">running</div>
+                <div class="ci1-worker-pulse"></div>
+            </div>
+            <div class="ci1-worker" id="ci1W1">
+                <div class="ci1-worker-label">Worker 2</div>
+                <div class="ci1-worker-status ci1-status-running">running</div>
+                <div class="ci1-worker-pulse"></div>
+            </div>
+            <div class="ci1-worker" id="ci1W2">
+                <div class="ci1-worker-label">Worker 3</div>
+                <div class="ci1-worker-status ci1-status-running">running</div>
+                <div class="ci1-worker-pulse"></div>
+            </div>
+            <div class="ci1-worker" id="ci1W3">
+                <div class="ci1-worker-label">Worker 4</div>
+                <div class="ci1-worker-status ci1-status-running">running</div>
+                <div class="ci1-worker-pulse"></div>
+            </div>
+        </div>
+        <div class="ci1-coord-event" id="ci1Event">
+            <span class="ci1-event-icon">⚡</span> Worker 3 hits a fatal error → circuit.trip()
+        </div>
+        <div class="ci1-coord-note" id="ci1CoordNote">No Redis. No database. Just a shared circuit.</div>
+    </div>
+
+    <!-- Step 3: Punchline -->
+    <div class="ci1-phase ci1-punchline" id="ci1Punchline">
+        <div class="ci1-punch-title" id="ci1PunchTitle">Handle your failures using suitkaise.circuits instead of doing it yourself.</div>
+        <pre class="ci1-codeblock ci1-codeblock-sm" id="ci1PunchCode"></pre>
+        <div class="ci1-tagline" id="ci1Tagline">Circuit auto resets. BreakingCircuit stays broken until you reset it yourself.</div>
+        <button class="ci1-replay-btn" id="ci1Replay">replay</button>
+    </div>
+
+</div>
