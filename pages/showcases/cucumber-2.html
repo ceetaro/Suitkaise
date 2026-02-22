@@ -1,0 +1,108 @@
+<div class="cuke2-showcase" id="cuke2Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="cuke2Nav">
+        <button class="sc-nav-btn" id="cuke2Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="cuke2Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- The Problem (single phase, elements stagger in) -->
+    <div class="cuke2-phase cuke2-problem" id="cuke2Problem">
+        <div class="cuke2-text cuke2-text-center" id="cuke2ProbText1">You have a database connection. You need it in another process.</div>
+        <pre class="cuke2-codeblock" id="cuke2ProbCode"></pre>
+        <div class="cuke2-error" id="cuke2Error">
+            <span class="cuke2-error-label">PicklingError</span>
+            <span class="cuke2-error-msg">can't pickle psycopg2.connection objects</span>
+        </div>
+        <div class="cuke2-prob-explain" id="cuke2ProbText2">The connection is alive here. So it can't exist over there.</div>
+    </div>
+
+    <!-- Suitcase packing + Reconnector label (one scene) -->
+    <div class="cuke2-phase cuke2-packing" id="cuke2Packing">
+        <div class="cuke2-text cuke2-text-center" id="cuke2PackText1"><span class="api-highlight">cucumber</span> doesn't try to copy the connection.</div>
+        <div class="cuke2-text cuke2-text-center" id="cuke2PackText2">It packs what it needs to make a new one.</div>
+
+        <div class="cuke2-case-area" id="cuke2CaseArea">
+            <img class="cuke2-case-img" id="cuke2CaseImg"
+                 src="__assets__/briefcase-laptop-closed.png" alt="">
+        </div>
+
+        <div class="cuke2-tags" id="cuke2Tags">
+            <div class="cuke2-tag" data-idx="0"><span class="cuke2-tag-key">host</span><span class="cuke2-tag-val">"db.prod"</span></div>
+            <div class="cuke2-tag" data-idx="1"><span class="cuke2-tag-key">database</span><span class="cuke2-tag-val">"users"</span></div>
+            <div class="cuke2-tag" data-idx="2"><span class="cuke2-tag-key">port</span><span class="cuke2-tag-val">5432</span></div>
+            <div class="cuke2-tag" data-idx="3"><span class="cuke2-tag-key">user</span><span class="cuke2-tag-val">"admin"</span></div>
+            <div class="cuke2-tag cuke2-tag-denied" data-idx="4"><span class="cuke2-tag-key">password</span><span class="cuke2-tag-x">&#10007;</span></div>
+        </div>
+
+        <div class="cuke2-security-note" id="cuke2SecurityNote">Credentials are never stored for security reasons.</div>
+
+        <div class="cuke2-label-wrap" id="cuke2LabelWrap">
+            <div class="cuke2-reconn-label">PostgresReconnector</div>
+        </div>
+        <div class="cuke2-text cuke2-text-center cuke2-text-dim cuke2-label-explain" id="cuke2LabelExplain">A <span style="color:rgba(109,233,149,0.8)">Reconnector</span> stores everything needed to recreate the connection &mdash; host, port, user, database &mdash; without the credentials. It's a placeholder that knows how to come back to life.</div>
+    </div>
+
+    <!-- Crossing the Boundary -->
+    <div class="cuke2-phase cuke2-crossing" id="cuke2Crossing">
+        <div class="cuke2-boundary-scene">
+            <div class="cuke2-side cuke2-side-left">
+                <div class="cuke2-side-label">Process A</div>
+            </div>
+            <div class="cuke2-boundary-line">
+                <span class="cuke2-boundary-text">process boundary</span>
+            </div>
+            <div class="cuke2-side cuke2-side-right">
+                <div class="cuke2-side-label">Process B</div>
+            </div>
+            <div class="cuke2-travel-case" id="cuke2TravelCase">
+                <img src="__assets__/briefcase-laptop-closed.png" alt="" class="cuke2-travel-img">
+            </div>
+        </div>
+        <div class="cuke2-text cuke2-text-center cuke2-cross-text" id="cuke2CrossText">On the other side, you reconnect.</div>
+    </div>
+
+    <!-- Three Flavors — side by side -->
+    <div class="cuke2-phase cuke2-flavors" id="cuke2Flavors">
+        <div class="cuke2-flavors-row">
+
+            <div class="cuke2-flavor-card" id="cuke2Lazy">
+                <div class="cuke2-flavor-header">lazy reconnect</div>
+                <div class="cuke2-flavor-sub">No credentials needed.</div>
+                <pre class="cuke2-flavor-code" id="cuke2LazyCode"></pre>
+                <div class="cuke2-flavor-note" id="cuke2LazyNote">First attribute access auto-reconnects.</div>
+                <div class="cuke2-flavor-supported">SQLite &middot; DuckDB &middot; sockets &middot; threads</div>
+            </div>
+
+            <div class="cuke2-flavor-card" id="cuke2Auth">
+                <div class="cuke2-flavor-header">auth reconnect</div>
+                <div class="cuke2-flavor-sub">You provide the password.</div>
+                <pre class="cuke2-flavor-code" id="cuke2AuthCode"></pre>
+                <div class="cuke2-flavor-note" id="cuke2AuthNote"><span class="api-highlight">cucumber</span> never stores credentials.</div>
+                <div class="cuke2-flavor-supported">PostgreSQL &middot; MySQL &middot; MongoDB &middot; Redis &middot; +12 more</div>
+            </div>
+
+            <div class="cuke2-flavor-card" id="cuke2All">
+                <div class="cuke2-flavor-header">reconnect_all</div>
+                <div class="cuke2-flavor-sub">Many connections at once.</div>
+                <pre class="cuke2-flavor-code cuke2-flavor-code-tall" id="cuke2AllCode"></pre>
+                <div class="cuke2-flavor-note" id="cuke2AllNote">One call. Every connection. Per-attribute credentials.</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Punchline -->
+    <div class="cuke2-phase cuke2-punchline" id="cuke2Punchline">
+        <div class="cuke2-text cuke2-text-center" id="cuke2PunchText1">Or, just let it happen automatically.</div>
+        <pre class="cuke2-codeblock cuke2-codeblock-wide" id="cuke2PunchCode"></pre>
+        <div class="cuke2-punch-note" id="cuke2PunchNote">Connections auto-reconnect when the process starts.</div>
+        <div class="cuke2-tagline" id="cuke2Tagline">Pack anything. Cross any boundary. Reconnect on the other side.</div>
+        <button class="cuke2-replay-btn" id="cuke2Replay">replay</button>
+    </div>
+
+</div>

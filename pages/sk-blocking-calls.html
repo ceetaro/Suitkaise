@@ -1,0 +1,414 @@
+<div class="module-bar" data-module="sk">
+    <button class="module-bar-title">suitkaise.sk</button>
+    <nav class="module-bar-nav">
+        <a href="#sk-why" class="module-bar-link" data-page="sk-why">why</a>
+        <a href="#sk-quick-start" class="module-bar-link" data-page="sk-quick-start">quick start</a>
+        <a href="#sk" class="module-bar-link" data-page="sk">how to use</a>
+        <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
+        <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
+        <a href="#sk-blocking-calls" class="module-bar-link active" data-page="sk-blocking-calls">blocking calls</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
+        <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>Blocking Calls Reference</h1>
+    <p>This page lists all function and method calls that the <code><suitkaise-api>sk</suitkaise-api></code> module auto-detects as blocking. If your code uses any of these, <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> become available.</p>
+    <p>Note: Detection is case-insensitive.</p>
+    <p>Note: You can always use the <code><suitkaise-api>@blocking</suitkaise-api></code> decorator to explicitly mark code as blocking when <code>AST</code> detection doesn&#x27;t catch it (for things like heavy, time consuming CPU bound work)</p>
+    <hr>
+    <h2>Exact Blocking Calls</h2>
+    <p>These are matched exactly (full <code>call path</code>).</p>
+    <h3>Time / Sleep</h3>
+    <ul>
+        <li><code>time.sleep</code></li>
+        <li><code>sleep</code></li>
+        <li><code><suitkaise-api>timing</suitkaise-api>.sleep</code></li>
+        <li><code><suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api>.sleep</code></li>
+    </ul>
+    <h3>File I/O</h3>
+    <ul>
+        <li><code>open</code></li>
+        <li><code>read</code></li>
+        <li><code>write</code></li>
+        <li><code>readline</code></li>
+        <li><code>readlines</code></li>
+        <li><code>writelines</code></li>
+    </ul>
+    <h3>OS Module</h3>
+    <ul>
+        <li><code>os.read</code></li>
+        <li><code>os.write</code></li>
+        <li><code>os.popen</code></li>
+        <li><code>os.system</code></li>
+    </ul>
+    <h3>Subprocess</h3>
+    <ul>
+        <li><code>subprocess.<suitkaise-api>run</suitkaise-api></code></li>
+        <li><code>subprocess.call</code></li>
+        <li><code>subprocess.check_call</code></li>
+        <li><code>subprocess.check_output</code></li>
+        <li><code>subprocess.popen</code></li>
+    </ul>
+    <h3>Requests</h3>
+    <ul>
+        <li><code>requests.get</code></li>
+        <li><code>requests.post</code></li>
+        <li><code>requests.put</code></li>
+        <li><code>requests.delete</code></li>
+        <li><code>requests.patch</code></li>
+        <li><code>requests.head</code></li>
+        <li><code>requests.options</code></li>
+        <li><code>requests.request</code></li>
+    </ul>
+    <h3>HTTPX</h3>
+    <ul>
+        <li><code>httpx.get</code></li>
+        <li><code>httpx.post</code></li>
+        <li><code>httpx.put</code></li>
+        <li><code>httpx.delete</code></li>
+        <li><code>httpx.patch</code></li>
+        <li><code>httpx.head</code></li>
+        <li><code>httpx.options</code></li>
+        <li><code>httpx.request</code></li>
+        <li><code>httpx.stream</code></li>
+    </ul>
+    <h3>urllib / urllib3</h3>
+    <ul>
+        <li><code>urllib.request.urlopen</code></li>
+        <li><code>urlopen</code></li>
+        <li><code>urllib3.poolmanager.request</code></li>
+        <li><code>urllib3.connectionpool.request</code></li>
+        <li><code>urllib3.request</code></li>
+    </ul>
+    <h3>Socket</h3>
+    <ul>
+        <li><code>socket.socket</code></li>
+        <li><code>socket.create_connection</code></li>
+    </ul>
+    <h3>Pathlib</h3>
+    <ul>
+        <li><code>pathlib.path.open</code></li>
+        <li><code>pathlib.path.read_text</code></li>
+        <li><code>pathlib.path.read_bytes</code></li>
+        <li><code>pathlib.path.write_text</code></li>
+        <li><code>pathlib.path.write_bytes</code></li>
+    </ul>
+    <h3>Shutil</h3>
+    <ul>
+        <li><code>shutil.copy</code></li>
+        <li><code>shutil.copy2</code></li>
+        <li><code>shutil.copyfile</code></li>
+        <li><code>shutil.copytree</code></li>
+        <li><code>shutil.move</code></li>
+        <li><code>shutil.rmtree</code></li>
+    </ul>
+    <h3>Database Connectors</h3>
+    <ul>
+        <li><code>sqlite3.connect</code></li>
+        <li><code>psycopg2.connect</code></li>
+        <li><code>psycopg.connect</code></li>
+        <li><code>pymysql.connect</code></li>
+        <li><code>mysql.connector.connect</code></li>
+        <li><code>mysqldb.connect</code></li>
+        <li><code>pyodbc.connect</code></li>
+        <li><code>duckdb.connect</code></li>
+        <li><code>pymssql.connect</code></li>
+        <li><code>oracledb.connect</code></li>
+        <li><code>cx_oracle.connect</code></li>
+        <li><code>snowflake.connector.connect</code></li>
+    </ul>
+    <h3>Redis</h3>
+    <ul>
+        <li><code>redis.from_url</code></li>
+        <li><code>redis.redis.from_url</code></li>
+        <li><code>redis.strictredis.from_url</code></li>
+        <li><code>redis.sentinel.sentinel</code></li>
+    </ul>
+    <h3>MongoDB</h3>
+    <ul>
+        <li><code>pymongo.mongoclient</code></li>
+        <li><code>pymongo.mongo_client.mongoclient</code></li>
+    </ul>
+    <h3>AWS / Boto3</h3>
+    <ul>
+        <li><code>boto3.client</code></li>
+        <li><code>boto3.resource</code></li>
+        <li><code>boto3.session.session.client</code></li>
+        <li><code>boto3.session.session.resource</code></li>
+    </ul>
+    <h3>Kafka / RabbitMQ</h3>
+    <ul>
+        <li><code>kafka.kafka_producer</code></li>
+        <li><code>kafka.kafkaconsumer</code></li>
+        <li><code>confluent_kafka.producer</code></li>
+        <li><code>confluent_kafka.consumer</code></li>
+        <li><code>pika.blockingconnection</code></li>
+    </ul>
+    <h3>Elasticsearch / OpenSearch</h3>
+    <ul>
+        <li><code>elasticsearch.elasticsearch</code></li>
+        <li><code>opensearchpy.opensearch</code></li>
+    </ul>
+    <h3>Database Cursor/Connection</h3>
+    <ul>
+        <li><code>cursor.execute</code></li>
+        <li><code>cursor.executemany</code></li>
+        <li><code>cursor.fetchone</code></li>
+        <li><code>cursor.fetchall</code></li>
+        <li><code>cursor.fetchmany</code></li>
+        <li><code>connection.commit</code></li>
+        <li><code>connection.rollback</code></li>
+    </ul>
+    <hr>
+    <h2>Blocking Method Patterns</h2>
+    <p>If any call ends with one of these <code>method names</code>, it&#x27;s considered blocking.</p>
+    <h3>Core Blocking</h3>
+    <ul>
+        <li><code>sleep</code></li>
+        <li><code>wait</code></li>
+        <li><code>wait_for</code></li>
+        <li><code>join</code></li>
+        <li><code>acquire</code></li>
+    </ul>
+    <h3>Socket / Network</h3>
+    <ul>
+        <li><code>recv</code></li>
+        <li><code>recvfrom</code></li>
+        <li><code>send</code></li>
+        <li><code>sendto</code></li>
+        <li><code>sendall</code></li>
+        <li><code>accept</code></li>
+        <li><code>connect</code></li>
+        <li><code>listen</code></li>
+    </ul>
+    <h3>File I/O</h3>
+    <ul>
+        <li><code>read</code></li>
+        <li><code>readline</code></li>
+        <li><code>readlines</code></li>
+        <li><code>write</code></li>
+        <li><code>writelines</code></li>
+        <li><code>open</code></li>
+        <li><code>read_text</code></li>
+        <li><code>read_bytes</code></li>
+        <li><code>write_text</code></li>
+        <li><code>write_bytes</code></li>
+    </ul>
+    <h3>Database</h3>
+    <ul>
+        <li><code>fetch</code></li>
+        <li><code>fetchone</code></li>
+        <li><code>fetchall</code></li>
+        <li><code>fetchmany</code></li>
+        <li><code>execute</code></li>
+        <li><code>executemany</code></li>
+        <li><code>commit</code></li>
+        <li><code>rollback</code></li>
+    </ul>
+    <h3>AWS S3</h3>
+    <ul>
+        <li><code>get_object</code></li>
+        <li><code>put_object</code></li>
+        <li><code>head_object</code></li>
+        <li><code>list_objects</code></li>
+        <li><code>list_objects_v2</code></li>
+        <li><code>delete_object</code></li>
+        <li><code>copy_object</code></li>
+        <li><code>upload_file</code></li>
+        <li><code>upload_fileobj</code></li>
+        <li><code>download_file</code></li>
+        <li><code>download_fileobj</code></li>
+        <li><code>list_buckets</code></li>
+        <li><code>create_bucket</code></li>
+        <li><code>delete_bucket</code></li>
+    </ul>
+    <h3>AWS DynamoDB</h3>
+    <ul>
+        <li><code>get_item</code></li>
+        <li><code>put_item</code></li>
+        <li><code>update_item</code></li>
+        <li><code>delete_item</code></li>
+        <li><code>batch_get_item</code></li>
+        <li><code>batch_write_item</code></li>
+        <li><code>query</code></li>
+        <li><code>scan</code></li>
+    </ul>
+    <h3>AWS SQS / SNS</h3>
+    <ul>
+        <li><code>send_message</code></li>
+        <li><code>receive_message</code></li>
+        <li><code>delete_message</code></li>
+        <li><code>publish</code></li>
+        <li><code>subscribe</code></li>
+    </ul>
+    <h3>MongoDB</h3>
+    <ul>
+        <li><code>find</code></li>
+        <li><code>find_one</code></li>
+        <li><code>insert_one</code></li>
+        <li><code>insert_many</code></li>
+        <li><code>update_one</code></li>
+        <li><code>update_many</code></li>
+        <li><code>replace_one</code></li>
+        <li><code>delete_one</code></li>
+        <li><code>delete_many</code></li>
+        <li><code>aggregate</code></li>
+        <li><code>count_documents</code></li>
+        <li><code>distinct</code></li>
+        <li><code>bulk_write</code></li>
+    </ul>
+    <h3>Redis</h3>
+    <ul>
+        <li><code>blpop</code></li>
+        <li><code>brpop</code></li>
+        <li><code>brpoplpush</code></li>
+        <li><code>bzpopmin</code></li>
+        <li><code>bzpopmax</code></li>
+        <li><code>xread</code></li>
+        <li><code>xreadgroup</code></li>
+        <li><code>get_message</code></li>
+    </ul>
+    <h3>Elasticsearch / OpenSearch</h3>
+    <ul>
+        <li><code>search</code></li>
+        <li><code>index</code></li>
+        <li><code>bulk</code></li>
+        <li><code>msearch</code></li>
+        <li><code>delete_by_query</code></li>
+        <li><code>update_by_query</code></li>
+    </ul>
+    <h3>Kafka / RabbitMQ</h3>
+    <ul>
+        <li><code>produce</code></li>
+        <li><code>send</code></li>
+        <li><code>poll</code></li>
+        <li><code>flush</code></li>
+        <li><code>basic_publish</code></li>
+        <li><code>basic_consume</code></li>
+        <li><code>basic_get</code></li>
+    </ul>
+    <h3>Other Databases</h3>
+    <ul>
+        <li><code>execute</code></li>
+        <li><code><suitkaise-api>run</suitkaise-api></code></li>
+        <li><code>query</code></li>
+        <li><code>write_points</code></li>
+        <li><code>write_api</code></li>
+    </ul>
+    <h3>Suitkaise</h3>
+    <ul>
+        <li><code>map</code></li>
+        <li><code>imap</code></li>
+        <li><code>starmap</code></li>
+        <li><code>short</code></li>
+        <li><code>trip</code></li>
+    </ul>
+    <hr>
+    <h2>Broad Blocking Patterns</h2>
+    <p>These <code>method names</code> are only considered blocking when the <code>call path</code> contains an <code>I/O context keyword</code>.</p>
+    <h3>Broad Methods</h3>
+    <ul>
+        <li><code>get</code></li>
+        <li><code>set</code></li>
+        <li><code>find</code></li>
+        <li><code>insert</code></li>
+        <li><code>update</code></li>
+        <li><code>delete</code></li>
+        <li><code>query</code></li>
+        <li><code>scan</code></li>
+        <li><code>request</code></li>
+        <li><code>send</code></li>
+        <li><code>recv</code></li>
+        <li><code>read</code></li>
+        <li><code>write</code></li>
+        <li><code>execute</code></li>
+        <li><code>commit</code></li>
+        <li><code>rollback</code></li>
+    </ul>
+    <h3>I/O Context Keywords</h3>
+    <p>For a broad method to trigger <code>blocking detection</code>, the <code>call path</code> must contain one of these:</p>
+    <h4>Databases</h4>
+    <ul>
+        <li><code>db</code></li>
+        <li><code>database</code></li>
+        <li><code>cursor</code></li>
+        <li><code>conn</code></li>
+        <li><code>connection</code></li>
+        <li><code>engine</code></li>
+        <li><code>session</code></li>
+        <li><code>pool</code></li>
+        <li><code>psycopg</code></li>
+        <li><code>postgres</code></li>
+        <li><code>mysql</code></li>
+        <li><code>sqlite</code></li>
+        <li><code>mongo</code></li>
+        <li><code>pymongo</code></li>
+        <li><code>redis</code></li>
+        <li><code>sqlalchemy</code></li>
+        <li><code>odbc</code></li>
+        <li><code>duckdb</code></li>
+    </ul>
+    <h4>Cloud / AWS</h4>
+    <ul>
+        <li><code>boto3</code></li>
+        <li><code>botocore</code></li>
+        <li><code>s3</code></li>
+        <li><code>sqs</code></li>
+        <li><code>sns</code></li>
+        <li><code>dynamodb</code></li>
+        <li><code>kinesis</code></li>
+        <li><code>lambda</code></li>
+    </ul>
+    <h4>Messaging / Search</h4>
+    <ul>
+        <li><code>kafka</code></li>
+        <li><code>rabbitmq</code></li>
+        <li><code>amqp</code></li>
+        <li><code>pika</code></li>
+        <li><code>elasticsearch</code></li>
+        <li><code>opensearch</code></li>
+        <li><code>search</code></li>
+    </ul>
+    <h4>Data Stores</h4>
+    <ul>
+        <li><code>cassandra</code></li>
+        <li><code>neo4j</code></li>
+        <li><code>influx</code></li>
+        <li><code>influxdb</code></li>
+        <li><code>clickhouse</code></li>
+    </ul>
+    <h4>Networking</h4>
+    <ul>
+        <li><code>http</code></li>
+        <li><code>https</code></li>
+        <li><code>request</code></li>
+        <li><code>requests</code></li>
+        <li><code>httpx</code></li>
+        <li><code>urllib</code></li>
+        <li><code>socket</code></li>
+        <li><code>sock</code></li>
+        <li><code>client</code></li>
+        <li><code>channel</code></li>
+    </ul>
+    <hr>
+    <h2>Examples</h2>
+    <h3>Detected as blocking</h3>
+    <pre><code class="language-python">time.sleep(1)                    # exact match: time.sleep
+requests.get(url)                # exact match: requests.get
+cursor.fetchall()                # pattern match: fetchall
+self.db.execute(query)           # broad match: execute + db context
+s3_client.get_object(...)        # pattern match: get_object</code></pre>
+    <h3>NOT detected as blocking</h3>
+    <pre><code class="language-python">my_dict.get(&quot;key&quot;)               # broad method, no I/O context
+data.update({&quot;a&quot;: 1})            # broad method, no I/O context
+calculate()                      # unknown function</code></pre>
+    <h3>Use @blocking for undetected cases</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
+def cpu_intensive():
+    # pure computation, no I/O calls
+    return sum(x**2 for x in range(10_000_000))</code></pre>
+</section>

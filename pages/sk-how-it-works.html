@@ -1,0 +1,562 @@
+<div class="module-bar" data-module="sk">
+    <button class="module-bar-title">suitkaise.sk</button>
+    <nav class="module-bar-nav">
+        <a href="#sk-why" class="module-bar-link" data-page="sk-why">why</a>
+        <a href="#sk-quick-start" class="module-bar-link" data-page="sk-quick-start">quick start</a>
+        <a href="#sk" class="module-bar-link" data-page="sk">how to use</a>
+        <a href="#sk-how-it-works" class="module-bar-link active" data-page="sk-how-it-works">how it works</a>
+        <a href="#sk-examples" class="module-bar-link" data-page="sk-examples">examples</a>
+        <a href="#sk-blocking-calls" class="module-bar-link" data-page="sk-blocking-calls">blocking calls</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
+        <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>How <code><suitkaise-api>sk</suitkaise-api></code> works</h1>
+    <p><code><suitkaise-api>sk</suitkaise-api></code> attaches modifiers and async support to classes and functions without changing how you call them. It also pre-computes <code>_shared_meta</code> for <code><suitkaise-api>Share</suitkaise-api></code> compatibility.</p>
+    <h2>Architecture Overview</h2>
+    <pre><code class="language-text">┌──────────────────────────────────────────────────────┐
+│ @sk decorator / sk()                                 │
+│ input: class or function                             │
+└─────────────────────────────┬────────────────────────┘
+                              ▼
+                 ┌────────────────────────────┐
+                 │ AST analysis (analyzer.py) │
+                 └──────────────┬─────────────┘
+                                │
+        ┌───────────────────────┼────────────────────────┐
+        ▼                       ▼                        ▼
+┌──────────────────┐   ┌──────────────────┐   ┌─────────────────────────┐
+│ attribute reads  │   │ attribute writes │   │ blocking detection      │
+│ (self.x reads)   │   │ (self.x writes)  │   │ (time.sleep, I/O, etc.) │
+└────────┬─────────┘   └────────┬─────────┘   └────────────┬────────────┘
+         └──────────────────────┴──────────────────────────┘
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ attach sk features      │
+                    └────────────┬────────────┘
+                                 │
+                 ┌───────────────┴────────────────┐
+                 ▼                                ▼
+┌──────────────────────────────────────┐  ┌──────────────────────────────────────┐
+│ classes                              │  │ functions                            │
+│ - _shared_meta                       │  │ - has_blocking_calls                 │
+│ - _blocking_methods                  │  │ - blocking_calls                     │
+│ - .asynced()                         │  │ - .asynced() .retry() .timeout()     │
+│ - method modifiers                   │  │ - .background() .rate_limit()        │
+└───────────────────┬──────────────────┘  └───────────────────┬──────────────────┘
+                    └──────────────────────┬──────────────────┘
+                                           ▼
+                    ┌──────────────────────────────────────────┐
+                    │ return original object (enhanced)        │
+                    └──────────────────────────────────────────┘</code></pre>
+    <h2>Blocking Detection</h2>
+    <p>The <code>sk</code> module detects blocking code to decide whether <code>.<suitkaise-api>asynced</suitkaise-api>()</code> and <code>.<suitkaise-api>background</suitkaise-api>()</code> are allowed.</p>
+    <h3>Detection Order</h3>
+    <ol>
+        <li>Check for <code><suitkaise-api>@blocking</suitkaise-api></code> decorator - if a function/method has <code><suitkaise-api>@blocking</suitkaise-api></code>, it&#x27;s immediately marked as blocking. AST analysis for blocking calls is skipped (performance optimization).</li>
+        <li>AST analysis - if no <code><suitkaise-api>@blocking</suitkaise-api></code> decorator, parse the source code and look for known blocking patterns.</li>
+    </ol>
+    <h3>Known Blocking Calls</h3>
+    <p>The analyzer maintains a set of known blocking calls:</p>
+    <pre><code class="language-python">BLOCKING_CALLS = {
+    # time module
+    &#x27;time.sleep&#x27;, &#x27;sleep&#x27;,
+    
+    # file I/O
+    &#x27;open&#x27;, &#x27;read&#x27;, &#x27;write&#x27;, &#x27;readline&#x27;, &#x27;readlines&#x27;,
+    
+    # subprocess
+    &#x27;subprocess.run&#x27;, &#x27;subprocess.call&#x27;, &#x27;subprocess.check_call&#x27;,
+    
+    # requests
+    &#x27;requests.get&#x27;, &#x27;requests.post&#x27;, &#x27;requests.put&#x27;, ...
+    
+    # database connectors
+    &#x27;sqlite3.connect&#x27;, &#x27;psycopg2.connect&#x27;, &#x27;pymysql.connect&#x27;, ...
+    
+    # for the whole list, see the blocking calls page
+}</code></pre>
+    <h3>Blocking Method Patterns</h3>
+    <p>The analyzer also recognizes method name patterns that typically indicate blocking:</p>
+    <pre><code class="language-python">BLOCKING_METHOD_PATTERNS = {
+    &#x27;sleep&#x27;, &#x27;wait&#x27;, &#x27;join&#x27;,
+    &#x27;recv&#x27;, &#x27;send&#x27;, &#x27;accept&#x27;, &#x27;connect&#x27;,
+    &#x27;read&#x27;, &#x27;write&#x27;, &#x27;fetch&#x27;, &#x27;fetchone&#x27;, &#x27;fetchall&#x27;,
+    &#x27;execute&#x27;, &#x27;commit&#x27;, &#x27;rollback&#x27;,
+    # for the whole list, see the blocking calls page
+}</code></pre>
+    <h3>How <code>_BlockingCallVisitor</code> Works</h3>
+    <ol>
+        <li>Parse AST - convert function source to abstract syntax tree</li>
+        <li>Visit all <code>ast.Call</code> nodes - for each function/method call in the code</li>
+        <li>Extract full name - build the dotted name (<code>time.sleep</code>, <code>self.db.execute</code>)</li>
+        <li>Check against known patterns:</li>
+    </ol>
+    <ul>
+        <li>Direct match in <code>BLOCKING_CALLS</code></li>
+        <li>Method name ends with pattern in <code>BLOCKING_METHOD_PATTERNS</code></li>
+        <li>Broad pattern match with I/O context hints</li>
+    </ul>
+    <pre><code class="language-python">class _BlockingCallVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.<suitkaise-api>blocking_calls</suitkaise-api>: List[str] = []
+    
+    def visit_Call(self, node: ast.Call):
+        call_name = self._get_call_name(node)
+        
+        if call_name:
+            # check exact match
+            if call_name.lower() in BLOCKING_CALLS:
+                self.<suitkaise-api>blocking_calls</suitkaise-api>.append(call_name)
+            
+            # check method pattern
+            elif call_name.split(&#x27;.&#x27;)[-1] in BLOCKING_METHOD_PATTERNS:
+                self.<suitkaise-api>blocking_calls</suitkaise-api>.append(call_name)
+        
+        self.generic_visit(node)</code></pre>
+    <h2><code>_shared_meta</code> Generation</h2>
+    <p><code>_shared_meta</code> tells <code><suitkaise-api>Share</suitkaise-api></code> which attributes each method reads and writes. This enables efficient synchronization.</p>
+    <h3>How <code>_AttributeVisitor</code> Works</h3>
+    <ol>
+        <li>Parse AST - convert method source to abstract syntax tree</li>
+        <li>Visit all Attribute nodes - for each <code>self.something</code> access</li>
+        <li>Check context:</li>
+    </ol>
+    <ul>
+        <li><code>ast.Store</code> context → write (<code>self.x = 1</code>)</li>
+        <li><code>ast.Load</code> context → read (<code>y = self.x</code>)</li>
+    </ul>
+    <ol start="4">
+        <li>Handle augmented assignment - <code>self.x += 1</code> is both read and write</li>
+    </ol>
+    <pre><code class="language-python">class _AttributeVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.reads: Set[str] = set()
+        self.writes: Set[str] = set()
+    
+    def visit_Attribute(self, node: ast.Attribute):
+        if isinstance(node.value, ast.Name) and node.value.id == &#x27;self&#x27;:
+            attr_name = node.attr
+            
+            if isinstance(node.ctx, ast.Store):
+                self.writes.add(attr_name)
+            elif isinstance(node.ctx, ast.Load):
+                self.reads.add(attr_name)
+        
+        self.generic_visit(node)
+    
+    def visit_AugAssign(self, node: ast.AugAssign):
+        # self.x += 1 is both read and write
+        if isinstance(node.target, ast.Attribute):
+            if isinstance(node.target.value, ast.Name) and node.target.value.id == &#x27;self&#x27;:
+                attr_name = node.target.attr
+                self.reads.add(attr_name)
+                self.writes.add(attr_name)
+        
+        self.visit(node.value)</code></pre>
+    <h3><code>_shared_meta</code> Structure</h3>
+    <pre><code class="language-python">_shared_meta = {
+    &#x27;methods&#x27;: {
+        &#x27;increment&#x27;: {&#x27;writes&#x27;: [&#x27;counter&#x27;]},
+        &#x27;reset&#x27;: {&#x27;writes&#x27;: [&#x27;counter&#x27;, &#x27;history&#x27;]},
+        &#x27;get_value&#x27;: {&#x27;writes&#x27;: []},
+    },
+    &#x27;properties&#x27;: {
+        &#x27;value&#x27;: {&#x27;reads&#x27;: [&#x27;counter&#x27;]},
+        &#x27;is_empty&#x27;: {&#x27;reads&#x27;: [&#x27;counter&#x27;]},
+    },
+}</code></pre>
+    <h2><code><suitkaise-api>sk</suitkaise-api></code> on Functions</h2>
+    <p>When you apply <code><suitkaise-api>sk</suitkaise-api></code> to a function (as a decorator or function call):</p>
+    <pre><code class="language-python"># as decorator
+<suitkaise-api>@sk</suitkaise-api>
+def slow_fetch(url):
+    return requests.get(url).text
+
+# or as function call
+def slow_fetch(url):
+    return requests.get(url).text
+
+slow_fetch = <suitkaise-api>sk</suitkaise-api>(slow_fetch)</code></pre>
+    <h3>What Happens</h3>
+    <ol>
+        <li>Detect blocking calls - check for <code><suitkaise-api>@blocking</suitkaise-api></code> or analyze AST</li>
+        <li>Attach attributes:</li>
+    </ol>
+    <ul>
+        <li><code>func.<suitkaise-api>has_blocking_calls</suitkaise-api></code> - <code>bool</code></li>
+        <li><code>func.<suitkaise-api>blocking_calls</suitkaise-api></code> - list of detected calls</li>
+    </ul>
+    <ol start="3">
+        <li>Attach modifier methods - each returns an <code>Skfunction</code> for chaining</li>
+    </ol>
+    <pre><code class="language-python">def <suitkaise-api>sk</suitkaise-api>(func):
+    # detect blocking calls
+    blocking_calls = detect_blocking(func)
+    
+    # attach attributes
+    func.<suitkaise-api>has_blocking_calls</suitkaise-api> = len(blocking_calls) &gt; 0
+    func.<suitkaise-api>blocking_calls</suitkaise-api> = blocking_calls
+    
+    # attach modifier methods
+    func.<suitkaise-api>asynced</suitkaise-api> = lambda: Skfunction(func).<suitkaise-api>asynced</suitkaise-api>()
+    func.<suitkaise-api>retry</suitkaise-api> = lambda *args, **kwargs: Skfunction(func).<suitkaise-api>retry</suitkaise-api>(*args, **kwargs)
+    func.<suitkaise-api>timeout</suitkaise-api> = lambda seconds: Skfunction(func).<suitkaise-api>timeout</suitkaise-api>(seconds)
+    func.<suitkaise-api>background</suitkaise-api> = lambda: Skfunction(func).<suitkaise-api>background</suitkaise-api>()
+    func.rate_limit = lambda per_second: Skfunction(func).rate_limit(per_second)
+    
+    return func  # return original function</code></pre>
+    <h3>Modifier Chaining</h3>
+    <p>When you call a modifier, it creates an <code>Skfunction</code> wrapper:</p>
+    <pre><code class="language-python">slow_fetch.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(&quot;https://example.com&quot;)</code></pre>
+    <ol>
+        <li><code>slow_fetch.<suitkaise-api>retry</suitkaise-api>(3)</code> → creates <code>Skfunction</code> with retry config</li>
+        <li><code>.<suitkaise-api>timeout</suitkaise-api>(5.0)</code> → returns new <code>Skfunction</code> with both retry and timeout</li>
+        <li><code>(&quot;https://example.com&quot;)</code> → executes with both modifiers applied</li>
+    </ol>
+    <h2><code><suitkaise-api>sk</suitkaise-api></code> on Classes</h2>
+    <p>When you apply <code><suitkaise-api>sk</suitkaise-api></code> to a class (as a decorator or function call):</p>
+    <pre><code class="language-python"># as decorator
+<suitkaise-api>@sk</suitkaise-api>
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self):
+        self.value += 1
+
+# or as function call
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def increment(self):
+        self.value += 1
+
+Counter = <suitkaise-api>sk</suitkaise-api>(Counter)</code></pre>
+    <h3>What Happens</h3>
+    <ol>
+        <li>Analyze all methods - generate <code>_shared_meta</code> and detect blocking calls</li>
+        <li>Attach class-level attributes:</li>
+    </ol>
+    <ul>
+        <li><code>cls._shared_meta</code> - for <code><suitkaise-api>Share</suitkaise-api></code> compatibility</li>
+        <li><code>cls._blocking_methods</code> - dict of method → blocking calls</li>
+        <li><code>cls.<suitkaise-api>has_blocking_calls</suitkaise-api></code> - <code>bool</code></li>
+        <li><code>cls.<suitkaise-api>asynced</suitkaise-api>()</code> - static method returning async class</li>
+    </ul>
+    <ol start="3">
+        <li>Wrap methods with descriptors - each method gets modifier support</li>
+    </ol>
+    <pre><code class="language-python">def <suitkaise-api>sk</suitkaise-api>(cls):
+    # analyze class
+    shared_meta, blocking_methods = analyze_class(cls)
+    
+    # attach metadata
+    cls._shared_meta = shared_meta
+    cls._blocking_methods = blocking_methods
+    cls.<suitkaise-api>has_blocking_calls</suitkaise-api> = len(blocking_methods) &gt; 0
+    
+    # attach asynced() static method
+    def <suitkaise-api>asynced</suitkaise-api>():
+        if not blocking_methods:
+            raise <suitkaise-api>SkModifierError</suitkaise-api>(f&quot;{cls.__name__} has no blocking calls&quot;)
+        return create_async_class(cls, blocking_methods)
+    cls.<suitkaise-api>asynced</suitkaise-api> = staticmethod(asynced)
+    
+    # wrap methods with _ModifiableMethod descriptors
+    for name, member in cls.__dict__.items():
+        if is_regular_method(member):
+            setattr(cls, name, _ModifiableMethod(member))
+    
+    return cls  # return original class</code></pre>
+    <h3>Method Wrapping</h3>
+    <p>Each method is wrapped with <code>_ModifiableMethod</code>, a descriptor that provides modifiers:</p>
+    <pre><code class="language-python">class _ModifiableMethod:
+    def __init__(self, sync_method, ...):
+        self._sync_method = sync_method
+    
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return _ModifiableBoundMethod(obj, self._sync_method, ...)</code></pre>
+    <p>When you access a method on an instance, you get a <code>_ModifiableBoundMethod</code> that supports:</p>
+    <pre><code class="language-python">counter.increment()                    # direct call
+counter.increment.asynced()()          # async version using asyncio.to_thread()
+counter.increment.retry(3)()           # with retry
+counter.increment.timeout(5.0)()       # with timeout
+counter.increment.background()()       # returns Future
+counter.increment.rate_limit(2.0)()    # rate limited</code></pre>
+    <h2>Async Class Generation</h2>
+    <p>When you call <code>MyClass.<suitkaise-api>asynced</suitkaise-api>()</code>, it creates a new class with blocking methods wrapped.</p>
+    <h3>How <code>create_async_class</code> Works</h3>
+    <ol>
+        <li>Create new class - name it <code>_Async{ClassName}</code></li>
+        <li>Copy all methods - non-blocking methods stay as-is</li>
+        <li>Wrap blocking methods - use <code>asyncio.to_thread()</code> wrapper</li>
+        <li>Copy metadata - preserve <code>_shared_meta</code> for <code>Share</code></li>
+    </ol>
+    <pre><code class="language-python">def create_async_class(cls, blocking_methods):
+    new_methods = {}
+    
+    for name in dir(cls):
+        method = getattr(cls, name)
+        
+        if name in blocking_methods:
+            # wrap with to_thread
+            async def async_wrapper(self, *args, _method=method, **kwargs):
+                return await asyncio.to_thread(_method, self, *args, **kwargs)
+            new_methods[name] = async_wrapper
+        else:
+            # keep original
+            new_methods[name] = method
+    
+    # create new class
+    async_cls = type(f&#x27;_Async{cls.__name__}&#x27;, (cls,), new_methods)
+    async_cls._shared_meta = cls._shared_meta
+    
+    return async_cls</code></pre>
+    <h2>Modifier Execution Order</h2>
+    <p>Modifiers are always applied in a consistent order, regardless of how you chain them.</p>
+    <ol>
+        <li>Rate limit (outermost) - throttles before each attempt</li>
+        <li>Retry (wraps attempts)</li>
+        <li>Timeout (inside retry) - times out each attempt</li>
+        <li>Function call (innermost)</li>
+    </ol>
+    <p>This means these are equivalent:</p>
+    <pre><code class="language-python">fn.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(...)
+fn.<suitkaise-api>timeout</suitkaise-api>(5.0).<suitkaise-api>retry</suitkaise-api>(3)(...)</code></pre>
+    <p>Both will</p>
+    <ol>
+        <li>Check rate limit</li>
+        <li>Start retry loop (up to 3 attempts)</li>
+        <li>For each attempt, apply 5-second timeout</li>
+        <li>Call the function</li>
+    </ol>
+    <h3>Why Fixed Order Matters</h3>
+    <ul>
+        <li>Timeout inside retry: Each attempt gets 5 seconds. Total time could be 15s.</li>
+        <li>Retry inside timeout: All 3 attempts must complete in 5 seconds total.</li>
+    </ul>
+    <p>Making this consistent means you don&#x27;t have to worry about the exact order every time.</p>
+    <h2><code>Skfunction</code> Internals</h2>
+    <p><code>Skfunction</code> is the internal wrapper that holds modifier configuration and applies it when you call the function.</p>
+    <h3>How It Stores Configuration</h3>
+    <p>When you chain modifiers, each one returns a new <code>Skfunction</code> with updated config:</p>
+    <ol>
+        <li>You call <code>.<suitkaise-api>retry</suitkaise-api>(3)</code> on an <code>Skfunction</code></li>
+        <li>It creates a copy of itself with <code>retry: {times: 3, ...}</code> added to <code>_config</code></li>
+        <li>You call <code>.<suitkaise-api>timeout</suitkaise-api>(5.0)</code> on that copy</li>
+        <li>It creates another copy with <code>timeout: {seconds: 5.0}</code> added</li>
+        <li>The final <code>Skfunction</code> has both retry and timeout in its <code>_config</code> dict</li>
+    </ol>
+    <p>This copy-on-modify pattern is why chaining order doesn&#x27;t matter - each modifier just adds its config, and execution order is determined at call time.</p>
+    <pre><code class="language-python">class Skfunction:
+    def __init__(self, func, *, _config=None, _blocking_calls=None):
+        self._func = func
+        self._config = _config or {}
+        self._blocking_calls = _blocking_calls
+    
+    def _copy_with(self, **config_updates):
+        new_config = {**self._config, **config_updates}
+        return Skfunction(self._func, _config=new_config, _blocking_calls=self._blocking_calls)
+    
+    def <suitkaise-api>retry</suitkaise-api>(self, times=3, delay=1.0, backoff_factor=1.0, exceptions=(Exception,)):
+        return self._copy_with(retry={&#x27;times&#x27;: times, &#x27;delay&#x27;: delay, &#x27;backoff_factor&#x27;: backoff_factor, &#x27;exceptions&#x27;: exceptions})
+    
+    def <suitkaise-api>timeout</suitkaise-api>(self, seconds):
+        return self._copy_with(timeout={&#x27;seconds&#x27;: seconds})</code></pre>
+    <h3>How Execution Works</h3>
+    <p>When you finally call the <code>Skfunction</code> (e.g., <code>fn.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(&quot;arg&quot;)</code>):</p>
+    <ol>
+        <li>Extract all configs - pull retry, timeout, and rate_limit settings from <code>_config</code></li>
+        <li>Check rate limit first - if rate limiting is configured, block until we&#x27;re allowed to proceed. This happens before any execution attempts.</li>
+        <li>Build the execution function - create an inner function that:</li>
+    </ol>
+    <ul>
+        <li>If timeout is set: run the real function in a <code>ThreadPoolExecutor</code> with a timeout on <code>future.<suitkaise-api>result</suitkaise-api>()</code></li>
+        <li>If no timeout: just call the function directly</li>
+    </ul>
+    <ol start="4">
+        <li>Apply retry logic - if retry is configured:</li>
+    </ol>
+    <ul>
+        <li>Loop up to <code>times</code> attempts</li>
+        <li>On each failure, sleep for <code>delay</code> seconds (multiplied by <code>backoff_factor</code> each time)</li>
+        <li>If all attempts fail, raise the last exception</li>
+    </ul>
+    <ol start="5">
+        <li>Return the result - either from the first successful attempt, or raise if all failed</li>
+    </ol>
+    <pre><code class="language-python">def __call__(self, *args, **kwargs):
+    func = self._func
+    retry_config = self._config.get(&#x27;retry&#x27;)
+    timeout_config = self._config.get(&#x27;timeout&#x27;)
+    rate_limit_config = self._config.get(&#x27;rate_limit&#x27;)
+    
+    # step 2: check rate limit first
+    if rate_limit_config:
+        rate_limit_config[&#x27;limiter&#x27;].acquire()
+    
+    # step 3: build the execution function
+    def execute_once():
+        if timeout_config:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(func, *args, **kwargs)
+                try:
+                    return future.<suitkaise-api>result</suitkaise-api>(timeout=timeout_config[&#x27;seconds&#x27;])
+                except TimeoutError:
+                    raise <suitkaise-api>FunctionTimeoutError</suitkaise-api>(f&quot;{func.__name__} timed out&quot;)
+        else:
+            return func(*args, **kwargs)
+    
+    # step 4: apply retry logic
+    if retry_config:
+        sleep_time = retry_config[&#x27;delay&#x27;]
+        for attempt in range(retry_config[&#x27;times&#x27;]):
+            try:
+                return execute_once()
+            except retry_config[&#x27;exceptions&#x27;] as e:
+                if attempt &lt; retry_config[&#x27;times&#x27;] - 1:
+                    time.sleep(sleep_time)
+                    sleep_time *= retry_config[&#x27;backoff_factor&#x27;]
+                else:
+                    raise
+    else:
+        return execute_once()</code></pre>
+    <h3>Timeout Implementation</h3>
+    <p>Timeouts use a <code>ThreadPoolExecutor</code> with a single worker:</p>
+    <ol>
+        <li>Submit the function to the executor</li>
+        <li>Call <code>future.<suitkaise-api>result</suitkaise-api>(timeout=seconds)</code> which blocks up to the timeout</li>
+        <li>If it times out, raise <code><suitkaise-api>FunctionTimeoutError</suitkaise-api></code></li>
+    </ol>
+    <p>This approach can interrupt blocking I/O because the main thread stops waiting, even if the worker thread continues.</p>
+    <hr>
+    <h2><code><suitkaise-api>AsyncSkfunction</suitkaise-api></code> Internals</h2>
+    <p>Returned by <code>Skfunction.<suitkaise-api>asynced</suitkaise-api>()</code> for async execution.</p>
+    <h3>How It Differs from Sync</h3>
+    <p>The async version follows the same modifier pattern, but:</p>
+    <ol>
+        <li>Rate limiting uses <code>await limiter.acquire_async()</code> instead of blocking</li>
+        <li>Timeouts use <code>asyncio.wait_for()</code> instead of <code>ThreadPoolExecutor</code></li>
+        <li>Function execution uses <code>asyncio.to_thread()</code> to run the sync function without blocking the event loop</li>
+        <li>Retry delays use <code>await asyncio.sleep()</code> instead of <code>time.sleep()</code></li>
+    </ol>
+    <h3>Execution Flow</h3>
+    <ol>
+        <li>Check rate limit - await the async limiter if configured</li>
+        <li>Build async execution - create a coroutine that:</li>
+    </ol>
+    <ul>
+        <li>Wraps the sync function in <code>asyncio.to_thread()</code></li>
+        <li>If timeout is set, wraps that in <code>asyncio.wait_for()</code></li>
+    </ul>
+    <ol start="3">
+        <li>Apply retry logic - same loop as sync, but using <code>await</code> for the execution and <code>asyncio.sleep()</code> for delays</li>
+        <li>Return the result - the awaited result from the function</li>
+    </ol>
+    <pre><code class="language-python">async def __call__(self, *args, **kwargs):
+    retry_config = self._config.get(&#x27;retry&#x27;)
+    timeout_config = self._config.get(&#x27;timeout&#x27;)
+    rate_limit_config = self._config.get(&#x27;rate_limit&#x27;)
+    
+    # step 1: check rate limit
+    if rate_limit_config:
+        await rate_limit_config[&#x27;limiter&#x27;].acquire_async()
+    
+    # step 2: build async execution
+    async def execute_once():
+        if timeout_config:
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(self._func, *args, **kwargs),
+                    timeout=timeout_config[&#x27;seconds&#x27;],
+                )
+            except asyncio.TimeoutError:
+                raise <suitkaise-api>FunctionTimeoutError</suitkaise-api>(f&quot;{self._func.__name__} timed out&quot;)
+        else:
+            return await asyncio.to_thread(self._func, *args, **kwargs)
+    
+    # step 3: apply retry logic
+    if retry_config:
+        sleep_time = retry_config[&#x27;delay&#x27;]
+        for attempt in range(retry_config[&#x27;times&#x27;]):
+            try:
+                return await execute_once()
+            except retry_config[&#x27;exceptions&#x27;] as e:
+                if attempt &lt; retry_config[&#x27;times&#x27;] - 1:
+                    await asyncio.sleep(sleep_time)
+                    sleep_time *= retry_config[&#x27;backoff_factor&#x27;]
+                else:
+                    raise
+    else:
+        return await execute_once()</code></pre>
+    <hr>
+    <h2>Rate Limiter</h2>
+    <p>The rate limiter ensures a maximum number of calls per second using a simple interval-based approach.</p>
+    <h3>How It Works</h3>
+    <ol>
+        <li>Calculate minimum interval - if you want 2 calls/second, the minimum interval is 0.5 seconds between calls</li>
+        <li>Track last call time - store when the last call happened</li>
+        <li>On each acquire:</li>
+    </ol>
+    <ul>
+        <li>Calculate how long since the last call</li>
+        <li>If less than the minimum interval, sleep for the remaining time</li>
+        <li>Update the last call timestamp</li>
+    </ul>
+    <ol start="4">
+        <li>Thread safety - the sync version uses a lock to prevent race conditions when multiple threads call simultaneously</li>
+    </ol>
+    <h3>Sync vs Async</h3>
+    <ul>
+        <li>Sync <code>acquire()</code>: Uses <code>time.sleep()</code> and a threading lock</li>
+        <li>Async <code>acquire_async()</code>: Uses <code>await asyncio.sleep()</code> (no lock needed in async context)</li>
+    </ul>
+    <pre><code class="language-python">class RateLimiter:
+    def __init__(self, per_second: float):
+        self._per_second = per_second
+        self._interval = 1.0 / per_second  # minimum time between calls
+        self._last_call = 0.0
+        self._lock = threading.Lock()
+    
+    def acquire(self):
+        with self._lock:
+            now = time.monotonic()
+            wait_time = self._interval - (now - self._last_call)
+            if wait_time &gt; 0:
+                time.sleep(wait_time)
+            self._last_call = time.monotonic()
+    
+    async def acquire_async(self):
+        now = time.monotonic()
+        wait_time = self._interval - (now - self._last_call)
+        if wait_time &gt; 0:
+            await asyncio.sleep(wait_time)
+        self._last_call = time.monotonic()</code></pre>
+    <h2>Share Integration</h2>
+    <p>When <code><suitkaise-api>Share</suitkaise-api></code> receives an <code><suitkaise-api>@sk</suitkaise-api></code>-decorated class, it can use <code>_shared_meta</code> for efficient synchronization.</p>
+    <h3>How It Works</h3>
+    <ol>
+        <li><code>share.counter = Counter()</code> - share sees <code>Counter._shared_meta</code></li>
+        <li>Share creates proxy that intercepts method calls</li>
+        <li>When <code>share.counter.increment()</code> is called:</li>
+    </ol>
+    <ul>
+        <li>Proxy looks up <code>_shared_meta[&#x27;methods&#x27;][&#x27;increment&#x27;][&#x27;writes&#x27;]</code></li>
+        <li>Proxy increments pending counter for <code>counter.value</code></li>
+        <li>Proxy queues the command</li>
+    </ul>
+    <ol start="4">
+        <li>When reading <code>share.counter.value</code>:</li>
+    </ol>
+    <ul>
+        <li>Proxy looks up <code>_shared_meta[&#x27;properties&#x27;][&#x27;value&#x27;][&#x27;reads&#x27;]</code></li>
+        <li>Proxy waits for pending writes to <code>counter.value</code></li>
+        <li>Proxy fetches and returns the value</li>
+    </ul>
+    <p>This ensures reads see the effects of prior writes.</p>
+</section>

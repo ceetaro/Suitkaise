@@ -1,0 +1,910 @@
+<div class="module-bar" data-module="processing">
+    <button class="module-bar-title">suitkaise.processing</button>
+    <nav class="module-bar-nav">
+        <a href="#processing-why" class="module-bar-link" data-page="processing-why">why</a>
+        <a href="#processing-quick-start" class="module-bar-link" data-page="processing-quick-start">quick start</a>
+        <a href="#processing" class="module-bar-link active" data-page="processing">how to use</a>
+        <a href="#processing-how-it-works" class="module-bar-link" data-page="processing-how-it-works">how it works</a>
+        <a href="#processing-examples" class="module-bar-link" data-page="processing-examples">examples</a>
+        <a href="#processing-videos" class="module-bar-link" data-page="processing-videos">videos</a>
+        <a href="#processing-learn" class="module-bar-link" data-page="processing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page" data-skapi-roots="process_config" data-skapi-extra="process_config,runs,join_in,lives,timeouts,prerun,run,postrun,onfinish,result,error">
+    <h1>How to use <code><suitkaise-api>processing</suitkaise-api></code></h1>
+    <p><code><suitkaise-api>processing</suitkaise-api></code> provides powerful subprocess execution, parallel processing, and shared memory across process boundaries.</p>
+    <p><code><suitkaise-api>Skprocess</suitkaise-api></code>: Base class for easy, class based subprocess execution.</p>
+    <ul>
+        <li>Inherit from <code><suitkaise-api>Skprocess</suitkaise-api></code></li>
+        <li>Implement the lifecycle methods</li>
+        <li>Easy to make and use</li>
+        <li><code><suitkaise-api>tell</suitkaise-api>()</code> and <code><suitkaise-api>listen</suitkaise-api>()</code> for queue based communication</li>
+        <li>Serializes with <code><suitkaise-api>cucumber</suitkaise-api></code></li>
+        <li>Automatic reconnection of live resources with <code><suitkaise-api>autoreconnect</suitkaise-api></code></li>
+        <li>Automatic timing</li>
+        <li>Automatic retries</li>
+        <li>Automatic timeouts</li>
+        <li>Automatic looping</li>
+        <li>Simple class pattern</li>
+    </ul>
+    <p><code><suitkaise-api>Pool</suitkaise-api></code>: Parallel batch processing.</p>
+    <ul>
+        <li><code><suitkaise-api>map</suitkaise-api></code>: returns a list, ordered by input</li>
+        <li><code><suitkaise-api>unordered_map</suitkaise-api></code>: returns an unordered list, fastest items first</li>
+        <li><code><suitkaise-api>imap</suitkaise-api></code>: returns an iterator, ordered by input</li>
+        <li><code><suitkaise-api>unordered_imap</suitkaise-api></code>: returns an iterator, unordered</li>
+        <li><code>.<suitkaise-api>star</suitkaise-api>()</code> modifier: unpacks tuples as function arguments</li>
+        <li>Supports <code><suitkaise-api>sk</suitkaise-api></code> modifiers: <code>.<suitkaise-api>timeout</suitkaise-api>()</code>, <code>.<suitkaise-api>background</suitkaise-api>()</code>, <code>.<suitkaise-api>asynced</suitkaise-api>()</code></li>
+    </ul>
+    <p><code><suitkaise-api>Share</suitkaise-api></code>: Shared memory container that works across processes.</p>
+    <ul>
+        <li>Best feature in the entire library</li>
+        <li>Literally just create a <code><suitkaise-api>Share</suitkaise-api></code> and add any objects to it, like a regular class</li>
+        <li>Pass the <code><suitkaise-api>Share</suitkaise-api></code> to your subprocesses</li>
+        <li>Access and update the objects normally</li>
+        <li>Everything remains in sync</li>
+    </ul>
+    <p><code><suitkaise-api>Pipe</suitkaise-api></code>: upgraded <code>multiprocessing.<not-api>Pipe</not-api></code></p>
+    <ul>
+        <li>Super fast cross process communication</li>
+        <li>Uses <code><suitkaise-api>cucumber</suitkaise-api></code> for serialization</li>
+        <li>Ensures one pipe endpoint remains locked in the parent process</li>
+        <li>Easy to use and understand</li>
+    </ul>
+    <h2>Importing</h2>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>processing</suitkaise-api></code></pre>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import (
+    <suitkaise-api>Skprocess</suitkaise-api>,
+    <suitkaise-api>Pool</suitkaise-api>,
+    <suitkaise-api>Share</suitkaise-api>,
+    <suitkaise-api>Pipe</suitkaise-api>,
+    <suitkaise-api>autoreconnect</suitkaise-api>,
+    <suitkaise-api>ProcessTimers</suitkaise-api>,
+    <suitkaise-api>ProcessError</suitkaise-api>,
+    <suitkaise-api>PreRunError</suitkaise-api>,
+    <suitkaise-api>RunError</suitkaise-api>,
+    <suitkaise-api>PostRunError</suitkaise-api>,
+    <suitkaise-api>OnFinishError</suitkaise-api>,
+    <suitkaise-api>ResultError</suitkaise-api>,
+    <suitkaise-api>ErrorHandlerError</suitkaise-api>,
+    <suitkaise-api>ProcessTimeoutError</suitkaise-api>,
+    <suitkaise-api>ResultTimeoutError</suitkaise-api>,
+)</code></pre>
+    <hr>
+    <details>
+        <summary><code><suitkaise-api>Skprocess</suitkaise-api></code></summary>
+        <div class="dropdown-content">
+    <p>Base class for subprocess execution. Inherit from this class and implement lifecycle methods.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self):
+        self.counter = 0
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
+    
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        self.counter += 1
+    
+    def <suitkaise-api>__result__</suitkaise-api>(self):
+        return self.counter
+
+process = <suitkaise-api>MyProcess</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+result = <suitkaise-api>process.result()</suitkaise-api>  # 10</code></pre>
+    <h3>Lifecycle Methods</h3>
+    <p>Define any of these methods in your subclass. All are optional except <code><suitkaise-api>__run__</suitkaise-api>()</code>.</p>
+    <p><code><suitkaise-api>__run__</suitkaise-api>()</code>: main work method</p>
+    <ul>
+        <li>Required</li>
+        <li>No need to write looping code</li>
+    </ul>
+    <p><code><suitkaise-api>__prerun__</suitkaise-api>()</code>: setup before each iteration (run)</p>
+    <ul>
+        <li>Optional</li>
+        <li>Use for setup that needs to happen before each run</li>
+    </ul>
+    <p><code><suitkaise-api>__postrun__</suitkaise-api>()</code>: cleanup after each iteration (run)</p>
+    <ul>
+        <li>Optional</li>
+        <li>Use for cleanup that needs to happen after every run</li>
+    </ul>
+    <p><code><suitkaise-api>__onfinish__</suitkaise-api>()</code>: cleanup/teardown after the process ends</p>
+    <ul>
+        <li>Optional</li>
+        <li>Use for cleanup that needs to happen before the process ends</li>
+    </ul>
+    <p><code><suitkaise-api>__result__</suitkaise-api>()</code>: return data when the process completes</p>
+    <ul>
+        <li>Optional</li>
+        <li>Whatever is returned here is what <code><suitkaise-api>process.result()</suitkaise-api></code> returns</li>
+    </ul>
+    <p><code><suitkaise-api>__error__</suitkaise-api>()</code>: return data when the process fails</p>
+    <ul>
+        <li>Optional</li>
+        <li>Allows you more flexibility when an error occurs</li>
+    </ul>
+    <h4><code><suitkaise-api>__prerun__</suitkaise-api>()</code></h4>
+    <p>Called before each <code><suitkaise-api>__run__</suitkaise-api>()</code> iteration.</p>
+    <pre><code class="language-python">def <suitkaise-api>__prerun__</suitkaise-api>(self):
+    self.data = fetch_next_batch()</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Fetching data for the next iteration</li>
+        <li>Setup that needs to happen before each run</li>
+        <li>Checking conditions before running</li>
+    </ul>
+    <h4><code><suitkaise-api>__run__</suitkaise-api>()</code></h4>
+    <p>Main work method. Called each iteration.</p>
+    <pre><code class="language-python">def <suitkaise-api>__run__</suitkaise-api>(self):
+    for item in self.data:
+        process(item)</code></pre>
+    <p>This is where your core logic goes.</p>
+    <h4><code><suitkaise-api>__postrun__</suitkaise-api>()</code></h4>
+    <p>Called after each <code><suitkaise-api>__run__</suitkaise-api>()</code> iteration completes.</p>
+    <pre><code class="language-python">def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    self.results.append(self.batch_result)
+    self.batch_result = None</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Cleanup after each iteration</li>
+        <li>Recording results</li>
+        <li>State transitions</li>
+    </ul>
+    <h4><code><suitkaise-api>__onfinish__</suitkaise-api>()</code></h4>
+    <p>Called when the process ends (stop signal or run limit reached).</p>
+    <pre><code class="language-python">def <suitkaise-api>__onfinish__</suitkaise-api>(self):
+    self.cleanup_resources()
+    self.save_final_state()</code></pre>
+    <p>Use for:</p>
+    <ul>
+        <li>Final cleanup</li>
+        <li>Saving state</li>
+        <li>Closing connections</li>
+    </ul>
+    <h4><code><suitkaise-api>__result__</suitkaise-api>()</code></h4>
+    <p>Return data when process completes. This is what <code><suitkaise-api>process.result()</suitkaise-api></code> returns.</p>
+    <pre><code class="language-python">def <suitkaise-api>__result__</suitkaise-api>(self):
+    return {
+        &#x27;count&#x27;: self.counter,
+        &#x27;results&#x27;: self.results,
+        &#x27;status&#x27;: &#x27;completed&#x27;
+    }</code></pre>
+    <p>NOTE: Your process will not return a result unless you define <code><suitkaise-api>__result__</suitkaise-api>()</code>.</p>
+    <h4><code><suitkaise-api>__error__</suitkaise-api>()</code></h4>
+    <p>Handle errors when all lives are exhausted. Receives the error via <code>self.<suitkaise-api>error</suitkaise-api></code>.</p>
+    <pre><code class="language-python">def <suitkaise-api>__error__</suitkaise-api>(self):
+    log_error(self.<suitkaise-api>error</suitkaise-api>)
+    return {&#x27;status&#x27;: &#x27;failed&#x27;, &#x27;error&#x27;: str(self.error)}</code></pre>
+    <p>Default behavior: Returns <code>self.<suitkaise-api>error</suitkaise-api></code>, which will be raised by <code><suitkaise-api>process.result()</suitkaise-api></code>.</p>
+    <h3><code><suitkaise-api>process_config</suitkaise-api></code></h3>
+    <p>Configuration object available in your <code>__init__</code>. Set these to control process behavior.</p>
+    <h4><code><suitkaise-api>runs</suitkaise-api></code></h4>
+    <p>Number of run iterations before auto-stopping.</p>
+    <pre><code class="language-python">def __init__(self):
+    # run 100 iterations, then stop
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 100</code></pre>
+    <ul>
+        <li><code>int</code>: Run this many iterations</li>
+        <li><code>None</code>: Run indefinitely until <code><suitkaise-api>stop</suitkaise-api>()</code> is called</li>
+    </ul>
+    <h4><code><suitkaise-api>join_in</suitkaise-api></code></h4>
+    <p>Maximum total runtime in seconds before auto-stopping.</p>
+    <pre><code class="language-python">def __init__(self):
+    # stop after 60 seconds
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>join_in</suitkaise-api> = 60.0 </code></pre>
+    <ul>
+        <li><code>float</code>: Maximum seconds to run</li>
+        <li><code>None</code>: No time limit</li>
+    </ul>
+    <h4><code><suitkaise-api>lives</suitkaise-api></code></h4>
+    <p>Number of times to retry after a crash before giving up.</p>
+    <pre><code class="language-python">def __init__(self):
+    # retry up to 2 times (3 total attempts)
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>lives</suitkaise-api> = 3  </code></pre>
+    <ul>
+        <li><code>1</code>: No retries (fail on first error)</li>
+        <li><code>n &gt; 1</code>: Retry <code>n-1</code> times on error</li>
+    </ul>
+    <h4>When the process crashes</h4>
+    <ol>
+        <li>Current run state is preserved</li>
+        <li>Process restarts from where it left off</li>
+        <li><code><suitkaise-api>lives</suitkaise-api></code> is decremented</li>
+        <li>If <code><suitkaise-api>lives</suitkaise-api></code> reaches 0, <code><suitkaise-api>__error__</suitkaise-api>()</code> is called</li>
+    </ol>
+    <h4><code><suitkaise-api>timeouts</suitkaise-api></code></h4>
+    <p>Timeout settings for each lifecycle section.</p>
+    <pre><code class="language-python">def __init__(self):
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>prerun</suitkaise-api> = 5.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>run</suitkaise-api> = 30.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>postrun</suitkaise-api> = 5.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>onfinish</suitkaise-api> = 10.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.result = 5.0
+    self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>timeouts</suitkaise-api>.<suitkaise-api>error</suitkaise-api> = 5.0</code></pre>
+    <p>All default to <code>None</code> (no timeout). Set a value to enable timeout for that section.</p>
+    <p>If a section times out, <code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code> is raised. This counts against <code><suitkaise-api>lives</suitkaise-api></code>.</p>
+    <h3>Control Methods</h3>
+    <p>These are all of the methods you use to actually run and control <code><suitkaise-api>Skprocess</suitkaise-api></code> made subprocesses.</p>
+    <h4><code><suitkaise-api>start</suitkaise-api>()</code></h4>
+    <p>Start the process in a new subprocess.</p>
+    <pre><code class="language-python">process = <suitkaise-api>MyProcess</suitkaise-api>()
+<suitkaise-api>process.start()</suitkaise-api></code></pre>
+    <ul>
+        <li>Serializes the <code><suitkaise-api>Skprocess</suitkaise-api></code> object</li>
+        <li>Spawns a subprocess that runs your <code><suitkaise-api>Skprocess</suitkaise-api></code> object</li>
+        <li>Returns immediately (non-blocking)</li>
+    </ul>
+    <h4><code><suitkaise-api>stop</suitkaise-api>()</code></h4>
+    <p>Signal the process to stop gracefully.</p>
+    <pre><code class="language-python"><suitkaise-api>process.stop()</suitkaise-api></code></pre>
+    <ul>
+        <li>Non-blocking (returns immediately)</li>
+        <li>Process finishes current section</li>
+        <li>Then runs <code><suitkaise-api>__onfinish__</suitkaise-api>()</code> and <code><suitkaise-api>__result__</suitkaise-api>()</code></li>
+        <li>Use <code><suitkaise-api>wait</suitkaise-api>()</code> after <code><suitkaise-api>stop</suitkaise-api>()</code> to block until finished</li>
+    </ul>
+    <h4><code><suitkaise-api>kill</suitkaise-api>()</code></h4>
+    <p>Forcefully terminate the process immediately.</p>
+    <pre><code class="language-python"><suitkaise-api>process.kill()</suitkaise-api></code></pre>
+    <ul>
+        <li>Bypasses the lives system</li>
+        <li>No cleanup, no <code><suitkaise-api>__onfinish__</suitkaise-api>()</code>, no result</li>
+        <li>Use only as a last resort</li>
+    </ul>
+    <h4><code><suitkaise-api>wait</suitkaise-api>()</code></h4>
+    <p>Wait for the process to finish.</p>
+    <pre><code class="language-python">finished = <suitkaise-api>process.wait()</suitkaise-api> # blocks until done
+
+finished = <suitkaise-api>process.wait(</suitkaise-api>timeout=10.0) # returns False if timeout</code></pre>
+    <p>Arguments</p>
+    <p><code>timeout</code>: Maximum seconds to wait.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li><code>None</code> = wait forever</li>
+    </ul>
+    <p>Returns</p>
+    <p><code>bool</code>: True if process finished, False if timeout reached.</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># async
+await process.<suitkaise-api>wait</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+    <p>If the process crashes and has lives remaining, <code><suitkaise-api>wait</suitkaise-api>()</code> continues blocking during the restart.</p>
+    <h4><code><suitkaise-api>result</suitkaise-api>()</code></h4>
+    <p>Get the result from the process.</p>
+    <p>Will block until the process finishes if not already done.</p>
+    <p>Returns</p>
+    <p>Whatever <code><suitkaise-api>__result__</suitkaise-api>()</code> returned.</p>
+    <pre><code class="language-python">data = <suitkaise-api>process.result()</suitkaise-api>  # blocks until result ready</code></pre>
+    <p>Raises</p>
+    <p><code><suitkaise-api>ProcessError</suitkaise-api></code>: If the process failed (after exhausting lives).</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># with timeout
+data = process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)()
+
+# background - returns Future
+future = process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()()
+data = future.<suitkaise-api>result</suitkaise-api>()
+
+# async
+data = await process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+    <h4><code><suitkaise-api>run</suitkaise-api>()</code></h4>
+    <p>Start, wait, and return the result in one call.</p>
+    <pre><code class="language-python">result = <suitkaise-api>process.run()</suitkaise-api></code></pre>
+    <p>Equivalent to:</p>
+    <pre><code class="language-python"><suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+result = <suitkaise-api>process.result()</suitkaise-api></code></pre>
+    <p>Returns</p>
+    <p>Whatever <code><suitkaise-api>__result__</suitkaise-api>()</code> returned.</p>
+    <p>Raises</p>
+    <p><code><suitkaise-api>ProcessError</suitkaise-api></code>: If the process failed (after exhausting lives).</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># with timeout
+result = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)()
+
+# background - returns Future
+future = process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()()
+# ... do other work ...
+result = future.<suitkaise-api>result</suitkaise-api>()
+
+# async
+result = await process.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+    <h3>Queue based communication with <code><suitkaise-api>tell</suitkaise-api>()</code> and <code><suitkaise-api>listen</suitkaise-api>()</code></h3>
+    <p>Bidirectional communication between parent and subprocess.</p>
+    <h4><code><suitkaise-api>tell</suitkaise-api>()</code></h4>
+    <p>Send data to the other side.</p>
+    <pre><code class="language-python"># from parent
+<suitkaise-api>process.tell(</suitkaise-api>{&quot;command&quot;: &quot;update_config&quot;, &quot;value&quot;: 100})
+
+# from subprocess (in lifecycle methods)
+def <suitkaise-api>__postrun__</suitkaise-api>(self):
+    self.<suitkaise-api>tell</suitkaise-api>({&quot;status&quot;: &quot;batch_complete&quot;, &quot;count&quot;: len(self.batch)})</code></pre>
+    <p>Arguments</p>
+    <p><code>data</code>: Any serializable data to send.</p>
+    <ul>
+        <li><code>Any</code></li>
+        <li>required</li>
+    </ul>
+    <p>Non-blocking - returns immediately after queuing the data.</p>
+    <h4><code><suitkaise-api>listen</suitkaise-api>()</code></h4>
+    <p>Receive data from the other side.</p>
+    <pre><code class="language-python"># from parent
+data = <suitkaise-api>process.listen()</suitkaise-api> # blocks until data received
+data = <suitkaise-api>process.listen(</suitkaise-api>timeout=5.0) # returns None if timeout
+
+# from subprocess (in lifecycle methods)
+def <suitkaise-api>__prerun__</suitkaise-api>(self):
+    command = self.<suitkaise-api>listen</suitkaise-api>(timeout=1.0)
+    if command:
+        self.handle_command(command)</code></pre>
+    <p>Arguments</p>
+    <p><code>timeout</code>: Maximum seconds to wait.</p>
+    <ul>
+        <li><code>float | None = None</code></li>
+        <li><code>None</code> = wait forever</li>
+    </ul>
+    <p>Returns</p>
+    <p><code>Any | None</code>: Data sent by the other side, or <code>None</code> if timeout.</p>
+    <p>Modifiers:</p>
+    <pre><code class="language-python"># background
+future = process.<suitkaise-api>listen</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(timeout=5.0)
+
+# async
+data = await process.<suitkaise-api>listen</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()()</code></pre>
+    <h3>Timing</h3>
+    <p>Every lifecycle method is automatically timed.</p>
+    <pre><code class="language-python"><suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+
+# access timing data
+print(<suitkaise-api>process.__run__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(<suitkaise-api>process.__prerun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>)
+print(<suitkaise-api>process.__postrun__</suitkaise-api>.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))
+
+# aggregate timer for full iterations (prerun + run + postrun)
+print(process.process_timer.mean)</code></pre>
+    <p>Each timer is an <code><suitkaise-api>Sktimer</suitkaise-api></code> with full statistics: <code>mean</code>, <code>median</code>, <code>stdev</code>, <code>min</code>, <code>max</code>, <code><suitkaise-api>percentile</suitkaise-api>()</code>, ...</p>
+    <h3>Properties</h3>
+    <p><code>current_run</code>: Current run iteration number (0-indexed).</p>
+    <ul>
+        <li><code>int</code></li>
+        <li>First run is run 0</li>
+    </ul>
+    <p><code>is_alive</code>: Whether the subprocess is currently running.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <p><code>timers</code>: Container with all lifecycle timers.</p>
+    <ul>
+        <li><code><suitkaise-api>ProcessTimers</suitkaise-api> | None</code></li>
+    </ul>
+    <p><code><suitkaise-api>error</suitkaise-api></code>: The error that caused the process to fail (available in <code><suitkaise-api>__error__</suitkaise-api>()</code>).</p>
+    <ul>
+        <li><code>BaseException | None</code></li>
+    </ul>
+        </div>
+    </details>
+    <details>
+        <summary><code><suitkaise-api>Pool</suitkaise-api></code></summary>
+        <div class="dropdown-content">
+    <p>Process pool for parallel batch processing.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pool</suitkaise-api>
+
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+
+# basic usage
+results = <suitkaise-api>pool.map(</suitkaise-api>process_item, items)</code></pre>
+    <h3>Constructor</h3>
+    <p>Arguments</p>
+    <p><code>workers</code>: Maximum concurrent workers.</p>
+    <ul>
+        <li><code>int | None = None</code></li>
+        <li><code>None</code> = number of CPUs</li>
+    </ul>
+    <h3><code>map</code></h3>
+    <p>Apply function to each item, return list of results.</p>
+    <pre><code class="language-python">results = <suitkaise-api>pool.map(</suitkaise-api>fn, items)</code></pre>
+    <ul>
+        <li>Blocks until all items are processed</li>
+        <li>Results are in the same order as inputs</li>
+        <li>Works with both functions and <code><suitkaise-api>Skprocess</suitkaise-api></code> classes</li>
+    </ul>
+    <p>Arguments</p>
+    <p><code>fn_or_process</code>: Function or <code><suitkaise-api>Skprocess</suitkaise-api></code> class to apply.</p>
+    <ul>
+        <li><code>Callable | type[<suitkaise-api>Skprocess</suitkaise-api>]</code></li>
+        <li>required</li>
+    </ul>
+    <p><code>iterable</code>: Items to process.</p>
+    <ul>
+        <li><code>Iterable</code></li>
+        <li>required</li>
+    </ul>
+    <p>Returns</p>
+    <p><code>list</code>: Results in order.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+# fn(1, 2), fn(3, 4) instead of fn((1, 2), ), fn((3, 4), )
+
+# with timeout
+results = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+
+# background - returns Future
+future = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = future.<suitkaise-api>result</suitkaise-api>()
+
+# async
+results = await <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
+
+# combine modifiers
+future = <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0).<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = await <suitkaise-api>pool.map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>().<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+
+# star composes with all modifiers
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
+    <h3><code>unordered_map</code></h3>
+    <p>Apply function to each item, return list in completion order.</p>
+    <pre><code class="language-python">results = <suitkaise-api>pool.unordered_map(</suitkaise-api>fn, items)</code></pre>
+    <ul>
+        <li>Returns a list (like <code>map</code>)</li>
+        <li>Results are in completion order, not input order (like <code>unordered_imap</code>)</li>
+        <li>Fastest when you need all results as a list but don&#x27;t care about order</li>
+    </ul>
+    <p>Arguments and returns same as <code>map</code>, but results are in completion order.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+
+# with timeout
+results = <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items)
+
+# background - returns Future
+future = <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = future.<suitkaise-api>result</suitkaise-api>()
+
+# async
+results = await <suitkaise-api>pool.unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)
+
+# star composes with all modifiers
+results = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
+    <h3><code>imap</code></h3>
+    <p>Apply function to each item, return iterator of results.</p>
+    <pre><code class="language-python">for result in <suitkaise-api>pool.imap(</suitkaise-api>fn, items):
+    process(result)</code></pre>
+    <ul>
+        <li>Results are yielded in order</li>
+        <li>Blocks on <code>next()</code> if the next result isn&#x27;t ready</li>
+        <li>Memory efficient for large datasets</li>
+    </ul>
+    <p>Arguments and returns same as <code>map</code>, but returns <code>Iterator</code> instead of <code>list</code>.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
+    process(result)
+
+# with timeout (per-item)
+for result in <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, items):
+    process(result)
+
+# background - collects to list
+future = <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = future.<suitkaise-api>result</suitkaise-api>()  # list
+
+# async - collects to list
+results = await <suitkaise-api>pool.imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
+
+# star composes with all modifiers
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)(fn, args_tuples):
+    process(result)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
+    <h3><code>unordered_imap</code></h3>
+    <p>Apply function to each item, yield results as they complete.</p>
+    <pre><code class="language-python">for result in <suitkaise-api>pool.unordered_imap(</suitkaise-api>fn, items):
+    process(result)</code></pre>
+    <ul>
+        <li>Fastest way to get results</li>
+        <li>Order is NOT preserved</li>
+        <li>Results are yielded as soon as they&#x27;re ready</li>
+    </ul>
+    <p>Arguments and returns same as <code>imap</code>.</p>
+    <h4>Modifiers</h4>
+    <pre><code class="language-python"># star - unpacks tuples as function arguments
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>(fn, [(1, 2), (3, 4)]):
+    process(result)
+
+# with timeout
+for result in <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, items):
+    process(result)
+
+# background - collects to list
+future = <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, items)
+results = future.<suitkaise-api>result</suitkaise-api>()  # list
+
+# async - collects to list
+results = await <suitkaise-api>pool.unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, items)  # list
+
+# star composes with all modifiers
+for result in <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples):
+    process(result)
+future = <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>background</suitkaise-api>()(fn, args_tuples)
+results = await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
+    <h3><code><suitkaise-api>star</suitkaise-api>()</code> Modifier</h3>
+    <p>Unpack tuples as function arguments.</p>
+    <pre><code class="language-python"># without star: fn receives a single tuple argument
+<suitkaise-api>pool.map(</suitkaise-api>fn, [(1, 2), (3, 4)])
+# fn((1, 2), ), fn((3, 4), )
+
+# with star: fn receives unpacked arguments
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, [(1, 2), (3, 4)])
+# fn(1, 2), fn(3, 4)</code></pre>
+    <p>Works with all methods:</p>
+    <pre><code class="language-python"><suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_imap</suitkaise-api>(fn, args_tuples)
+<suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>unordered_map</suitkaise-api>(fn, args_tuples)</code></pre>
+    <p>Works with other modifiers:</p>
+    <pre><code class="language-python"><suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(30.0)(fn, args_tuples)
+await <suitkaise-api>pool.star()</suitkaise-api>.<suitkaise-api>imap</suitkaise-api>.<suitkaise-api>asynced</suitkaise-api>()(fn, args_tuples)</code></pre>
+    <h3>Using <code><suitkaise-api>Skprocess</suitkaise-api></code> with <code><suitkaise-api>Pool</suitkaise-api></code></h3>
+    <pre><code class="language-python">class <suitkaise-api>ProcessItem</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, item):
+        self.item = item
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+    
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        self.result_data = heavy_computation(self.item)
+    
+    def <suitkaise-api>__result__</suitkaise-api>(self):
+        return self.result_data
+
+# Pool creates instances and runs them
+results = <suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>ProcessItem</suitkaise-api>, items)</code></pre>
+    <p>The pool:</p>
+    <ol>
+        <li>Creates a <code><suitkaise-api>ProcessItem</suitkaise-api></code> instance for each item</li>
+        <li>Runs each instance in a subprocess</li>
+        <li>Collects and returns the results</li>
+    </ol>
+    <h3>Context Manager</h3>
+    <pre><code class="language-python">with <suitkaise-api>Pool(</suitkaise-api>workers=4) as pool:
+
+    results = <suitkaise-api>pool.map(</suitkaise-api>fn, items)
+
+# pool is closed on exit</code></pre>
+    <h3><code>close()</code> and <code>terminate()</code></h3>
+    <pre><code class="language-python">pool.close()      # wait for all active processes to finish
+pool.terminate()  # forcefully terminate all processes</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code><suitkaise-api>Share</suitkaise-api></code></summary>
+        <div class="dropdown-content">
+    <p>Container for shared memory across process boundaries.</p>
+    <p>The easiest and greatest way to share data between processes.</p>
+    <p>Uses <code><suitkaise-api>cucumber</suitkaise-api></code> for serialization, so now you can easily share anything you want.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
+
+<suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+<suitkaise-api>share.timer</suitkaise-api> = <suitkaise-api>Sktimer(</suitkaise-api>)
+share.counter = 0</code></pre>
+    <h3>Basic Usage</h3>
+    <pre><code class="language-python"><suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+share.counter = 0
+
+class <suitkaise-api>IncrementProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, share):
+        self.share = share
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 10
+    
+    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+        self.share.counter += 1
+
+<suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
+<suitkaise-api>pool.map(</suitkaise-api><suitkaise-api>IncrementProcess</suitkaise-api>, [share] * 10)
+
+print(share.counter)  # 100 (10 processes × 10 runs each)</code></pre>
+    <h3>How It Works</h3>
+    <ol>
+        <li>Assign objects as Share attributes</li>
+        <li>Pass Share to processes</li>
+        <li>Access/update attributes normally</li>
+        <li>Share coordinates reads and writes across processes</li>
+    </ol>
+    <p>Share uses a coordinator-proxy system:</p>
+    <ul>
+        <li><strong>Coordinator</strong>: Background process that handles all writes</li>
+        <li><strong>Proxy</strong>: Intercepts attribute access and queues commands</li>
+        <li><strong>Source of Truth</strong>: Serialized state in shared memory</li>
+    </ul>
+    <h3>Supported Objects</h3>
+    <p><strong>With <code>_shared_meta</code></strong> (suitkaise objects):</p>
+    <ul>
+        <li><code><suitkaise-api>Sktimer</suitkaise-api></code>, <code><suitkaise-api>Circuit</suitkaise-api></code>, <code><suitkaise-api>BreakingCircuit</suitkaise-api></code>, ...</li>
+        <li>Full method and property tracking</li>
+        <li>Efficient barrier waits</li>
+    </ul>
+    <p><strong>User classes</strong>:</p>
+    <ul>
+        <li>Auto-wrapped with <code>Skclass</code> to generate <code>_shared_meta</code></li>
+        <li>Works automatically</li>
+    </ul>
+    <p><strong>Primitives</strong>:</p>
+    <ul>
+        <li><code>int</code>, <code>str</code>, <code>float</code>, <code>bool</code>, <code>list</code>, <code>dict</code>, ...</li>
+        <li>Stored directly in source of truth</li>
+        <li>No proxy needed</li>
+    </ul>
+    <p><strong>Iterators</strong> (<code>enumerate</code>, <code>zip</code>, <code>map</code>, ...):</p>
+    <ul>
+        <li>Serialized by <code><suitkaise-api>cucumber</suitkaise-api></code> by exhausting remaining values</li>
+        <li>Reconstruction returns a plain iterator over remaining values (not the original iterator type)</li>
+    </ul>
+    <p><strong>Not Supported</strong>:</p>
+    <ul>
+        <li><code>multiprocessing.*</code> objects (queues, managers, events, shared_memory, connections)</li>
+        <li>These are process-bound IPC primitives; use <code><suitkaise-api>Share</suitkaise-api></code> primitives instead</li>
+        <li><code>os.pipe()</code> file handles / pipe-backed <code>io.FileIO</code></li>
+    </ul>
+    <h3>Start and Stop</h3>
+    <pre><code class="language-python"><suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)  # auto-starts
+
+# stop sharing (frees resources)
+<suitkaise-api>share.stop()</suitkaise-api>
+# or
+share.exit()
+
+# start again
+<suitkaise-api>share.start()</suitkaise-api></code></pre>
+    <p>While stopped, changes are queued but won&#x27;t take effect until <code><suitkaise-api>start</suitkaise-api>()</code> is called.</p>
+    <h3>Reconnect All</h3>
+    <p><code><suitkaise-api>Share</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>()</code> reconnects all <code><suitkaise-api>cucumber</suitkaise-api></code> Reconnector objects currently stored in Share and returns a dict of reconnected objects by name.</p>
+    <pre><code class="language-python"><suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
+share.db = sqlite3.connect(&quot;:memory:&quot;)
+
+# share.db is a Reconnector in Share
+reconnected = <suitkaise-api>share.reconnect_all()</suitkaise-api>
+
+# now it&#x27;s a live connection again
+conn = reconnected[&quot;db&quot;]</code></pre>
+    <h3>Context Manager</h3>
+    <pre><code class="language-python">with <suitkaise-api>Share(</suitkaise-api>) as share:
+    share.counter = 0
+    # ... use share ...
+# automatically stopped on exit</code></pre>
+    <h3>Properties</h3>
+    <p><code>is_running</code>: Whether the coordinator is running.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <p><code>has_error</code>: Whether the coordinator encountered an error.</p>
+    <ul>
+        <li><code>bool</code></li>
+    </ul>
+    <h3>Methods</h3>
+    <p><code><suitkaise-api>start</suitkaise-api>()</code>: Start the coordinator.</p>
+    <p><code><suitkaise-api>stop</suitkaise-api>(timeout=5.0)</code>: Stop the coordinator gracefully.</p>
+    <ul>
+        <li>Returns <code>True</code> if stopped cleanly, <code>False</code> if timed out.</li>
+    </ul>
+    <p><code>exit(timeout=5.0)</code>: Alias for <code><suitkaise-api>stop</suitkaise-api>()</code>.</p>
+    <p><code>clear()</code>: Clear all shared objects and counters.</p>
+        </div>
+    </details>
+    <details>
+        <summary><code><suitkaise-api>Pipe</suitkaise-api></code></summary>
+        <div class="dropdown-content">
+    <p>Fast, direct parent/child communication using <code>multiprocessing.<not-api>Pipe</not-api></code>.</p>
+    <p>This is the fastest way to communicate between processes.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Pipe</suitkaise-api>
+
+# create a pipe pair
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()</code></pre>
+    <h3>Creating Pipes</h3>
+    <pre><code class="language-python"># bidirectional (default)
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
+
+# one-way
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair(one_way=True)</code></pre>
+    <p>For one-way pipes, the anchor is the send-only end (parent), and the point is the receive-only end (child).</p>
+    <h3>Anchor vs Point</h3>
+    <p><strong>Anchor</strong>:</p>
+    <ul>
+        <li>Stays in the parent process</li>
+        <li>Always locked (cannot be transferred)</li>
+        <li>Use for the &quot;stable&quot; end of the pipe</li>
+    </ul>
+    <p><strong>Point</strong>:</p>
+    <ul>
+        <li>Can be transferred to a subprocess</li>
+        <li>Unlocked by default</li>
+        <li>Use for the &quot;mobile&quot; end</li>
+    </ul>
+    <h3>Sending and Receiving</h3>
+    <pre><code class="language-python"># from anchor (parent)
+anchor.send({&quot;data&quot;: [1, 2, 3]})
+response = anchor.recv()
+
+# from point (subprocess)
+data = point.recv()
+point.send({&quot;status&quot;: &quot;received&quot;})</code></pre>
+    <p><code>send(obj)</code>: Serialize with <code><suitkaise-api>cucumber</suitkaise-api></code> and send.</p>
+    <ul>
+        <li>Non-blocking</li>
+    </ul>
+    <p><code>recv()</code>: Receive and deserialize with <code><suitkaise-api>cucumber</suitkaise-api></code>.</p>
+    <ul>
+        <li>Blocking</li>
+    </ul>
+    <p><code>close()</code>: Close the connection.</p>
+    <h3>Usage with Skprocess</h3>
+    <pre><code class="language-python">class <suitkaise-api>PipeProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, pipe_point):
+        self.pipe = pipe_point
+        self.<suitkaise-api>process_config</suitkaise-api>.<suitkaise-api>runs</suitkaise-api> = 1
+    
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        # receive command
+        command = self.pipe.recv()
+        
+        # process it
+        result = process_command(command)
+        
+        # send result back
+        self.pipe.send(result)
+
+# parent
+anchor, <suitkaise-api>point</suitkaise-api> = <suitkaise-api>Pipe</suitkaise-api>.pair()
+
+process = <suitkaise-api>PipeProcess</suitkaise-api>(point)
+<suitkaise-api>process.start()</suitkaise-api>
+
+anchor.send({&quot;action&quot;: &quot;compute&quot;, &quot;value&quot;: 42})
+result = anchor.recv()
+
+<suitkaise-api>process.wait()</suitkaise-api></code></pre>
+    <h3>Lock/Unlock</h3>
+    <pre><code class="language-python">point.lock()    # prevent transfer
+point.unlock()  # allow transfer
+
+anchor.lock()   # always locked
+anchor.unlock() # raises PipeEndpointError</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary><code><suitkaise-api>autoreconnect</suitkaise-api></code></summary>
+        <div class="dropdown-content">
+    <h2><code><suitkaise-api>autoreconnect</suitkaise-api></code> Decorator</h2>
+    <p>Automatically reconnect resources (database connections, sockets, ...) when an <code><suitkaise-api>Skprocess</suitkaise-api></code> is deserialized in the child process.</p>
+    <p>Since <code><suitkaise-api>Skprocess</suitkaise-api></code> is serialized with <code><suitkaise-api>cucumber</suitkaise-api></code>, it gives you placeholders for live resources that can be reconnected.</p>
+    <p>Usually, you need to call <code><suitkaise-api>cucumber</suitkaise-api>.<suitkaise-api>reconnect_all</suitkaise-api>()</code> to reconnect all resources in an object.</p>
+    <p>However, with <code><suitkaise-api>@autoreconnect</suitkaise-api></code>, you can decorate a <code><suitkaise-api>Skprocess</suitkaise-api></code> class and it will automatically reconnect all resources when the <code><suitkaise-api>Skprocess</suitkaise-api></code> is deserialized in the child process.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>, <suitkaise-api>autoreconnect</suitkaise-api>
+
+<suitkaise-api>@autoreconnect</suitkaise-api>(
+    start_threads=True,
+    **{
+        &quot;psycopg2.Connection&quot;: {&quot;*&quot;: &quot;secret&quot;},
+        &quot;redis.Redis&quot;: {&quot;*&quot;: &quot;redis_pass&quot;},
+    }
+)
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self, db_connection, cache_connection):
+        self.db = db_connection
+        self.cache = cache_connection
+    
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        # db and cache are automatically reconnected
+        self.db.execute(...)
+        self.cache.get(...)</code></pre>
+    <p>Arguments</p>
+    <p><code>start_threads</code>: If <code>True</code>, auto-start any deserialized threads.</p>
+    <ul>
+        <li><code>bool = False</code></li>
+        <li>keyword only</li>
+    </ul>
+    <p><code>**auth</code>: Reconnection parameters keyed by type, then by attribute name.</p>
+    <ul>
+        <li>Use <code>&quot;*&quot;</code> as the attr key for defaults that apply to all instances</li>
+    </ul>
+    <p>When <code><suitkaise-api>cucumber</suitkaise-api></code> deserializes the <code><suitkaise-api>Skprocess</suitkaise-api></code>:</p>
+    <ol>
+        <li>Resources like database connections become <code>Reconnector</code> objects</li>
+        <li><code><suitkaise-api>@autoreconnect</suitkaise-api></code> calls <code><suitkaise-api>reconnect_all</suitkaise-api>()</code> automatically</li>
+        <li>Each <code>Reconnector</code> is replaced with a live connection using the provided auth</li>
+    </ol>
+    <h3>Multiple Connections</h3>
+    <pre><code class="language-python"><suitkaise-api>@autoreconnect</suitkaise-api>(**{
+    &quot;psycopg2.Connection&quot;: {
+        &quot;*&quot;: &quot;default_password&quot;,           # default for all psycopg2 connections
+        &quot;analytics_db&quot;: &quot;analytics_secret&quot;, # specific override for analytics_db attr
+    },
+})
+class <suitkaise-api>MyProcess</suitkaise-api>(<suitkaise-api>Skprocess</suitkaise-api>):
+    def __init__(self):
+        self.main_db = psycopg2.connect(...)      # uses &quot;*&quot; auth
+        self.analytics_db = psycopg2.connect(...) # uses &quot;analytics_db&quot; auth</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Other features you should know about</summary>
+        <div class="dropdown-content">
+    <h2><code><suitkaise-api>ProcessTimers</suitkaise-api></code></h2>
+    <p>Container for timing lifecycle sections.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessTimers</suitkaise-api>
+
+# usually accessed via process.timers
+<suitkaise-api>process.start()</suitkaise-api>
+<suitkaise-api>process.wait()</suitkaise-api>
+
+timers = process.timers
+print(timers.<suitkaise-api>run</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(timers.<suitkaise-api>prerun</suitkaise-api>.<suitkaise-api>total_time</suitkaise-api>)
+print(timers.full_run.<suitkaise-api>percentile</suitkaise-api>(95))</code></pre>
+    <h3>Properties</h3>
+    <p>Each property is an <code><suitkaise-api>Sktimer</suitkaise-api> | None</code>:</p>
+    <p><code><suitkaise-api>prerun</suitkaise-api></code>: Timer for <code><suitkaise-api>__prerun__</suitkaise-api>()</code> calls.</p>
+    <p><code><suitkaise-api>run</suitkaise-api></code>: Timer for <code><suitkaise-api>__run__</suitkaise-api>()</code> calls.</p>
+    <p><code><suitkaise-api>postrun</suitkaise-api></code>: Timer for <code><suitkaise-api>__postrun__</suitkaise-api>()</code> calls.</p>
+    <p><code><suitkaise-api>onfinish</suitkaise-api></code>: Timer for <code><suitkaise-api>__onfinish__</suitkaise-api>()</code> call.</p>
+    <p><code><suitkaise-api>result</suitkaise-api></code>: Timer for <code><suitkaise-api>__result__</suitkaise-api>()</code> call.</p>
+    <p><code><suitkaise-api>error</suitkaise-api></code>: Timer for <code><suitkaise-api>__error__</suitkaise-api>()</code> call.</p>
+    <p><code>full_run</code>: Aggregate timer for complete iterations (prerun + run + postrun).</p>
+    <hr>
+    <h2>Exceptions</h2>
+    <p>All exceptions inherit from <code><suitkaise-api>ProcessError</suitkaise-api></code>.</p>
+    <h3><code><suitkaise-api>ProcessError</suitkaise-api></code></h3>
+    <p>Base class for all Process-related errors.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessError</suitkaise-api>
+
+try:
+    result = <suitkaise-api>process.result()</suitkaise-api>
+except <suitkaise-api>ProcessError</suitkaise-api> as e:
+    print(f&quot;Process failed: {e}&quot;)</code></pre>
+    <p>Properties:</p>
+    <ul>
+        <li><code>current_run</code>: Run iteration where error occurred</li>
+        <li><code>original_error</code>: The underlying exception</li>
+    </ul>
+    <h3><code><suitkaise-api>PreRunError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__prerun__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>RunError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__run__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>PostRunError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__postrun__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>OnFinishError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__onfinish__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>ResultError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__result__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>ErrorHandlerError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>__error__</suitkaise-api>()</code> fails.</p>
+    <h3><code><suitkaise-api>ProcessTimeoutError</suitkaise-api></code></h3>
+    <p>Raised when a lifecycle section times out.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ProcessTimeoutError</suitkaise-api>
+
+try:
+    result = <suitkaise-api>process.result()</suitkaise-api>
+except <suitkaise-api>ProcessTimeoutError</suitkaise-api> as e:
+    print(f&quot;Timeout in {e.section} after {e.timeout}s on run {e.current_run}&quot;)</code></pre>
+    <p>Properties:</p>
+    <ul>
+        <li><code>section</code>: Which lifecycle method timed out</li>
+        <li><code>timeout</code>: The timeout value that was exceeded</li>
+    </ul>
+    <h3><code><suitkaise-api>ResultTimeoutError</suitkaise-api></code></h3>
+    <p>Raised when <code><suitkaise-api>result</suitkaise-api>()</code>, <code><suitkaise-api>wait</suitkaise-api>()</code>, or <code><suitkaise-api>listen</suitkaise-api>()</code> times out via <code>.<suitkaise-api>timeout</suitkaise-api>()</code> modifier.</p>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>ResultTimeoutError</suitkaise-api>
+
+try:
+    result = process.<suitkaise-api>result</suitkaise-api>.<suitkaise-api>timeout</suitkaise-api>(10.0)()
+except <suitkaise-api>ResultTimeoutError</suitkaise-api> as e:
+    print(&quot;Timed out waiting for result&quot;)</code></pre>
+        </div>
+    </details>
+</section>

@@ -1,0 +1,289 @@
+<section class="module-page about-page">
+    <h1>About <code><suitkaise-api>suitkaise</suitkaise-api></code></h1>
+
+    <p>For technical info, see the <a href="#technical-info" class="nav-link" data-page="technical-info">technical info</a> page.</p>
+
+    <p><code><suitkaise-api>suitkaise</suitkaise-api></code> is a Python code library.</p>
+
+    <p>It's for developers of all skill levels, and was created with 3 main goals in mind:</p>
+
+    <ol>
+        <li>To make things easier and faster for all developers.</li>
+        <li>To bridge the knowledge gap for inexperienced developers to create professional level programs</li>
+        <li>Change the world of parallel processing in Python</li>
+    </ol>
+
+    <p>There are many things in Python that are difficult or nuanced for beginners, and many more that are just annoying, overwhelming, and time consuming for all developers.</p>
+
+    <p>I have taken a few of the most foundational and useful parts of modern Python and made them faster, clearer, and easier to use.</p>
+
+    <p>Every module I have made started as a "dream API".</p>
+
+    <p><em>"If it could just be like this..."</em></p>
+    <p><em>"If it worked like this..."</em></p>
+    <p><em>"I would use this so much more if it looked like this..."</em></p>
+
+    <p>I created things that I wished worked like the concepts I wrote. Then I went backwards to actually make it work.</p>
+
+    <h2>What <code><suitkaise-api>suitkaise</suitkaise-api></code> does</h2>
+
+    <p>Think of the printing press, an invention that made production of paper media faster, more standardized, and less prone to human error. People didn't have to write books by hand anymore, saving them a large amount of time and effort.</p>
+
+    <p>The result: the world was flooded with books, and the "Information Age" began.</p>
+
+    <p>There are many things in Python that need their own printing press to make using them faster, more standardized, and less prone to human error.</p>
+
+    <p>Parallel processing, Python-to-Python serialization, file path handling, and more.</p>
+
+    <p><code><suitkaise-api>suitkaise</suitkaise-api></code> gives you these printing presses.</p>
+
+    <p>The name is inspired by "hacker laptops", where the user opens a briefcase and hacks some mainframe in 5 seconds. That's the level of speed and ease you get with <code><suitkaise-api>suitkaise</suitkaise-api></code>.</p>
+
+    <h3><code><suitkaise-api>processing</suitkaise-api></code> — Unlocks the full potential of parallel programming in Python.</h3>
+
+    <p>60% of parallel processing is batch processing, where you process N number of items at once instead of just 1. <code><suitkaise-api>processing</suitkaise-api></code> gives you a <code><suitkaise-api>Pool</suitkaise-api></code> class that makes batch processing easy, with 3 standard pooling patterns.</p>
+
+    <p>The other 40% is creating long-running, complex subprocesses that do more than just look up data or compute something. Creating these is generally a nightmare even for experienced developers.</p>
+
+    <p><code><suitkaise-api>processing</suitkaise-api></code> gives you an <code><suitkaise-api>Skprocess</suitkaise-api></code> class that makes creating these easy, with coded lifecycle methods to setup, run, cleanup, and more. These classes include timing, error handling, and run the process internally, so you don't have to worry about managing the process yourself.</p>
+
+    <p>Finally, <code><suitkaise-api>processing</suitkaise-api></code> gives you a <code><suitkaise-api>Share</suitkaise-api></code> class.</p>
+
+    <p>Every developer knows how to create a class instance and add objects to it.</p>
+
+    <p>And that's all you have to do with <code><suitkaise-api>Share</suitkaise-api></code>. Instantiate it, add objects to it, and pass it to your subprocesses. It ensures that everything syncs up and remains in sync for you. Even complex classes can be added and used just like you would use it normally.</p>
+
+    <p>How? <code><suitkaise-api>cucumber</suitkaise-api></code>, the serialization engine that can handle a vast amount of things that <code>pickle</code>, <code>cloudpickle</code>, and <code>dill</code> cannot, including complex, user created class instances that would fail to serialize with the other options.</p>
+
+    <h3><code><suitkaise-api>cucumber</suitkaise-api></code> — Serialize anything.</h3>
+
+    <p><code><suitkaise-api>cucumber</suitkaise-api></code> outperforms all competitors in coverage, almost entirely eliminating errors when converting to and from bytes. Things like locks, generators, file handles, and more are all covered. Additionally, it has faster speed than <code>cloudpickle</code> and <code>dill</code> for many simple types, and is also faster in most cases for the more complex types as well.</p>
+
+    <p>Why is this awesome? You don't have to worry about errors anymore. You now have access to a custom class, the objects you want to use in it but couldn't before, and the ability to just share data between processes without thinking, all powered by this engine. You don't even have to use the other modules to get an upgrade. This is just simply better.</p>
+
+    <h3><code><suitkaise-api>paths</suitkaise-api></code> — Everything path related is so much more simple.</h3>
+
+    <p>It includes <code><suitkaise-api>Skpath</suitkaise-api></code>, a path object that uses an auto-detected project root to normalize all of your paths for you. It is cross platform compatible. An <code><suitkaise-api>Skpath</suitkaise-api></code> made on Murphy's Mac will be the same as the same <code><suitkaise-api>Skpath</suitkaise-api></code> made on Gurphy's Windows laptop.</p>
+
+    <p>It also includes an <code><suitkaise-api>@autopath</suitkaise-api></code> decorator that can be used to automatically streamline all of your paths to a specific type, getting rid of type mismatches in their entirety.</p>
+
+    <h3><code><suitkaise-api>timing</suitkaise-api></code> — Times your code with one line.</h3>
+
+    <p><code><suitkaise-api>timing</suitkaise-api></code> gives you a <code><suitkaise-api>Sktimer</suitkaise-api></code> class that is the core piece of this module. It powers <code><suitkaise-api>@timethis</suitkaise-api></code> and the <code><suitkaise-api>TimeThis</suitkaise-api></code> context manager, which allow you to time your code with one line.</p>
+
+    <p>Additionally, <code><suitkaise-api>Sktimer</suitkaise-api></code> collects far more statistical data than <code>timeit</code>, including mean, median, standard deviation, percentiles, and more.</p>
+
+    <h3><code><suitkaise-api>circuits</suitkaise-api></code> — Manage your execution flow more cleanly.</h3>
+
+    <p><code><suitkaise-api>circuits</suitkaise-api></code> gives you two patterns to manage your code. What separates them from other circuit breaker libraries is their use in parallel processing.</p>
+
+    <ul>
+        <li><code><suitkaise-api>Circuit</suitkaise-api></code> — auto-resets after sleeping, great for rate limiting, resource management, and more</li>
+        <li><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> — stays broken until manually reset, great for stopping execution after a certain number of failures with extra control</li>
+    </ul>
+
+    <p><code><suitkaise-api>circuits</suitkaise-api></code> is fully thread-safe.</p>
+
+    <p><code><suitkaise-api>BreakingCircuit</suitkaise-api></code> also works with <code><suitkaise-api>Share</suitkaise-api></code>, so you can share the circuit breaker state across process boundaries.</p>
+
+    <h3><code><suitkaise-api>sk</suitkaise-api></code> — Modify your functions and methods without changing their code.</h3>
+
+    <p><code><suitkaise-api>sk</suitkaise-api></code> can be used as a decorator or a function, and adds some special modifiers to your functions and methods.</p>
+
+    <ul>
+        <li><code><suitkaise-api>.retry()</suitkaise-api></code> — retry it when it fails</li>
+        <li><code><suitkaise-api>.timeout()</suitkaise-api></code> — return an error if it takes too long</li>
+        <li><code><suitkaise-api>.background()</suitkaise-api></code> — run it in the background and get the result later using Futures</li>
+        <li><code><suitkaise-api>.asynced()</suitkaise-api></code> — get an async version of it if it has calls that block your code from running using <code>asyncio.to_thread()</code></li>
+        <li><code><suitkaise-api>.rate_limit()</suitkaise-api></code> — limit the number of calls it makes per second</li>
+    </ul>
+
+    <h2>Why you should use <code><suitkaise-api>suitkaise</suitkaise-api></code></h2>
+
+    <p><code><suitkaise-api>suitkaise</suitkaise-api></code> is for the developer.</p>
+
+    <p>As previously mentioned, when I created <code><suitkaise-api>suitkaise</suitkaise-api></code>, I made the end goal first: what I myself as a developer would want to use.</p>
+
+    <p>All of <code><suitkaise-api>suitkaise</suitkaise-api></code> is thousands of iterations improving on this goal API, which was created to address different problems I myself have encountered as a developer.</p>
+
+    <p>Here are the problems that <code><suitkaise-api>suitkaise</suitkaise-api></code> was made for.</p>
+
+    <details>
+        <summary>Multiprocessing</summary>
+        <p>Parallel processing, or multiprocessing, is one of the essential concepts for modern software development.</p>
+        <p>But it is also a pain in the ass to set up.</p>
+        <p>Many users aren't just plugging the same function into multiple processes to make things go faster.</p>
+        <p>They might be using multiple subprocesses to make software run smoother, manage UI, gather real time data, manage resources or databases, and more.</p>
+        <p>These are all much more involved than just creating a processing pool to work with a single function that has different inputs. They require things like:</p>
+        <ul>
+            <li>Error handling</li>
+            <li>Detailed logging and debugging</li>
+            <li>Cross process communication</li>
+            <li>Thoughtful lifecycle management</li>
+            <li>And more</li>
+        </ul>
+        <p>Trying to do all of this manually for each individual scenario is overwhelming and time consuming, even with Python's <code>multiprocessing.Process</code> class.</p>
+        <p>So I made my own class.</p>
+        <p>Inherit from the special <code><suitkaise-api>Skprocess</suitkaise-api></code> class to create your own custom processes.</p>
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Skprocess</suitkaise-api>
+
+class MyProcess(<suitkaise-api>Skprocess</suitkaise-api>):
+
+    def __init__(self, num_runs: int):
+        self.counter = 0
+        self.<suitkaise-api>process_config</suitkaise-api>.runs = num_runs
+
+    def <suitkaise-api>__prerun__</suitkaise-api>(self):
+        # setup before the main part
+        # connect to databases, make API calls, read files
+
+    def <suitkaise-api>__run__</suitkaise-api>(self):
+        # the main part
+        # write your code here
+        # it repeats for you, no need to write looping code
+
+    def <suitkaise-api>__postrun__</suitkaise-api>(self):
+        # clean up your work
+        # close connections, add results to attributes
+
+    def <suitkaise-api>__onfinish__</suitkaise-api>(self):
+        # clean up the process
+        # calculate summaries, save results to files, send emails
+
+    def <suitkaise-api>__result__</suitkaise-api>(self):
+        # return the result of the process
+        # store your results as instance attributes and return them here
+
+    def <suitkaise-api>__error__</suitkaise-api>(self):
+        # __result__() when an error occurs</code></pre>
+        <p>Everything is separated into pieces that make much more sense. You have set spaces for setup, your main work, and cleanup/teardown. And, everything follows simple class practices.</p>
+        <p>Control the process with simple methods:</p>
+<pre><code class="language-python">p = MyProcess(num_runs=10)
+
+# start the process
+p.<suitkaise-api>start()</suitkaise-api>
+
+# wait for the process to finish
+p.<suitkaise-api>wait()</suitkaise-api>
+
+# access the result
+result = p.<suitkaise-api>result</suitkaise-api></code></pre>
+        <a href="#processing" class="learn-more-link arrow-right nav-link" data-page="processing">
+            learn more <span class="arrow">&#x27F6;</span>
+        </a>
+    </details>
+
+    <details>
+        <summary>Can't pickle</summary>
+        <p>When you try to pickle an object, you might get an error like this:</p>
+<pre><code>TypeError: cannot pickle 'MyObject' object</code></pre>
+        <p>After hours of debugging, these feel like slaps in the face.</p>
+        <p>So many essential objects in Python are not pickleable, even if you use custom picklers like <code>cloudpickle</code> or <code>dill</code>.</p>
+        <p>Your thread locks don't pickle.</p>
+        <p>Your database connections don't pickle.</p>
+        <p>Your functions don't always pickle.</p>
+        <p>Your loggers don't pickle correctly.</p>
+        <p>Your class objects don't pickle unless they are extremely basic.</p>
+        <p>Your circular references don't reconstruct correctly.</p>
+        <p>There are also so many other weird BS quirks that you have to account for, like locally-defined functions, lambdas, closures, and more.</p>
+        <p>So, I made my own serialization engine that handles all of this: <code><suitkaise-api>cucumber</suitkaise-api></code>.</p>
+        <p>I wanted a serialization engine that could handle anything. I never wanted a pickling error again in my life.</p>
+        <p>But being able to serialize "anything" is a steep challenge. To prove that <code><suitkaise-api>cucumber</suitkaise-api></code> could do it, I needed a rival, an enemy, a final boss to defeat. One that, after winning, would let me say "I think I can serialize anything now."</p>
+        <p>So, I created the <code>WorstPossibleObject</code>.</p>
+        <ul>
+            <li>5 levels of nested classes.</li>
+            <li>Every collection type placed in each level at random, nested with random objects.</li>
+            <li>Objects including complex classes, loggers, functions, and more, that nothing else serializes.</li>
+            <li>Every object initialized at least once on every level.</li>
+            <li>Each object with a different random seed.</li>
+        </ul>
+        <p>Basically, "how can I make this as bad as possible?"</p>
+        <p>Then, I created an engine to beat it.</p>
+        <p>Then, I battled it thousands of times, forcing the engine to successfully serialize it and deserialize it multiple times per battle. Not a single error was allowed to occur.</p>
+        <p>Once the engine won, I felt confident that I could serialize anything. But there will always be some gap, some edge case, some exception not accounted for.</p>
+        <p>Therefore, I have written a special way for you to handle things yourself if need be.</p>
+        <p><code>__serialize__()</code> and <code>__deserialize__()</code> methods in your classes will be used first by <code><suitkaise-api>cucumber</suitkaise-api></code>, before it uses the default handling.</p>
+        <p>You can use them to override the default serialization and deserialization behavior for your own objects.</p>
+        <a href="#cucumber" class="learn-more-link arrow-right nav-link" data-page="cucumber">
+            learn more <span class="arrow">&#x27F6;</span>
+        </a>
+    </details>
+
+    <details>
+        <summary>File path handling</summary>
+        <p>Do you ever pull a repo from your Windows PC at work and it doesn't work on your Mac at home?</p>
+        <p>Or, maybe your laptop at home is also Windows, but the project is placed in a different directory than the one you use at work.</p>
+        <p>And then everything breaks.</p>
+        <p>Right now, Python doesn't have true, consistent, or standardized cross-platform path handling. While it isn't too hard to do manually, it opens the door for miscommunications, errors, and more.</p>
+        <p><code><suitkaise-api>paths</suitkaise-api></code> ensures that you can't make mistakes, and simplifies a lot of the manual work down into one line.</p>
+        <p>First off, there's <code><suitkaise-api>Skpath</suitkaise-api></code>.</p>
+        <p><code><suitkaise-api>Skpath</suitkaise-api></code> is a path object that automatically detects the project root and uses it to normalize paths for you. These paths work cross machine and cross platform, as long as the project structure is the same.</p>
+        <p>No need to convert paths between operating systems.</p>
+        <p>No need to worry about where your project is located.</p>
+        <p>No needing to manually convert paths to work correctly everywhere.</p>
+        <a href="#paths" class="learn-more-link arrow-right nav-link" data-page="paths">
+            learn more <span class="arrow">&#x27F6;</span>
+        </a>
+    </details>
+
+    <details>
+        <summary>Timing your code</summary>
+        <p>I used to hate having to write code to time things.</p>
+        <p>Set up a start time, stop time, calculate the difference, store it somewhere, calculate statistics manually...</p>
+        <p><code><suitkaise-api>timing</suitkaise-api></code> removes all of that. One decorator or context manager, and you get automatic timing with deep statistics — mean, median, standard deviation, percentiles, and more.</p>
+<pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>timethis</suitkaise-api>
+
+@<suitkaise-api>timethis()</suitkaise-api>
+def my_function():
+    do_work()
+
+for _ in range(100):
+    my_function()
+
+print(my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>mean</suitkaise-api>)
+print(my_function.<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>percentile</suitkaise-api>(95))</code></pre>
+        <a href="#timing" class="learn-more-link arrow-right nav-link" data-page="timing">
+            learn more <span class="arrow">&#x27F6;</span>
+        </a>
+    </details>
+
+    <h2>Using <code><suitkaise-api>suitkaise</suitkaise-api></code> with AI</h2>
+
+    <p>Currently, AI agents like ChatGPT that you use with something like Cursor are not trained to use <code><suitkaise-api>suitkaise</suitkaise-api></code>.</p>
+
+    <p>That doesn't mean you can't use <code><suitkaise-api>suitkaise</suitkaise-api></code> with AI.</p>
+
+    <h3>Install the docs and place them in your project</h3>
+
+    <p>The docs are available for download through the <code><suitkaise-api>suitkaise</suitkaise-api></code> CLI.</p>
+
+    <ol>
+        <li><code>pip install <suitkaise-api>suitkaise</suitkaise-api></code></li>
+        <li>Add a <code>setup.sk</code> file to your project root</li>
+        <li>With your cwd inside the project root, run <code>suitkaise docs</code> from the terminal to download the docs to your project root.</li>
+    </ol>
+
+    <p>Once you do this, AI agents will have access to the docs, including a detailed API reference for each module and internal workings.</p>
+
+    <p>Use this prompt:</p>
+
+<pre><code class="language-text">I am using suitkaise, a Python code library.
+
+The docs for the lib are attached under suitkaise-docs.
+
+Please read them and familiarize yourself with the library before continuing.</code></pre>
+
+    <h2>How to give feedback</h2>
+
+    <p>There are multiple ways to give feedback or report bugs. I am most likely to check the feedback forms first.</p>
+
+    <ul>
+        <li>Use the <a href="#feedback" class="nav-link" data-page="feedback">feedback page</a></li>
+        <li>Use the GitHub issues page</li>
+        <li>Use the Discord server</li>
+        <li>Use the Reddit subreddit</li>
+        <li>Email <a href="mailto:suitkaise@suitkaise.info">suitkaise@suitkaise.info</a></li>
+        <li>DM any <code><suitkaise-api>suitkaise</suitkaise-api></code> social media account</li>
+    </ul>
+
+</section>

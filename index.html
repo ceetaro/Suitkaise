@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suitkaise</title>
+    <link rel="stylesheet" href="styles.css?v=20260221-70">
+    <!-- Prism.js syntax highlighting (Tomorrow Night theme) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-briefcase" id="loadingBriefcase">
+            <img src="../__assets__/briefcase-laptop-closed.png" alt="Loading..." class="loading-img loading-frame" id="loadingFrame0">
+            <img src="../__assets__/briefcase-laptop-half-open.png" alt="" class="loading-img loading-frame half-open" id="loadingFrame1" style="display:none">
+            <img src="../__assets__/briefcase-laptop-fully-open.png" alt="" class="loading-img loading-frame fully-open" id="loadingFrame2" style="display:none">
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay (closes sidebar when clicked) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-close-btn" id="sidebarCloseBtn">&lt;</button>
+        <nav class="sidebar-nav">
+            <a href="#processing-why" class="sidebar-item nav-link" data-page="processing-why">Processing</a>
+            <a href="#cucumber-why" class="sidebar-item nav-link" data-page="cucumber-why">Cucumber</a>
+            <a href="#sk-why" class="sidebar-item nav-link" data-page="sk-why">Sk</a>
+            <a href="#timing-why" class="sidebar-item nav-link" data-page="timing-why">Timing</a>
+            <a href="#paths-why" class="sidebar-item nav-link" data-page="paths-why">Paths</a>
+            <a href="#circuits-why" class="sidebar-item nav-link" data-page="circuits-why">Circuits</a>
+        </nav>
+    </aside>
+
+    <!-- Navigation Bar -->
+    <header class="nav-bar">
+        <button class="nav-btn sidebar-toggle" id="sidebarToggle">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+        <div class="nav-right">
+            <a href="#quick-start" class="nav-btn nav-link" data-page="quick-start" id="navQuickStart">Quick Start</a>
+            <a href="#about" class="nav-btn nav-link" data-page="about">About</a>
+            <a href="#feedback" class="nav-btn nav-link" data-page="feedback">Feedback</a>
+            <a href="#technical-info" class="nav-btn nav-link" data-page="technical-info">Technical Info</a>
+            <a href="#error" class="nav-btn nav-link" data-page="error">Donate</a>
+            <a href="#home" class="nav-btn home-btn nav-link" id="homeBtn" data-page="home">
+                <img src="../__assets__/briefcase-laptop-closed.png" alt="Home" class="home-icon" id="homeIcon">
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Page Content Container -->
+    <main class="page-content" id="pageContent"></main>
+
+    <!-- Prism.js for syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    
+    <script src="script.js?v=20260221-35"></script>
+</body>
+</html>

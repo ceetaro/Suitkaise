@@ -1,0 +1,79 @@
+<div class="pt1-showcase" id="pt1Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="pt1Nav">
+        <button class="sc-nav-btn" id="pt1Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="pt1Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: The Problem — three paths, all different -->
+    <div class="pt1-phase pt1-problem" id="pt1Problem">
+        <div class="pt1-title" id="pt1ProbTitle">Same file. Three machines.</div>
+        <div class="pt1-cards" id="pt1ProbCards">
+            <div class="pt1-card" id="pt1CardMac">
+                <div class="pt1-card-os">macOS</div>
+                <div class="pt1-card-code"><span class="kw">str</span>(Path(<span class="st">"config/settings.yaml"</span>).resolve())</div>
+                <div class="pt1-card-path">
+                    <span class="pt1-path-noise">/Users/murphy/project/</span><span class="pt1-path-common">config/settings.yaml</span>
+                </div>
+            </div>
+            <div class="pt1-card" id="pt1CardWin">
+                <div class="pt1-card-os">Windows</div>
+                <div class="pt1-card-code"><span class="kw">str</span>(Path(<span class="st">"config/settings.yaml"</span>).resolve())</div>
+                <div class="pt1-card-path">
+                    <span class="pt1-path-noise">C:\Users\gurphy\project\</span><span class="pt1-path-common">config\settings.yaml</span>
+                </div>
+            </div>
+            <div class="pt1-card" id="pt1CardLinux">
+                <div class="pt1-card-os">Linux</div>
+                <div class="pt1-card-code"><span class="kw">str</span>(Path(<span class="st">"config/settings.yaml"</span>).resolve())</div>
+                <div class="pt1-card-path">
+                    <span class="pt1-path-noise">/home/furphy/project/</span><span class="pt1-path-common">config/settings.yaml</span>
+                </div>
+            </div>
+        </div>
+        <div class="pt1-compare" id="pt1Compare">
+            <span class="pt1-compare-code">mac_path == win_path == linux_path</span>
+            <span class="pt1-compare-result pt1-fail">→ False</span>
+        </div>
+    </div>
+
+    <!-- Step 1: The Fix — Skpath.rp, all identical -->
+    <div class="pt1-phase pt1-fix" id="pt1Fix">
+        <div class="pt1-title" id="pt1FixTitle">One <span class="pt1-hl">rp</span>. Every machine.</div>
+        <div class="pt1-cards" id="pt1FixCards">
+            <div class="pt1-card pt1-card-fix" id="pt1FixCardMac">
+                <div class="pt1-card-os">macOS</div>
+                <div class="pt1-card-code"><span class="api-hl">Skpath</span>(<span class="st">"config/settings.yaml"</span>).<span class="dc">rp</span></div>
+                <div class="pt1-card-path pt1-path-match">config/settings.yaml</div>
+            </div>
+            <div class="pt1-card pt1-card-fix" id="pt1FixCardWin">
+                <div class="pt1-card-os">Windows</div>
+                <div class="pt1-card-code"><span class="api-hl">Skpath</span>(<span class="st">"config/settings.yaml"</span>).<span class="dc">rp</span></div>
+                <div class="pt1-card-path pt1-path-match">config/settings.yaml</div>
+            </div>
+            <div class="pt1-card pt1-card-fix" id="pt1FixCardLinux">
+                <div class="pt1-card-os">Linux</div>
+                <div class="pt1-card-code"><span class="api-hl">Skpath</span>(<span class="st">"config/settings.yaml"</span>).<span class="dc">rp</span></div>
+                <div class="pt1-card-path pt1-path-match">config/settings.yaml</div>
+            </div>
+        </div>
+        <div class="pt1-compare" id="pt1FixCompare">
+            <span class="pt1-compare-code">mac.rp == win.rp == linux.rp</span>
+            <span class="pt1-compare-result pt1-pass">→ True</span>
+        </div>
+    </div>
+
+    <!-- Step 2: Punchline -->
+    <div class="pt1-phase pt1-punchline" id="pt1Punchline">
+        <div class="pt1-punch-title" id="pt1PunchTitle">Stop fighting with paths. Start using them.</div>
+        <pre class="pt1-codeblock" id="pt1PunchCode"></pre>
+        <div class="pt1-tagline" id="pt1Tagline">Same project, any machine, and now everything just works.</div>
+        <button class="pt1-replay-btn" id="pt1Replay">replay</button>
+    </div>
+
+</div>

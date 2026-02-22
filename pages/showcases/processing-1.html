@@ -1,0 +1,45 @@
+<div class="proc-showcase" id="procShowcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="procNav">
+        <button class="sc-nav-btn" id="procPrev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="procNext">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: Scenario + Requirements -->
+    <div class="proc-scene proc-intro" id="procIntro">
+        <div class="proc-scenario" id="procScenario">
+            <p class="proc-scenario-text" id="procScenarioText">Let's make a process that queries a database for user data based on given input from a parent process.</p>
+        </div>
+        <div class="proc-requirements" id="procRequirements">
+            <div class="proc-req" id="procReq0">Receive query parameters from parent</div>
+            <div class="proc-req" id="procReq1">Connect to database and execute query</div>
+            <div class="proc-req" id="procReq2">Handle connection failures with retry</div>
+            <div class="proc-req" id="procReq3">Timeout if query takes too long</div>
+            <div class="proc-req" id="procReq4">Track timing statistics</div>
+            <div class="proc-req" id="procReq5">Return results to parent</div>
+            <div class="proc-req" id="procReq6">Clean up connection on exit</div>
+        </div>
+    </div>
+
+    <!-- Phase 2: Side-by-side code typing -->
+    <div class="proc-scene proc-battle" id="procBattle">
+        <div class="proc-panel proc-panel-left" id="procPanelLeft">
+            <div class="proc-panel-label">with <span class="api-highlight">suitkaise</span> — <span class="proc-line-count" id="procLeftCount">40 lines</span></div>
+            <div class="proc-panel-code">
+                <pre class="proc-code" id="procCodeLeft"></pre>
+            </div>
+        </div>
+        <div class="proc-panel proc-panel-right" id="procPanelRight">
+            <div class="proc-panel-label">without — <span class="proc-line-count" id="procRightCount">92 lines</span></div>
+            <div class="proc-panel-code">
+                <pre class="proc-code" id="procCodeRight"></pre>
+            </div>
+        </div>
+    </div>
+
+</div>

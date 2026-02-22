@@ -1,0 +1,147 @@
+<div class="module-bar" data-module="cucumber">
+    <button class="module-bar-title">suitkaise.cucumber</button>
+    <nav class="module-bar-nav">
+        <a href="#cucumber-why" class="module-bar-link" data-page="cucumber-why">why</a>
+        <a href="#cucumber-quick-start" class="module-bar-link" data-page="cucumber-quick-start">quick start</a>
+        <a href="#cucumber" class="module-bar-link" data-page="cucumber">how to use</a>
+        <a href="#cucumber-how-it-works" class="module-bar-link" data-page="cucumber-how-it-works">how it works</a>
+        <a href="#cucumber-supported-types" class="module-bar-link active" data-page="cucumber-supported-types">supported types</a>
+        <a href="#cucumber-performance" class="module-bar-link" data-page="cucumber-performance">performance</a>
+        <a href="#cucumber-worst-possible-object" class="module-bar-link" data-page="cucumber-worst-possible-object">worst possible object</a>
+        <a href="#cucumber-videos" class="module-bar-link" data-page="cucumber-videos">videos</a>
+        <a href="#cucumber-learn" class="module-bar-link" data-page="cucumber-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1>cucumber supported types</h1>
+    <p><strong>Note:</strong> Iterator-style objects (including <code>enumerate</code> and <code>zip</code>) are exhausted during <code>serialization</code>. Reconstruction returns a plain iterator over the remaining values, not the original iterator type.</p>
+    <p><strong>Note:</strong> Objects that turn into <code>Reconnector</code> objects may need to be reconnected after <code>deserialization</code> to fully work. Reconnectors that do not require auth will lazily reconnect on first attribute access; auth-based reconnectors still require an explicit <code>reconnect(...)</code> call (or <code><suitkaise-api>reconnect_all</suitkaise-api>(...)</code> with credentials).</p>
+    <p><strong>Note:</strong> Due to Python limitations, some types are not supported by <code><suitkaise-api>Share</suitkaise-api></code>.</p>
+    <ul>
+        <li><code>multiprocessing.*</code> objects (queues, managers, events, shared_memory, connections)</li>
+        <li><code>os.pipe()</code> file handles / pipe-backed <code>io.FileIO</code></li>
+        <li><code>weakref.ref</code> objects (recreated as weak references; dead refs become placeholders)</li>
+        <li>Tokens with authentication (cannot serialize authentication strings)</li>
+    </ul>
+    <h3>All <code><suitkaise-api>cucumber</suitkaise-api></code> supported types</h3>
+    <ul>
+        <li>User-defined class instances --&gt; new instance of same type with same state</li>
+        <li>All <code><suitkaise-api>suitkaise</suitkaise-api></code> types</li>
+        <li><code>None</code> --&gt; <code>None</code></li>
+        <li><code>bool</code> --&gt; <code>bool</code></li>
+        <li><code>int</code> --&gt; <code>int</code></li>
+        <li><code>float</code> --&gt; <code>float</code></li>
+        <li><code>str</code> --&gt; <code>str</code></li>
+        <li><code>bytes</code> --&gt; <code>bytes</code></li>
+        <li><code>list</code> --&gt; <code>list</code></li>
+        <li><code>tuple</code> --&gt; <code>tuple</code></li>
+        <li><code>set</code> --&gt; <code>set</code></li>
+        <li><code>frozenset</code> --&gt; <code>frozenset</code></li>
+        <li><code>dict</code> --&gt; <code>dict</code></li>
+        <li><code>datetime.datetime</code> --&gt; <code>datetime.datetime</code></li>
+        <li><code>datetime.date</code> --&gt; <code>datetime.date</code></li>
+        <li><code>datetime.time</code> --&gt; <code>datetime.time</code></li>
+        <li><code>datetime.timedelta</code> --&gt; <code>datetime.timedelta</code></li>
+        <li><code>datetime.timezone</code> --&gt; <code>datetime.timezone</code></li>
+        <li><code>decimal.Decimal</code> --&gt; <code>decimal.Decimal</code></li>
+        <li><code>fractions.Fraction</code> --&gt; <code>fractions.Fraction</code></li>
+        <li><code>uuid.UUID</code> --&gt; <code>uuid.UUID</code></li>
+        <li><code>pathlib.Path</code> --&gt; <code>pathlib.Path</code></li>
+        <li><code>pathlib.PurePath</code> --&gt; <code>pathlib.PurePath</code></li>
+        <li><code>pathlib.PosixPath</code> --&gt; <code>pathlib.PosixPath</code></li>
+        <li><code>pathlib.WindowsPath</code> --&gt; <code>pathlib.WindowsPath</code></li>
+        <li><code>types.FunctionType</code> --&gt; <code>types.FunctionType</code></li>
+        <li><code>functools.partial</code> --&gt; <code>functools.partial</code></li>
+        <li><code>types.MethodType</code> --&gt; <code>types.MethodType</code></li>
+        <li><code>staticmethod</code> --&gt; <code>staticmethod</code></li>
+        <li><code>classmethod</code> --&gt; <code>classmethod</code></li>
+        <li><code>type</code> --&gt; <code>type</code></li>
+        <li><code>logging.Logger</code> --&gt; <code>logging.Logger</code></li>
+        <li><code>logging.StreamHandler</code> --&gt; <code>logging.StreamHandler</code></li>
+        <li><code>logging.FileHandler</code> --&gt; <code>logging.FileHandler</code></li>
+        <li><code>logging.Formatter</code> --&gt; <code>logging.Formatter</code></li>
+        <li><code>_thread.lock</code> --&gt; <code>_thread.lock</code></li>
+        <li><code>threading.RLock</code> --&gt; <code>threading.RLock</code></li>
+        <li><code>threading.Semaphore</code> --&gt; <code>threading.Semaphore</code></li>
+        <li><code>threading.BoundedSemaphore</code> --&gt; <code>threading.BoundedSemaphore</code></li>
+        <li><code>threading.Barrier</code> --&gt; <code>threading.Barrier</code></li>
+        <li><code>threading.Condition</code> --&gt; <code>threading.Condition</code></li>
+        <li><code>io.TextIOBase</code> --&gt; <code>io.TextIOBase</code></li>
+        <li><code>tempfile._TemporaryFileWrapper</code> --&gt; <code>tempfile._TemporaryFileWrapper</code></li>
+        <li><code>io.StringIO</code> --&gt; <code>io.StringIO</code></li>
+        <li><code>io.BytesIO</code> --&gt; <code>io.BytesIO</code></li>
+        <li><code>queue.Queue</code> --&gt; <code>queue.Queue</code></li>
+        <li><code>multiprocessing.Queue</code> --&gt; <code>multiprocessing.Queue</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>threading.Event</code> --&gt; <code>threading.Event</code></li>
+        <li><code>multiprocessing.Event</code> --&gt; <code>multiprocessing.Event</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>re.Pattern</code> --&gt; <code>re.Pattern</code></li>
+        <li><code>re.Match</code> --&gt; <code>MatchReconnector</code></li>
+        <li><code>sqlite3.Connection</code> --&gt; <code>SQLiteConnectionReconnector</code></li>
+        <li><code>sqlite3.Cursor</code> --&gt; <code>SQLiteCursorReconnector</code></li>
+        <li><code>contextvars.ContextVar</code> --&gt; <code>contextvars.ContextVar</code></li>
+        <li><code>contextvars.Token</code> --&gt; <code>contextvars.Token</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>requests.Session</code> --&gt; <code>requests.Session</code></li>
+        <li><code>socket.socket</code> --&gt; <code>SocketReconnector</code></li>
+        <li><code>psycopg2.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymysql.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymongo.MongoClient</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>redis.Redis</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>sqlalchemy.Engine</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>cassandra.Cluster</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>elasticsearch.Elasticsearch</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>neo4j.Driver</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>influxdb_client.InfluxDBClient</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pyodbc.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>clickhouse_driver.Client</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>pymssql.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>oracledb.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>snowflake.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>duckdb.Connection</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>collections.abc.Iterator</code> --&gt; <code>iterator</code></li>
+        <li><code>range</code> --&gt; <code>range</code></li>
+        <li><code>enumerate</code> --&gt; <code>iterator</code></li>
+        <li><code>zip</code> --&gt; <code>iterator</code></li>
+        <li><code>mmap.mmap</code> --&gt; <code>mmap.mmap</code></li>
+        <li><code>multiprocessing.shared_memory.SharedMemory</code> --&gt; <code>multiprocessing.shared_memory.SharedMemory</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>int</code> (file descriptors) --&gt; <code>int</code> (file descriptors)</li>
+        <li><code>memoryview</code> --&gt; <code>memoryview</code></li>
+        <li><code>threading.Thread</code> --&gt; <code>ThreadReconnector</code></li>
+        <li><code>concurrent.futures.ThreadPoolExecutor</code> --&gt; <code>concurrent.futures.ThreadPoolExecutor</code></li>
+        <li><code>concurrent.futures.ProcessPoolExecutor</code> --&gt; <code>concurrent.futures.ProcessPoolExecutor</code></li>
+        <li><code>threading.local</code> --&gt; <code>threading.local</code></li>
+        <li><code>io.FileIO</code> (from <code>os.pipe</code>) --&gt; <code>io.FileIO</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>multiprocessing.connection.Connection</code> --&gt; <code>multiprocessing.connection.Connection</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>multiprocessing.managers.BaseProxy</code> --&gt; <code>multiprocessing.managers.BaseProxy</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>types.CodeType</code> --&gt; <code>types.CodeType</code></li>
+        <li><code>types.FrameType</code> --&gt; <code>types.FrameType</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>property</code> --&gt; <code>property</code></li>
+        <li><code>types.MemberDescriptorType</code> --&gt; <code>types.MemberDescriptorType</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>types.GetSetDescriptorType</code> --&gt; <code>types.GetSetDescriptorType</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>types.WrapperDescriptorType</code> --&gt; <code>types.WrapperDescriptorType</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>types.MethodDescriptorType</code> --&gt; <code>types.MethodDescriptorType</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>types.MethodWrapperType</code> --&gt; <code>types.MethodWrapperType</code></li>
+        <li><code>types.GeneratorType</code> --&gt; <code>iterator</code></li>
+        <li><code>weakref.ref</code> --&gt; <code>weakref.ref</code> (<code><suitkaise-api>Share</suitkaise-api></code> not supported)</li>
+        <li><code>weakref.WeakValueDictionary</code> --&gt; <code>weakref.WeakValueDictionary</code></li>
+        <li><code>weakref.WeakKeyDictionary</code> --&gt; <code>weakref.WeakKeyDictionary</code></li>
+        <li><code>enum.Enum</code> --&gt; <code>enum.Enum</code></li>
+        <li><code>enum.EnumMeta</code> --&gt; <code>enum.EnumMeta</code></li>
+        <li><code>contextlib._GeneratorContextManager</code> --&gt; <code>contextlib._GeneratorContextManager</code></li>
+        <li><code>subprocess.Popen</code> --&gt; <code>SubprocessReconnector</code></li>
+        <li><code>subprocess.CompletedProcess</code> --&gt; <code>subprocess.CompletedProcess</code></li>
+        <li><code>types.CoroutineType</code> --&gt; <code>types.CoroutineType</code></li>
+        <li><code>types.AsyncGeneratorType</code> --&gt; <code>types.AsyncGeneratorType</code></li>
+        <li><code>asyncio.Task</code> --&gt; <code>asyncio.Task</code></li>
+        <li><code>asyncio.Future</code> --&gt; <code>asyncio.Future</code></li>
+        <li><code>types.ModuleType</code> --&gt; <code>types.ModuleType</code></li>
+        <li><code>collections.namedtuple</code> --&gt; <code>collections.namedtuple</code></li>
+        <li><code>typing.NamedTuple</code> --&gt; <code>typing.NamedTuple</code></li>
+        <li><code>typing.TypedDict</code> --&gt; <code>typing.TypedDict</code></li>
+        <li><code>DbReconnector</code> --&gt; <code>DbReconnector</code></li>
+        <li><code>SocketReconnector</code> --&gt; <code>SocketReconnector</code></li>
+        <li><code>ThreadReconnector</code> --&gt; <code>ThreadReconnector</code></li>
+        <li><code>PipeReconnector</code> --&gt; <code>PipeReconnector</code></li>
+        <li><code>SubprocessReconnector</code> --&gt; <code>SubprocessReconnector</code></li>
+        <li><code>MatchReconnector</code> --&gt; <code>MatchReconnector</code></li>
+    </ul>
+</section>

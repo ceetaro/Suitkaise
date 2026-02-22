@@ -1,0 +1,80 @@
+<div class="sk1-showcase" id="sk1Showcase">
+
+    <!-- Nav arrows -->
+    <div class="sc-nav" id="sk1Nav">
+        <button class="sc-nav-btn" id="sk1Prev" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="sc-nav-btn" id="sk1Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+    </div>
+
+    <!-- Step 0: The decorator — just works -->
+    <div class="sk1-phase sk1-intro" id="sk1Intro">
+        <div class="sk1-title" id="sk1Title">
+            <span class="sk1-title-full" id="sk1TitleFull">s<span class="sk1-title-collapse" id="sk1Collapse">uit</span>k<span class="sk1-title-collapse" id="sk1Collapse2">aise</span></span>
+        </div>
+        <pre class="sk1-codeblock" id="sk1IntroCode"></pre>
+        <div class="sk1-intro-note" id="sk1IntroNote">Your function works exactly as before.</div>
+    </div>
+
+    <!-- Step 1: Modifiers appear one by one -->
+    <div class="sk1-phase sk1-modifiers" id="sk1Modifiers">
+        <div class="sk1-mod-title" id="sk1ModTitle">But now you have superpowers.</div>
+        <div class="sk1-mod-list" id="sk1ModList">
+            <div class="sk1-mod" id="sk1Mod0">
+                <div class="sk1-mod-code">.asynced()</div>
+                <div class="sk1-mod-desc">Make it async, automatically</div>
+            </div>
+            <div class="sk1-mod" id="sk1Mod1">
+                <div class="sk1-mod-code">.background()</div>
+                <div class="sk1-mod-desc">Run it in a thread, get a Future</div>
+            </div>
+            <div class="sk1-mod" id="sk1Mod2">
+                <div class="sk1-mod-code">.retry(<span class="nr">N</span>)</div>
+                <div class="sk1-mod-desc">Retry up to N times with backoff</div>
+            </div>
+            <div class="sk1-mod" id="sk1Mod3">
+                <div class="sk1-mod-code">.timeout(<span class="nr">N</span>)</div>
+                <div class="sk1-mod-desc">Kill it if it takes too long</div>
+            </div>
+            <div class="sk1-mod" id="sk1Mod4">
+                <div class="sk1-mod-code">.rate_limit(<span class="nr">N</span>)</div>
+                <div class="sk1-mod-desc">Throttle to N calls per second</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: asynced & background in action -->
+    <div class="sk1-phase sk1-demo" id="sk1Demo">
+        <div class="sk1-demo-title" id="sk1DemoTitle">No rewrites. Just call it differently.</div>
+        <div class="sk1-demo-panels">
+            <div class="sk1-demo-panel" id="sk1DemoAsync">
+                <div class="sk1-demo-label">Make any function async</div>
+                <pre class="sk1-codeblock sk1-codeblock-demo" id="sk1DemoAsyncCode"></pre>
+            </div>
+            <div class="sk1-demo-panel" id="sk1DemoBg">
+                <div class="sk1-demo-label">Run anything in the background</div>
+                <pre class="sk1-codeblock sk1-codeblock-demo" id="sk1DemoBgCode"></pre>
+            </div>
+        </div>
+        <div class="sk1-demo-note" id="sk1DemoNote">Same function definition.</div>
+    </div>
+
+    <!-- Step 3: Chain them all -->
+    <div class="sk1-phase sk1-chain" id="sk1Chain">
+        <div class="sk1-chain-label" id="sk1ChainLabel">Chain any combination. Order doesn't matter.</div>
+        <pre class="sk1-codeblock sk1-codeblock-chain" id="sk1ChainCode"></pre>
+        <div class="sk1-chain-note" id="sk1ChainNote">Execution order is always consistent:<br>rate limit → retry → timeout → call</div>
+    </div>
+
+    <!-- Step 3: Punchline -->
+    <div class="sk1-phase sk1-punchline" id="sk1Punchline">
+        <div class="sk1-punch-title" id="sk1PunchTitle">One decorator. Five cool things.</div>
+        <pre class="sk1-codeblock sk1-codeblock-small" id="sk1PunchCode"></pre>
+        <div class="sk1-tagline" id="sk1Tagline">Define once. Modify anywhere. Chain everything.</div>
+        <button class="sk1-replay-btn" id="sk1Replay">replay</button>
+    </div>
+
+</div>

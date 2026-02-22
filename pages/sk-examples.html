@@ -1,0 +1,537 @@
+<div class="module-bar" data-module="sk">
+    <button class="module-bar-title">suitkaise.sk</button>
+    <nav class="module-bar-nav">
+        <a href="#sk-why" class="module-bar-link" data-page="sk-why">why</a>
+        <a href="#sk-quick-start" class="module-bar-link" data-page="sk-quick-start">quick start</a>
+        <a href="#sk" class="module-bar-link" data-page="sk">how to use</a>
+        <a href="#sk-how-it-works" class="module-bar-link" data-page="sk-how-it-works">how it works</a>
+        <a href="#sk-examples" class="module-bar-link active" data-page="sk-examples">examples</a>
+        <a href="#sk-blocking-calls" class="module-bar-link" data-page="sk-blocking-calls">blocking calls</a>
+        <a href="#sk-videos" class="module-bar-link" data-page="sk-videos">videos</a>
+        <a href="#sk-learn" class="module-bar-link" data-page="sk-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1><code><suitkaise-api>sk</suitkaise-api></code> examples</h1>
+    <details>
+        <summary>Basic examples</summary>
+        <div class="dropdown-content">
+    <h3>Decorate a function</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+import json
+
+<suitkaise-api>@sk</suitkaise-api>
+def fetch_user(user_id: int) -&gt; dict:
+    &quot;&quot;&quot;Fetch user data (simulated).&quot;&quot;&quot;
+    import time
+    time.sleep(0.05)
+    return {&quot;id&quot;: user_id, &quot;name&quot;: f&quot;User {user_id}&quot;, &quot;active&quot;: True}
+
+# normal call — works exactly like a regular function
+user = fetch_user(42)
+print(user)  # {&quot;id&quot;: 42, &quot;name&quot;: &quot;User 42&quot;, &quot;active&quot;: True}
+
+# retry on failure
+user = fetch_user.<suitkaise-api>retry</suitkaise-api>(times=3, delay=0.5)(42)
+
+# timeout
+user = fetch_user.<suitkaise-api>timeout</suitkaise-api>(2.0)(42)
+
+# run in background, get a Future
+future = fetch_user.<suitkaise-api>background</suitkaise-api>()(42)
+other_work = sum(range(1_000_000))
+user = future.<suitkaise-api>result</suitkaise-api>()
+
+# chain modifiers
+user = fetch_user.<suitkaise-api>retry</suitkaise-api>(3).<suitkaise-api>timeout</suitkaise-api>(5.0)(42)</code></pre>
+    <h3>Use <code><suitkaise-api>sk</suitkaise-api>()</code> as a function</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+
+def streamline_format(text: str) -&gt; str:
+    return text.strip().lower().replace(&quot; &quot;, &quot;-&quot;)
+
+streamline_format = <suitkaise-api>sk</suitkaise-api>(streamline_format)
+
+print(streamline_format(&quot;Hello World&quot;))  # &quot;hello-world&quot;</code></pre>
+    <h3>Chaining modifiers (order does not matter)</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import hashlib
+
+<suitkaise-api>@sk</suitkaise-api>
+def read_and_hash(path: Path) -&gt; str:
+    content = Path(path).read_bytes()
+    return hashlib.sha256(content).hexdigest()
+
+data_path = Path(&quot;data/blob.bin&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_bytes(b&quot;real data&quot; * 100_000)
+
+# same behavior, different order
+digest = read_and_hash.<suitkaise-api>retry</suitkaise-api>(times=3, delay=0.1).<suitkaise-api>timeout</suitkaise-api>(1.0)(data_path)
+digest = read_and_hash.<suitkaise-api>timeout</suitkaise-api>(1.0).<suitkaise-api>retry</suitkaise-api>(times=3, delay=0.1)(data_path)</code></pre>
+    <h3>Timeout handling</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>FunctionTimeoutError</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+def count_primes(limit: int) -&gt; int:
+    primes = []
+    for n in range(2, limit):
+        is_prime = True
+        for p in primes:
+            if p * p &gt; n:
+                break
+            if n % p == 0:
+                is_prime = False
+                break
+        if is_prime:
+            primes.append(n)
+    return len(primes)
+
+try:
+    result = count_primes.<suitkaise-api>timeout</suitkaise-api>(0.05)(200_000)
+except <suitkaise-api>FunctionTimeoutError</suitkaise-api> as exc:
+    print(f&quot;Timed out: {exc}&quot;)</code></pre>
+    <h3>Background execution (Future)</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import hashlib
+
+<suitkaise-api>@sk</suitkaise-api>
+def hash_file(path: Path) -&gt; str:
+    data = Path(path).read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+data_path = Path(&quot;data/large.bin&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_bytes(b&quot;x&quot; * 5_000_000)
+
+future = hash_file.<suitkaise-api>background</suitkaise-api>()(data_path)
+
+# do other work
+summary = (data_path.stat().st_size, data_path.name)
+
+# get the result (this will block)
+result = future.<suitkaise-api>result</suitkaise-api>()
+print(summary, result[:12])</code></pre>
+    <h3>Rate limiting</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+
+<suitkaise-api>@sk</suitkaise-api>
+def file_size(path: Path) -&gt; int:
+    return Path(path).stat().st_size
+
+data_path = Path(&quot;data/sample.txt&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_text(&quot;real content\n&quot; * 1000)
+
+limited = file_size.rate_limit(2.0)  # max 2 calls per second
+sizes = [limited(data_path) for _ in range(5)]
+print(sizes)</code></pre>
+    <h3>Custom retry exceptions</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import json
+
+class ApiError(RuntimeError):
+    pass
+
+<suitkaise-api>@sk</suitkaise-api>
+def load_config(path: Path) -&gt; dict:
+    text = Path(path).read_text()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # repair the file and retry
+        Path(path).write_text(text + &quot;}&quot;)
+        raise ApiError(&quot;Config was incomplete, repaired and retrying&quot;)
+
+# create a truncated JSON file
+config_path = Path(&quot;data/config.json&quot;)
+config_path.parent.mkdir(parents=True, exist_ok=True)
+config_path.write_text(&#x27;{&quot;name&quot;: &quot;demo&quot;&#x27;)
+
+# only retry on ApiError
+config = load_config.<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1, exceptions=(ApiError,))(config_path)
+print(config)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Async examples</summary>
+        <div class="dropdown-content">
+    <h3><code><suitkaise-api>asynced</suitkaise-api>()</code> for async code</h3>
+    <pre><code class="language-python">import asyncio
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import csv
+
+<suitkaise-api>@sk</suitkaise-api>
+def sum_csv(path: Path) -&gt; int:
+    total = 0
+    with open(path, &quot;r&quot;, newline=&quot;&quot;) as f:
+        reader = csv.reader(f)
+        for row in reader:
+            total += int(row[0])
+    return total
+
+# real CSV work
+data_dir = Path(&quot;data&quot;)
+data_dir.mkdir(parents=True, exist_ok=True)
+paths = []
+for i in range(3):
+    p = data_dir / f&quot;numbers_{i}.csv&quot;
+    p.write_text(&quot;\n&quot;.join(str(n) for n in range(1, 1000)))
+    paths.append(p)
+
+async def main():
+    results = await asyncio.gather(
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[0]),
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[1]),
+        sum_csv.<suitkaise-api>asynced</suitkaise-api>()(paths[2]),
+    )
+    print(results)
+
+asyncio.run(main())</code></pre>
+    <h3>Async chaining with timeout + retry</h3>
+    <pre><code class="language-python">import asyncio
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import json
+
+<suitkaise-api>@sk</suitkaise-api>
+def load_report(path: Path) -&gt; dict:
+    text = Path(path).read_text()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # fix the file and retry
+        Path(path).write_text(text + &quot;}&quot;)
+        raise ValueError(&quot;Report was incomplete, repaired and retrying&quot;)
+
+report_path = Path(&quot;data/report.json&quot;)
+report_path.parent.mkdir(parents=True, exist_ok=True)
+report_path.write_text(&#x27;{&quot;ok&quot;: true&#x27;)
+
+async def main():
+    report = await (
+        load_report.asynced()
+        .<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1, exceptions=(ValueError,))
+        .<suitkaise-api>timeout</suitkaise-api>(0.5)
+    )(report_path)
+    print(report)
+
+asyncio.run(main())</code></pre>
+    <h3>Async rate limiting</h3>
+    <pre><code class="language-python">import asyncio
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import hashlib
+
+<suitkaise-api>@sk</suitkaise-api>
+def hash_text(path: Path) -&gt; str:
+    data = Path(path).read_text().encode()
+    return hashlib.sha256(data).hexdigest()
+
+data_path = Path(&quot;data/log.txt&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_text(&quot;log line\n&quot; * 1000)
+
+async def main():
+    limited = hash_text.asynced().rate_limit(5.0)
+    results = await asyncio.gather(*[limited(data_path) for _ in range(10)])
+    print(results[:2])
+
+asyncio.run(main())</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Blocking detection</summary>
+        <div class="dropdown-content">
+    <h3>Inspect blocking calls</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+
+<suitkaise-api>@sk</suitkaise-api>
+def load_text(path: Path) -&gt; str:
+    with open(path, &quot;r&quot;) as f:
+        return f.read()
+
+data_path = Path(&quot;data/readme.txt&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_text(&quot;real text&quot;)
+
+print(load_text.<suitkaise-api>has_blocking_calls</suitkaise-api>)  # True
+print(load_text.<suitkaise-api>blocking_calls</suitkaise-api>)      # includes file I/O</code></pre>
+    <h3>Mark CPU-heavy code with <code><suitkaise-api>@blocking</suitkaise-api></code></h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
+def heavy_math(n: int) -&gt; int:
+    return sum(range(n))
+
+# background/asynced are now available
+future = heavy_math.<suitkaise-api>background</suitkaise-api>()(1_000_000)
+result = future.<suitkaise-api>result</suitkaise-api>()</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Classes</summary>
+        <div class="dropdown-content">
+    <h3>Decorate a class</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+import json
+
+<suitkaise-api>@sk</suitkaise-api>
+class DataStore:
+    def __init__(self):
+        self.data = {}
+    
+    def set(self, key: str, value: dict):
+        self.data[key] = value
+    
+    def save(self, path: str):
+        with open(path, &quot;w&quot;) as f:
+            f.write(json.dumps(self.data))
+
+store = DataStore()
+store.set(&quot;a&quot;, {&quot;value&quot;: 1})
+store.save(&quot;output.json&quot;)
+
+# modifiers on methods
+store.save.<suitkaise-api>timeout</suitkaise-api>(2.0)(&quot;output.json&quot;)</code></pre>
+    <h3>Class-level async</h3>
+    <pre><code class="language-python">import asyncio
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
+from pathlib import Path
+
+<suitkaise-api>@sk</suitkaise-api>
+class FileReader:
+    <suitkaise-api>@blocking</suitkaise-api>
+    def read(self, path: Path) -&gt; str:
+        with open(path, &quot;r&quot;) as f:
+            return f.read()
+
+data_path = Path(&quot;data/message.txt&quot;)
+data_path.parent.mkdir(parents=True, exist_ok=True)
+data_path.write_text(&quot;hello from disk&quot;)
+
+async def main():
+    reader = FileReader()
+    data = await reader.read.<suitkaise-api>asynced</suitkaise-api>()(data_path)
+    print(data)
+
+asyncio.run(main())</code></pre>
+    <h3>Handling <code><suitkaise-api>SkModifierError</suitkaise-api></code> for classes without blocking calls</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>SkModifierError</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def inc(self):
+        self.value += 1
+
+try:
+    Counter.<suitkaise-api>asynced</suitkaise-api>()
+except <suitkaise-api>SkModifierError</suitkaise-api> as exc:
+    print(exc)</code></pre>
+    <h3><code><suitkaise-api>Share</suitkaise-api></code> compatibility</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+class Counter:
+    def __init__(self):
+        self.value = 0
+    
+    def inc(self):
+        self.value += 1
+
+with <suitkaise-api>Share(</suitkaise-api>) as share:
+    share.counter = Counter()
+    share.counter.inc()
+    share.counter.inc()
+    print(share.counter.value)  # 2</code></pre>
+    <h3><code><suitkaise-api>_shared_meta</suitkaise-api></code> Generation</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+
+<suitkaise-api>@sk</suitkaise-api>
+class Ledger:
+    def __init__(self):
+        self.balance = 0.0
+        self.transactions = []
+        self.name = &quot;main&quot;
+
+    def deposit(self, amount: float):
+        self.balance += amount
+        self.transactions.append((&quot;deposit&quot;, amount))
+
+    def withdraw(self, amount: float):
+        self.balance -= amount
+        self.transactions.append((&quot;withdraw&quot;, amount))
+
+# sk analyzed every method via AST and generated this:
+print(Ledger.<suitkaise-api>_shared_meta</suitkaise-api>)
+# {
+#     &#x27;methods&#x27;: {
+#         &#x27;deposit&#x27;: {&#x27;reads&#x27;: [&#x27;balance&#x27;, &#x27;transactions&#x27;], &#x27;writes&#x27;: [&#x27;balance&#x27;, &#x27;transactions&#x27;]},
+#         &#x27;withdraw&#x27;: {&#x27;reads&#x27;: [&#x27;balance&#x27;, &#x27;transactions&#x27;], &#x27;writes&#x27;: [&#x27;balance&#x27;, &#x27;transactions&#x27;]},
+#     },
+#     &#x27;properties&#x27;: {}
+# }
+
+# Why this matters: when used with Share, only &#x27;balance&#x27; and &#x27;transactions&#x27;
+# are synced after deposit() — not &#x27;name&#x27; or anything else.</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Advanced examples</summary>
+        <div class="dropdown-content">
+    <h3>Combining retry + timeout + background</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+import json
+
+<suitkaise-api>@sk</suitkaise-api>
+def load_payload(path: Path) -&gt; dict:
+    text = Path(path).read_text()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # repair the file, then retry
+        Path(path).write_text(text + &quot;}&quot;)
+        raise RuntimeError(&quot;Payload incomplete, repaired and retrying&quot;)
+
+payload_path = Path(&quot;data/payload.json&quot;)
+payload_path.parent.mkdir(parents=True, exist_ok=True)
+payload_path.write_text(&#x27;{&quot;id&quot;: 1, &quot;value&quot;: 42&#x27;)
+
+future = load_payload.<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1).<suitkaise-api>timeout</suitkaise-api>(1.0).<suitkaise-api>background</suitkaise-api>()(payload_path)
+print(future.<suitkaise-api>result</suitkaise-api>())</code></pre>
+    <h3>Rate limiting shared across wrappers</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>
+from pathlib import Path
+
+<suitkaise-api>@sk</suitkaise-api>
+def read_lines(path: Path) -&gt; int:
+    return len(Path(path).read_text().splitlines())
+
+log_path = Path(&quot;data/log.txt&quot;)
+log_path.parent.mkdir(parents=True, exist_ok=True)
+log_path.write_text(&quot;line\n&quot; * 500)
+
+# limiter lives inside the wrapper
+limited = read_lines.rate_limit(3.0)
+
+batch_a = [limited(log_path) for _ in range(3)]
+batch_b = [limited(log_path) for _ in range(3)]
+print(batch_a + batch_b)</code></pre>
+        </div>
+    </details>
+    <h2>Full script using <code><suitkaise-api>sk</suitkaise-api></code> modifiers</h2>
+    <p>An end-to-end example that uses multiple modifiers together:</p>
+    <ul>
+        <li><code><suitkaise-api>asynced</suitkaise-api>()</code> for concurrent fetches</li>
+        <li><code><suitkaise-api>retry</suitkaise-api>()</code> for transient failures</li>
+        <li><code><suitkaise-api>timeout</suitkaise-api>()</code> to cap long calls</li>
+        <li><code>rate_limit()</code> to protect external services</li>
+        <li><code><suitkaise-api>background</suitkaise-api>()</code> for CPU-heavy scoring</li>
+        <li><code><suitkaise-api>@blocking</suitkaise-api></code> to mark CPU-bound work</li>
+    </ul>
+    <pre><code class="language-python">&quot;&quot;&quot;
+End-to-end <suitkaise-api>sk</suitkaise-api> modifiers example.
+
+Parses in-memory JSON records, repairs incomplete inputs, scores them in
+background, and returns scored records.
+&quot;&quot;&quot;
+
+import asyncio
+import json
+import hashlib
+
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>sk</suitkaise-api>, <suitkaise-api>blocking</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>sk</suitkaise-api> import <suitkaise-api>FunctionTimeoutError</suitkaise-api>
+
+
+class TransientError(RuntimeError):
+    pass
+
+
+def seed_records() -&gt; list[str]:
+    &quot;&quot;&quot;Create a mix of valid and truncated JSON payloads.&quot;&quot;&quot;
+    payloads = []
+    for record_id in range(1, 11):
+        record = {&quot;id&quot;: record_id, &quot;value&quot;: record_id * 3}
+        text = json.dumps(record)
+        if record_id == 4:
+            text = text[:-1]  # truncate one payload to trigger repair
+        payloads.append(text)
+    return payloads
+
+
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
+def load_record(index: int, payloads: list[str]) -&gt; dict:
+    text = payloads[index]
+    try:
+        record = json.loads(text)
+    except json.JSONDecodeError:
+        # repair and retry in memory
+        payloads[index] = text + &quot;}&quot;
+        raise TransientError(&quot;Record incomplete, repaired and retrying&quot;)
+    
+    if &quot;id&quot; not in record or &quot;value&quot; not in record:
+        raise ValueError(&quot;Missing required keys&quot;)
+    
+    return record
+
+
+<suitkaise-api>@sk</suitkaise-api>
+<suitkaise-api>@blocking</suitkaise-api>
+def score_record(record: dict) -&gt; dict:
+    payload = f&quot;{record[&#x27;id&#x27;]}:{record[&#x27;value&#x27;]}&quot;.encode()
+    digest = hashlib.sha256(payload).hexdigest()
+    score = int(digest[:8], 16) % 1000
+    return {**record, &quot;score&quot;: score}
+
+
+async def main():
+    payloads = seed_records()
+    
+    loader = (
+        load_record.<suitkaise-api>asynced</suitkaise-api>()
+        .<suitkaise-api>retry</suitkaise-api>(times=2, delay=0.1, exceptions=(TransientError,))
+        .<suitkaise-api>timeout</suitkaise-api>(0.5)
+        .rate_limit(20.0)
+    )
+    
+    results = await asyncio.gather(
+        *[loader(i, payloads) for i in range(len(payloads))],
+        return_exceptions=True,
+    )
+    
+    records = []
+    for idx, result in enumerate(results):
+        if isinstance(result, <suitkaise-api>FunctionTimeoutError</suitkaise-api>):
+            print(f&quot;Timeout: record {idx + 1}&quot;)
+            continue
+        if isinstance(result, Exception):
+            print(f&quot;Failed: record {idx + 1}: {result}&quot;)
+            continue
+        records.append(result)
+    
+    futures = [score_record.<suitkaise-api>background</suitkaise-api>()(record) for record in records]
+    scored = [future.<suitkaise-api>result</suitkaise-api>() for future in futures]
+    
+    print(f&quot;Scored {len(scored)} records&quot;)
+    print(&quot;Sample:&quot;, scored[:3])
+
+
+if __name__ == &quot;__main__&quot;:
+    asyncio.run(main())</code></pre>
+</section>

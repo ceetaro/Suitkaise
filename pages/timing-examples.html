@@ -1,0 +1,504 @@
+<div class="module-bar" data-module="timing">
+    <button class="module-bar-title">suitkaise.timing</button>
+    <nav class="module-bar-nav">
+        <a href="#timing-why" class="module-bar-link" data-page="timing-why">why</a>
+        <a href="#timing-quick-start" class="module-bar-link" data-page="timing-quick-start">quick start</a>
+        <a href="#timing" class="module-bar-link" data-page="timing">how to use</a>
+        <a href="#timing-how-it-works" class="module-bar-link" data-page="timing-how-it-works">how it works</a>
+        <a href="#timing-examples" class="module-bar-link active" data-page="timing-examples">examples</a>
+        <a href="#timing-videos" class="module-bar-link" data-page="timing-videos">videos</a>
+        <a href="#timing-learn" class="module-bar-link" data-page="timing-learn">learn</a>
+    </nav>
+</div>
+<section class="module-page">
+    <h1><code><suitkaise-api>timing</suitkaise-api></code> Examples</h1>
+    <details>
+        <summary>Basic Examples</summary>
+        <div class="dropdown-content">
+    <h3>Simple Timing</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+total = sum(i * i for i in range(1_000_000))
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+print(f&quot;Elapsed: {elapsed:.3f}s&quot;)
+print(f&quot;Same value: {timer.most_recent:.3f}s&quot;)  # also accessible as a property</code></pre>
+    <h3>Using elapsed()</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+start = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>time</suitkaise-api>()
+<suitkaise-api>timing</suitkaise-api>.<suitkaise-api>sleep</suitkaise-api>(0.5)
+end = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>time</suitkaise-api>()
+
+# one argument: uses current time as second timestamp
+print(f&quot;Elapsed: {timing.elapsed(start):.3f}s&quot;)
+
+# two arguments: explicit timestamps
+print(f&quot;Elapsed: {timing.elapsed(start, end):.3f}s&quot;)
+
+# order doesn&#x27;t matter — always positive
+print(f&quot;Reversed: {timing.elapsed(end, start):.3f}s&quot;)  # same value</code></pre>
+    <h3>Multiple Measurements</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+# run 100 iterations, each timed independently
+for i in range(100):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    data = {&quot;id&quot;: i, &quot;values&quot;: list(range(500))}
+    json.dumps(data)
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+print(f&quot;Measurements: {timer.num_times}&quot;)
+print(f&quot;Mean: {timer.mean:.6f}s&quot;)
+print(f&quot;Median: {timer.median:.6f}s&quot;)
+print(f&quot;Std Dev: {timer.stdev:.6f}s&quot;)
+print(f&quot;Min: {timer.min:.6f}s&quot;)
+print(f&quot;Max: {timer.max:.6f}s&quot;)
+print(f&quot;95th percentile: {timer.percentile(95):.6f}s&quot;)
+print(f&quot;99th percentile: {timer.percentile(99):.6f}s&quot;)</code></pre>
+    <h3>Using lap()</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+
+pipeline = [
+    (&quot;parse&quot;,     lambda: json.loads(&#x27;{&quot;users&quot;: &#x27; + json.dumps(list(range(5000))) + &#x27;}&#x27;)),
+    (&quot;validate&quot;,  lambda: [x for x in range(5000) if isinstance(x, int)]),
+    (&quot;transform&quot;, lambda: {str(k): k * 2 for k in range(5000)}),
+    (&quot;serialize&quot;, lambda: json.dumps(list(range(5000)))),
+]
+
+for stage_name, stage_fn in pipeline:
+    stage_fn()
+    lap_time = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>lap</suitkaise-api>()
+    print(f&quot;{stage_name}: {lap_time:.4f}s&quot;)
+
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # clean up the last pending measurement
+
+print(f&quot;\nTotal pipeline time: {timer.total_time:.4f}s&quot;)
+print(f&quot;Slowest stage: {timer.max:.4f}s&quot;)</code></pre>
+    <h3>Pause and Resume</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import time
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+
+# phase 1: actual work (timed)
+total = sum(range(2_000_000))
+
+# pause during a simulated user prompt
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>pause</suitkaise-api>()
+time.sleep(1.0)  # pretend: input(&quot;Export results? (y/n): &quot;)
+<suitkaise-api>timer</suitkaise-api>.<suitkaise-api>resume</suitkaise-api>()
+
+# phase 2: more work (timed)
+squared = [x * x for x in range(500_000)]
+
+elapsed = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+print(f&quot;Active work time: {elapsed:.3f}s&quot;)              # ~0.1s (only work)
+print(f&quot;Time spent paused: {timer.total_time_paused:.3f}s&quot;)  # ~1.0s (the prompt)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Context Manager Examples</summary>
+        <div class="dropdown-content">
+    <h3>Basic TimeThis</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as <suitkaise-api>timer</suitkaise-api>:
+    total = sum(range(1_000_000))
+
+print(f&quot;Loop took: {timer.most_recent:.3f}s&quot;)
+
+# quick A/B comparison
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as timer_a:
+    result_a = sum(range(1_000_000))
+
+with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as timer_b:
+    result_b = 0
+    for i in range(1_000_000):
+        result_b += i
+
+print(f&quot;\nBuilt-in sum(): {timer_a.most_recent:.6f}s&quot;)
+print(f&quot;Manual loop:   {timer_b.most_recent:.6f}s&quot;)
+print(f&quot;Ratio: {timer_b.most_recent / timer_a.most_recent:.1f}x slower&quot;)</code></pre>
+    <h3>Shared Timer with TimeThis</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+api_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+def serialize(obj):
+    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>api_timer):
+        return json.dumps(obj)
+
+def deserialize(data):
+    with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>api_timer):
+        return json.loads(data)
+
+objects = [{&quot;id&quot;: i, &quot;values&quot;: list(range(500))} for i in range(100)]
+
+for obj in objects:
+    data = serialize(obj)
+    deserialize(data)
+
+# 100 objects × 2 operations = 200 measurements
+print(f&quot;Total calls: {api_timer.num_times}&quot;)
+print(f&quot;Total time: {api_timer.total_time:.3f}s&quot;)
+print(f&quot;Average: {api_timer.mean:.6f}s&quot;)
+print(f&quot;Slowest: {api_timer.max:.6f}s&quot;)
+print(f&quot;p95: {api_timer.percentile(95):.6f}s&quot;)</code></pre>
+    <h3>TimeThis with Threshold</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import time
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(<suitkaise-api>threshold</suitkaise-api>=0.1)
+def handle_request(request_id):
+    &quot;&quot;&quot;Simulate request handling — every 10th request is slow.&quot;&quot;&quot;
+    delay = 0.01 if request_id % 10 != 0 else 0.2
+    time.sleep(delay)
+
+for i in range(50):
+    handle_request(i)
+
+# only the slow requests (&gt;= 0.1s) are recorded
+print(f&quot;Slow requests: {handle_request.timer.num_times}&quot;)  # ~5
+print(f&quot;Mean slow time: {handle_request.timer.mean:.3f}s&quot;)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Decorator Examples</summary>
+        <div class="dropdown-content">
+    <h3>Basic @timethis</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Timing functions with @timethis decorator
+#
+# @timethis() automatically times every call to the decorated function.
+# The timer is attached to the function as .timer attribute.
+# Call the function multiple times to build statistics.
+# ──────────────────────────────────────────────────────────────────────────────
+
+import random
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+def sort_data(data):
+    &quot;&quot;&quot;Sort a list using Python&#x27;s built-in sort.&quot;&quot;&quot;
+    return sorted(data)
+
+# generate random datasets
+datasets = [random.sample(range(100_000), 10_000) for _ in range(20)]
+
+for data in datasets:
+    sort_data(data)
+
+# each call = one measurement
+print(f&quot;Calls: {sort_data.timer.num_times}&quot;)         # 20
+print(f&quot;Mean: {sort_data.timer.mean:.4f}s&quot;)
+print(f&quot;Fastest: {sort_data.timer.min:.4f}s&quot;)
+print(f&quot;Slowest: {sort_data.timer.max:.4f}s&quot;)
+print(f&quot;p95: {sort_data.timer.percentile(95):.4f}s&quot;)</code></pre>
+    <h3>Shared Timer Across Functions</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+io_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(io_timer)
+def serialize(obj):
+    return json.dumps(obj)
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(io_timer)
+def deserialize(data):
+    return json.loads(data)
+
+objects = [{&quot;id&quot;: i, &quot;values&quot;: list(range(500))} for i in range(100)]
+
+for obj in objects:
+    data = serialize(obj)
+    deserialize(data)
+
+print(f&quot;Total I/O operations: {io_timer.num_times}&quot;)    # 200
+print(f&quot;Total I/O time: {io_timer.total_time:.3f}s&quot;)
+print(f&quot;Average operation: {io_timer.mean:.6f}s&quot;)</code></pre>
+    <h3>Stacked Decorators</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+db_timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
+def db_read(key):
+    return json.loads(&#x27;{&quot;users&quot;: 100}&#x27;).get(key)
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()           # per-function timer
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(db_timer)   # shared timer
+def db_write(key, value):
+    json.dumps({key: value})
+
+for i in range(100):
+    db_read(f&quot;key_{i}&quot;)
+    db_write(f&quot;key_{i}&quot;, f&quot;value_{i}&quot;)
+
+# combined stats
+print(f&quot;Total DB ops: {db_timer.num_times}&quot;)     # 200
+print(f&quot;Overall mean: {db_timer.mean:.6f}s&quot;)
+
+# per-function breakdown
+print(f&quot;Read mean:  {db_read.timer.mean:.6f}s&quot;)  # 100 reads
+print(f&quot;Write mean: {db_write.timer.mean:.6f}s&quot;) # 100 writes</code></pre>
+    <h3>Rolling Window</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import json
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(<suitkaise-api>max_times</suitkaise-api>=10)
+def process_request():
+    json.dumps({&quot;data&quot;: list(range(1000))})
+
+for i in range(100):
+    process_request()
+
+    if (i + 1) % 25 == 0:
+        t = process_request.timer
+        print(f&quot;After {i+1} requests: {t.num_times} kept, mean: {t.mean:.6f}s&quot;)
+
+# stats always reflect only the last 10 measurements — memory stays bounded
+print(f&quot;\nFinal (last 10): mean={process_request.timer.mean:.6f}s&quot;)</code></pre>
+        </div>
+    </details>
+    <details>
+        <summary>Advanced Examples</summary>
+        <div class="dropdown-content">
+    <h3>Concurrent Timing</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import threading
+import hashlib
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+def worker(worker_id, num_iterations):
+    &quot;&quot;&quot;Worker function that times its operations.&quot;&quot;&quot;
+    for i in range(num_iterations):
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+        data = f&quot;worker_{worker_id}_item_{i}&quot;.encode()
+        for _ in range(5000):
+            data = hashlib.sha256(data).digest()
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+threads = [threading.Thread(target=worker, args=(i, 25)) for i in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# 4 workers × 25 iterations = 100 measurements, aggregated automatically
+print(f&quot;Total measurements: {timer.num_times}&quot;)
+print(f&quot;Mean: {timer.mean:.3f}s&quot;)
+print(f&quot;Std Dev: {timer.stdev:.3f}s&quot;)
+print(f&quot;p95: {timer.percentile(95):.3f}s&quot;)</code></pre>
+    <h3>Benchmarking Multiple Implementations</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Comparing performance of different implementations
+#
+# Create separate timers for each implementation.
+# Run multiple iterations to get statistically meaningful results.
+# Compare using mean, std dev, and percentiles.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def benchmark(name, func, iterations=100):
+    &quot;&quot;&quot;Run a function multiple times and return timing statistics.&quot;&quot;&quot;
+    timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+    
+    for _ in range(iterations):
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+        func()
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+    
+    return {
+        &#x27;name&#x27;: name,
+        &#x27;mean&#x27;: timer.mean,
+        &#x27;stdev&#x27;: timer.stdev,
+        &#x27;p50&#x27;: timer.percentile(50),
+        &#x27;p95&#x27;: timer.percentile(95),
+        &#x27;p99&#x27;: timer.percentile(99),
+    }
+
+# implementations to compare
+def list_append():
+    result = []
+    for i in range(10000):
+        result.append(i)
+    return result
+
+def list_comprehension():
+    return [i for i in range(10000)]
+
+def list_constructor():
+    return list(range(10000))
+
+# run benchmarks
+results = [
+    benchmark(&quot;list.append()&quot;, list_append),
+    benchmark(&quot;list comprehension&quot;, list_comprehension),
+    benchmark(&quot;list(range())&quot;, list_constructor),
+]
+
+# print comparison table
+print(f&quot;{&#x27;Method&#x27;:&lt;20} {&#x27;Mean&#x27;:&gt;10} {&#x27;StdDev&#x27;:&gt;10} {&#x27;P95&#x27;:&gt;10} {&#x27;P99&#x27;:&gt;10}&quot;)
+print(&quot;-&quot; * 62)
+
+for r in sorted(results, key=lambda x: x[&#x27;mean&#x27;]):
+    print(f&quot;{r[&#x27;name&#x27;]:&lt;20} &quot;
+          f&quot;{r[&#x27;mean&#x27;]*1000:&gt;9.3f}ms &quot;
+          f&quot;{r[&#x27;stdev&#x27;]*1000:&gt;9.3f}ms &quot;
+          f&quot;{r[&#x27;p95&#x27;]*1000:&gt;9.3f}ms &quot;
+          f&quot;{r[&#x27;p99&#x27;]*1000:&gt;9.3f}ms&quot;)</code></pre>
+    <h3>Discard Failed Operations</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import random
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+successes = 0
+failures = 0
+
+for i in range(100):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    try:
+        if random.random() &lt; 0.3:
+            raise RuntimeError(&quot;transient failure&quot;)
+        sorted(range(10_000))  # actual work
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+        successes += 1
+    except RuntimeError:
+        <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>discard</suitkaise-api>()  # don&#x27;t pollute stats with failed runs
+        failures += 1
+
+print(f&quot;Successes: {successes}, Failures: {failures}&quot;)
+print(f&quot;Recorded: {timer.num_times}&quot;)  # equals successes
+print(f&quot;Mean success time: {timer.mean:.6f}s&quot;)</code></pre>
+    <h3>Async Timing</h3>
+    <pre><code class="language-python">import asyncio
+from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+# @timethis works on async functions transparently
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+async def fetch_user(user_id):
+    await asyncio.sleep(0.05)  # simulate network I/O
+    return {&quot;id&quot;: user_id, &quot;name&quot;: f&quot;User {user_id}&quot;}
+
+# TimeThis works as an async context manager
+async def process_batch(user_ids):
+    async with <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>TimeThis(</suitkaise-api>) as batch_timer:
+        results = []
+        for uid in user_ids:
+            results.append(await fetch_user(uid))
+    print(f&quot;Batch took: {batch_timer.most_recent:.3f}s&quot;)
+    return results
+
+async def main():
+    users = await process_batch(range(10))
+
+    # per-fetch stats from @timethis
+    print(f&quot;Per-fetch mean: {fetch_user.timer.mean:.4f}s&quot;)
+    print(f&quot;Per-fetch p95:  {fetch_user.timer.percentile(95):.4f}s&quot;)
+
+asyncio.run(main())</code></pre>
+    <h3>Frozen Snapshots</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+for _ in range(50):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    sorted(range(10_000))
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+# capture a frozen snapshot
+snapshot = <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>get_statistics</suitkaise-api>()
+
+# timer continues recording new data...
+for _ in range(50):
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>start</suitkaise-api>()
+    sorted(range(10_000))
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>stop</suitkaise-api>()
+
+# snapshot is immutable — still reflects the first 50 measurements
+print(f&quot;Snapshot mean (50 runs): {snapshot.mean:.4f}s&quot;)
+print(f&quot;Snapshot count: {snapshot.num_times}&quot;)         # 50
+
+print(f&quot;Live mean (100 runs): {timer.mean:.4f}s&quot;)
+print(f&quot;Live count: {timer.num_times}&quot;)                # 100</code></pre>
+    <h3>Importing External Measurements</h3>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+
+timer = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api>)
+
+# import timings from an external source (logs, another system, etc.)
+external_measurements = [0.45, 0.52, 0.48, 0.71, 0.39, 0.55]
+for t in external_measurements:
+    <suitkaise-api>timer</suitkaise-api>.<suitkaise-api>add_time</suitkaise-api>(t)
+
+# Sktimer isn&#x27;t just a stopwatch — it&#x27;s a statistical analysis tool
+print(f&quot;Mean: {timer.mean:.3f}s&quot;)
+print(f&quot;p95:  {timer.percentile(95):.3f}s&quot;)
+print(f&quot;Stdev: {timer.stdev:.3f}s&quot;)</code></pre>
+        </div>
+    </details>
+    <h2>Full API Performance Monitor Script</h2>
+    <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>timing</suitkaise-api>
+import threading
+
+overall = <suitkaise-api>timing</suitkaise-api>.<suitkaise-api>Sktimer(</suitkaise-api><suitkaise-api>max_times</suitkaise-api>=1000)
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_users():
+    sorted(range(50_000))
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_search():
+    {str(i): i for i in range(100_000)}
+
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>()
+<suitkaise-api>@timing</suitkaise-api>.<suitkaise-api>timethis</suitkaise-api>(overall)
+def handle_health():
+    pass
+
+def worker(num_requests):
+    endpoints = [handle_users, handle_search, handle_health]
+    for i in range(num_requests):
+        endpoints[i % len(endpoints)]()
+
+# 4 threads, 100 requests each — thread-safe, automatic aggregation
+threads = [threading.Thread(target=worker, args=(100,)) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# overall stats
+print(f&quot;Total requests: {overall.num_times}&quot;)
+print(f&quot;Overall mean: {overall.mean*1000:.1f}ms&quot;)
+print(f&quot;Overall p95:  {overall.percentile(95)*1000:.1f}ms&quot;)
+
+# per-endpoint breakdown — stacked decorators give you both levels for free
+for fn in [handle_users, handle_search, handle_health]:
+    t = fn.<suitkaise-api>timer</suitkaise-api>
+    print(f&quot;  {fn.__name__}: n={t.num_times}, &quot;
+          f&quot;mean={t.mean*1000:.1f}ms, p95={t.percentile(95)*1000:.1f}ms&quot;)</code></pre>
+</section>
