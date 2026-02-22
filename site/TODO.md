@@ -185,3 +185,32 @@ Tagline: "Once it's on, wrong paths can't get in."
 
 4 steps: ugly manual backoff code → Circuit + backoff ladder animation → coordinated shutdown with 4 workers + .trip() → punchline.
 Tagline: "Retry smart. Fail together. Recover gracefully."
+
+
+
+
+next:
+
+
+- after launch, we need to make it google look for it when you search for suitkaise
+- and we need to set up donation page via github sponsors and kofi
+
+## What I built
+
+suitkaise is a Python library that makes hard things simple. The name is based off of the concept of hackers in movies carrying a suitcase with a laptop inside it, and writing code super fast.
+
+If you haven't already, I really recommend checking it out, especially Share.
+
+You can learn more about it at https://suitkaise.info.
+
+## Why it matters
+
+I wanted to make things easier for myself, and then I realized that other developers might benefit from it as well. So I made things API first, and then wrote the code to actually make it work.
+
+## What sponsorship supports
+
+suitkaise has one author: me. I genuinely put my heart and soul into this project, and I want to continue cultivating it through bug fixes, updates, and new or upgraded features.
+
+However, I am a full time student and I am broke. Sponsoring helps me dedicate more of my time looking through feedback, fixing issues, updating docs, and interacting with the community.
+
+Please only sponsor if you have the means to do so. Just because I am broke doesn't mean you need to be too!

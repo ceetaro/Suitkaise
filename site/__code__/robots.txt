@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://suitkaise.info/sitemap.xml
