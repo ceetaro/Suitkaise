@@ -4,13 +4,14 @@ Share api
 
 from typing import Any, Dict, Optional
 import io
+import logging
 import threading
 import weakref
 import warnings
 from multiprocessing.managers import SyncManager
 
 from .coordinator import _Coordinator
-from .proxy import _ObjectProxy
+from .proxy import _ObjectProxy, _AtomicRmwToken
 
 # import Skclass for auto-wrapping user objects (internal API)
 from suitkaise.sk._int.analyzer import analyze_class
@@ -404,9 +405,10 @@ class Share:
     
     # attrs that belong to Share itself, not shared objects
     _SHARE_ATTRS = frozenset({
-        '_coordinator', '_proxies', '_started',
+        '_coordinator', '_proxies', '_started', '_coordinator_state_cache',
     })
     _META_CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+    _LIVE_DESERIALIZE_CACHE: dict[bytes, weakref.ReferenceType["Share"]] = {}
     
     def __init__(
         self,
@@ -425,6 +427,7 @@ class Share:
         object.__setattr__(self, '_coordinator', coordinator or _Coordinator(manager))
         object.__setattr__(self, '_proxies', {})  # name -> proxy
         object.__setattr__(self, '_started', False)
+        object.__setattr__(self, '_coordinator_state_cache', None)
         object.__setattr__(self, '_client_mode', client_mode)
         # auto-start coordinator on creation
         if auto_start and not client_mode:
@@ -449,6 +452,13 @@ class Share:
             if name in self._proxies and value._object_name == name:
                 return
             value = value._value()
+        if isinstance(value, _AtomicRmwToken):
+            if name in self._proxies and value.object_name == name:
+                updated = self._coordinator.atomic_apply(name, value.operation, value.operand)
+                if updated is None and not self._coordinator.has_object(name):
+                    raise AttributeError(f"Object '{name}' not found in Share")
+                return
+            value = value.value
 
         if not object.__getattribute__(self, '_client_mode'):
             if not object.__getattribute__(self, '_started'):
@@ -504,7 +514,7 @@ class Share:
                 attrs.update(prop_meta.get('writes', []))
         self._coordinator.register_object(name, value, attrs=attrs if attrs else None)
 
-        should_proxy = has_meta
+        should_proxy = has_meta and not self._is_always_non_proxy_object(value)
         if should_proxy:
             handler = self._get_cucumber_handler(value)
             if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:
@@ -566,6 +576,11 @@ class Share:
         except Exception:
             return None
 
+    @staticmethod
+    def _is_always_non_proxy_object(value: Any) -> bool:
+        """Objects that should never be routed through Share object proxies."""
+        return isinstance(value, logging.Logger)
+
     def _build_proxy_for(self, name: str, obj: Any) -> Any:
         """
         Build and cache the appropriate proxy entry for a shared object.
@@ -576,7 +591,7 @@ class Share:
         if meta is None and self._is_user_class_instance(obj):
             meta = self._ensure_shared_meta(type(obj))
 
-        should_proxy = meta is not None
+        should_proxy = (meta is not None) and not self._is_always_non_proxy_object(obj)
         if should_proxy:
             handler = self._get_cucumber_handler(obj)
             if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:
@@ -787,8 +802,14 @@ class Share:
                     objects[name] = serialized
         coordinator_state = None
         if started:
-            # pickle raw manager proxies to preserve Share internals
-            coordinator_state = pickle.dumps(coordinator.get_state())
+            # Cache live coordinator state bytes so repeated Pool item
+            # serialization does not repeatedly pickle manager proxies.
+            cached = object.__getattribute__(self, '_coordinator_state_cache')
+            if isinstance(cached, (bytes, bytearray)):
+                coordinator_state = cached
+            else:
+                coordinator_state = pickle.dumps(coordinator.get_state())
+                object.__setattr__(self, '_coordinator_state_cache', coordinator_state)
         return {
             "mode": "live" if started else "snapshot",
             "objects": objects,
@@ -805,7 +826,15 @@ class Share:
         from suitkaise.cucumber._int.deserializer import Deserializer
         deserializer = Deserializer()
         coordinator_state = state.get("coordinator_state")
+        cache_key: bytes | None = None
         if coordinator_state:
+            if isinstance(coordinator_state, (bytes, bytearray)):
+                cache_key = bytes(coordinator_state)
+                cached_ref = Share._LIVE_DESERIALIZE_CACHE.get(cache_key)
+                if cached_ref is not None:
+                    cached = cached_ref()
+                    if cached is not None:
+                        return cached
             if isinstance(coordinator_state, (bytes, bytearray)):
                 coordinator_state = pickle.loads(coordinator_state)
             else:
@@ -818,6 +847,8 @@ class Share:
                 coordinator=coordinator,
             )
             object.__setattr__(share, '_started', True)
+            if cache_key is not None:
+                Share._LIVE_DESERIALIZE_CACHE[cache_key] = weakref.ref(share)
         else:
             share = Share()
 
@@ -830,7 +861,7 @@ class Share:
             if meta is None and share._is_user_class_instance(obj):
                 meta = share._ensure_shared_meta(type(obj))
 
-            should_proxy = meta is not None
+            should_proxy = (meta is not None) and not share._is_always_non_proxy_object(obj)
             if should_proxy:
                 handler = share._get_cucumber_handler(obj)
                 if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:

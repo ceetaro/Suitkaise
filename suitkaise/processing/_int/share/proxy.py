@@ -11,9 +11,55 @@ Uses _shared_meta on the wrapped class to know which attrs each method/property 
 
 from typing import Any, Optional, TYPE_CHECKING
 import warnings
+import operator
 
 if TYPE_CHECKING:
     from .coordinator import _Coordinator
+
+
+class _AtomicRmwToken:
+    """
+    Carries read-modify-write intent from proxy expressions to Share.__setattr__.
+
+    This enables patterns like:
+      share.lst = share.lst + [x]
+      share.s = share.s | {x}
+    to be applied atomically in the coordinator.
+    """
+
+    __slots__ = ("object_name", "coordinator", "operation", "operand", "value")
+
+    def __init__(
+        self,
+        object_name: str,
+        coordinator: "_Coordinator",
+        operation: str,
+        operand: Any,
+        value: Any,
+    ):
+        self.object_name = object_name
+        self.coordinator = coordinator
+        self.operation = operation
+        self.operand = operand
+        self.value = value
+
+    def __repr__(self) -> str:
+        return repr(self.value)
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+    def __iter__(self):
+        return iter(self.value)
+
+    def __len__(self) -> int:
+        return len(self.value)
+
+    def __getitem__(self, key):
+        return self.value[key]
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.value, name)
 
 
 class _ObjectProxy:
@@ -120,6 +166,25 @@ class _ObjectProxy:
             {},
             [name],
         )
+
+    def _unwrap_other(self, other: Any) -> Any:
+        if isinstance(other, _ObjectProxy):
+            return other._fetch_object()
+        if isinstance(other, _AtomicRmwToken):
+            return other.value
+        return other
+
+    def _rmw_token(self, operation: str, func, other: Any) -> _AtomicRmwToken:
+        other_value = self._unwrap_other(other)
+        current = self._fetch_object()
+        value = func(current, other_value)
+        return _AtomicRmwToken(
+            object_name=self._object_name,
+            coordinator=self._coordinator,
+            operation=operation,
+            operand=other_value,
+            value=value,
+        )
     
     # ── helpers ──────────────────────────────────────────────────────────
 
@@ -166,6 +231,24 @@ class _ObjectProxy:
 
     def __str__(self) -> str:
         return str(self._fetch_object())
+
+    def __add__(self, other):
+        return self._rmw_token("add", operator.add, other)
+
+    def __sub__(self, other):
+        return self._rmw_token("sub", operator.sub, other)
+
+    def __mul__(self, other):
+        return self._rmw_token("mul", operator.mul, other)
+
+    def __or__(self, other):
+        return self._rmw_token("or", operator.or_, other)
+
+    def __and__(self, other):
+        return self._rmw_token("and", operator.and_, other)
+
+    def __xor__(self, other):
+        return self._rmw_token("xor", operator.xor, other)
 
     # ── property reads ──────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 # Technical Info
 
-Currently, `suitkaise` is version `0.4.13`.
+Currently, `suitkaise` is version `0.4.14`.
 
 `suitkaise` supports Python 3.11 and above.
 
@@ -34,7 +34,7 @@ pip install suitkaise
 
 Explicitly supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.4.13`.
+Currently, `suitkaise` is version `0.4.14`.
 
 `suitkaise` contains the following modules:
 
@@ -424,12 +424,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Changelog is maintained from version 0.3.0 forward.
 
 
+### [0.4.14] - 2026-02-23
+
+### Fixed
+- `Share` counter-registry manager locks now use bounded acquisition with recovery/retry, preventing worker hangs on stale manager lock proxies under multiprocessing spawn workloads.
+- `Skprocess` IPC proxy cleanup is now best-effort during object teardown to reduce intermittent `Bad file descriptor` warnings from multiprocessing connection finalizers.
+- Restored one-time post-install welcome display through the package import path (still gated by interactive terminal + version marker behavior).
+
+
 ### [0.4.13] - 2026-02-23
 
 ### Fixed
 - `Share` manager counter retry now recovers stale manager lock handles that surface as `TypeError: 'NoneType' object cannot be interpreted as an integer` in worker write paths.
 - Restored correct cucumber handler detection in `Share` so handler-backed objects (like `sqlite3.Connection`) resolve to reconnectors instead of being incorrectly proxied.
 - Normalized supported-type name matching in processing tests to avoid false failures from case-only differences (e.g., `User-defined` vs `user-defined`).
+- `Share.__serialize__` now caches live coordinator-state bytes so repeated `Pool` payload serialization does not repickle manager proxies on every item (spawn-stability regression guard).
+- Added atomic operator-intent support for common read-modify-reassign forms on shared mutable objects (`share.lst = share.lst + [...]`, `share.s = share.s | {...}`, `share.d = share.d | {...}`) to preserve regular-Python ergonomics under concurrency.
+- `Share.__deserialize__` now caches live coordinator-bound Share instances per worker process, preventing repeated manager-proxy reconstruction for every mapped task item.
 
 
 ### [0.4.12] - 2026-02-23
@@ -642,7 +653,7 @@ Print the current version of `suitkaise`.
 
 ```
 $ suitkaise --version
-0.4.13
+0.4.14
 ```
 
 ### `suitkaise info`
@@ -652,7 +663,7 @@ Print version, module list, and supported Python versions.
 ```
 $ suitkaise info
 
-  suitkaise 0.4.13
+  suitkaise 0.4.14
 
   Website:         https://suitkaise.info
   Download docs:   suitkaise docs

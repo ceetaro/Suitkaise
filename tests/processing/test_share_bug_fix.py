@@ -12,7 +12,7 @@ def process(item, share: Share):
     with TimeThis() as timer:
         result = item * 2
         share.results.append(result)
-        share.results = sorted(share.results)
+        share.results.sort()
         share.counter += 1
         share.log.info(f"Processed {item} -> {result}, counter: {share.counter}")
 
@@ -31,9 +31,12 @@ def main():
         num_shorts_to_trip=1,
         sleep_time_after_trip=0.0,
     )
-    share.log = logging.getLogger(str(Skpath()))
-    share.log.addHandler(logging.StreamHandler())
-    share.log.setLevel(logging.INFO)
+    logger = logging.getLogger(str(Skpath()))
+    logger.handlers.clear()
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    share.log = logger
     share.timer = Sktimer()
 
     with Pool(workers=4) as pool:

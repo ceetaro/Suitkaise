@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suitkaise"
-version = "0.4.13"
+version = "0.4.14"
 description = "Write Python at hacker-level speeds."
 authors = [
     {name = "Casey Eddings", email = "suitkaise@suitkaise.info"}

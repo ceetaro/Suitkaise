@@ -124,6 +124,36 @@ class PrimitiveTupleConcatWorker(Skprocess):
         self.share.items += (self.value,)
 
 
+class ListConcatAssignWorker(Skprocess):
+    def __init__(self, share: Share, value: int):
+        self.share = share
+        self.value = value
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.items = self.share.items + [self.value]
+
+
+class SetUnionAssignWorker(Skprocess):
+    def __init__(self, share: Share, value: int):
+        self.share = share
+        self.value = value
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.tags = self.share.tags | {self.value}
+
+
+class DictOrAssignWorker(Skprocess):
+    def __init__(self, share: Share, value: int):
+        self.share = share
+        self.value = value
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.meta = self.share.meta | {self.value: self.value}
+
+
 class TestResult:
     def __init__(self, name: str, passed: bool, message: str = "", error: str = "", traceback_text: str = ""):
         self.name = name
@@ -238,6 +268,29 @@ def test_share_coordinator_state_roundtrip():
         time.sleep(0.1)
 
 
+def test_share_live_serialize_reuses_coordinator_state_cache():
+    """
+    Regression guard for macOS spawn: repeatedly serializing a live Share
+    should reuse cached coordinator state bytes instead of repickling manager
+    proxies on every task payload.
+    """
+    share = Share()
+    try:
+        share.counter = 0
+        first = share.__serialize__()
+        second = share.__serialize__()
+
+        assert first["mode"] == "live"
+        assert second["mode"] == "live"
+        assert isinstance(first["coordinator_state"], (bytes, bytearray))
+        assert first["coordinator_state"] is second["coordinator_state"], (
+            "Live Share serialization should reuse coordinator_state bytes cache"
+        )
+    finally:
+        share._coordinator.stop()
+        time.sleep(0.1)
+
+
 def test_pool_share_roundtrip_timing():
     share = Share()
     pool = Pool(workers=2)
@@ -339,15 +392,48 @@ def test_pool_share_primitive_augmented_assignment_regression():
         time.sleep(0.1)
 
 
+def test_pool_share_read_modify_reassign_operator_regression():
+    share = Share()
+    pool = Pool(workers=4)
+    try:
+        total = 40
+        share.items = []
+        share.tags = set()
+        share.meta = {}
+
+        pool.star().map.timeout(10.0)(
+            ListConcatAssignWorker,
+            [(share, i) for i in range(total)],
+        )
+        pool.star().map.timeout(10.0)(
+            SetUnionAssignWorker,
+            [(share, i) for i in range(total)],
+        )
+        pool.star().map.timeout(10.0)(
+            DictOrAssignWorker,
+            [(share, i) for i in range(total)],
+        )
+
+        assert len(share.items) == total, f"Expected list length={total}, got {len(share.items)}"
+        assert len(share.tags) == total, f"Expected set length={total}, got {len(share.tags)}"
+        assert len(share.meta) == total, f"Expected dict length={total}, got {len(share.meta)}"
+    finally:
+        pool.close()
+        share._coordinator.stop()
+        time.sleep(0.1)
+
+
 def run_all_tests():
     runner = TestRunner("Pool + Share Tests")
     runner.run_test("Share serialize/deserialize", test_share_serialization_roundtrip)
     runner.run_test("Share coordinator state roundtrip", test_share_coordinator_state_roundtrip)
+    runner.run_test("Share live serialize cache regression", test_share_live_serialize_reuses_coordinator_state_cache)
     runner.run_test("Pool with Share roundtrip + timing", test_pool_share_roundtrip_timing)
     runner.run_test("Pool worker TimeThis regression", test_pool_star_map_timethis_worker_regression)
     runner.run_test("Share BreakingCircuit pool regression", test_share_breaking_circuit_pool_regression)
     runner.run_test("Share primitive += counter regression", test_pool_share_primitive_counter_increment_regression)
     runner.run_test("Share primitive augmented assignment regression", test_pool_share_primitive_augmented_assignment_regression)
+    runner.run_test("Share read-modify-reassign operator regression", test_pool_share_read_modify_reassign_operator_regression)
     return runner.print_results()
 
 

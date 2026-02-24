@@ -11,6 +11,7 @@ This module provides the core primitives used by the Share system:
 import ctypes
 import struct
 import time
+from contextlib import contextmanager
 from multiprocessing import Queue, Manager, Value, Lock
 from multiprocessing import shared_memory
 from multiprocessing.managers import SyncManager
@@ -234,6 +235,11 @@ class _AtomicCounterRegistry:
     - Actual counters are multiprocessing.Value (shared memory)
     - Each process caches Value handles locally for fast access
     """
+
+    _LOCK_ACQUIRE_TIMEOUT_SECONDS = 0.25
+
+    class _ManagerLockAcquireTimeout(TimeoutError):
+        """Raised when manager lock acquisition times out."""
     
     def __init__(self, manager: Optional[SyncManager] = None):
         self._manager = manager or Manager()
@@ -294,6 +300,27 @@ class _AtomicCounterRegistry:
         for proxy in (self._lock, self._registry, self._object_keys):
             self._reset_proxy_connection(proxy)
 
+    def _acquire_lock(self, timeout: float | None = None) -> None:
+        """Acquire manager lock with timeout to avoid indefinite deadlocks."""
+        wait = self._LOCK_ACQUIRE_TIMEOUT_SECONDS if timeout is None else max(0.0, timeout)
+        try:
+            acquired = bool(self._lock.acquire(timeout=wait))
+        except TypeError:
+            # Some manager lock proxies accept only positional args.
+            acquired = bool(self._lock.acquire(True, wait))
+        if not acquired:
+            raise self._ManagerLockAcquireTimeout(
+                f"Timed out acquiring manager lock after {wait:.3f}s"
+            )
+
+    @contextmanager
+    def _locked(self, timeout: float | None = None):
+        self._acquire_lock(timeout=timeout)
+        try:
+            yield
+        finally:
+            self._lock.release()
+
     @staticmethod
     def _is_recoverable_manager_error(exc: BaseException) -> bool:
         """
@@ -310,6 +337,7 @@ class _AtomicCounterRegistry:
                 BrokenPipeError,
                 ConnectionResetError,
                 ConnectionAbortedError,
+                _AtomicCounterRegistry._ManagerLockAcquireTimeout,
             ),
         ):
             return True
@@ -352,7 +380,7 @@ class _AtomicCounterRegistry:
         if not keys:
             return
         def _op() -> None:
-            with self._lock:
+            with self._locked():
                 for key in keys:
                     if key not in self._registry:
                         # create shared memory counters for new keys
@@ -388,7 +416,7 @@ class _AtomicCounterRegistry:
 
     def _ensure_counter(self, key: str) -> tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]:
         def _op() -> tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]:
-            with self._lock:
+            with self._locked():
                 counter = self._registry.get(key)
                 if counter is None:
                     # lazily create counters if a key is seen for the first time
@@ -420,7 +448,7 @@ class _AtomicCounterRegistry:
         counter = self._get_counter(key)
         pending, _ = counter
         def _op() -> int:
-            with self._lock:
+            with self._locked():
                 # pending increments happen before enqueueing a write command
                 value = struct.unpack_from("i", pending.buf, 0)[0] + 1
                 struct.pack_into("i", pending.buf, 0, value)
@@ -431,7 +459,7 @@ class _AtomicCounterRegistry:
         counter = self._get_counter(key)
         pending, completed = counter
         def _op() -> None:
-            with self._lock:
+            with self._locked():
                 # coordinator marks a write as completed after commit
                 pending_val = struct.unpack_from("i", pending.buf, 0)[0]
                 pending_val = max(0, pending_val - 1)
@@ -446,7 +474,7 @@ class _AtomicCounterRegistry:
             counter = self._get_counter(key)
             pending, completed = counter
             def _op() -> tuple[int, int]:
-                with self._lock:
+                with self._locked():
                     # snapshot pending + completed to avoid read starvation
                     pending_val = struct.unpack_from("i", pending.buf, 0)[0]
                     completed_val = struct.unpack_from("i", completed.buf, 0)[0]
@@ -466,9 +494,12 @@ class _AtomicCounterRegistry:
                 continue
             _, completed = counter
             while True:
-                with self._lock:
-                    if struct.unpack_from("i", completed.buf, 0)[0] >= target:
-                        break
+                try:
+                    with self._locked():
+                        if struct.unpack_from("i", completed.buf, 0)[0] >= target:
+                            break
+                except self._ManagerLockAcquireTimeout:
+                    self._recover_manager_connections()
                 if time.perf_counter() - start > timeout:
                     return False
                 time.sleep(0.0001)
@@ -491,7 +522,7 @@ class _AtomicCounterRegistry:
         keys = list(dict.fromkeys(keys))
         entries: list[tuple[str, str]] = []
         locals: list[tuple[shared_memory.SharedMemory, shared_memory.SharedMemory]] = []
-        with self._lock:
+        with self._locked():
             try:
                 del self._object_keys[object_name]
             except Exception:
@@ -550,7 +581,7 @@ class _AtomicCounterRegistry:
         """Clear all counters and local caches, unlink owned segments."""
         names: list[str] = []
         try:
-            with self._lock:
+            with self._locked():
                 for pending_name, completed_name in list(self._registry.values()):
                     names.extend([pending_name, completed_name])
                 self._registry.clear()

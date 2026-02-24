@@ -134,10 +134,11 @@ def test_cli_version():
 
 
 def test_cli_info():
-    """CLI info prints version and modules."""
+    """CLI info prints version and core info text."""
     output = _run_cli(["info"])
     assert __version__ in output
-    assert "Modules:" in output
+    assert "Website:" in output
+    assert "Download docs:" in output
 
 
 def test_cli_modules():

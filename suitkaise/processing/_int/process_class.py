@@ -755,11 +755,27 @@ class Skprocess:
         """
         Close IPC resources after process completion.
         """
+        for proxy in (self._stop_event, self._result_queue, self._tell_queue, self._listen_queue):
+            if proxy is None:
+                continue
+            close_proxy = getattr(proxy, "_close", None)
+            if callable(close_proxy):
+                try:
+                    close_proxy()
+                except Exception:
+                    pass
         self._stop_event = None
         self._result_queue = None
         self._tell_queue = None
         self._listen_queue = None
         self._ipc_manager = None
+
+    def __del__(self) -> None:
+        """Best-effort IPC proxy cleanup during garbage collection."""
+        try:
+            self._cleanup_ipc()
+        except Exception:
+            pass
     
     wait = _ModifiableMethod(
         _sync_wait,

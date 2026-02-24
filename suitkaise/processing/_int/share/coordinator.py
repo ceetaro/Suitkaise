@@ -186,6 +186,19 @@ class _Coordinator:
         from suitkaise import cucumber
 
         binary_ops = {
+            "add": operator.add,
+            "sub": operator.sub,
+            "mul": operator.mul,
+            "truediv": operator.truediv,
+            "floordiv": operator.floordiv,
+            "mod": operator.mod,
+            "pow": operator.pow,
+            "lshift": operator.lshift,
+            "rshift": operator.rshift,
+            "and": operator.and_,
+            "xor": operator.xor,
+            "or": operator.or_,
+            "matmul": operator.matmul,
             "iadd": operator.iadd,
             "isub": operator.isub,
             "imul": operator.imul,

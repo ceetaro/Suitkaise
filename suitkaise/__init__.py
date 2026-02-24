@@ -156,8 +156,15 @@ from . import docs
 # ============================================================================
 # Module Metadata
 # ============================================================================
-__version__ = "0.4.13"
+__version__ = "0.4.14"
 __author__ = "Casey Eddings"
+
+# Show post-install welcome once per version in interactive terminals.
+try:
+    from ._welcome import _show_welcome as _show_welcome
+    _show_welcome(__version__)
+except Exception:
+    pass
 
 __all__ = [
     # Timing
