@@ -561,6 +561,8 @@ class Share:
         """
         try:
             from suitkaise.cucumber._int.serializer import Serializer
+            serializer = Serializer()
+            return serializer._find_handler(value)
         except Exception:
             return None
 
@@ -588,11 +590,6 @@ class Share:
             proxy = None
         self._proxies[name] = proxy
         return proxy
-        try:
-            serializer = Serializer()
-            return serializer._find_handler(value)
-        except Exception:
-            return None
     
     def __getattr__(self, name: str) -> Any:
         """

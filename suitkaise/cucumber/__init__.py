@@ -19,6 +19,6 @@ from .api import *
 from .api import __all__
 
 # Module metadata
-__version__ = "0.4.12"
+__version__ = "0.4.13"
 __author__ = "Casey Eddings"
 

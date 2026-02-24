@@ -746,9 +746,9 @@ def _build_specs() -> List[SupportedTypeSpec]:
 
 def test_share_supported_types_multi_process():
     cleanup_queue: List[tuple[Optional[Callable[[Any], None]], Any]] = []
-    supported_names = set(_load_supported_type_names())
+    supported_names = {name.strip().lower() for name in _load_supported_type_names()}
     specs = _build_specs()
-    spec_names = {spec.name for spec in specs}
+    spec_names = {spec.name.strip().lower() for spec in specs}
     missing = supported_names - spec_names
     assert not missing, f"Missing supported types in Share test: {sorted(missing)}"
 

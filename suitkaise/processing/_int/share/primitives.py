@@ -294,6 +294,32 @@ class _AtomicCounterRegistry:
         for proxy in (self._lock, self._registry, self._object_keys):
             self._reset_proxy_connection(proxy)
 
+    @staticmethod
+    def _is_recoverable_manager_error(exc: BaseException) -> bool:
+        """
+        Return True when an exception indicates a stale manager proxy connection.
+
+        On some platforms/loads, broken manager proxies raise a TypeError from
+        multiprocessing internals (write(self._handle, ...)) when _handle is None.
+        """
+        if isinstance(
+            exc,
+            (
+                OSError,
+                EOFError,
+                BrokenPipeError,
+                ConnectionResetError,
+                ConnectionAbortedError,
+            ),
+        ):
+            return True
+
+        if isinstance(exc, TypeError):
+            message = str(exc)
+            return "NoneType" in message and "cannot be interpreted as an integer" in message
+
+        return False
+
     def _with_manager_retry(self, operation):
         """
         Run an operation and retry once after reconnecting manager proxies.
@@ -301,13 +327,9 @@ class _AtomicCounterRegistry:
         for attempt in range(2):
             try:
                 return operation()
-            except (
-                OSError,
-                EOFError,
-                BrokenPipeError,
-                ConnectionResetError,
-                ConnectionAbortedError,
-            ):
+            except Exception as exc:
+                if not self._is_recoverable_manager_error(exc):
+                    raise
                 if attempt == 0:
                     self._recover_manager_connections()
                     continue

@@ -9,6 +9,13 @@ Changelog is maintained from version 0.3.0 forward.
 
 ---
 
+## [0.4.13] - 2026-02-23
+
+### Fixed
+- `Share` manager counter retry now recovers stale manager lock handles that surface as `TypeError: 'NoneType' object cannot be interpreted as an integer` in worker write paths.
+- Restored correct cucumber handler detection in `Share` so handler-backed objects (like `sqlite3.Connection`) resolve to reconnectors instead of being incorrectly proxied.
+- Normalized supported-type name matching in processing tests to avoid false failures from case-only differences (e.g., `User-defined` vs `user-defined`).
+
 ## [0.4.12] - 2026-02-23
 
 ### Fixed
