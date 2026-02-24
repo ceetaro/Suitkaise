@@ -33,9 +33,6 @@ def process(item):
 then, when comparing to mp.Manager
 
 
-from suitkaise import Share, Pool
-
-# still just as simple
 share = Share()
 
 share.counter = 0

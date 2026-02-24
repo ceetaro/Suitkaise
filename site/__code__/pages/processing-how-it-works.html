@@ -950,6 +950,19 @@ def _drain_result_queue(self):
         <li><strong>Store proxy</strong> - Future attribute access returns the proxy, not the real object</li>
     </ol>
     <p>Note: When <code><suitkaise-api>Share</suitkaise-api></code> is deserialized inside a subprocess, it is reconstructed in client mode from a snapshot. In that mode it does not re-register objects or allocate new counters; it simply restores the serialized snapshots and proxies so reads/writes go through the existing coordinator.</p>
+    <h3>Primitive values and augmented assignment</h3>
+    <p>Primitive shared values (<code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>complex</code>) are handled with a lightweight primitive proxy. This gives regular assignment and augmented operators (<code>+=</code>, <code>-=</code>, <code>*=</code>, etc.) the same cross-process safety guarantees as other shared writes.</p>
+    <p>How it works:</p>
+    <ol>
+        <li>Augmented primitive writes are applied atomically in the coordinator.</li>
+        <li>The proxy records a local read-your-own-write value for the calling worker.</li>
+        <li>The next immediate read from that same worker returns that local value.</li>
+        <li>Later reads continue from shared coordinator state.</li>
+    </ol>
+    <p>This keeps common patterns like:</p>
+    <pre><code class="language-python">share.counter += 1
+share.log.info(f&quot;counter: {share.counter}&quot;)</code></pre>
+    <p>consistent with user expectations under concurrency.</p>
     <pre><code class="language-python">def __setattr__(self, name, value):
     if name in self._SHARE_ATTRS:
         object.__setattr__(self, name, value)

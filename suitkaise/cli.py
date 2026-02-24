@@ -8,6 +8,7 @@ import argparse
 from typing import Iterable, Sequence
 
 import suitkaise
+from ._welcome import _show_welcome
 
 
 def _module_names() -> list[str]:
@@ -59,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    _show_welcome(suitkaise.__version__)
     parser = build_parser()
     args = parser.parse_args(argv)
 

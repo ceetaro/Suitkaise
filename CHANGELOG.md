@@ -9,6 +9,36 @@ Changelog is maintained from version 0.3.0 forward.
 
 ---
 
+## [0.4.12] - 2026-02-23
+
+### Fixed
+- `Share` primitive assignments now behave consistently in multiprocessing for plain Python types (`int`, `float`, `bool`, `str`, `bytes`, `tuple`, `frozenset`, `complex`), including atomic augmented operations (`+=`, `-=`, `*=`, etc.).
+- Added primitive read-your-own-write behavior so immediate reads after augmented assignment reflect the worker's just-applied value.
+- Prevented stale `Share` snapshot restores in client mode from overwriting active coordinator state.
+- Prevented `logging.Logger` proxy deadlocks in shared objects by treating logger handlers as non-proxied.
+- Fixed `cucumber` deserializer cleanup guard for reconstruction path underflow (`pop from empty list`).
+- CLI welcome message no longer triggers from package import path; it now runs from CLI startup and is still shown once per installed version.
+
+## [0.4.11b0] - 2026-02-23
+
+### Fixed
+- small CLI install message adjustment, some typos in docs
+
+## [0.4.10b0] - 2026-02-23
+
+### Fixed
+- small CLI install message adjustment
+
+## [0.4.9b0] - 2026-02-23
+
+### Fixed
+- small CLI install message adjustment
+
+## [0.4.8b0] - 2026-02-23
+
+### Fixed
+- small CLI bug fix: website was not being displayed when installing suitkaise.
+
 ## [0.4.7b0] - 2026-02-11
 
 ### Fixed

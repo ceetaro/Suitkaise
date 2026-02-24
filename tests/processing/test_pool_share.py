@@ -77,6 +77,53 @@ class NoopShareWorker(Skprocess):
         return self.out
 
 
+class PrimitiveIncrementWorker(Skprocess):
+    def __init__(self, share: Share):
+        self.share = share
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        # Regression guard: primitive += should not lose updates.
+        self.share.counter += 1
+
+
+class PrimitiveFloatMultiplyWorker(Skprocess):
+    def __init__(self, share: Share):
+        self.share = share
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.factor *= 2.0
+
+
+class PrimitiveStringAppendWorker(Skprocess):
+    def __init__(self, share: Share):
+        self.share = share
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.text += "x"
+
+
+class PrimitiveBoolOrWorker(Skprocess):
+    def __init__(self, share: Share):
+        self.share = share
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.flag |= True
+
+
+class PrimitiveTupleConcatWorker(Skprocess):
+    def __init__(self, share: Share, value: int):
+        self.share = share
+        self.value = value
+        self.process_config.runs = 1  # type: ignore[attr-defined]
+
+    def __run__(self):
+        self.share.items += (self.value,)
+
+
 class TestResult:
     def __init__(self, name: str, passed: bool, message: str = "", error: str = "", traceback_text: str = ""):
         self.name = name
@@ -242,6 +289,56 @@ def test_share_breaking_circuit_pool_regression():
         time.sleep(0.1)
 
 
+def test_pool_share_primitive_counter_increment_regression():
+    share = Share()
+    pool = Pool(workers=4)
+    try:
+        share.counter = 0
+        total = 100
+        pool.star().map.timeout(10.0)(PrimitiveIncrementWorker, [(share,) for _ in range(total)])
+        assert share.counter == total, f"Expected counter={total}, got {share.counter}"
+    finally:
+        pool.close()
+        share._coordinator.stop()
+        time.sleep(0.1)
+
+
+def test_pool_share_primitive_augmented_assignment_regression():
+    share = Share()
+    pool = Pool(workers=4)
+    try:
+        share.factor = 1.0
+        share.text = ""
+        share.flag = False
+        share.items = ()
+        total = 50
+        pool.star().map.timeout(10.0)(
+            PrimitiveFloatMultiplyWorker,
+            [(share,) for _ in range(total)],
+        )
+        pool.star().map.timeout(10.0)(
+            PrimitiveStringAppendWorker,
+            [(share,) for _ in range(total)],
+        )
+        pool.star().map.timeout(10.0)(
+            PrimitiveBoolOrWorker,
+            [(share,) for _ in range(total)],
+        )
+        pool.star().map.timeout(10.0)(
+            PrimitiveTupleConcatWorker,
+            [(share, i) for i in range(total)],
+        )
+
+        assert share.factor == 2.0 ** total, f"Expected factor=2**{total}, got {share.factor}"
+        assert len(share.text) == total, f"Expected text length={total}, got {len(share.text)}"
+        assert bool(share.flag) is True, f"Expected flag=True, got {share.flag}"
+        assert len(share.items) == total, f"Expected tuple length={total}, got {len(share.items)}"
+    finally:
+        pool.close()
+        share._coordinator.stop()
+        time.sleep(0.1)
+
+
 def run_all_tests():
     runner = TestRunner("Pool + Share Tests")
     runner.run_test("Share serialize/deserialize", test_share_serialization_roundtrip)
@@ -249,6 +346,8 @@ def run_all_tests():
     runner.run_test("Pool with Share roundtrip + timing", test_pool_share_roundtrip_timing)
     runner.run_test("Pool worker TimeThis regression", test_pool_star_map_timethis_worker_regression)
     runner.run_test("Share BreakingCircuit pool regression", test_share_breaking_circuit_pool_regression)
+    runner.run_test("Share primitive += counter regression", test_pool_share_primitive_counter_increment_regression)
+    runner.run_test("Share primitive augmented assignment regression", test_pool_share_primitive_augmented_assignment_regression)
     return runner.print_results()
 
 

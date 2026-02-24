@@ -1,7 +1,7 @@
 <section class="module-page about-page">
     <h1>Technical Info</h1>
 
-    <p>Currently, <code><suitkaise-api>suitkaise</suitkaise-api></code> is version <code>0.4.11 beta</code>.</p>
+    <p>Currently, <code><suitkaise-api>suitkaise</suitkaise-api></code> is version <code>0.4.12</code>.</p>
 
     <p><code><suitkaise-api>suitkaise</suitkaise-api></code> supports Python 3.11 and above.</p>
 
@@ -26,7 +26,7 @@
 
         <p>Explicitly supported Python versions: 3.11 and above</p>
 
-        <p>Currently, <code><suitkaise-api>suitkaise</suitkaise-api></code> is version <code>0.4.11 beta</code>.</p>
+        <p>Currently, <code><suitkaise-api>suitkaise</suitkaise-api></code> is version <code>0.4.12</code>.</p>
 
         <p><code><suitkaise-api>suitkaise</suitkaise-api></code> contains the following modules:</p>
 
@@ -237,6 +237,19 @@ limitations under the License.</code></pre>
         <p>Changelog is maintained from version 0.3.0 forward.</p>
 
         <details>
+            <summary>[0.4.12] - 2026-02-23</summary>
+            <h4>Fixed</h4>
+            <ul>
+                <li><code><suitkaise-api>Share</suitkaise-api></code> primitive assignments now behave consistently in multiprocessing for plain Python types (<code>int</code>, <code>float</code>, <code>bool</code>, <code>str</code>, <code>bytes</code>, <code>tuple</code>, <code>frozenset</code>, <code>complex</code>), including atomic augmented operations (<code>+=</code>, <code>-=</code>, <code>*=</code>, etc.).</li>
+                <li>Added primitive read-your-own-write behavior so immediate reads after augmented assignment reflect the worker&#x27;s just-applied value.</li>
+                <li>Prevented stale <code><suitkaise-api>Share</suitkaise-api></code> snapshot restores in client mode from overwriting active coordinator state.</li>
+                <li>Prevented <code>logging.Logger</code> proxy deadlocks in shared objects by treating logger handlers as non-proxied.</li>
+                <li>Fixed <code><suitkaise-api>cucumber</suitkaise-api></code> deserializer cleanup guard for reconstruction path underflow (<code>pop from empty list</code>).</li>
+                <li>CLI welcome message no longer triggers from package import path; it now runs from CLI startup and is still shown once per installed version.</li>
+            </ul>
+        </details>
+
+        <details>
             <summary>[0.4.7b0] - 2026-02-11</summary>
             <h4>Fixed</h4>
             <ul>
@@ -354,13 +367,13 @@ limitations under the License.</code></pre>
         <h3><code>suitkaise --version</code></h3>
         <p>Print the current version of <code><suitkaise-api>suitkaise</suitkaise-api></code>.</p>
 <pre><code>$ suitkaise --version
-0.4.11b0</code></pre>
+0.4.12</code></pre>
 
         <h3><code>suitkaise info</code></h3>
         <p>Print version, module list, and supported Python versions.</p>
 <pre><code>$ suitkaise info
 
-  suitkaise 0.4.11 beta
+  suitkaise 0.4.12
 
   Website:         https://suitkaise.info
   Download docs:   suitkaise docs

@@ -211,6 +211,7 @@ I wanted to make things easier for myself, and then I realized that other develo
 
 suitkaise has one author: me. I genuinely put my heart and soul into this project, and I want to continue cultivating it through bug fixes, updates, and new or upgraded features.
 
-However, I am a full time student and I am broke. Sponsoring helps me dedicate more of my time looking through feedback, fixing issues, updating docs, and interacting with the community.
+Donating helps me dedicate more of my time looking through feedback, fixing issues, updating docs, and interacting with the community.
 
-Please only sponsor if you have the means to do so. Just because I am broke doesn't mean you need to be too!
+Please only donate if you have the means to do so. Have a great day!
+

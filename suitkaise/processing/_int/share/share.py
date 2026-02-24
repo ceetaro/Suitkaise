@@ -4,6 +4,7 @@ Share api
 
 from typing import Any, Dict, Optional
 import io
+import threading
 import weakref
 import warnings
 from multiprocessing.managers import SyncManager
@@ -13,6 +14,19 @@ from .proxy import _ObjectProxy
 
 # import Skclass for auto-wrapping user objects (internal API)
 from suitkaise.sk._int.analyzer import analyze_class
+
+_NON_PROXY_CUCUMBER_HANDLERS = {
+    "SQLiteConnectionHandler",
+    "SQLiteCursorHandler",
+    "SocketHandler",
+    "DatabaseConnectionHandler",
+    "ThreadHandler",
+    "PopenHandler",
+    "MatchObjectHandler",
+    "MultiprocessingPipeHandler",
+    "MultiprocessingManagerHandler",
+    "LoggerHandler",
+}
 
 
 # ── Built-in mutable type metadata ──────────────────────────────────────
@@ -83,6 +97,243 @@ _BUILTIN_SHARED_META: dict[type, dict] = {
         'properties': {},
     },
 }
+
+_PRIMITIVE_PROXY_TYPES: tuple[type, ...] = (
+    int, float, bool, str, bytes, complex, tuple, frozenset,
+)
+
+
+class _PrimitiveProxy:
+    """Proxy for primitive shared values without _shared_meta."""
+
+    __slots__ = ("_object_name", "_coordinator", "_local")
+
+    def __init__(self, object_name: str, coordinator: _Coordinator):
+        self._object_name = object_name
+        self._coordinator = coordinator
+        self._local = threading.local()
+
+    def _unwrap_other(self, value: Any) -> Any:
+        if isinstance(value, _PrimitiveProxy):
+            return value._value()
+        return value
+
+    def _set_local_override(self, value: Any) -> None:
+        self._local.override = value
+
+    def _consume_local_override(self) -> Any:
+        if hasattr(self._local, "override"):
+            value = self._local.override
+            del self._local.override
+            return value
+        return None
+
+    def _value(self) -> Any:
+        override = self._consume_local_override()
+        if override is not None:
+            return override
+        value = self._coordinator.get_object(self._object_name)
+        if value is None and not self._coordinator.has_object(self._object_name):
+            raise AttributeError(f"Object '{self._object_name}' not found in Share")
+        return value
+
+    def _atomic_apply(self, operation: str, operand: Any = None) -> "_PrimitiveProxy":
+        operand = self._unwrap_other(operand)
+        updated = self._coordinator.atomic_apply(self._object_name, operation, operand)
+        if updated is None and not self._coordinator.has_object(self._object_name):
+            raise AttributeError(f"Object '{self._object_name}' not found in Share")
+        # make the next read in this worker observe its own write result
+        self._set_local_override(updated)
+        return self
+
+    def __repr__(self) -> str:
+        return repr(self._value())
+
+    def __str__(self) -> str:
+        return str(self._value())
+
+    def __format__(self, format_spec: str) -> str:
+        return format(self._value(), format_spec)
+
+    def __len__(self) -> int:
+        return len(self._value())
+
+    def __iter__(self):
+        return iter(self._value())
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self._value()
+
+    def __getitem__(self, key: Any) -> Any:
+        return self._value()[key]
+
+    def __bool__(self) -> bool:
+        return bool(self._value())
+
+    def __int__(self) -> int:
+        return int(self._value())
+
+    def __float__(self) -> float:
+        return float(self._value())
+
+    def __complex__(self) -> complex:
+        return complex(self._value())
+
+    def __bytes__(self) -> bytes:
+        return bytes(self._value())
+
+    def __index__(self) -> int:
+        return self._value().__index__()
+
+    def __hash__(self) -> int:
+        return hash(self._value())
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._value(), name)
+
+    def __lt__(self, other: Any) -> bool:
+        return self._value() < self._unwrap_other(other)
+
+    def __le__(self, other: Any) -> bool:
+        return self._value() <= self._unwrap_other(other)
+
+    def __eq__(self, other: Any) -> bool:
+        return self._value() == self._unwrap_other(other)
+
+    def __ne__(self, other: Any) -> bool:
+        return self._value() != self._unwrap_other(other)
+
+    def __gt__(self, other: Any) -> bool:
+        return self._value() > self._unwrap_other(other)
+
+    def __ge__(self, other: Any) -> bool:
+        return self._value() >= self._unwrap_other(other)
+
+    def __add__(self, other: Any) -> Any:
+        return self._value() + self._unwrap_other(other)
+
+    def __radd__(self, other: Any) -> Any:
+        return self._unwrap_other(other) + self._value()
+
+    def __sub__(self, other: Any) -> Any:
+        return self._value() - self._unwrap_other(other)
+
+    def __rsub__(self, other: Any) -> Any:
+        return self._unwrap_other(other) - self._value()
+
+    def __mul__(self, other: Any) -> Any:
+        return self._value() * self._unwrap_other(other)
+
+    def __rmul__(self, other: Any) -> Any:
+        return self._unwrap_other(other) * self._value()
+
+    def __truediv__(self, other: Any) -> Any:
+        return self._value() / self._unwrap_other(other)
+
+    def __rtruediv__(self, other: Any) -> Any:
+        return self._unwrap_other(other) / self._value()
+
+    def __floordiv__(self, other: Any) -> Any:
+        return self._value() // self._unwrap_other(other)
+
+    def __rfloordiv__(self, other: Any) -> Any:
+        return self._unwrap_other(other) // self._value()
+
+    def __mod__(self, other: Any) -> Any:
+        return self._value() % self._unwrap_other(other)
+
+    def __rmod__(self, other: Any) -> Any:
+        return self._unwrap_other(other) % self._value()
+
+    def __pow__(self, other: Any) -> Any:
+        return self._value() ** self._unwrap_other(other)
+
+    def __rpow__(self, other: Any) -> Any:
+        return self._unwrap_other(other) ** self._value()
+
+    def __and__(self, other: Any) -> Any:
+        return self._value() & self._unwrap_other(other)
+
+    def __rand__(self, other: Any) -> Any:
+        return self._unwrap_other(other) & self._value()
+
+    def __or__(self, other: Any) -> Any:
+        return self._value() | self._unwrap_other(other)
+
+    def __ror__(self, other: Any) -> Any:
+        return self._unwrap_other(other) | self._value()
+
+    def __xor__(self, other: Any) -> Any:
+        return self._value() ^ self._unwrap_other(other)
+
+    def __rxor__(self, other: Any) -> Any:
+        return self._unwrap_other(other) ^ self._value()
+
+    def __lshift__(self, other: Any) -> Any:
+        return self._value() << self._unwrap_other(other)
+
+    def __rlshift__(self, other: Any) -> Any:
+        return self._unwrap_other(other) << self._value()
+
+    def __rshift__(self, other: Any) -> Any:
+        return self._value() >> self._unwrap_other(other)
+
+    def __rrshift__(self, other: Any) -> Any:
+        return self._unwrap_other(other) >> self._value()
+
+    def __matmul__(self, other: Any) -> Any:
+        return self._value() @ self._unwrap_other(other)
+
+    def __rmatmul__(self, other: Any) -> Any:
+        return self._unwrap_other(other) @ self._value()
+
+    def __pos__(self) -> Any:
+        return +self._value()
+
+    def __neg__(self) -> Any:
+        return -self._value()
+
+    def __invert__(self) -> Any:
+        return ~self._value()
+
+    def __iadd__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("iadd", other)
+
+    def __isub__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("isub", other)
+
+    def __imul__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("imul", other)
+
+    def __itruediv__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("itruediv", other)
+
+    def __ifloordiv__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("ifloordiv", other)
+
+    def __imod__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("imod", other)
+
+    def __ipow__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("ipow", other)
+
+    def __ilshift__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("ilshift", other)
+
+    def __irshift__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("irshift", other)
+
+    def __iand__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("iand", other)
+
+    def __ixor__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("ixor", other)
+
+    def __ior__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("ior", other)
+
+    def __imatmul__(self, other: Any) -> "_PrimitiveProxy":
+        return self._atomic_apply("imatmul", other)
 
 
 class Share:
@@ -192,6 +443,13 @@ class Share:
             object.__setattr__(self, name, value)
             return
 
+        if isinstance(value, _PrimitiveProxy):
+            # Augmented assignment on primitive proxies (e.g. share.x += 1)
+            # stores back the proxy object; the atomic update already happened.
+            if name in self._proxies and value._object_name == name:
+                return
+            value = value._value()
+
         if not object.__getattribute__(self, '_client_mode'):
             if not object.__getattribute__(self, '_started'):
                 warnings.warn(
@@ -249,25 +507,19 @@ class Share:
         should_proxy = has_meta
         if should_proxy:
             handler = self._get_cucumber_handler(value)
-            if handler and handler.__class__.__name__ in {
-                "SQLiteConnectionHandler",
-                "SQLiteCursorHandler",
-                "SocketHandler",
-                "DatabaseConnectionHandler",
-                "ThreadHandler",
-                "PopenHandler",
-                "MatchObjectHandler",
-                "MultiprocessingPipeHandler",
-                "MultiprocessingManagerHandler",
-            }:
+            if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:
                 should_proxy = False
         if should_proxy:
             # create a proxy for this object
             proxy = _ObjectProxy(name, self._coordinator, type(value), shared_meta=meta)
             self._proxies[name] = proxy
         else:
-            # no proxy - we'll fetch directly from source of truth
-            self._proxies[name] = None
+            # immutable primitives still get lightweight proxies so augmented
+            # assignment operators can apply atomically in the coordinator.
+            if isinstance(value, _PRIMITIVE_PROXY_TYPES):
+                self._proxies[name] = _PrimitiveProxy(name, self._coordinator)
+            else:
+                self._proxies[name] = None
     
     def _is_user_class_instance(self, value: Any) -> bool:
         """
@@ -311,6 +563,31 @@ class Share:
             from suitkaise.cucumber._int.serializer import Serializer
         except Exception:
             return None
+
+    def _build_proxy_for(self, name: str, obj: Any) -> Any:
+        """
+        Build and cache the appropriate proxy entry for a shared object.
+        """
+        meta = getattr(type(obj), '_shared_meta', None)
+        if meta is None:
+            meta = _BUILTIN_SHARED_META.get(type(obj))
+        if meta is None and self._is_user_class_instance(obj):
+            meta = self._ensure_shared_meta(type(obj))
+
+        should_proxy = meta is not None
+        if should_proxy:
+            handler = self._get_cucumber_handler(obj)
+            if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:
+                should_proxy = False
+
+        if should_proxy:
+            proxy = _ObjectProxy(name, self._coordinator, type(obj), shared_meta=meta)
+        elif isinstance(obj, _PRIMITIVE_PROXY_TYPES):
+            proxy = _PrimitiveProxy(name, self._coordinator)
+        else:
+            proxy = None
+        self._proxies[name] = proxy
+        return proxy
         try:
             serializer = Serializer()
             return serializer._find_handler(value)
@@ -330,8 +607,17 @@ class Share:
             proxies = object.__getattribute__(self, '_proxies')
         except AttributeError:
             raise AttributeError(f"Share has no attribute '{name}'")
-        
+
         if name not in proxies:
+            coordinator = object.__getattribute__(self, '_coordinator')
+            if coordinator.has_object(name):
+                obj = coordinator.get_object(name)
+                if obj is None:
+                    raise AttributeError(f"Object '{name}' not found in Share")
+                proxy = self._build_proxy_for(name, obj)
+                if proxy is not None:
+                    return proxy
+                return obj
             raise AttributeError(f"Share has no attribute '{name}'")
         
         proxy = proxies[name]
@@ -486,28 +772,30 @@ class Share:
         
         Captures a snapshot of shared objects as cucumber bytes.
         """
-        coordinator = object.__getattribute__(self, '_coordinator')
-        objects: Dict[str, bytes] = {}
-        try:
-            names = list(coordinator._object_names)
-        except Exception:
-            names = []
-        for name in names:
-            try:
-                serialized = coordinator._source_store.get(name)
-            except Exception:
-                serialized = None
-            if serialized is not None:
-                objects[name] = serialized
         import pickle
+        coordinator = object.__getattribute__(self, '_coordinator')
+        started = object.__getattribute__(self, '_started')
+        objects: Dict[str, bytes] = {}
+        if not started:
+            try:
+                names = list(coordinator._object_names)
+            except Exception:
+                names = []
+            for name in names:
+                try:
+                    serialized = coordinator._source_store.get(name)
+                except Exception:
+                    serialized = None
+                if serialized is not None:
+                    objects[name] = serialized
         coordinator_state = None
-        if object.__getattribute__(self, '_started'):
+        if started:
             # pickle raw manager proxies to preserve Share internals
             coordinator_state = pickle.dumps(coordinator.get_state())
         return {
-            "mode": "live" if object.__getattribute__(self, '_started') else "snapshot",
+            "mode": "live" if started else "snapshot",
             "objects": objects,
-            "started": object.__getattribute__(self, '_started'),
+            "started": started,
             "coordinator_state": coordinator_state,
         }
 
@@ -548,37 +836,37 @@ class Share:
             should_proxy = meta is not None
             if should_proxy:
                 handler = share._get_cucumber_handler(obj)
-                if handler and handler.__class__.__name__ in {
-                    "SQLiteConnectionHandler",
-                    "SQLiteCursorHandler",
-                    "SocketHandler",
-                    "DatabaseConnectionHandler",
-                    "ThreadHandler",
-                    "PopenHandler",
-                    "MatchObjectHandler",
-                    "MultiprocessingPipeHandler",
-                    "MultiprocessingManagerHandler",
-                }:
+                if handler and handler.__class__.__name__ in _NON_PROXY_CUCUMBER_HANDLERS:
                     should_proxy = False
 
             if should_proxy:
                 proxies[name] = _ObjectProxy(name, coordinator, type(obj), shared_meta=meta)
             else:
-                proxies[name] = None
+                if isinstance(obj, _PRIMITIVE_PROXY_TYPES):
+                    proxies[name] = _PrimitiveProxy(name, coordinator)
+                else:
+                    proxies[name] = None
 
-            try:
-                with coordinator._source_lock:
-                    coordinator._source_store[name] = serialized_obj
-            except Exception:
+            # In client mode (workers connected to parent coordinator), never
+            # clobber existing shared state with deserialized snapshots.
+            should_seed_state = (
+                not object.__getattribute__(share, '_client_mode')
+                or not coordinator.has_object(name)
+            )
+            if should_seed_state:
                 try:
-                    coordinator._source_store[name] = serialized_obj
+                    with coordinator._source_lock:
+                        coordinator._source_store[name] = serialized_obj
+                except Exception:
+                    try:
+                        coordinator._source_store[name] = serialized_obj
+                    except Exception:
+                        pass
+                try:
+                    if name not in list(coordinator._object_names):
+                        coordinator._object_names.append(name)
                 except Exception:
                     pass
-            try:
-                if name not in list(coordinator._object_names):
-                    coordinator._object_names.append(name)
-            except Exception:
-                pass
 
         for name, serialized in state.get("objects", {}).items():
             try:

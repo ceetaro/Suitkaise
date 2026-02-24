@@ -607,7 +607,8 @@ class Deserializer:
             
         finally:
             # always clean up path
-            self._reconstruction_path.pop()
+            if self._reconstruction_path:
+                self._reconstruction_path.pop()
     
     def _reconstruct_pickle_native(self, data: Dict[str, Any]) -> Any:
         """

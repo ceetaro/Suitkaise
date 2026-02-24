@@ -1060,6 +1060,28 @@ client mode from a snapshot. In that mode it does not re-register objects
 or allocate new counters; it simply restores the serialized snapshots and
 proxies so reads/writes go through the existing coordinator.
 
+### Primitive values and augmented assignment
+
+Primitive shared values (`int`, `float`, `bool`, `str`, `bytes`, `tuple`,
+`frozenset`, `complex`) are handled with a lightweight primitive proxy.
+This gives regular assignment and augmented operators (`+=`, `-=`, `*=`, etc.)
+the same cross-process safety guarantees as other shared writes.
+
+How it works:
+1. Augmented primitive writes are applied atomically in the coordinator.
+2. The proxy records a local read-your-own-write value for the calling worker.
+3. The next immediate read from that same worker returns that local value.
+4. Later reads continue from shared coordinator state.
+
+This keeps common patterns like:
+
+```python
+share.counter += 1
+share.log.info(f"counter: {share.counter}")
+```
+
+consistent with user expectations under concurrency.
+
 ```python
 def __setattr__(self, name, value):
     if name in self._SHARE_ATTRS:

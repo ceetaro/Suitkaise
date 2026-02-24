@@ -1,6 +1,6 @@
 # Technical Info
 
-Currently, `suitkaise` is version `0.4.11 beta`.
+Currently, `suitkaise` is version `0.4.12`.
 
 `suitkaise` supports Python 3.11 and above.
 
@@ -34,7 +34,7 @@ pip install suitkaise
 
 Explicitly supported Python versions: 3.11 and above
 
-Currently, `suitkaise` is version `0.4.11 beta`.
+Currently, `suitkaise` is version `0.4.12`.
 
 `suitkaise` contains the following modules:
 
@@ -424,6 +424,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Changelog is maintained from version 0.3.0 forward.
 
 
+### [0.4.12] - 2026-02-23
+
+### Fixed
+- `Share` primitive assignments now behave consistently in multiprocessing for plain Python types (`int`, `float`, `bool`, `str`, `bytes`, `tuple`, `frozenset`, `complex`), including atomic augmented operations (`+=`, `-=`, `*=`, etc.).
+- Added primitive read-your-own-write behavior so immediate reads after augmented assignment reflect the worker's just-applied value.
+- Prevented stale `Share` snapshot restores in client mode from overwriting active coordinator state.
+- Prevented `logging.Logger` proxy deadlocks in shared objects by treating logger handlers as non-proxied.
+- Fixed `cucumber` deserializer cleanup guard for reconstruction path underflow (`pop from empty list`).
+- CLI welcome message no longer triggers from package import path; it now runs from CLI startup and is still shown once per installed version.
+
+
 ### [0.4.7b0] - 2026-02-11
 
 ### Fixed
@@ -623,7 +634,7 @@ Print the current version of `suitkaise`.
 
 ```
 $ suitkaise --version
-0.4.11b0
+0.4.12
 ```
 
 ### `suitkaise info`
@@ -633,7 +644,7 @@ Print version, module list, and supported Python versions.
 ```
 $ suitkaise info
 
-  suitkaise 0.4.11 beta
+  suitkaise 0.4.12
 
   Website:         https://suitkaise.info
   Download docs:   suitkaise docs

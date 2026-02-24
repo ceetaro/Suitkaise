@@ -14,6 +14,7 @@ import multiprocessing
 from multiprocessing import Process, Event
 from multiprocessing.managers import SyncManager
 from typing import Any, Dict, Optional
+import operator
 
 from .primitives import _AtomicCounterRegistry
 import time
@@ -177,6 +178,53 @@ class _Coordinator:
             if serialized is None:
                 return None
             return cucumber.deserialize(serialized)
+
+    def atomic_apply(self, object_name: str, operation: str, operand: Any = None) -> Optional[Any]:
+        """
+        Atomically apply an operation to a shared primitive value.
+        """
+        from suitkaise import cucumber
+
+        binary_ops = {
+            "iadd": operator.iadd,
+            "isub": operator.isub,
+            "imul": operator.imul,
+            "itruediv": operator.itruediv,
+            "ifloordiv": operator.ifloordiv,
+            "imod": operator.imod,
+            "ipow": operator.ipow,
+            "ilshift": operator.ilshift,
+            "irshift": operator.irshift,
+            "iand": operator.iand,
+            "ixor": operator.ixor,
+            "ior": operator.ior,
+            "imatmul": operator.imatmul,
+        }
+        unary_ops = {
+            "pos": operator.pos,
+            "neg": operator.neg,
+            "invert": operator.invert,
+        }
+
+        with self._source_lock:
+            serialized = self._source_store.get(object_name)
+            if serialized is None:
+                return None
+            current = cucumber.deserialize(serialized)
+            if operation == "set":
+                updated = operand
+            elif operation in binary_ops:
+                updated = binary_ops[operation](current, operand)
+            elif operation in unary_ops:
+                updated = unary_ops[operation](current)
+            else:
+                raise ValueError(f"Unsupported atomic operation: {operation}")
+            self._source_store[object_name] = cucumber.serialize(updated)
+            return updated
+
+    def has_object(self, object_name: str) -> bool:
+        """Return True when object name is registered in coordinator."""
+        return object_name in list(self._object_names)
     
     def queue_command(
         self,
