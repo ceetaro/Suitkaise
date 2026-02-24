@@ -148,7 +148,7 @@ process(Path("data/file.txt"))  # Path → Skpath</code></pre>
     <p>The modules are designed to work together:</p>
 
 <pre><code class="language-python">from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>processing</suitkaise-api> import <suitkaise-api>Share</suitkaise-api>, <suitkaise-api>Pool</suitkaise-api>, <suitkaise-api>Skprocess</suitkaise-api>
-from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>
+from <suitkaise-api>suitkaise</suitkaise-api>.<suitkaise-api>timing</suitkaise-api> import <suitkaise-api>Sktimer</suitkaise-api>, <suitkaise-api>TimeThis</suitkaise-api>
 from <suitkaise-api>suitkaise</suitkaise-api> import <suitkaise-api>Circuit</suitkaise-api>
 
 <suitkaise-api>share</suitkaise-api> = <suitkaise-api>Share(</suitkaise-api>)
@@ -161,12 +161,14 @@ class ResilientWorker(<suitkaise-api>Skprocess</suitkaise-api>):
         self.url = url
 
     def <suitkaise-api>__run__</suitkaise-api>(self):
-        self.share.timer.<suitkaise-api>start()</suitkaise-api>
-        try:
-            result = fetch(self.url)
-        except ServiceError:
-            self.share.circuit.<suitkaise-api>short()</suitkaise-api>
-        self.share.timer.<suitkaise-api>stop()</suitkaise-api>
+        with <suitkaise-api>TimeThis()</suitkaise-api> as timer:
+            try:
+                result = fetch(self.url)
+            except ServiceError:
+                self.share.circuit.<suitkaise-api>short()</suitkaise-api>
+
+        self.share.timer.<suitkaise-api>add_time</suitkaise-api>(timer.<suitkaise-api>most_recent</suitkaise-api>)
+
 
 <suitkaise-api>pool</suitkaise-api> = <suitkaise-api>Pool(</suitkaise-api>workers=4)
 pool.<suitkaise-api>star()</suitkaise-api>.<suitkaise-api>map</suitkaise-api>(ResilientWorker, [(share, url) for url in urls])
