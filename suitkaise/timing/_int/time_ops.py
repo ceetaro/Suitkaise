@@ -14,6 +14,7 @@ The internal operations handle all the complex timing logic and state management
 """
 
 from dataclasses import dataclass
+import inspect
 import os
 import sys
 import time
@@ -950,38 +951,72 @@ def _timethis_decorator(timer: Sktimer, threshold: float = 0.0):
         Decorator function
     """
     def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # avoid nested timing frames on the same timer
-            if timer._has_active_frame():
-                start = perf_counter()
-                try:
-                    result = func(*args, **kwargs)
-                except BaseException:
-                    # don't record partial timing on exception
-                    raise
-                elapsed = perf_counter() - start
-                if elapsed >= threshold:
-                    timer.add_time(elapsed)
-                return result
-            else:
-                # concurrent session-aware: each thread call starts/stops its own session
-                timer.start()
-                try:
-                    result = func(*args, **kwargs)
-                except BaseException:
-                    # don't record partial timing on exception;
-                    # discard the frame so the timer doesn't leak a session
+        if inspect.iscoroutinefunction(func):
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                # avoid nested timing frames on the same timer
+                if timer._has_active_frame():
+                    start = perf_counter()
                     try:
-                        timer.discard()
-                    except Exception:
-                        pass
-                    raise
-                # success path: record timing
-                elapsed = timer.discard()
-                if elapsed >= threshold:
-                    timer.add_time(elapsed)
-                return result
+                        result = await func(*args, **kwargs)
+                    except BaseException:
+                        # don't record partial timing on exception
+                        raise
+                    elapsed = perf_counter() - start
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
+                    return result
+                else:
+                    # concurrent session-aware: each thread call starts/stops its own session
+                    timer.start()
+                    try:
+                        result = await func(*args, **kwargs)
+                    except BaseException:
+                        # don't record partial timing on exception;
+                        # discard the frame so the timer doesn't leak a session
+                        try:
+                            timer.discard()
+                        except Exception:
+                            pass
+                        raise
+                    # success path: record timing
+                    elapsed = timer.discard()
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
+                    return result
+        else:
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                # avoid nested timing frames on the same timer
+                if timer._has_active_frame():
+                    start = perf_counter()
+                    try:
+                        result = func(*args, **kwargs)
+                    except BaseException:
+                        # don't record partial timing on exception
+                        raise
+                    elapsed = perf_counter() - start
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
+                    return result
+                else:
+                    # concurrent session-aware: each thread call starts/stops its own session
+                    timer.start()
+                    try:
+                        result = func(*args, **kwargs)
+                    except BaseException:
+                        # don't record partial timing on exception;
+                        # discard the frame so the timer doesn't leak a session
+                        try:
+                            timer.discard()
+                        except Exception:
+                            pass
+                        raise
+                    # success path: record timing
+                    elapsed = timer.discard()
+                    if elapsed >= threshold:
+                        timer.add_time(elapsed)
+                    return result
         
         # if the wrapped function has @sk modifiers, redirect them to use
         # the timed wrapper so retry/timeout/background go through timing

@@ -11,6 +11,7 @@ Tests the @timethis decorator functionality:
 """
 
 import sys
+import asyncio
 import time as stdlib_time
 import threading
 
@@ -302,6 +303,58 @@ def test_timethis_preserves_complex_return():
     result = returns_dict()
     
     assert result == {"a": 1, "b": [2, 3], "c": {"nested": True}}
+
+
+# =============================================================================
+# @timethis Async Tests
+# =============================================================================
+
+def test_timethis_async_function_records_time():
+    """@timethis should record awaited async function runtime."""
+    clear_global_timers()
+
+    @timethis()
+    async def async_work():
+        await asyncio.sleep(0.01)
+        return "async_done"
+
+    result = asyncio.run(async_work())
+
+    assert result == "async_done", "Async function should return value"
+    assert hasattr(async_work, "timer"), "Async function should have timer attribute"
+    assert async_work.timer.num_times == 1, f"Expected 1 timing, got {async_work.timer.num_times}"
+    assert async_work.timer.most_recent >= 0.008, f"Expected ~10ms timing, got {async_work.timer.most_recent}"
+
+
+def test_timethis_async_threshold():
+    """@timethis threshold should apply to async functions."""
+    timer = Sktimer()
+
+    @timethis(timer, threshold=0.01)
+    async def async_sleep_for(duration: float):
+        await asyncio.sleep(duration)
+
+    asyncio.run(async_sleep_for(0.005))  # Below threshold
+    asyncio.run(async_sleep_for(0.02))   # Above threshold
+
+    assert timer.num_times == 1, f"Expected 1 async timing above threshold, got {timer.num_times}"
+
+
+def test_timethis_async_exception_does_not_time():
+    """@timethis should not record async timing when function raises."""
+    timer = Sktimer()
+
+    @timethis(timer, threshold=0.0)
+    async def async_raises():
+        await asyncio.sleep(0.005)
+        raise ValueError("async test error")
+
+    try:
+        asyncio.run(async_raises())
+    except ValueError:
+        pass
+
+    assert timer.num_times == 0, f"Expected 0 timings on async exception, got {timer.num_times}"
 
 
 # =============================================================================
@@ -672,6 +725,11 @@ def run_all_tests():
     runner.run_test("@timethis preserves return", test_timethis_preserves_return)
     runner.run_test("@timethis preserves None", test_timethis_preserves_none)
     runner.run_test("@timethis preserves complex return", test_timethis_preserves_complex_return)
+    
+    # Async tests
+    runner.run_test("@timethis async records time", test_timethis_async_function_records_time)
+    runner.run_test("@timethis async threshold", test_timethis_async_threshold)
+    runner.run_test("@timethis async exception does not time", test_timethis_async_exception_does_not_time)
     
     # Arguments tests
     runner.run_test("@timethis preserves args", test_timethis_preserves_args)
