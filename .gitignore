@@ -62,3 +62,7 @@ tempCodeRunnerFile*
 # virtualenvs
 .venv*/
 venv*/
+
+# any local virtualenv
+.venv*/
+venv*/
