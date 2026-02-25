@@ -55,3 +55,10 @@ suitkaise-noncode/
 
 # Code Runner temp files
 tempCodeRunnerFile*
+
+# macOS
+**/.DS_Store
+
+# virtualenvs
+.venv*/
+venv*/
